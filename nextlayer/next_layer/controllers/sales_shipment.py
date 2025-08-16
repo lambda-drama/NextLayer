@@ -41,10 +41,11 @@ def _make_gl_entries(doc):
 
 	gl_entries = []
 	total_amount = 0
-
+	cost_center = ""
 		# Debit lines - expense accounts from child table
 		# Debit lines - expense accounts from child table
 	for row in doc.taxes:
+		cost_center = row.cost_center
 		if not row.expense_account:
 			frappe.throw("Row in Shipment Cost Distribution is missing an Expense Account.")
 		if not row.amount:
