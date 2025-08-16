@@ -53,10 +53,10 @@ def _make_gl_entries(doc):
 
 		gl_entries.append(_dict({
 			"account": row.expense_account,
-			"debit": row.amount,   # ✅ increase expense
-			"debit_in_account_currency": row.amount,
-			"credit": 0,
-			"credit_in_account_currency": 0,
+			"debit": 0,   # ✅ increase expense
+			"debit_in_account_currency": 0,
+			"credit": row.amount,
+			"credit_in_account_currency": row.amount,
 			"cost_center": cost_center,
 			"against": ",".join(income_accounts),
 			"voucher_type": "Sales Invoice",
@@ -70,10 +70,10 @@ def _make_gl_entries(doc):
 	# Credit line - Income Account(s) from Sales Invoice Items
 	gl_entries.append(_dict({
 		"account": income_accounts[0],
-		"debit": 0,
-		"debit_in_account_currency": 0,
-		"credit": total_amount,   # ✅ reduce income
-		"credit_in_account_currency": total_amount,
+		"debit": total_amount,
+		"debit_in_account_currency": total_amount,
+		"credit": 0,   # ✅ reduce income
+		"credit_in_account_currency": 0,
 		"cost_center": cost_center or "Main - CW",
 		"against": ",".join([d.expense_account for d in doc.taxes if d.expense_account]),
 		"voucher_type": "Sales Invoice",
