@@ -21,6 +21,12 @@ app_license = "mit"
 # 	}
 # ]
 
+doc_events = {
+    "Sales Shipment Cost": {
+        "on_submit": "nextlayer.next_layer.controllers.sales_shipment.on_submit",
+        "on_cancel": "nextlayer.next_layer.controllers.sales_shipment.on_cancel",
+    },
+}
 # Includes in <head>
 # ------------------
 
