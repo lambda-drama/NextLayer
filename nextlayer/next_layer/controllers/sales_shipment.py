@@ -22,12 +22,13 @@ def _make_gl_entries(doc):
 		frappe.throw("Could not determine Sales Invoice from Purchase Receipts child table.")
 
 	# Fetch Sales Invoice details
-	credit_account, customer, cost_center = frappe.db.get_value(
-		"Sales Invoice",
-		sales_invoice,
-		["debit_to", "customer", "cost_center"]
-	)
-
+	# credit_account, customer= frappe.db.get_value(
+	# 	"Sales Invoice",
+	# 	sales_invoice,
+	# 	["debit_to", "customer"]
+	# )
+	company_abbreviation = frappe.db.get_value("Company", doc.company, "abbr")
+	cost_center = "Main - "+ str(company_abbreviation)
 	# Get distinct income accounts from Sales Invoice Item child table
 	income_accounts = frappe.get_all(
 		"Sales Invoice Item",
@@ -41,11 +42,10 @@ def _make_gl_entries(doc):
 
 	gl_entries = []
 	total_amount = 0
-	cost_center = ""
 		# Debit lines - expense accounts from child table
 		# Debit lines - expense accounts from child table
 	for row in doc.taxes:
-		cost_center = row.cost_center
+
 		if not row.expense_account:
 			frappe.throw("Row in Shipment Cost Distribution is missing an Expense Account.")
 		if not row.amount:
@@ -63,10 +63,12 @@ def _make_gl_entries(doc):
 			"voucher_no": sales_invoice,
 			"posting_date": doc.posting_date,
 			"company": doc.company,
-			"remarks": f"Sales Shipment Cost - {doc.name} for Sales Invoice {sales_invoice}"
+			"remarks": f"Sales Shipment Cost - {doc.name} for Sales Invoice {sales_invoice}",
+			"branch":doc.branch,
+			"company_group":doc.company_group,
+			"marka":doc.marka,
 		}))
 		total_amount += row.amount
-
 	# Credit line - Income Account(s) from Sales Invoice Items
 	gl_entries.append(_dict({
 		"account": income_accounts[0],
@@ -74,13 +76,16 @@ def _make_gl_entries(doc):
 		"debit_in_account_currency": total_amount,
 		"credit": 0,   # ✅ reduce income
 		"credit_in_account_currency": 0,
-		"cost_center": cost_center or "Main - CW",
+		"cost_center": cost_center,
 		"against": ",".join([d.expense_account for d in doc.taxes if d.expense_account]),
 		"voucher_type": "Sales Invoice",
 		"voucher_no": sales_invoice,
 		"posting_date": doc.posting_date,
 		"company": doc.company,
-		"remarks": f"Sales Shipment Cost - {doc.name} for Sales Invoice {sales_invoice}"
+		"remarks": f"Sales Shipment Cost - {doc.name} for Sales Invoice {sales_invoice}",
+		"branch":doc.branch,
+        "company_group":doc.company_group,
+         "marka":doc.marka,
 	}))
 
 
