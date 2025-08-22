@@ -102,6 +102,7 @@ from frappe import _
 from frappe.utils import flt
 from erpnext.accounts.utils import get_account_currency
 from erpnext.accounts.general_ledger import make_gl_entries
+from nextlayer.next_layer.utils import fetch_exchange_rate
 
 def on_submit(doc, method=None):
     _make_gl_entries(doc)
@@ -138,6 +139,7 @@ def _make_gl_entries(doc):
 
     gl_entries = []
     total_amount_company_currency = 0
+    total_amount_account_currency = 0
 
     # Debit expense accounts from doc.taxes
     for row in doc.taxes:
@@ -156,20 +158,21 @@ def _make_gl_entries(doc):
                 "exchange_rate"
             ) or 1.0
 
-        amount_in_company_currency = flt(row.amount, 2)
-        amount_in_account_currency = flt(row.amount * exchange_rate, 2)
+        amount_in_company_currency = flt(row.base_amount, 2)
+        amount_in_account_currency = flt(row.amount, 2)
 
         gl_entries.append(frappe._dict({
             "account": row.expense_account,
             "debit": 0,
             "debit_in_account_currency": 0,
             "credit": amount_in_company_currency,
+            "credit_in_transaction_currency":amount_in_account_currency,
             "credit_in_account_currency": amount_in_account_currency,
             "account_currency": account_currency,
             "cost_center": cost_center,
             "against": ",".join(income_accounts),
-            "voucher_type": doc.doctype,
-            "voucher_no": doc.name,
+            "voucher_type": "Sales Invoice",
+        	"voucher_no": sales_invoice,
             "posting_date": doc.posting_date,
             "company": doc.company,
             "remarks": f"Sales Shipment Cost - {doc.name} for Sales Invoice {sales_invoice}",
@@ -178,29 +181,25 @@ def _make_gl_entries(doc):
             "marka": doc.marka,
         }))
         total_amount_company_currency += amount_in_company_currency
+        total_amount_account_currency += amount_in_account_currency
+
 
     # Credit Income Account(s) with total
     income_account = income_accounts[0]
     account_currency = get_account_currency(income_account) or company_currency
-    exchange_rate = 1.0
-    if account_currency != company_currency:
-        exchange_rate = frappe.db.get_value(
-            "Currency Exchange",
-            {"from_currency": company_currency, "to_currency": account_currency},
-            "exchange_rate"
-        ) or 1.0
 
     gl_entries.append(frappe._dict({
         "account": income_account,
         "debit": total_amount_company_currency,
-        "debit_in_account_currency": flt(total_amount_company_currency * exchange_rate, 2),
+        "debit_in_transaction_currency":total_amount_account_currency,
+        "debit_in_account_currency": flt(total_amount_company_currency, 2),
         "credit": 0,
         "credit_in_account_currency": 0,
         "account_currency": account_currency,
         "cost_center": cost_center,
         "against": ",".join([d.expense_account for d in doc.taxes if d.expense_account]),
-        "voucher_type": doc.doctype,
-        "voucher_no": doc.name,
+        "voucher_type": "Sales Invoice",
+        "voucher_no": sales_invoice,
         "posting_date": doc.posting_date,
         "company": doc.company,
         "remarks": f"Sales Shipment Cost - {doc.name} for Sales Invoice {sales_invoice}",
@@ -217,3 +216,15 @@ def delete_gl_entries(doc):
         WHERE voucher_type=%s AND voucher_no=%s
     """, (doc.doctype, doc.name))
 
+def update_landed_cost_rows(doc, method):
+    company_currency = doc.company_currency
+    for row in doc.taxes:  # child table = Sales Landed Cost Taxes and Charges
+        if row.expense_account:
+            account_currency = frappe.db.get_value("Account", row.expense_account, "account_currency")
+            if account_currency and account_currency != company_currency:
+                rate = fetch_exchange_rate(account_currency, company_currency, doc.posting_date)
+                row.exchange_rate = flt(rate) or 1
+                row.base_amount = flt(row.amount) * flt(row.exchange_rate)
+            else:
+                row.exchange_rate = 1
+                row.base_amount = row.amount

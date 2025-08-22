@@ -23,6 +23,7 @@ app_license = "mit"
 
 doc_events = {
     "Sales Shipment Cost": {
+        "on_update":"nextlayer.next_layer.controllers.sales_shipment.update_landed_cost_rows",
         "on_submit": "nextlayer.next_layer.controllers.sales_shipment.on_submit",
         "on_cancel": "nextlayer.next_layer.controllers.sales_shipment.on_cancel",
     },
@@ -50,6 +51,10 @@ doc_events = {
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+
+doctype_js = {
+	"Sales Shipment Cost":"public/js/sales_shipment.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
