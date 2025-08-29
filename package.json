@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build && cd .. && cp nextlayer/public/frontend/index.html nextlayer/www/frontend.html"
+    "build": "cd frontend && npx tsc && npx vite build && cd .. && cp nextlayer/public/frontend/index.html nextlayer/www/frontend.html"
   },
   "private": true
 }
