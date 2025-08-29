@@ -1,9 +1,0 @@
-{
-  "name": "nextlayer",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "cd frontend && npm run dev",
-    "build": "cd frontend && ./node_modules/.bin/tsc && ./node_modules/.bin/vite build && cd .. && cp nextlayer/public/frontend/index.html nextlayer/www/frontend.html"
-  },
-  "private": true
-}
