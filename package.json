@@ -2,11 +2,10 @@
   "name": "nextlayer",
   "version": "1.0.0",
   "scripts": {
-  "dev": "cd frontend && npm run dev",
-  "build": "npm run build:frontend && npm run copy-html",
-  "build:frontend": "cd frontend && npm run build",
-  "copy-html": "cp nextlayer/public/frontend/index.html nextlayer/www/frontend.html"
-},
-
+    "dev": "cd frontend && npm run dev",
+    "build": "npm run build:frontend && npm run copy-html",
+    "build:frontend": "cd frontend && npm run build",
+    "copy-html": "cp nextlayer/public/frontend/index.html nextlayer/www/frontend.html"
+  },
   "private": true
 }
