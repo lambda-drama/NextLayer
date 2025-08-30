@@ -19,6 +19,7 @@ interface UseCompaniesReturn {
   error: string | null
   refetch: () => void
   testEndpoint: () => void
+  refreshCSRFToken: () => Promise<string | null>
   count: number
 }
 
@@ -115,6 +116,29 @@ export function useCompanies(): UseCompaniesReturn {
     }
   }
 
+  const refreshCSRFToken = async () => {
+    try {
+      console.log("Refreshing CSRF token...");
+      const response = await fetch("/api/method/frappe.sessions.get_csrf_token", {
+        method: "GET",
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const newToken = result.message;
+        window.csrf_token = newToken;
+        console.log("New CSRF token set:", newToken);
+        return newToken;
+      } else {
+        console.error("Failed to refresh CSRF token");
+        return null;
+      }
+    } catch (err) {
+      console.error("Error refreshing CSRF token:", err);
+      return null;
+    }
+  }
+
   useEffect(() => {
     fetchCompanies()
   }, [])
@@ -124,6 +148,7 @@ export function useCompanies(): UseCompaniesReturn {
     error,
     refetch: fetchCompanies,
     testEndpoint,
+    refreshCSRFToken,
     count: companies.length,
   }
 }

@@ -25,7 +25,7 @@ export default function IntercompanyReconciliation() {
   const [isAutoFilled, setIsAutoFilled] = useState(false)
 
   // Use the custom hooks
-  const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint } = useCompanies()
+  const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint, refreshCSRFToken } = useCompanies()
 
   const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = useParties(
     "Customer",
@@ -306,18 +306,28 @@ export default function IntercompanyReconciliation() {
               </div>
             </div>
 
-            {/* Debug Section */}
+                        {/* Debug Section */}
             <div className="mt-6 pt-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-medium text-gray-600">Debug Tools</h4>
-                <Button
-                  onClick={testEndpoint}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                >
-                  Test API Endpoint
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={testEndpoint}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    Test API Endpoint
+                  </Button>
+                  <Button
+                    onClick={refreshCSRFToken}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    Refresh CSRF Token
+                  </Button>
+                </div>
               </div>
               {companiesError && (
                 <Alert className="mt-2">

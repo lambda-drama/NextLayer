@@ -9,9 +9,15 @@ SCRIPT_TAG_PATTERN = re.compile(r"\<script[^<]*\</script\>")
 CLOSING_SCRIPT_TAG_PATTERN = re.compile(r"</script\>")
 
 def get_context(context):
-    # csrf_token = frappe.sessions.get_csrf_token()
-    # frappe.db.commit()
-    # context.csrf_token = csrf_token
+    # Ensure CSRF token is generated
+    try:
+        csrf_token = frappe.sessions.get_csrf_token()
+        frappe.db.commit()
+        context.csrf_token = csrf_token
+        frappe.logger().info(f"CSRF token generated for user {frappe.session.user}: {csrf_token[:10]}...")
+    except Exception as e:
+        frappe.logger().error(f"Failed to generate CSRF token: {str(e)}")
+        context.csrf_token = ""
 
     if frappe.session.user == "Guest":
         boot = frappe.website.utils.get_boot_data()
