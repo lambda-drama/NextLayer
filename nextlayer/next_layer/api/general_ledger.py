@@ -6,7 +6,8 @@ from frappe.utils import cint, flt
 # from nextlayer.next_layer.report.general_ledger.general_ledger import execute
 from nextlayer.next_layer.report.general_ledger_extension.general_ledger_extension import execute
 from frappe import _dict
-
+import frappe
+from frappe.utils import flt
 
 @frappe.whitelist()
 def get_general_ledger_data(filters):
@@ -60,7 +61,7 @@ def get_general_ledger_data(filters):
         }
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_companies():
     """Get list of companies for dropdown"""
     companies = frappe.get_all(
@@ -70,7 +71,7 @@ def get_companies():
     )
     return {"success": True, "data": companies}
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_parties(party_type="Customer", company=None):
     """Get list of parties (customers/suppliers) for dropdown"""
     filters = {}
@@ -100,8 +101,7 @@ def get_parties(party_type="Customer", company=None):
 
 
 # api/helpers.py
-import frappe
-from frappe.utils import flt
+
 
 def format_gl_entries_for_frontend(data, columns):
     """

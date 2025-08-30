@@ -29,6 +29,7 @@ export function useCompanies(): UseCompaniesReturn {
   const fetchCompanies = async () => {
     setIsLoading(true)
     setError(null)
+    const csrfToken = window.csrf_token;
     try {
       const response = await fetch(
         "/api/method/nextlayer.next_layer.api.general_ledger.get_companies",
@@ -36,6 +37,7 @@ export function useCompanies(): UseCompaniesReturn {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+             "X-Frappe-CSRF-Token": csrfToken ?? ""
           },
         }
       )

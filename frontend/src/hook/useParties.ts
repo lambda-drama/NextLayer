@@ -29,13 +29,13 @@ export function useParties(partyType: string, company: string): UsePartiesReturn
     if (!partyType || !company) return
     setIsLoading(true)
     setError(null)
-
+    const csrfToken = window.csrf_token;
     try {
       const response = await fetch(
         "/api/method/nextlayer.next_layer.api.general_ledger.get_parties",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Frappe-CSRF-Token": csrfToken ?? "" },
           body: JSON.stringify({ party_type: partyType, company }),
         }
       )
