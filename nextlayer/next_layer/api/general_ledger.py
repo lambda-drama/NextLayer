@@ -8,7 +8,7 @@ from nextlayer.next_layer.report.general_ledger_extension.general_ledger_extensi
 from frappe import _dict
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_general_ledger_data(filters):
     try:
         # Parse filters if they're passed as JSON string
@@ -17,7 +17,7 @@ def get_general_ledger_data(filters):
 
         # Convert dict → frappe._dict so .party works
         filters = _dict(filters)
-        print("Maybe am wriong", filters)
+        
         # Validate required fields
         if not filters.get("company"):
             frappe.throw(_("Company is required"))
