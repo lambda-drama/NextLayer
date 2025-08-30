@@ -25,25 +25,25 @@ export default function IntercompanyReconciliation() {
   const [isAutoFilled, setIsAutoFilled] = useState(false)
 
   // Use the custom hooks
-  const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
-  
+  const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint } = useCompanies()
+
   const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = useParties(
-    "Customer", 
+    "Customer",
     companyA
   )
-  
+
   const { parties: partiesB, isLoading: partiesBLoading, error: partiesBError } = useParties(
-    partyTypeB, 
+    partyTypeB,
     companyB
   )
 
-  
+
   // GL Data hooks - only fetch when shouldLoadData is true
-  const { 
-    data: glDataA, 
+  const {
+    data: glDataA,
     reconciliationTotals: totalsA,
-    loading: glLoadingA, 
-    error: glErrorA 
+    loading: glLoadingA,
+    error: glErrorA
   } = useGeneralLedgerData({
     company: shouldLoadData ? companyA : "",
     partyType: "Customer",
@@ -52,14 +52,14 @@ export default function IntercompanyReconciliation() {
     toDate
   })
 
-  const { 
-    data: glDataB, 
+  const {
+    data: glDataB,
     reconciliationTotals: totalsB,
-    loading: glLoadingB, 
-    error: glErrorB 
+    loading: glLoadingB,
+    error: glErrorB
   } = useGeneralLedgerData({
     company: shouldLoadData ? companyB : "",
-    partyType: partyTypeB, 
+    partyType: partyTypeB,
     party: shouldLoadData ? partyB : "",
     fromDate,
     toDate
@@ -140,7 +140,7 @@ export default function IntercompanyReconciliation() {
       minimumFractionDigits: 0
     }).format(amount)
   }
-  
+
   // Determine loading and error states
   const isLoading = glLoadingA || glLoadingB
   const error = companiesError || partiesAError || partiesBError || glErrorA || glErrorB
@@ -232,9 +232,9 @@ export default function IntercompanyReconciliation() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select 
-                      value={companyB} 
-                      onValueChange={handleCompanyBChange} 
+                    <Select
+                      value={companyB}
+                      onValueChange={handleCompanyBChange}
                       disabled={companiesLoading}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
@@ -263,9 +263,9 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Party</label>
-                    <Select 
-                      value={partyB} 
-                      onValueChange={handlePartyBChange} 
+                    <Select
+                      value={partyB}
+                      onValueChange={handlePartyBChange}
                       disabled={!companyB || partiesBLoading}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
@@ -304,6 +304,29 @@ export default function IntercompanyReconciliation() {
                   className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none"
                 />
               </div>
+            </div>
+
+            {/* Debug Section */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-gray-600">Debug Tools</h4>
+                <Button
+                  onClick={testEndpoint}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                >
+                  Test API Endpoint
+                </Button>
+              </div>
+              {companiesError && (
+                <Alert className="mt-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Companies Error: {companiesError}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             {error && (
@@ -435,7 +458,7 @@ export default function IntercompanyReconciliation() {
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-blue-600" />
                     <AlertDescription className="text-blue-800">
-                      <strong>Balance Summary:</strong> 
+                      <strong>Balance Summary:</strong>
                       <div className="mt-2 grid grid-cols-2 gap-4">
                         <div>{companyA} Balance: {formatCurrency(reconciliationAnalysis.balanceA)}</div>
                         <div>{companyB} Balance: {formatCurrency(reconciliationAnalysis.balanceB)}</div>
