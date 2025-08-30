@@ -16,6 +16,12 @@ export interface GLEntry {
   cost_center?: string
   project?: string
 }
+declare global {
+  interface Window {
+    csrf_token?: string;
+  }
+}
+
 
 export interface ReconciliationTotals {
   totalDebit: number
@@ -80,10 +86,11 @@ export function useGeneralLedgerData({
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            'X-Frappe-CSRF-Token': csrfToken
-          },
+  "Content-Type": "application/json",
+  Accept: "application/json",
+  "X-Frappe-CSRF-Token": csrfToken ?? ""
+},
+
           body: JSON.stringify({ filters }),
            credentials: "include"
         }
