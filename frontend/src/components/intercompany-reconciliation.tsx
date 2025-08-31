@@ -12,6 +12,25 @@ import { useCompanies } from "../hook/useCompanies"
 import { useParties } from "../hook/useParties"
 import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
 
+export interface GLEntry {
+  gl_entry?: string
+  posting_date: string
+  account: string
+  voucher_type: string
+  voucher_no: string
+  debit: number
+  credit: number
+  balance: number
+  against: string
+  remarks?: string
+  party_type?: string
+  party?: string
+  cost_center?: string
+  project?: string
+  status?: 'Match' | 'Mismatch' | 'Pending'
+  matchedEntry?: GLEntry
+}
+
 export default function IntercompanyReconciliation() {
   // State for selections
   const [companyA, setCompanyA] = useState<string>("")
@@ -107,6 +126,71 @@ export default function IntercompanyReconciliation() {
     setShouldLoadData(false)
   }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate])
 
+    // Function to find matching entries between Company A and Company B
+  const findMatchingEntries = useMemo(() => {
+    if (!glDataA.length || !glDataB.length) return { glDataAWithStatus: [], glDataBWithStatus: [] }
+
+    console.log("=== DEBUGGING MATCHING LOGIC ===")
+    console.log("Company A Data:", glDataA)
+    console.log("Company B Data:", glDataB)
+
+    const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
+      console.log(`\n--- Checking Entry A: ${entryA.voucher_type} ${entryA.voucher_no} ---`)
+      console.log(`Entry A - Date: ${entryA.posting_date}, Debit: ${entryA.debit} (type: ${typeof entryA.debit}), Credit: ${entryA.credit} (type: ${typeof entryA.credit})`)
+
+      // Find matching entry in Company B based on amount only (date can be different)
+      const matchingEntry = glDataB.find(entryB => {
+        console.log(`  Comparing with Entry B: ${entryB.voucher_type} ${entryB.voucher_no}`)
+        console.log(`  Entry B - Date: ${entryB.posting_date}, Debit: ${entryB.debit} (type: ${typeof entryB.debit}), Credit: ${entryB.credit} (type: ${typeof entryB.credit})`)
+
+        // Check if amounts match (debit on one side should equal credit on other side)
+        const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+        const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+
+        console.log(`  Debit-Credit Match: ${debitCreditMatch} (${entryA.debit} === ${entryB.credit})`)
+        console.log(`  Credit-Debit Match: ${creditDebitMatch} (${entryA.credit} === ${entryB.debit})`)
+        console.log(`  Math.abs(${entryA.debit} - ${entryB.credit}) = ${Math.abs(entryA.debit - entryB.credit)}`)
+        console.log(`  Math.abs(${entryA.credit} - ${entryB.debit}) = ${Math.abs(entryA.credit - entryB.debit)}`)
+
+        // Return true if either debit matches credit OR credit matches debit (no date requirement)
+        const isMatch = debitCreditMatch || creditDebitMatch
+        console.log(`  Final Match: ${isMatch}`)
+
+        return isMatch
+      })
+
+      const status = matchingEntry ? 'Match' : 'Mismatch'
+      console.log(`  Final Status for Entry A: ${status}`)
+
+      return {
+        ...entryA,
+        status,
+        matchedEntry: matchingEntry
+      }
+    })
+
+    const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
+      // Find matching entry in Company A
+      const matchingEntry = glDataA.find(entryA => {
+        // Check if amounts match (debit on one side should equal credit on other side)
+        const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+        const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+
+        // Return true if either debit matches credit OR credit matches debit (no date requirement)
+        return debitCreditMatch || creditDebitMatch
+      })
+
+      return {
+        ...entryB,
+        status: matchingEntry ? 'Match' : 'Mismatch',
+        matchedEntry: matchingEntry
+      }
+    })
+
+    console.log("=== END DEBUGGING ===")
+    return { glDataAWithStatus, glDataBWithStatus }
+  }, [glDataA, glDataB])
+
   // Updated reconciliation analysis using reconciliationTotals
   const reconciliationAnalysis = useMemo(() => {
     if (!totalsA || !totalsB) return null
@@ -144,6 +228,18 @@ export default function IntercompanyReconciliation() {
   // Determine loading and error states
   const isLoading = glLoadingA || glLoadingB
   const error = companiesError || partiesAError || partiesBError || glErrorA || glErrorB
+
+  // Get status badge component
+  const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending') => {
+    switch (status) {
+      case 'Match':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">✓ Match</Badge>
+      case 'Mismatch':
+        return <Badge className="bg-red-100 text-red-800 border-red-200">✗ Mismatch</Badge>
+      default:
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">? Pending</Badge>
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
@@ -379,37 +475,54 @@ export default function IntercompanyReconciliation() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Company A Cards */}
                 <Card className="border-blue-200">
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(reconciliationAnalysis.totalDebitA)}
+                  <CardHeader className="bg-gray-50 border-b border-gray-200">
+                    <CardTitle className="text-lg text-gray-800">
+                      {companyA} Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {formatCurrency(reconciliationAnalysis.totalDebitA)}
+                        </div>
+                        <div className="text-sm text-gray-600">Total Debit</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {formatCurrency(reconciliationAnalysis.totalCreditA)}
+                        </div>
+                        <div className="text-sm text-gray-600">Total Credit</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600">{companyA} Debit</div>
                   </CardContent>
                 </Card>
+
+                {/* Company B Cards */}
                 <Card className="border-blue-200">
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(reconciliationAnalysis.totalCreditA)}
+                  <CardHeader className="bg-gray-50 border-b border-gray-200">
+                    <CardTitle className="text-lg text-gray-800">
+                      {companyB} Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {formatCurrency(reconciliationAnalysis.totalDebitB)}
+                        </div>
+                        <div className="text-sm text-gray-600">Total Debit</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {formatCurrency(reconciliationAnalysis.totalCreditB)}
+                        </div>
+                        <div className="text-sm text-gray-600">Total Credit</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600">{companyA} Credit</div>
-                  </CardContent>
-                </Card>
-                <Card className="border-blue-200">
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(reconciliationAnalysis.totalDebitB)}
-                    </div>
-                    <div className="text-sm text-gray-600">{companyB} Debit</div>
-                  </CardContent>
-                </Card>
-                <Card className="border-blue-200">
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(reconciliationAnalysis.totalCreditB)}
-                    </div>
-                    <div className="text-sm text-gray-600">{companyB} Credit</div>
                   </CardContent>
                 </Card>
               </div>
@@ -482,7 +595,7 @@ export default function IntercompanyReconciliation() {
         )}
 
         {/* General Ledger Data */}
-        {(glDataA.length > 0 || glDataB.length > 0) && (
+        {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Company A GL */}
             <Card className="border-blue-200 shadow-lg">
@@ -504,10 +617,11 @@ export default function IntercompanyReconciliation() {
                         <TableHead className="text-blue-800 text-right">Debit</TableHead>
                         <TableHead className="text-blue-800 text-right">Credit</TableHead>
                         <TableHead className="text-blue-800 text-right">Balance</TableHead>
+                        <TableHead className="text-blue-800 text-center">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {glDataA.map((entry, index) => (
+                      {findMatchingEntries.glDataAWithStatus.map((entry, index) => (
                         <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
                           <TableCell className="font-medium">{entry.posting_date}</TableCell>
                           <TableCell>
@@ -525,11 +639,14 @@ export default function IntercompanyReconciliation() {
                           <TableCell className="text-right font-medium">
                             {formatCurrency(entry.balance)}
                           </TableCell>
+                          <TableCell className="text-center">
+                            {getStatusBadge(entry.status || 'Pending')}
+                          </TableCell>
                         </TableRow>
                       ))}
-                      {glDataA.length === 0 && (
+                      {findMatchingEntries.glDataAWithStatus.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
@@ -560,10 +677,11 @@ export default function IntercompanyReconciliation() {
                         <TableHead className="text-blue-800 text-right">Debit</TableHead>
                         <TableHead className="text-blue-800 text-right">Credit</TableHead>
                         <TableHead className="text-blue-800 text-right">Balance</TableHead>
+                        <TableHead className="text-blue-800 text-center">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {glDataB.map((entry, index) => (
+                      {findMatchingEntries.glDataBWithStatus.map((entry, index) => (
                         <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
                           <TableCell className="font-medium">{entry.posting_date}</TableCell>
                           <TableCell>
@@ -581,11 +699,14 @@ export default function IntercompanyReconciliation() {
                           <TableCell className="text-right font-medium">
                             {formatCurrency(entry.balance)}
                           </TableCell>
+                          <TableCell className="text-center">
+                            {getStatusBadge(entry.status || 'Pending')}
+                          </TableCell>
                         </TableRow>
                       ))}
-                      {glDataB.length === 0 && (
+                      {findMatchingEntries.glDataBWithStatus.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
