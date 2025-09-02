@@ -11,6 +11,7 @@ import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw } from "
 import { useCompanies } from "../hook/useCompanies"
 import { useParties } from "../hook/useParties"
 import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
+import { useMatchStatus } from "../hook/useMatchStatus"
 
 export interface GLEntry {
   gl_entry?: string
@@ -29,6 +30,12 @@ export interface GLEntry {
   project?: string
   status?: 'Match' | 'Mismatch' | 'Pending'
   matchedEntry?: GLEntry
+  backendMatchData?: {
+    status: string
+    matched_with?: string
+    matched_by?: string
+    matched_on?: string
+  }
 }
 
 export default function IntercompanyReconciliation() {
@@ -43,8 +50,15 @@ export default function IntercompanyReconciliation() {
   const [shouldLoadData, setShouldLoadData] = useState(false)
   const [isAutoFilled, setIsAutoFilled] = useState(false)
 
+  // Status filtering and matching
+  const [statusFilter, setStatusFilter] = useState<string>("Mismatch")
+  const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set())
+  const [showMatchModal, setShowMatchModal] = useState(false)
+  const [matchingEntry, setMatchingEntry] = useState<GLEntry | null>(null)
+
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint, refreshCSRFToken } = useCompanies()
+  const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, loading: matchLoading, error: matchError } = useMatchStatus()
 
   const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = useParties(
     "Customer",
@@ -126,7 +140,49 @@ export default function IntercompanyReconciliation() {
     setShouldLoadData(false)
   }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate])
 
-    // Function to find matching entries between Company A and Company B
+    // State for storing backend match status
+  const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
+
+    // Fetch match status from backend when data is loaded
+  useEffect(() => {
+    const fetchMatchStatus = async () => {
+      if (!glDataA.length || !glDataB.length || !companyA || !companyB) return
+
+      const statusMap: {[key: string]: any} = {}
+
+      // Fetch status for Company A entries
+      for (const entry of glDataA) {
+        try {
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA)
+          if (result.success) {
+            const key = `${entry.voucher_type}-${entry.voucher_no}`
+            statusMap[key] = result
+          }
+        } catch (error) {
+          console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
+        }
+      }
+
+      // Fetch status for Company B entries
+      for (const entry of glDataB) {
+        try {
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB)
+          if (result.success) {
+            const key = `${entry.voucher_type}-${entry.voucher_no}`
+            statusMap[key] = result
+          }
+        } catch (error) {
+          console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
+        }
+      }
+
+      setBackendMatchStatus(statusMap)
+    }
+
+    fetchMatchStatus()
+  }, [glDataA, glDataB, companyA, companyB, getMatchStatus])
+
+  // Function to find matching entries between Company A and Company B
   const findMatchingEntries = useMemo(() => {
     if (!glDataA.length || !glDataB.length) return { glDataAWithStatus: [], glDataBWithStatus: [] }
 
@@ -159,13 +215,25 @@ export default function IntercompanyReconciliation() {
         return isMatch
       })
 
-      const status = matchingEntry ? 'Match' : 'Mismatch'
-      console.log(`  Final Status for Entry A: ${status}`)
+      // Check if we have backend status for this entry
+      const key = `${entryA.voucher_type}-${entryA.voucher_no}`
+      const backendStatus = backendMatchStatus[key]
+
+      // Use backend status if available, otherwise use client-side logic
+      let status: 'Match' | 'Mismatch' | 'Pending'
+      if (backendStatus && backendStatus.status) {
+        status = backendStatus.status
+        console.log(`  Using backend status: ${status}`)
+      } else {
+        status = matchingEntry ? 'Match' : 'Mismatch'
+        console.log(`  Using client-side status: ${status}`)
+      }
 
       return {
         ...entryA,
         status,
-        matchedEntry: matchingEntry
+        matchedEntry: matchingEntry,
+        backendMatchData: backendStatus
       }
     })
 
@@ -180,16 +248,29 @@ export default function IntercompanyReconciliation() {
         return debitCreditMatch || creditDebitMatch
       })
 
+      // Check if we have backend status for this entry
+      const key = `${entryB.voucher_type}-${entryB.voucher_no}`
+      const backendStatus = backendMatchStatus[key]
+
+      // Use backend status if available, otherwise use client-side logic
+      let status: 'Match' | 'Mismatch' | 'Pending'
+      if (backendStatus && backendStatus.status) {
+        status = backendStatus.status
+      } else {
+        status = matchingEntry ? 'Match' : 'Mismatch'
+      }
+
       return {
         ...entryB,
-        status: matchingEntry ? 'Match' : 'Mismatch',
-        matchedEntry: matchingEntry
+        status: status,
+        matchedEntry: matchingEntry,
+        backendMatchData: backendStatus
       }
     })
 
     console.log("=== END DEBUGGING ===")
     return { glDataAWithStatus, glDataBWithStatus }
-  }, [glDataA, glDataB])
+  }, [glDataA, glDataB, backendMatchStatus])
 
   // Updated reconciliation analysis using reconciliationTotals
   const reconciliationAnalysis = useMemo(() => {
@@ -217,12 +298,154 @@ export default function IntercompanyReconciliation() {
     }
   }, [totalsA, totalsB])
 
-  const formatCurrency = (amount: number) => {
+    const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       minimumFractionDigits: 0
     }).format(amount)
+  }
+
+  // Handle entry selection
+  const handleEntrySelect = (entryKey: string, isSelected: boolean) => {
+    const newSelected = new Set(selectedEntries)
+    if (isSelected) {
+      newSelected.add(entryKey)
+    } else {
+      newSelected.delete(entryKey)
+    }
+    setSelectedEntries(newSelected)
+  }
+
+      // Handle bulk matching
+  const handleBulkMatch = async () => {
+    try {
+      // Get all selected entries that have potential matches
+      const entriesToMatch: Array<{ entryA: GLEntry; entryB: GLEntry }> = []
+
+      for (const entryKey of selectedEntries) {
+        // Find the entry in both Company A and Company B data
+        const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
+          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        )
+        const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
+          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        )
+
+        if (entryA && entryA.matchedEntry) {
+          entriesToMatch.push({ entryA, entryB: entryA.matchedEntry })
+        } else if (entryB && entryB.matchedEntry) {
+          entriesToMatch.push({ entryA: entryB.matchedEntry, entryB })
+        }
+      }
+
+      if (entriesToMatch.length === 0) {
+        alert('No valid matches found for selected entries.')
+        return
+      }
+
+      // Prepare data for bulk update
+      const bulkData = []
+      for (const { entryA, entryB } of entriesToMatch) {
+        bulkData.push({
+          voucher_type: entryA.voucher_type,
+          voucher_no: entryA.voucher_no,
+          company: companyA,
+          status: 'Match' as const,
+          matched_with: entryB
+        })
+        bulkData.push({
+          voucher_type: entryB.voucher_type,
+          voucher_no: entryB.voucher_no,
+          company: companyB,
+          status: 'Match' as const,
+          matched_with: entryA
+        })
+      }
+
+      // Perform bulk update
+      const result = await bulkUpdateMatchStatus(bulkData)
+
+      if (result.failed > 0) {
+        alert(`Bulk matching completed with ${result.success} successful and ${result.failed} failed updates.\n\nErrors:\n${result.errors.join('\n')}`)
+      } else {
+        alert(`Successfully matched ${result.success} entries!`)
+      }
+
+      // Refresh the match statuses
+      const allEntries = [...glDataA, ...glDataB].map(entry => ({
+        voucher_type: entry.voucher_type,
+        voucher_no: entry.voucher_no,
+        company: glDataA.includes(entry) ? companyA : companyB
+      }))
+
+      const newStatusMap = await refreshMatchStatuses(allEntries)
+      setBackendMatchStatus(newStatusMap)
+
+      // Clear selections
+      setSelectedEntries(new Set())
+      setShowMatchModal(false)
+
+    } catch (error) {
+      console.error('Error in bulk matching:', error)
+      alert('Failed to perform bulk matching. Please try again.')
+    }
+  }
+  const handleManualMatch = async (entryA: GLEntry, entryB: GLEntry) => {
+    try {
+      // Update both entries to Match status using the hook
+      await updateMatchStatus({
+        voucher_type: entryA.voucher_type,
+        voucher_no: entryA.voucher_no,
+        company: companyA,
+        status: 'Match',
+        matched_with: entryB
+      })
+
+      await updateMatchStatus({
+        voucher_type: entryB.voucher_type,
+        voucher_no: entryB.voucher_no,
+        company: companyB,
+        status: 'Match',
+        matched_with: entryA
+      })
+
+      // Refresh backend match status
+      const statusMap = { ...backendMatchStatus }
+
+      // Update the status map with new data
+      const keyA = `${entryA.voucher_type}-${entryA.voucher_no}`
+      const keyB = `${entryB.voucher_type}-${entryB.voucher_no}`
+
+      statusMap[keyA] = {
+        success: true,
+        status: 'Match',
+        matched_with: JSON.stringify(entryB),
+        matched_by: 'current_user', // This will be set by backend
+        matched_on: new Date().toISOString()
+      }
+
+      statusMap[keyB] = {
+        success: true,
+        status: 'Match',
+        matched_with: JSON.stringify(entryA),
+        matched_by: 'current_user', // This will be set by backend
+        matched_on: new Date().toISOString()
+      }
+
+      setBackendMatchStatus(statusMap)
+      setShowMatchModal(false)
+      setMatchingEntry(null)
+    } catch (error) {
+      console.error('Error matching entries:', error)
+      alert('Failed to match entries. Please try again.')
+    }
+  }
+
+  // Filter entries by status
+  const filterEntriesByStatus = (entries: GLEntry[]) => {
+    if (statusFilter === 'All') return entries
+    return entries.filter(entry => entry.status === statusFilter)
   }
 
   // Determine loading and error states
@@ -594,6 +817,52 @@ export default function IntercompanyReconciliation() {
           </Card>
         )}
 
+        {/* Status Filter and Actions */}
+        {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (
+          <Card className="border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Status Filter & Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Filter by Status</label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-48 border-blue-200 focus:border-blue-400">
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-blue-200">
+                        <SelectItem value="All">All Entries</SelectItem>
+                        <SelectItem value="Match">✓ Matched</SelectItem>
+                        <SelectItem value="Mismatch">✗ Mismatched</SelectItem>
+                        <SelectItem value="Pending">? Pending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length} of {findMatchingEntries.glDataAWithStatus.length} entries
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowMatchModal(true)}
+                    disabled={selectedEntries.size === 0}
+                    variant="outline"
+                    className="border-green-200 text-green-700 hover:bg-green-50"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Match Selected ({selectedEntries.size})
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* General Ledger Data */}
         {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -612,41 +881,83 @@ export default function IntercompanyReconciliation() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-blue-50">
+                        <TableHead className="text-blue-800 w-12">
+                          <input
+                            type="checkbox"
+                            onChange={(e) => {
+                              const isChecked = e.target.checked
+                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
+                              if (isChecked) {
+                                setSelectedEntries(new Set([...selectedEntries, ...entryKeys]))
+                              } else {
+                                const newSelected = new Set(selectedEntries)
+                                entryKeys.forEach(key => newSelected.delete(key))
+                                setSelectedEntries(newSelected)
+                              }
+                            }}
+                            className="rounded border-blue-300"
+                          />
+                        </TableHead>
                         <TableHead className="text-blue-800">Date</TableHead>
                         <TableHead className="text-blue-800">Voucher</TableHead>
                         <TableHead className="text-blue-800 text-right">Debit</TableHead>
                         <TableHead className="text-blue-800 text-right">Credit</TableHead>
                         <TableHead className="text-blue-800 text-right">Balance</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
+                        <TableHead className="text-blue-800 text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {findMatchingEntries.glDataAWithStatus.map((entry, index) => (
-                        <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
-                          <TableCell className="font-medium">{entry.posting_date}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{entry.voucher_type}</div>
-                              <div className="text-sm text-gray-600">{entry.voucher_no}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium text-blue-600">
-                            {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-medium text-green-600">
-                            {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(entry.balance)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {getStatusBadge(entry.status || 'Pending')}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {findMatchingEntries.glDataAWithStatus.length === 0 && (
+                      {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).map((entry, index) => {
+                        const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+                        return (
+                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                checked={selectedEntries.has(entryKey)}
+                                onChange={(e) => handleEntrySelect(entryKey, e.target.checked)}
+                                className="rounded border-blue-300"
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{entry.posting_date}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{entry.voucher_type}</div>
+                                <div className="text-sm text-gray-600">{entry.voucher_no}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-blue-600">
+                              {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-green-600">
+                              {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(entry.balance)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {getStatusBadge(entry.status || 'Pending')}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {entry.status === 'Mismatch' && entry.matchedEntry && (
+                                <Button
+                                  onClick={() => handleManualMatch(entry, entry.matchedEntry!)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-green-200 text-green-700 hover:bg-green-50"
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Match
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                      {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={8} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
@@ -672,41 +983,83 @@ export default function IntercompanyReconciliation() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-blue-50">
+                        <TableHead className="text-blue-800 w-12">
+                          <input
+                            type="checkbox"
+                            onChange={(e) => {
+                              const isChecked = e.target.checked
+                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
+                              if (isChecked) {
+                                setSelectedEntries(new Set([...selectedEntries, ...entryKeys]))
+                              } else {
+                                const newSelected = new Set(selectedEntries)
+                                entryKeys.forEach(key => newSelected.delete(key))
+                                setSelectedEntries(newSelected)
+                              }
+                            }}
+                            className="rounded border-blue-300"
+                          />
+                        </TableHead>
                         <TableHead className="text-blue-800">Date</TableHead>
                         <TableHead className="text-blue-800">Voucher</TableHead>
                         <TableHead className="text-blue-800 text-right">Debit</TableHead>
                         <TableHead className="text-blue-800 text-right">Credit</TableHead>
                         <TableHead className="text-blue-800 text-right">Balance</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
+                        <TableHead className="text-blue-800 text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {findMatchingEntries.glDataBWithStatus.map((entry, index) => (
-                        <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
-                          <TableCell className="font-medium">{entry.posting_date}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{entry.voucher_type}</div>
-                              <div className="text-sm text-gray-600">{entry.voucher_no}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium text-blue-600">
-                            {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-medium text-green-600">
-                            {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(entry.balance)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {getStatusBadge(entry.status || 'Pending')}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {findMatchingEntries.glDataBWithStatus.length === 0 && (
+                      {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).map((entry, index) => {
+                        const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+                        return (
+                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                checked={selectedEntries.has(entryKey)}
+                                onChange={(e) => handleEntrySelect(entryKey, e.target.checked)}
+                                className="rounded border-blue-300"
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{entry.posting_date}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{entry.voucher_type}</div>
+                                <div className="text-sm text-gray-600">{entry.voucher_no}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-blue-600">
+                              {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-green-600">
+                              {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(entry.balance)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {getStatusBadge(entry.status || 'Pending')}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {entry.status === 'Mismatch' && entry.matchedEntry && (
+                                <Button
+                                  onClick={() => handleManualMatch(entry, entry.matchedEntry!)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-green-200 text-green-700 hover:bg-green-50"
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Match
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                      {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={8} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
@@ -716,6 +1069,46 @@ export default function IntercompanyReconciliation() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* Match Confirmation Modal */}
+        {showMatchModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold mb-4">Confirm Bulk Matching</h3>
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to mark {selectedEntries.size} selected entries as matched? This action will update the status in the backend.
+              </p>
+              {matchError && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded text-red-700">
+                  {matchError}
+                </div>
+              )}
+              <div className="flex gap-3 justify-end">
+                <Button
+                  onClick={() => setShowMatchModal(false)}
+                  variant="outline"
+                  disabled={matchLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleBulkMatch}
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={matchLoading}
+                >
+                  {matchLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    `Confirm Match (${selectedEntries.size})`
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>

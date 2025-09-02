@@ -1,0 +1,138 @@
+[
+  {
+    "fieldname": "intercompany_match_status",
+    "fieldtype": "Select",
+    "label": "Intercompany Match Status",
+    "options": "Pending\nMatch\nMismatch",
+    "default": "Pending",
+    "insert_after": "status",
+    "doctype": "Payment Entry"
+  },
+  {
+    "fieldname": "intercompany_matched_with",
+    "fieldtype": "Text",
+    "label": "Intercompany Matched With",
+    "description": "Details of the matched entry (JSON format)",
+    "insert_after": "intercompany_match_status",
+    "doctype": "Payment Entry"
+  },
+  {
+    "fieldname": "intercompany_matched_by",
+    "fieldtype": "Link",
+    "label": "Intercompany Matched By",
+    "options": "User",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_with",
+    "doctype": "Payment Entry"
+  },
+  {
+    "fieldname": "intercompany_matched_on",
+    "fieldtype": "Datetime",
+    "label": "Intercompany Matched On",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_by",
+    "doctype": "Payment Entry"
+  },
+  {
+    "fieldname": "intercompany_match_status",
+    "fieldtype": "Select",
+    "label": "Intercompany Match Status",
+    "options": "Pending\nMatch\nMismatch",
+    "default": "Pending",
+    "insert_after": "status",
+    "doctype": "Journal Entry"
+  },
+  {
+    "fieldname": "intercompany_matched_with",
+    "fieldtype": "Text",
+    "label": "Intercompany Matched With",
+    "description": "Details of the matched entry (JSON format)",
+    "insert_after": "intercompany_match_status",
+    "doctype": "Journal Entry"
+  },
+  {
+    "fieldname": "intercompany_matched_by",
+    "fieldtype": "Link",
+    "label": "Intercompany Matched By",
+    "options": "User",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_with",
+    "doctype": "Journal Entry"
+  },
+  {
+    "fieldname": "intercompany_matched_on",
+    "fieldtype": "Datetime",
+    "label": "Intercompany Matched On",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_by",
+    "doctype": "Journal Entry"
+  },
+  {
+    "fieldname": "intercompany_match_status",
+    "fieldtype": "Select",
+    "label": "Intercompany Match Status",
+    "options": "Pending\nMatch\nMismatch",
+    "default": "Pending",
+    "insert_after": "status",
+    "doctype": "Purchase Invoice"
+  },
+  {
+    "fieldname": "intercompany_matched_with",
+    "fieldtype": "Text",
+    "label": "Intercompany Matched With",
+    "description": "Details of the matched entry (JSON format)",
+    "insert_after": "intercompany_match_status",
+    "doctype": "Purchase Invoice"
+  },
+  {
+    "fieldname": "intercompany_matched_by",
+    "fieldtype": "Link",
+    "label": "Intercompany Matched By",
+    "options": "User",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_with",
+    "doctype": "Purchase Invoice"
+  },
+  {
+    "fieldname": "intercompany_matched_on",
+    "fieldtype": "Datetime",
+    "label": "Intercompany Matched On",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_by",
+    "doctype": "Purchase Invoice"
+  },
+  {
+    "fieldname": "intercompany_match_status",
+    "fieldtype": "Select",
+    "label": "Intercompany Match Status",
+    "options": "Pending\nMatch\nMismatch",
+    "default": "Pending",
+    "insert_after": "status",
+    "doctype": "Sales Invoice"
+  },
+  {
+    "fieldname": "intercompany_matched_with",
+    "fieldtype": "Text",
+    "label": "Intercompany Matched With",
+    "description": "Details of the matched entry (JSON format)",
+    "insert_after": "intercompany_match_status",
+    "doctype": "Sales Invoice"
+  },
+  {
+    "fieldname": "intercompany_matched_by",
+    "fieldtype": "Link",
+    "label": "Intercompany Matched By",
+    "options": "User",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_with",
+    "doctype": "Sales Invoice"
+  },
+  {
+    "fieldname": "intercompany_matched_on",
+    "fieldtype": "Datetime",
+    "label": "Intercompany Matched On",
+    "read_only": 1,
+    "insert_after": "intercompany_matched_by",
+    "doctype": "Sales Invoice"
+  }
+]

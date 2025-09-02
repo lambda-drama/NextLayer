@@ -133,6 +133,84 @@ def get_parties(party_type="Customer", company=None):
         }
 
 
+@frappe.whitelist()
+def update_match_status():
+    """Update match status for GL entries by updating the original document"""
+    try:
+        data = frappe.parse_json(frappe.request.get_data())
+
+        voucher_type = data.get("voucher_type")
+        voucher_no = data.get("voucher_no")
+        company = data.get("company")
+        match_status = data.get("status")
+        matched_with = data.get("matched_with")
+
+        if not all([voucher_type, voucher_no, company, match_status]):
+            frappe.throw("Missing required fields: voucher_type, voucher_no, company, status")
+
+        # Get the original document
+        try:
+            doc = frappe.get_doc(voucher_type, voucher_no)
+        except frappe.DoesNotExistError:
+            frappe.throw(f"Document {voucher_type} {voucher_no} not found")
+
+        # Update the custom fields
+        doc.update({
+            "intercompany_match_status": match_status,
+            "intercompany_matched_with": matched_with,
+            "intercompany_matched_by": frappe.session.user,
+            "intercompany_matched_on": frappe.utils.now()
+        })
+
+        doc.save()
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "message": f"Match status updated to {match_status}",
+            "doc_name": doc.name
+        }
+
+    except Exception as e:
+        frappe.log_error(f"Update Match Status Error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to update match status"
+        }
+
+
+@frappe.whitelist()
+def get_match_status(voucher_type, voucher_no, company):
+    """Get current match status for a voucher from the original document"""
+    try:
+        try:
+            doc = frappe.get_doc(voucher_type, voucher_no)
+            return {
+                "success": True,
+                "status": doc.get("intercompany_match_status", "Pending"),
+                "matched_with": doc.get("intercompany_matched_with"),
+                "matched_by": doc.get("intercompany_matched_by"),
+                "matched_on": doc.get("intercompany_matched_on")
+            }
+        except frappe.DoesNotExistError:
+            return {
+                "success": True,
+                "status": "Pending",
+                "matched_with": None,
+                "matched_by": None,
+                "matched_on": None
+            }
+
+    except Exception as e:
+        frappe.log_error(f"Get Match Status Error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to get match status"
+        }
+
+
 # api/helpers.py
 
 @frappe.whitelist()
