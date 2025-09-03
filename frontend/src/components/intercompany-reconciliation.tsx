@@ -55,6 +55,9 @@ export default function IntercompanyReconciliation() {
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set())
   const [showMatchModal, setShowMatchModal] = useState(false)
   const [matchingEntry, setMatchingEntry] = useState<GLEntry | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingCancelled, setProcessingCancelled] = useState(false)
+  const [processingSuccess, setProcessingSuccess] = useState(false)
 
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint, refreshCSRFToken } = useCompanies()
@@ -186,31 +189,31 @@ export default function IntercompanyReconciliation() {
   const findMatchingEntries = useMemo(() => {
     if (!glDataA.length || !glDataB.length) return { glDataAWithStatus: [], glDataBWithStatus: [] }
 
-    console.log("=== DEBUGGING MATCHING LOGIC ===")
-    console.log("Company A Data:", glDataA)
-    console.log("Company B Data:", glDataB)
+    // console.log("=== DEBUGGING MATCHING LOGIC ===")
+    // console.log("Company A Data:", glDataA)
+    // console.log("Company B Data:", glDataB)
 
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
-      console.log(`\n--- Checking Entry A: ${entryA.voucher_type} ${entryA.voucher_no} ---`)
-      console.log(`Entry A - Date: ${entryA.posting_date}, Debit: ${entryA.debit} (type: ${typeof entryA.debit}), Credit: ${entryA.credit} (type: ${typeof entryA.credit})`)
+      // console.log(`\n--- Checking Entry A: ${entryA.voucher_type} ${entryA.voucher_no} ---`)
+      // console.log(`Entry A - Date: ${entryA.posting_date}, Debit: ${entryA.debit} (type: ${typeof entryA.debit}), Credit: ${entryA.credit} (type: ${typeof entryA.credit})`)
 
       // Find matching entry in Company B based on amount only (date can be different)
       const matchingEntry = glDataB.find(entryB => {
-        console.log(`  Comparing with Entry B: ${entryB.voucher_type} ${entryB.voucher_no}`)
-        console.log(`  Entry B - Date: ${entryB.posting_date}, Debit: ${entryB.debit} (type: ${typeof entryB.debit}), Credit: ${entryB.credit} (type: ${typeof entryB.credit})`)
+        // console.log(`  Comparing with Entry B: ${entryB.voucher_type} ${entryB.voucher_no}`)
+        // console.log(`  Entry B - Date: ${entryB.posting_date}, Debit: ${entryB.debit} (type: ${typeof entryB.debit}), Credit: ${entryB.credit} (type: ${typeof entryB.credit})`)
 
         // Check if amounts match (debit on one side should equal credit on other side)
         const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
         const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
 
-        console.log(`  Debit-Credit Match: ${debitCreditMatch} (${entryA.debit} === ${entryB.credit})`)
-        console.log(`  Credit-Debit Match: ${creditDebitMatch} (${entryA.credit} === ${entryB.debit})`)
-        console.log(`  Math.abs(${entryA.debit} - ${entryB.credit}) = ${Math.abs(entryA.debit - entryB.credit)}`)
-        console.log(`  Math.abs(${entryA.credit} - ${entryB.debit}) = ${Math.abs(entryA.credit - entryB.debit)}`)
+        // console.log(`  Debit-Credit Match: ${debitCreditMatch} (${entryA.debit} === ${entryB.credit})`)
+        // console.log(`  Credit-Debit Match: ${creditDebitMatch} (${entryA.credit} === ${entryB.debit})`)
+        // console.log(`  Math.abs(${entryA.debit} - ${entryB.credit}) = ${Math.abs(entryA.debit - entryB.credit)}`)
+        // console.log(`  Math.abs(${entryA.credit} - ${entryB.debit}) = ${Math.abs(entryA.credit - entryB.debit)}`)
 
         // Return true if either debit matches credit OR credit matches debit (no date requirement)
         const isMatch = debitCreditMatch || creditDebitMatch
-        console.log(`  Final Match: ${isMatch}`)
+        // console.log(`  Final Match: ${isMatch}`)
 
         return isMatch
       })
@@ -223,10 +226,10 @@ export default function IntercompanyReconciliation() {
       let status: 'Match' | 'Mismatch' | 'Pending'
       if (backendStatus && backendStatus.status) {
         status = backendStatus.status
-        console.log(`  Using backend status: ${status}`)
+        // console.log(`  Using backend status: ${status}`)
       } else {
         status = matchingEntry ? 'Match' : 'Mismatch'
-        console.log(`  Using client-side status: ${status}`)
+        // console.log(`  Using client-side status: ${status}`)
       }
 
       return {
@@ -268,7 +271,7 @@ export default function IntercompanyReconciliation() {
       }
     })
 
-    console.log("=== END DEBUGGING ===")
+    // console.log("=== END DEBUGGING ===")
     return { glDataAWithStatus, glDataBWithStatus }
   }, [glDataA, glDataB, backendMatchStatus])
 
@@ -319,11 +322,25 @@ export default function IntercompanyReconciliation() {
 
       // Handle bulk matching
   const handleBulkMatch = async () => {
+    console.log("Starting bulk match process...")
+    setIsProcessing(true)
+    setProcessingCancelled(false)
+
     try {
       // Get all selected entries that have potential matches
       const entriesToMatch: Array<{ entryA: GLEntry; entryB: GLEntry }> = []
 
+      console.log("Processing selected entries:", selectedEntries.size)
+
       for (const entryKey of selectedEntries) {
+        // Check if processing was cancelled
+        if (processingCancelled) {
+          console.log("Processing cancelled by user")
+          return
+        }
+
+        console.log("Processing entry key:", entryKey)
+
         // Find the entry in both Company A and Company B data
         const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
           `${entry.voucher_type}-${entry.voucher_no}` === entryKey
@@ -334,19 +351,30 @@ export default function IntercompanyReconciliation() {
 
         if (entryA && entryA.matchedEntry) {
           entriesToMatch.push({ entryA, entryB: entryA.matchedEntry })
+          console.log("Found match for entry A:", entryA.voucher_no)
         } else if (entryB && entryB.matchedEntry) {
           entriesToMatch.push({ entryA: entryB.matchedEntry, entryB })
+          console.log("Found match for entry B:", entryB.voucher_no)
         }
       }
 
       if (entriesToMatch.length === 0) {
         alert('No valid matches found for selected entries.')
+        setIsProcessing(false)
         return
       }
+
+      console.log("Total entries to match:", entriesToMatch.length)
 
       // Prepare data for bulk update
       const bulkData = []
       for (const { entryA, entryB } of entriesToMatch) {
+        // Check if processing was cancelled
+        if (processingCancelled) {
+          console.log("Processing cancelled during data preparation")
+          return
+        }
+
         bulkData.push({
           voucher_type: entryA.voucher_type,
           voucher_no: entryA.voucher_no,
@@ -363,16 +391,39 @@ export default function IntercompanyReconciliation() {
         })
       }
 
+      console.log("Prepared bulk data:", bulkData)
+
+      // Check if processing was cancelled before API call
+      if (processingCancelled) {
+        console.log("Processing cancelled before API call")
+        return
+      }
+
       // Perform bulk update
+      console.log("Calling bulkUpdateMatchStatus...")
       const result = await bulkUpdateMatchStatus(bulkData)
+      console.log("Bulk update result:", result)
 
       if (result.failed > 0) {
         alert(`Bulk matching completed with ${result.success} successful and ${result.failed} failed updates.\n\nErrors:\n${result.errors.join('\n')}`)
       } else {
-        alert(`Successfully matched ${result.success} entries!`)
+        setProcessingSuccess(true)
+        // Auto-close modal after 2 seconds
+        setTimeout(() => {
+          setShowMatchModal(false)
+          setIsProcessing(false)
+          setProcessingSuccess(false)
+        }, 2000)
+      }
+
+      // Check if processing was cancelled before refresh
+      if (processingCancelled) {
+        console.log("Processing cancelled before refresh")
+        return
       }
 
       // Refresh the match statuses
+      console.log("Refreshing match statuses...")
       const allEntries = [...glDataA, ...glDataB].map(entry => ({
         voucher_type: entry.voucher_type,
         voucher_no: entry.voucher_no,
@@ -382,15 +433,43 @@ export default function IntercompanyReconciliation() {
       const newStatusMap = await refreshMatchStatuses(allEntries)
       setBackendMatchStatus(newStatusMap)
 
-      // Clear selections
+      // Clear selections and close modal
       setSelectedEntries(new Set())
+      setIsProcessing(false)
       setShowMatchModal(false)
+      console.log("Bulk match process completed successfully, modal closed")
+      console.log("Modal state after completion - showMatchModal:", false, "isProcessing:", false)
+
+      // Force close modal after a short delay to ensure it closes
+      setTimeout(() => {
+        setShowMatchModal(false)
+        setIsProcessing(false)
+        console.log("Forced modal close after timeout")
+      }, 100)
 
     } catch (error) {
       console.error('Error in bulk matching:', error)
       alert('Failed to perform bulk matching. Please try again.')
+      setIsProcessing(false)
+      console.log("Bulk match process failed, processing state reset")
     }
   }
+  // Reset processing state when modal opens
+  useEffect(() => {
+    if (showMatchModal) {
+      console.log("Modal opened, resetting processing state")
+      setIsProcessing(false)
+      setProcessingCancelled(false)
+      setProcessingSuccess(false)
+    }
+  }, [showMatchModal])
+
+  const handleCancelProcessing = () => {
+    console.log("User cancelled processing")
+    setProcessingCancelled(true)
+    setIsProcessing(false)
+  }
+
   const handleManualMatch = async (entryA: GLEntry, entryB: GLEntry) => {
     try {
       // Update both entries to Match status using the hook
@@ -849,13 +928,27 @@ export default function IntercompanyReconciliation() {
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    onClick={() => setShowMatchModal(true)}
-                    disabled={selectedEntries.size === 0}
+                    onClick={() => {
+                      console.log("Opening match modal with", selectedEntries.size, "selected entries")
+                      console.log("Current matchLoading state:", matchLoading)
+                      console.log("Current isProcessing state:", isProcessing)
+                      setShowMatchModal(true)
+                    }}
+                    disabled={selectedEntries.size === 0 || isProcessing}
                     variant="outline"
                     className="border-green-200 text-green-700 hover:bg-green-50"
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Match Selected ({selectedEntries.size})
+                    {isProcessing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Match Selected ({selectedEntries.size})
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -1076,37 +1169,92 @@ export default function IntercompanyReconciliation() {
         {showMatchModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold mb-4">Confirm Bulk Matching</h3>
+              <h3 className="text-lg font-semibold mb-4">
+                {processingSuccess ? "Success!" : isProcessing ? "Processing Bulk Matching" : "Confirm Bulk Matching"}
+              </h3>
               <p className="text-gray-600 mb-4">
-                Are you sure you want to mark {selectedEntries.size} selected entries as matched? This action will update the status in the backend.
+                {processingSuccess
+                  ? `Successfully matched ${selectedEntries.size} entries! Modal will close automatically.`
+                  : isProcessing
+                    ? `Processing ${selectedEntries.size} selected entries... This may take a moment.`
+                    : `Are you sure you want to mark ${selectedEntries.size} selected entries as matched? This action will update the status in the backend.`
+                }
               </p>
+              {isProcessing && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                    <span className="text-sm text-blue-600">Processing entries...</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                  </div>
+                </div>
+              )}
+              {processingSuccess && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-600">Successfully completed!</span>
+                  </div>
+                </div>
+              )}
               {matchError && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded text-red-700">
                   {matchError}
                 </div>
               )}
               <div className="flex gap-3 justify-end">
-                <Button
-                  onClick={() => setShowMatchModal(false)}
-                  variant="outline"
-                  disabled={matchLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleBulkMatch}
-                  className="bg-green-600 hover:bg-green-700"
-                  disabled={matchLoading}
-                >
-                  {matchLoading ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    `Confirm Match (${selectedEntries.size})`
-                  )}
-                </Button>
+                {processingSuccess ? (
+                  <Button
+                    onClick={() => {
+                      setShowMatchModal(false)
+                      setIsProcessing(false)
+                      setProcessingSuccess(false)
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    Close
+                  </Button>
+                ) : isProcessing ? (
+                  <Button
+                    onClick={handleCancelProcessing}
+                    variant="outline"
+                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                  >
+                    Stop Processing
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => {
+                        console.log("Modal cancelled, closing modal")
+                        setShowMatchModal(false)
+                      }}
+                      variant="outline"
+                      disabled={isProcessing}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        console.log("Confirm button clicked, starting bulk match process")
+                        handleBulkMatch()
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        `Confirm Match (${selectedEntries.size})`
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1115,3 +1263,4 @@ export default function IntercompanyReconciliation() {
     </div>
   )
 }
+

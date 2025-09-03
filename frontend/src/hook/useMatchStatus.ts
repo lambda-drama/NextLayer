@@ -25,7 +25,7 @@ export const useMatchStatus = () => {
   const updateMatchStatus = async (data: MatchStatusData): Promise<MatchStatusResponse> => {
     setLoading(true)
     setError(null)
-
+    // console.log("Data", data)
     try {
       const response = await fetch('/api/method/nextlayer.next_layer.api.general_ledger.update_match_status', {
         method: 'POST',
@@ -37,13 +37,13 @@ export const useMatchStatus = () => {
           voucher_no: data.voucher_no,
           company: data.company,
           status: data.status,
-          matched_with: data.matched_with ? JSON.stringify(data.matched_with) : null
+          matched_with: data.matched_with
         })
       })
 
       const result = await response.json()
-
-      if (result.success) {
+      console.log("Providers", result.message.success)
+      if (result.message.success) {
         return result
       } else {
         throw new Error(result.message || 'Failed to update match status')

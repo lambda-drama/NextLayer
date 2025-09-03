@@ -37,8 +37,8 @@ export function useCompanies(): UseCompaniesReturn {
                      document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
                      '';
 
-    console.log("Csrf is", csrfToken)
-    console.log("Making API call to get_companies...")
+    // console.log("Csrf is", csrfToken)
+    // console.log("Making API call to get_companies...")
 
     try {
       const response = await fetch(
@@ -52,8 +52,8 @@ export function useCompanies(): UseCompaniesReturn {
         }
       )
 
-      console.log("Response status:", response.status);
-      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+      // console.log("Response status:", response.status);
+      // console.log("Response headers:", Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -62,7 +62,7 @@ export function useCompanies(): UseCompaniesReturn {
       }
 
       const result: APIResponse = await response.json()
-      console.log("API response:", result);
+      // console.log("API response:", result);
 
       if (Array.isArray(result.message?.data)) {
         setCompanies(result.message.data)
@@ -80,10 +80,10 @@ export function useCompanies(): UseCompaniesReturn {
 
   const testEndpoint = async () => {
     try {
-      console.log("Testing endpoint...");
+      // console.log("Testing endpoint...");
 
       // Try POST request first
-      console.log("Testing POST request...");
+      // console.log("Testing POST request...");
       const postResponse = await fetch(
         "/api/method/nextlayer.next_layer.api.general_ledger.test_endpoint",
         {
@@ -94,12 +94,12 @@ export function useCompanies(): UseCompaniesReturn {
         }
       )
 
-      console.log("POST response status:", postResponse.status);
+      // console.log("POST response status:", postResponse.status);
       const postResult = await postResponse.json();
-      console.log("POST result:", postResult);
+      // console.log("POST result:", postResult);
 
       // Try GET request as well
-      console.log("Testing GET request...");
+      // console.log("Testing GET request...");
       const getResponse = await fetch(
         "/api/method/nextlayer.next_layer.api.general_ledger.test_endpoint",
         {
@@ -107,9 +107,9 @@ export function useCompanies(): UseCompaniesReturn {
         }
       )
 
-      console.log("GET response status:", getResponse.status);
+      // console.log("GET response status:", getResponse.status);
       const getResult = await getResponse.json();
-      console.log("GET result:", getResult);
+      // console.log("GET result:", getResult);
 
     } catch (err: any) {
       console.error("Test endpoint failed:", err);
@@ -118,7 +118,7 @@ export function useCompanies(): UseCompaniesReturn {
 
   const refreshCSRFToken = async () => {
     try {
-      console.log("Refreshing CSRF token...");
+      // console.log("Refreshing CSRF token...");
       const response = await fetch("/api/method/frappe.sessions.get_csrf_token", {
         method: "GET",
       });
@@ -127,7 +127,7 @@ export function useCompanies(): UseCompaniesReturn {
         const result = await response.json();
         const newToken = result.message;
         window.csrf_token = newToken;
-        console.log("New CSRF token set:", newToken);
+        // console.log("New CSRF token set:", newToken);
         return newToken;
       } else {
         console.error("Failed to refresh CSRF token");

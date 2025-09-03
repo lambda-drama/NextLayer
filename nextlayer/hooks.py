@@ -28,6 +28,7 @@ doc_events = {
         "on_cancel": "nextlayer.next_layer.controllers.sales_shipment.on_cancel",
     },
 }
+
 # Includes in <head>
 # ------------------
 

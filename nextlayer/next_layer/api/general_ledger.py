@@ -137,7 +137,17 @@ def get_parties(party_type="Customer", company=None):
 def update_match_status():
     """Update match status for GL entries by updating the original document"""
     try:
-        data = frappe.parse_json(frappe.request.get_data())
+        # Get the raw data as bytes and decode to string
+        raw_data = frappe.request.get_data()
+        frappe.logger().info(f"Raw data type: {type(raw_data)}, Raw data: {raw_data}")
+        data_string = raw_data.decode('utf-8')
+        frappe.logger().info(f"Decoded string: {data_string}")
+        data = frappe.parse_json(data_string)
+        frappe.logger().info(f"Parsed data: {data}")
+
+        # Validate that data is a dictionary
+        if not isinstance(data, dict):
+            frappe.throw(f"Expected dictionary data, got {type(data)}")
 
         voucher_type = data.get("voucher_type")
         voucher_no = data.get("voucher_no")
@@ -145,34 +155,65 @@ def update_match_status():
         match_status = data.get("status")
         matched_with = data.get("matched_with")
 
+        frappe.logger().info(f"Extracted fields: voucher_type={voucher_type}, voucher_no={voucher_no}, company={company}, status={match_status}")
+        frappe.logger().info(f"Matched with type: {type(matched_with)}, value: {matched_with}")
+
         if not all([voucher_type, voucher_no, company, match_status]):
             frappe.throw("Missing required fields: voucher_type, voucher_no, company, status")
 
-        # Get the original document
-        try:
-            doc = frappe.get_doc(voucher_type, voucher_no)
-        except frappe.DoesNotExistError:
+        # Check if document exists
+        if not frappe.db.exists(voucher_type, voucher_no):
             frappe.throw(f"Document {voucher_type} {voucher_no} not found")
 
-        # Update the custom fields
-        doc.update({
-            "intercompany_match_status": match_status,
-            "intercompany_matched_with": matched_with,
-            "intercompany_matched_by": frappe.session.user,
-            "intercompany_matched_on": frappe.utils.now()
-        })
+        # Handle matched_with field - convert dict to JSON string if needed
+        matched_with_value = matched_with
+        if isinstance(matched_with, dict):
+            matched_with_value = frappe.as_json(matched_with)
 
-        doc.save()
+        # Use frappe.db.set_value to bypass submit validation
+        frappe.logger().info(f"Updating {voucher_type} {voucher_no} with match_status={match_status}")
+
+        frappe.db.set_value(
+            voucher_type,
+            voucher_no,
+            "intercompany_match_status",
+            match_status
+        )
+
+        frappe.db.set_value(
+            voucher_type,
+           voucher_no,
+            "intercompany_matched_with",
+            matched_with_value
+        )
+
+        frappe.db.set_value(
+            voucher_type,
+            voucher_no,
+            "intercompany_matched_by",
+            frappe.session.user
+        )
+
+        frappe.db.set_value(
+            voucher_type,
+            voucher_no,
+            "intercompany_matched_on",
+            frappe.utils.now()
+        )
+
         frappe.db.commit()
+        frappe.logger().info(f"Successfully updated {voucher_type} {voucher_no}")
 
         return {
             "success": True,
             "message": f"Match status updated to {match_status}",
-            "doc_name": doc.name
+            "doc_name": voucher_no
         }
 
     except Exception as e:
         frappe.log_error(f"Update Match Status Error: {str(e)}")
+        frappe.logger().error(f"Exception details: {type(e).__name__}: {str(e)}")
+        frappe.logger().error(f"Request data: {frappe.request.get_data()}")
         return {
             "success": False,
             "error": str(e),

@@ -97,7 +97,7 @@ export function useGeneralLedgerData({
       )
 
       const result: APIResponse = await response.json()
-      console.log("API Response:", result)
+      // console.log("API Response:", result)
 
       if (!result.message?.success) {
   throw new Error(result.message?.error || result.error || "Failed to fetch data")
@@ -116,11 +116,11 @@ const rawEntries = result.message?.data?.entries || []
           totalCredit: parseFloat(openingEntry.credit) || 0,
           balance: parseFloat(openingEntry.balance) || 0,
         })
-        console.log("Reconciliation totals extracted:", {
-          totalDebit: parseFloat(openingEntry.debit) || 0,
-          totalCredit: parseFloat(openingEntry.credit) || 0,
-          balance: parseFloat(openingEntry.balance) || 0,
-        })
+        // console.log("Reconciliation totals extracted:", {
+        //   totalDebit: parseFloat(openingEntry.debit) || 0,
+        //   totalCredit: parseFloat(openingEntry.credit) || 0,
+        //   balance: parseFloat(openingEntry.balance) || 0,
+        // })
       }
 
       // Filter and process regular GL entries (exclude special rows)

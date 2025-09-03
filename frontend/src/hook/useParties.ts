@@ -41,7 +41,7 @@ export function useParties(partyType: string, company: string): UsePartiesReturn
       )
 
       const result: APIResponse = await response.json()
-        console.log(result.message)
+        // console.log(result.message)
       if (Array.isArray(result.message?.data)) {
         setParties(result.message.data)
       } else {
