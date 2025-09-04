@@ -173,36 +173,45 @@ def update_match_status():
         # Use frappe.db.set_value to bypass submit validation
         frappe.logger().info(f"Updating {voucher_type} {voucher_no} with match_status={match_status}")
 
-        frappe.db.set_value(
-            voucher_type,
-            voucher_no,
-            "intercompany_match_status",
-            match_status
-        )
+        # Combine all updates into a single operation to avoid concurrency issues
+        update_data = {
+            "intercompany_match_status": match_status,
+            "intercompany_matched_with": matched_with_value,
+            "intercompany_matched_by": frappe.session.user,
+            "intercompany_matched_on": frappe.utils.now()
+        }
 
-        frappe.db.set_value(
-            voucher_type,
-           voucher_no,
-            "intercompany_matched_with",
-            matched_with_value
-        )
+        # Add retry logic for concurrency issues
+        max_retries = 3
+        retry_count = 0
 
-        frappe.db.set_value(
-            voucher_type,
-            voucher_no,
-            "intercompany_matched_by",
-            frappe.session.user
-        )
+        while retry_count < max_retries:
+            try:
+                # Use frappe.db.set_value with multiple fields in one call
+                frappe.db.set_value(
+                    voucher_type,
+                    voucher_no,
+                    update_data
+                )
+                frappe.db.commit()
+                frappe.logger().info(f"Successfully updated {voucher_type} {voucher_no}")
+                break
 
-        frappe.db.set_value(
-            voucher_type,
-            voucher_no,
-            "intercompany_matched_on",
-            frappe.utils.now()
-        )
+            except frappe.QueryDeadlockError as e:
+                retry_count += 1
+                frappe.logger().warning(f"Concurrency error on attempt {retry_count} for {voucher_type} {voucher_no}: {str(e)}")
 
-        frappe.db.commit()
-        frappe.logger().info(f"Successfully updated {voucher_type} {voucher_no}")
+                if retry_count >= max_retries:
+                    frappe.logger().error(f"Max retries reached for {voucher_type} {voucher_no}")
+                    raise e
+
+                # Wait a bit before retrying (exponential backoff)
+                import time
+                time.sleep(0.1 * (2 ** retry_count))
+
+            except Exception as e:
+                # For non-concurrency errors, don't retry
+                raise e
 
         return {
             "success": True,

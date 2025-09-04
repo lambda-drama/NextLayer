@@ -42,11 +42,21 @@ export const useMatchStatus = () => {
       })
 
       const result = await response.json()
-      console.log("Providers", result.message.success)
-      if (result.message.success) {
-        return result
+      console.log("Providers", result.success)
+      console.log("Full result:", result)
+
+      // Handle Frappe API response structure (wrapped in message object)
+      const responseData = result.message || result
+      console.log("Response data:", responseData)
+
+      if (responseData.success) {
+        return responseData
       } else {
-        throw new Error(result.message || 'Failed to update match status')
+        // Handle case where result.message might be an object
+        const errorMessage = typeof responseData.message === 'string'
+          ? responseData.message
+          : responseData.message?.message || JSON.stringify(responseData.message) || 'Failed to update match status'
+        throw new Error(errorMessage)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
@@ -65,10 +75,17 @@ export const useMatchStatus = () => {
       const response = await fetch(`/api/method/nextlayer.next_layer.api.general_ledger.get_match_status?voucher_type=${encodeURIComponent(voucherType)}&voucher_no=${encodeURIComponent(voucherNo)}&company=${encodeURIComponent(company)}`)
       const result = await response.json()
 
-      if (result.success) {
-        return result
+      // Handle Frappe API response structure (wrapped in message object)
+      const responseData = result.message || result
+
+      if (responseData.success) {
+        return responseData
       } else {
-        throw new Error(result.message || 'Failed to get match status')
+        // Handle case where result.message might be an object
+        const errorMessage = typeof responseData.message === 'string'
+          ? responseData.message
+          : responseData.message?.message || JSON.stringify(responseData.message) || 'Failed to get match status'
+        throw new Error(errorMessage)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
@@ -96,9 +113,12 @@ export const useMatchStatus = () => {
 
       const batchPromises = batch.map(async (entry) => {
         try {
+          console.log(`Processing entry: ${entry.voucher_type} ${entry.voucher_no}`)
           await updateMatchStatus(entry)
+          console.log(`Successfully processed: ${entry.voucher_type} ${entry.voucher_no}`)
           results.success++
         } catch (err) {
+          console.error(`Error processing ${entry.voucher_type} ${entry.voucher_no}:`, err)
           results.failed++
           const errorMessage = err instanceof Error ? err.message : 'Unknown error'
           results.errors.push(`${entry.voucher_type} ${entry.voucher_no}: ${errorMessage}`)
