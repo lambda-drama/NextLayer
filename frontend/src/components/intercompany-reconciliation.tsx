@@ -61,7 +61,7 @@ export default function IntercompanyReconciliation() {
 
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint, refreshCSRFToken } = useCompanies()
-  const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, loading: matchLoading, error: matchError } = useMatchStatus()
+  const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, loading: matchLoading, error: matchError, clearError } = useMatchStatus()
 
   const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = useParties(
     "Customer",
@@ -473,8 +473,13 @@ export default function IntercompanyReconciliation() {
       setIsProcessing(false)
       setProcessingCancelled(false)
       setProcessingSuccess(false)
+      // Clear any existing errors when modal opens
+      if (matchError) {
+        console.log("Clearing match error:", matchError)
+        clearError()
+      }
     }
-  }, [showMatchModal])
+  }, [showMatchModal, matchError, clearError])
 
   const handleCancelProcessing = () => {
     console.log("User cancelled processing")
@@ -1213,7 +1218,17 @@ export default function IntercompanyReconciliation() {
               )}
               {matchError && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded text-red-700">
-                  {matchError}
+                  <div className="flex justify-between items-center">
+                    <span>{matchError}</span>
+                    <Button
+                      onClick={clearError}
+                      size="sm"
+                      variant="outline"
+                      className="ml-2 text-xs"
+                    >
+                      Clear
+                    </Button>
+                  </div>
                 </div>
               )}
               <div className="flex gap-3 justify-end">
