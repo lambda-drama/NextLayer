@@ -183,40 +183,41 @@ export default function IntercompanyReconciliation() {
     }
 
     fetchMatchStatus()
-  }, [glDataA, glDataB, companyA, companyB, getMatchStatus])
+  }, [glDataA, glDataB, companyA, companyB])
 
   // Function to find matching entries between Company A and Company B
   const findMatchingEntries = useMemo(() => {
     if (!glDataA.length || !glDataB.length) return { glDataAWithStatus: [], glDataBWithStatus: [] }
 
-    // console.log("=== DEBUGGING MATCHING LOGIC ===")
-    // console.log("Company A Data:", glDataA)
-    // console.log("Company B Data:", glDataB)
+    // Create a map to track which entries have been matched to prevent duplicates
+    const matchedEntriesB = new Set<string>()
+    const matchedEntriesA = new Set<string>()
 
+    // First pass: Process Company A entries and find their matches
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
-      // console.log(`\n--- Checking Entry A: ${entryA.voucher_type} ${entryA.voucher_no} ---`)
-      // console.log(`Entry A - Date: ${entryA.posting_date}, Debit: ${entryA.debit} (type: ${typeof entryA.debit}), Credit: ${entryA.credit} (type: ${typeof entryA.credit})`)
-
       // Find matching entry in Company B based on amount only (date can be different)
+      // But ensure we don't match with an entry that's already been matched
       const matchingEntry = glDataB.find(entryB => {
-        // console.log(`  Comparing with Entry B: ${entryB.voucher_type} ${entryB.voucher_no}`)
-        // console.log(`  Entry B - Date: ${entryB.posting_date}, Debit: ${entryB.debit} (type: ${typeof entryB.debit}), Credit: ${entryB.credit} (type: ${typeof entryB.credit})`)
+        const entryBKey = `${entryB.voucher_type}-${entryB.voucher_no}`
+
+        // Skip if this entry B has already been matched
+        if (matchedEntriesB.has(entryBKey)) {
+          return false
+        }
 
         // Check if amounts match (debit on one side should equal credit on other side)
         const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
         const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
 
-        // console.log(`  Debit-Credit Match: ${debitCreditMatch} (${entryA.debit} === ${entryB.credit})`)
-        // console.log(`  Credit-Debit Match: ${creditDebitMatch} (${entryA.credit} === ${entryB.debit})`)
-        // console.log(`  Math.abs(${entryA.debit} - ${entryB.credit}) = ${Math.abs(entryA.debit - entryB.credit)}`)
-        // console.log(`  Math.abs(${entryA.credit} - ${entryB.debit}) = ${Math.abs(entryA.credit - entryB.debit)}`)
-
         // Return true if either debit matches credit OR credit matches debit (no date requirement)
-        const isMatch = debitCreditMatch || creditDebitMatch
-        // console.log(`  Final Match: ${isMatch}`)
-
-        return isMatch
+        return debitCreditMatch || creditDebitMatch
       })
+
+      // If we found a match, mark it as used
+      if (matchingEntry) {
+        const entryBKey = `${matchingEntry.voucher_type}-${matchingEntry.voucher_no}`
+        matchedEntriesB.add(entryBKey)
+      }
 
       // Check if we have backend status for this entry
       const key = `${entryA.voucher_type}-${entryA.voucher_no}`
@@ -226,10 +227,8 @@ export default function IntercompanyReconciliation() {
       let status: 'Match' | 'Mismatch' | 'Pending'
       if (backendStatus && backendStatus.status) {
         status = backendStatus.status
-        // console.log(`  Using backend status: ${status}`)
       } else {
         status = matchingEntry ? 'Match' : 'Mismatch'
-        // console.log(`  Using client-side status: ${status}`)
       }
 
       return {
@@ -240,9 +239,17 @@ export default function IntercompanyReconciliation() {
       }
     })
 
+    // Second pass: Process Company B entries and find their matches
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
       // Find matching entry in Company A
       const matchingEntry = glDataA.find(entryA => {
+        const entryAKey = `${entryA.voucher_type}-${entryA.voucher_no}`
+
+        // Skip if this entry A has already been matched
+        if (matchedEntriesA.has(entryAKey)) {
+          return false
+        }
+
         // Check if amounts match (debit on one side should equal credit on other side)
         const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
         const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
@@ -250,6 +257,12 @@ export default function IntercompanyReconciliation() {
         // Return true if either debit matches credit OR credit matches debit (no date requirement)
         return debitCreditMatch || creditDebitMatch
       })
+
+      // If we found a match, mark it as used
+      if (matchingEntry) {
+        const entryAKey = `${matchingEntry.voucher_type}-${matchingEntry.voucher_no}`
+        matchedEntriesA.add(entryAKey)
+      }
 
       // Check if we have backend status for this entry
       const key = `${entryB.voucher_type}-${entryB.voucher_no}`
@@ -271,7 +284,6 @@ export default function IntercompanyReconciliation() {
       }
     })
 
-    // console.log("=== END DEBUGGING ===")
     return { glDataAWithStatus, glDataBWithStatus }
   }, [glDataA, glDataB, backendMatchStatus])
 
