@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 
 export interface MatchStatusData {
   voucher_type: string
@@ -22,7 +22,7 @@ export const useMatchStatus = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const updateMatchStatus = async (data: MatchStatusData): Promise<MatchStatusResponse> => {
+  const updateMatchStatus = useCallback(async (data: MatchStatusData): Promise<MatchStatusResponse> => {
     setLoading(true)
     setError(null)
     // console.log("Data", data)
@@ -55,9 +55,9 @@ export const useMatchStatus = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const getMatchStatus = async (voucherType: string, voucherNo: string, company: string): Promise<MatchStatusResponse> => {
+  const getMatchStatus = useCallback(async (voucherType: string, voucherNo: string, company: string): Promise<MatchStatusResponse> => {
     setLoading(true)
     setError(null)
 
@@ -77,9 +77,9 @@ export const useMatchStatus = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const bulkUpdateMatchStatus = async (entries: MatchStatusData[]): Promise<{ success: number; failed: number; errors: string[] }> => {
+  const bulkUpdateMatchStatus = useCallback(async (entries: MatchStatusData[]): Promise<{ success: number; failed: number; errors: string[] }> => {
     setLoading(true)
     setError(null)
 
@@ -111,9 +111,9 @@ export const useMatchStatus = () => {
 
     setLoading(false)
     return results
-  }
+  }, [updateMatchStatus])
 
-  const refreshMatchStatuses = async (entries: Array<{ voucher_type: string; voucher_no: string; company: string }>): Promise<{[key: string]: MatchStatusResponse}> => {
+  const refreshMatchStatuses = useCallback(async (entries: Array<{ voucher_type: string; voucher_no: string; company: string }>): Promise<{[key: string]: MatchStatusResponse}> => {
     setLoading(true)
     setError(null)
 
@@ -139,7 +139,7 @@ export const useMatchStatus = () => {
 
     setLoading(false)
     return statusMap
-  }
+  }, [getMatchStatus])
 
   return {
     updateMatchStatus,
@@ -148,6 +148,6 @@ export const useMatchStatus = () => {
     refreshMatchStatuses,
     loading,
     error,
-    clearError: () => setError(null)
+    clearError: useCallback(() => setError(null), [])
   }
 }
