@@ -132,7 +132,7 @@ export default function IntercompanyReconciliation() {
   // Handle manual changes to Company A
   const handleCompanyAChange = (value: string) => {
     setCompanyA(value)
-    setPartyA("") // Reset party when company changes
+    setPartyA("") 
     setIsAutoFilled(false) // Clear auto-fill flag
   }
 
@@ -355,24 +355,19 @@ export default function IntercompanyReconciliation() {
   // Get party currencies for display
   const getPartyCurrency = (partyName: string, partyType: string) => {
     if (currency !== 'all') {
-      // If a specific currency is selected, use that
       return currency
     }
 
-    // If no specific currency selected, get the party's default currency
     if (partyType === 'Customer') {
-      // Left side: Customer from Company A
-      // partyName might be a company name due to autofill, so we need to find the actual customer
       const party = partiesA.find(p => p.name === partyName || p.party_name === partyName)
-      return party?.default_currency || 'INR'
+      return party?.default_currency || 'USD'
     } else if (partyType === 'Supplier') {
       // Right side: Supplier from Company B
-      // partyName might be a company name due to autofill, so we need to find the actual supplier
       const party = partiesB.find(p => p.name === partyName || p.party_name === partyName)
-      return party?.default_currency || 'INR'
+      return party?.default_currency || 'USD'
     }
 
-    return 'INR'
+    return 'USD'
   }
 
   // Handle entry selection
@@ -388,7 +383,6 @@ export default function IntercompanyReconciliation() {
 
       // Handle bulk matching
   const handleBulkMatch = async () => {
-    console.log("Starting bulk match process...")
     setIsProcessing(true)
     setProcessingCancelled(false)
 
@@ -396,7 +390,6 @@ export default function IntercompanyReconciliation() {
       // Get all selected entries that have potential matches
       const entriesToMatch: Array<{ entryA: GLEntry; entryB: GLEntry }> = []
 
-      console.log("Processing selected entries:", selectedEntries.size)
 
       // First, validate that selected entries can be matched by checking amounts
       const selectedEntriesArray = Array.from(selectedEntries)
@@ -540,8 +533,7 @@ export default function IntercompanyReconciliation() {
         return
       }
 
-      // Refresh the match statuses
-      console.log("Refreshing match statuses...")
+     
       const allEntries = [...glDataA, ...glDataB].map(entry => ({
         voucher_type: entry.voucher_type,
         voucher_no: entry.voucher_no,
@@ -555,14 +547,11 @@ export default function IntercompanyReconciliation() {
       setSelectedEntries(new Set())
       setIsProcessing(false)
       setShowMatchModal(false)
-      console.log("Bulk match process completed successfully, modal closed")
-      console.log("Modal state after completion - showMatchModal:", false, "isProcessing:", false)
-
+     
       // Force close modal after a short delay to ensure it closes
       setTimeout(() => {
         setShowMatchModal(false)
         setIsProcessing(false)
-        console.log("Forced modal close after timeout")
       }, 100)
 
     } catch (error) {
@@ -575,7 +564,6 @@ export default function IntercompanyReconciliation() {
   // Reset processing state when modal opens
   useEffect(() => {
     if (showMatchModal) {
-      console.log("Modal opened, resetting processing state")
       setIsProcessing(false)
       setProcessingCancelled(false)
       setProcessingSuccess(false)
@@ -588,7 +576,6 @@ export default function IntercompanyReconciliation() {
   }, [showMatchModal, matchError, clearError])
 
   const handleCancelProcessing = () => {
-    console.log("User cancelled processing")
     setProcessingCancelled(true)
     setIsProcessing(false)
   }
