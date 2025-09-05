@@ -47,7 +47,6 @@ export const useMatchStatus = () => {
 
       // Handle Frappe API response structure (wrapped in message object)
       const responseData = result.message || result
-      console.log("Response data:", responseData)
 
       if (responseData.success) {
         return responseData
