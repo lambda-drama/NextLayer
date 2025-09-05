@@ -122,11 +122,8 @@ def update_match_status():
     try:
         # Get the raw data as bytes and decode to string
         raw_data = frappe.request.get_data()
-        frappe.logger().info(f"Raw data type: {type(raw_data)}, Raw data: {raw_data}")
         data_string = raw_data.decode('utf-8')
-        frappe.logger().info(f"Decoded string: {data_string}")
         data = frappe.parse_json(data_string)
-        frappe.logger().info(f"Parsed data: {data}")
 
         # Validate that data is a dictionary
         if not isinstance(data, dict):
@@ -236,25 +233,6 @@ def get_match_status(voucher_type, voucher_no, company):
             "success": False,
             "error": str(e),
             "message": "Failed to get match status"
-        }
-
-
-# api/helpers.py
-
-@frappe.whitelist()
-def test_endpoint():
-    """Simple test endpoint to verify API is working"""
-    try:
-        return {
-            "success": True,
-            "message": "API is working",
-            "user": frappe.session.user,
-            "timestamp": frappe.utils.now()
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
         }
 
 def format_gl_entries_for_frontend(data, columns):
