@@ -49,6 +49,7 @@ interface UseGLDataOptions {
   party: string
   fromDate: string
   toDate: string
+  currency?: string
 }
 
 export function useGeneralLedgerData({
@@ -57,6 +58,7 @@ export function useGeneralLedgerData({
   party,
   fromDate,
   toDate,
+  currency,
 }: UseGLDataOptions) {
   const [data, setData] = useState<GLEntry[]>([])
   const [reconciliationTotals, setReconciliationTotals] = useState<ReconciliationTotals | null>(null)
@@ -77,6 +79,7 @@ export function useGeneralLedgerData({
       to_date: toDate,
       show_remarks: 1,
       include_dimensions: 0,
+      ...(currency && currency !== "all" && { currency }),
     }
 
     try {
@@ -105,8 +108,8 @@ export function useGeneralLedgerData({
 
 const rawEntries = result.message?.data?.entries || []
 
-     
-      const openingEntry = rawEntries.find((entry: any) => 
+
+      const openingEntry = rawEntries.find((entry: any) =>
         entry.account && entry.account.includes("'Opening'")
       )
 
@@ -116,11 +119,6 @@ const rawEntries = result.message?.data?.entries || []
           totalCredit: parseFloat(openingEntry.credit) || 0,
           balance: parseFloat(openingEntry.balance) || 0,
         })
-        // console.log("Reconciliation totals extracted:", {
-        //   totalDebit: parseFloat(openingEntry.debit) || 0,
-        //   totalCredit: parseFloat(openingEntry.credit) || 0,
-        //   balance: parseFloat(openingEntry.balance) || 0,
-        // })
       }
 
       // Filter and process regular GL entries (exclude special rows)
@@ -130,21 +128,21 @@ const rawEntries = result.message?.data?.entries || []
             return false
           }
           // Exclude special summary rows
-          return !entry.account.includes("'Opening'") && 
-                 !entry.account.includes("'Total'") && 
+          return !entry.account.includes("'Opening'") &&
+                 !entry.account.includes("'Total'") &&
                  !entry.account.includes("'Closing'")
         })
         .map((entry: any, index: number) => {
           let balance = 0
           for (let i = 0; i <= index; i++) {
-            const prevEntry = rawEntries.filter((e: any) => 
-              e.posting_date && 
-              typeof e.account === "string" && 
-              !e.account.includes("'Opening'") && 
-              !e.account.includes("'Total'") && 
+            const prevEntry = rawEntries.filter((e: any) =>
+              e.posting_date &&
+              typeof e.account === "string" &&
+              !e.account.includes("'Opening'") &&
+              !e.account.includes("'Total'") &&
               !e.account.includes("'Closing'")
             )[i]
-            
+
             if (prevEntry) {
               balance += (parseFloat(prevEntry.debit) || 0) - (parseFloat(prevEntry.credit) || 0)
             }
@@ -175,17 +173,17 @@ const rawEntries = result.message?.data?.entries || []
     } finally {
       setLoading(false)
     }
-  }, [company, partyType, party, fromDate, toDate])
+  }, [company, partyType, party, fromDate, toDate, currency])
 
   useEffect(() => {
     fetchGLData()
   }, [fetchGLData])
 
-  return { 
-    data, 
-    reconciliationTotals, 
-    loading, 
-    error, 
-    refetch: fetchGLData 
+  return {
+    data,
+    reconciliationTotals,
+    loading,
+    error,
+    refetch: fetchGLData
   }
 }

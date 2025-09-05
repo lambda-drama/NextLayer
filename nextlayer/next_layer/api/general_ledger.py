@@ -2,21 +2,17 @@
 # api/general_ledger.py
 import frappe
 from frappe import _
-from frappe.utils import cint, flt
-# from nextlayer.next_layer.report.general_ledger.general_ledger import execute
+from frappe.utils import flt
 from nextlayer.next_layer.report.general_ledger_extension.general_ledger_extension import execute
 from frappe import _dict
-import frappe
 from frappe.utils import flt
 
 @frappe.whitelist()
 def get_general_ledger_data(filters):
     try:
-        # Parse filters if they're passed as JSON string
         if isinstance(filters, str):
             filters = frappe.parse_json(filters)
 
-        # Convert dict → frappe._dict so .party works
         filters = _dict(filters)
 
         # Validate required fields
@@ -27,20 +23,24 @@ def get_general_ledger_data(filters):
             frappe.throw(_("From Date and To Date are required"))
 
         # Set default values
-        # filters.setdefault("party_type", "Customer")
         filters.setdefault("show_remarks", 1)
-        # filters.setdefault("include_dimensions", 1)
-        # filters.setdefault("group_by", "Group by Account")
         filters.setdefault("categorize_by", "Categorize by Voucher (Consolidated)")
         filters.setdefault("include_dimensions", 1)
         filters.setdefault("include_default_book_entries", 1)
-        filters.setdefault("company_currency", "INR")
-        filters.setdefault("account_currency", "INR")
+
+        if filters.get("currency"):
+            filters.setdefault("presentation_currency", filters.get("currency"))
+            filters.setdefault("account_currency", filters.get("currency"))
+
+        else:
+            company_currency = frappe.get_cached_value("Company", filters.get("company"), "default_currency")
+            filters.setdefault("company_currency", company_currency)
+            filters.setdefault("account_currency", company_currency)
+
         filters.setdefault("company_fb", "")
 
-        # Execute the report
         columns, data = execute(filters)
-        # print("Print", data)
+
         # Format the response
         return {
             "success": True,
@@ -65,12 +65,6 @@ def get_general_ledger_data(filters):
 def get_companies():
     """Get list of companies for dropdown"""
     try:
-        # Log the request for debugging
-        frappe.logger().info(f"get_companies called by user: {frappe.session.user}")
-        frappe.logger().info(f"Request method: {frappe.request.method}")
-        frappe.logger().info(f"Request headers: {dict(frappe.request.headers)}")
-        frappe.logger().info(f"Request args: {frappe.request.args}")
-        frappe.logger().info(f"Request form: {frappe.request.form}")
 
         companies = frappe.get_all(
             "Company",
@@ -78,11 +72,9 @@ def get_companies():
             order_by="name"
         )
 
-        frappe.logger().info(f"Found {len(companies)} companies")
         return {"success": True, "data": companies}
 
     except Exception as e:
-        frappe.logger().error(f"Error in get_companies: {str(e)}")
         frappe.log_error(f"get_companies API Error: {str(e)}")
         return {
             "success": False,
@@ -94,22 +86,15 @@ def get_companies():
 def get_parties(party_type="Customer", company=None):
     """Get list of parties (customers/suppliers) for dropdown"""
     try:
-        # Log the request for debugging
-        frappe.logger().info(f"get_parties called by user: {frappe.session.user}, party_type: {party_type}, company: {company}")
-
         filters = {}
-
-        # company filter if needed
-        # if company:
-        #     filters["company"] = company
 
         # add internal customer/supplier filter
         if party_type == "Customer":
             filters["is_internal_customer"] = 1
-            fields = ["name", "customer_name as party_name"]
+            fields = ["name", "customer_name as party_name", "default_currency"]
         elif party_type == "Supplier":
             filters["is_internal_supplier"] = 1
-            fields = ["name", "supplier_name as party_name"]
+            fields = ["name", "supplier_name as party_name", "default_currency"]
         else:
             frappe.throw("Invalid party_type. Must be 'Customer' or 'Supplier'")
 
@@ -120,11 +105,9 @@ def get_parties(party_type="Customer", company=None):
             order_by="name"
         )
 
-        frappe.logger().info(f"Found {len(parties)} {party_type} parties")
         return {"success": True, "data": parties}
 
     except Exception as e:
-        frappe.logger().error(f"Error in get_parties: {str(e)}")
         frappe.log_error(f"get_parties API Error: {str(e)}")
         return {
             "success": False,
@@ -155,9 +138,7 @@ def update_match_status():
         match_status = data.get("status")
         matched_with = data.get("matched_with")
 
-        frappe.logger().info(f"Extracted fields: voucher_type={voucher_type}, voucher_no={voucher_no}, company={company}, status={match_status}")
-        frappe.logger().info(f"Matched with type: {type(matched_with)}, value: {matched_with}")
-
+    
         if not all([voucher_type, voucher_no, company, match_status]):
             frappe.throw("Missing required fields: voucher_type, voucher_no, company, status")
 
@@ -170,9 +151,7 @@ def update_match_status():
         if isinstance(matched_with, dict):
             matched_with_value = frappe.as_json(matched_with)
 
-        # Use frappe.db.set_value to bypass submit validation
-        frappe.logger().info(f"Updating {voucher_type} {voucher_no} with match_status={match_status}")
-
+       
         # Combine all updates into a single operation to avoid concurrency issues
         update_data = {
             "intercompany_match_status": match_status,
@@ -199,7 +178,6 @@ def update_match_status():
 
             except frappe.QueryDeadlockError as e:
                 retry_count += 1
-                frappe.logger().warning(f"Concurrency error on attempt {retry_count} for {voucher_type} {voucher_no}: {str(e)}")
 
                 if retry_count >= max_retries:
                     frappe.logger().error(f"Max retries reached for {voucher_type} {voucher_no}")

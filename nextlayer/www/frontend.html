@@ -2,10 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/assets/nextlayer/frontend/placeholder-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token }}" />
     <title>Intercompany Reconciliation</title>
+    <script type="module" crossorigin src="/assets/nextlayer/frontend/assets/index-BASzGOlt.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/nextlayer/frontend/assets/index-OhSSb7pE.css">
   </head>
   <body>
     <div id="root"></div>
@@ -13,21 +15,6 @@
       // Set CSRF token globally for the frontend
       window.csrf_token = "{{ csrf_token }}";
       console.log("CSRF Token set:", window.csrf_token);
-
-      // Add cache-busting parameter to force fresh load
-      const timestamp = new Date().getTime();
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.crossOrigin = '';
-      script.src = `/assets/nextlayer/frontend/assets/index-C-PBTFIg.js?v=${timestamp}`;
-      document.head.appendChild(script);
-
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.crossOrigin = '';
-      link.href = `/assets/nextlayer/frontend/assets/index-C8XGqyNK.css?v=${timestamp}`;
-      document.head.appendChild(link);
     </script>
   </body>
 </html>
-

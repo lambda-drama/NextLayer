@@ -10,7 +10,7 @@ def execute():
             fieldtype="Select",
             label="Intercompany Match Status",
             options="Pending\nMatch\nMismatch",
-            default="Pending",
+            # default="Pending",
             insert_after="status"
         ),
         dict(
