@@ -25,7 +25,7 @@ def execute(filters=None):
     if not filters:
         return [], []
     account_details = {}
-    
+
     if (
         filters
         and filters.get("print_in_account_currency")
@@ -45,13 +45,12 @@ def execute(filters=None):
     validate_party(filters)
 
     filters = set_account_currency(filters)
-    
+
     columns = get_columns(filters)
 
     update_translations()
 
     res = get_result(filters, account_details)
-    print("Read Data", res)
     return columns, res
 
 
@@ -182,6 +181,10 @@ def get_result(filters, account_details):
 
 
 def get_gl_entries(filters, accounting_dimensions):
+    frappe.logger().info(f"Report received filters: {filters}")
+    frappe.logger().info(f"Account currency filter: {filters.get('account_currency')}")
+    frappe.logger().info(f"Presentation currency filter: {filters.get('presentation_currency')}")
+
     currency_map = get_currency(filters)
     select_fields = """, debit, credit, debit_in_account_currency,
 		credit_in_account_currency """
@@ -217,8 +220,10 @@ def get_gl_entries(filters, accounting_dimensions):
     if filters.get("add_values_in_transaction_currency"):
         transaction_currency_fields = "debit_in_transaction_currency, credit_in_transaction_currency, transaction_currency,"
 
-    gl_entries = frappe.db.sql(
-        f"""
+    conditions = get_conditions(filters)
+    frappe.logger().info(f"SQL conditions: {conditions}")
+
+    sql_query = f"""
 		select
 			name as gl_entry, posting_date, account, party_type, party,
 			voucher_type, voucher_subtype, voucher_no, {dimension_fields}
@@ -226,15 +231,21 @@ def get_gl_entries(filters, accounting_dimensions):
 			against_voucher_type, against_voucher, account_currency,
 			against, is_opening, creation {select_fields}
 		from `tabGL Entry`
-		where company=%(company)s {get_conditions(filters)}
+		where company=%(company)s {conditions}
 		{order_by_statement}
-	""",
-        filters,
-        as_dict=1,
-    )
+	"""
+    frappe.logger().info(f"SQL Query: {sql_query}")
+    frappe.logger().info(f"SQL Filters: {filters}")
+
+    gl_entries = frappe.db.sql(sql_query, filters, as_dict=1)
+    frappe.logger().info(f"Found {len(gl_entries)} GL entries")
+    if gl_entries:
+        frappe.logger().info(f"Sample entry: {gl_entries[0]}")
 
     if filters.get("presentation_currency"):
-        return convert_to_presentation_currency(gl_entries, currency_map)
+        converted_entries = convert_to_presentation_currency(gl_entries, currency_map)
+        frappe.logger().info(f"Converted {len(converted_entries)} entries to presentation currency")
+        return converted_entries
     else:
         return gl_entries
 
@@ -283,6 +294,9 @@ def get_conditions(filters):
 
     if filters.get("party"):
         conditions.append("party in %(party)s")
+
+    if filters.get("account_currency"):
+        conditions.append("account_currency=%(account_currency)s")
 
     if not (
         filters.get("account")
