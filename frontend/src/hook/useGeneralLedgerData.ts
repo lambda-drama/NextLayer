@@ -50,6 +50,8 @@ interface UseGLDataOptions {
   fromDate: string
   toDate: string
   currency?: string
+  ignoreExchangeRateRevaluation?: boolean
+  ignoreSystemGeneratedNotes?: boolean
 }
 
 export function useGeneralLedgerData({
@@ -59,6 +61,8 @@ export function useGeneralLedgerData({
   fromDate,
   toDate,
   currency,
+  ignoreExchangeRateRevaluation,
+  ignoreSystemGeneratedNotes,
 }: UseGLDataOptions) {
   const [data, setData] = useState<GLEntry[]>([])
   const [reconciliationTotals, setReconciliationTotals] = useState<ReconciliationTotals | null>(null)
@@ -80,6 +84,8 @@ export function useGeneralLedgerData({
       show_remarks: 1,
       include_dimensions: 0,
       ...(currency && currency !== "all" && { currency }),
+      ...(ignoreExchangeRateRevaluation && { ignore_err: 1 }),
+      ...(ignoreSystemGeneratedNotes && { ignore_cr_dr_notes: 1 }),
     }
 
     try {
@@ -173,7 +179,7 @@ const rawEntries = result.message?.data?.entries || []
     } finally {
       setLoading(false)
     }
-  }, [company, partyType, party, fromDate, toDate, currency])
+  }, [company, partyType, party, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes])
 
   useEffect(() => {
     fetchGLData()

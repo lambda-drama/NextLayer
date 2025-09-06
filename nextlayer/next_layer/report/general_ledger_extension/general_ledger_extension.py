@@ -283,6 +283,36 @@ def get_conditions(filters):
         if err_journals:
             filters.update({"voucher_no_not_in": [x[0] for x in err_journals]})
 
+    if filters.get("ignore_cr_dr_notes"):
+        # Get system generated credit/debit notes
+        cr_dr_notes = frappe.db.get_all(
+            "Sales Invoice",
+            filters={
+                "company": filters.get("company"),
+                "docstatus": 1,
+                "is_return": 1,
+                "is_internal_customer": 1,
+            },
+            as_list=True,
+        )
+        # Also get Purchase Invoice returns
+        cr_dr_notes.extend(
+            frappe.db.get_all(
+                "Purchase Invoice",
+                filters={
+                    "company": filters.get("company"),
+                    "docstatus": 1,
+                    "is_return": 1,
+                    "is_internal_supplier": 1,
+                },
+                as_list=True,
+            )
+        )
+        if cr_dr_notes:
+            existing_vouchers = filters.get("voucher_no_not_in", [])
+            existing_vouchers.extend([x[0] for x in cr_dr_notes])
+            filters.update({"voucher_no_not_in": existing_vouchers})
+
     if filters.get("voucher_no_not_in"):
         conditions.append("voucher_no not in %(voucher_no_not_in)s")
 
