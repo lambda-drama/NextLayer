@@ -5,7 +5,6 @@ from frappe import _
 from frappe.utils import flt
 from nextlayer.next_layer.report.general_ledger_extension.general_ledger_extension import execute
 from frappe import _dict
-from frappe.utils import flt
 
 @frappe.whitelist()
 def get_general_ledger_data(filters):
@@ -75,7 +74,6 @@ def get_companies():
         user_permitted_companies = user_permitted.get("Company")
 
         if user_permitted_companies:
-            # Extract just the company names from the list of dicts
             permitted_company_names = [c["doc"] for c in user_permitted_companies]
 
             companies = frappe.get_all(
@@ -85,7 +83,6 @@ def get_companies():
                 order_by="name"
             )
         else:
-            # If no specific permissions, return all companies
             companies = frappe.get_all(
                 "Company",
                 fields=["name", "default_currency"],
@@ -102,11 +99,11 @@ def get_companies():
             "message": "Failed to fetch companies"
         }
 
+
 @frappe.whitelist()
 def get_parties(party_type="Customer", company=None):
     """Get list of parties (customers/suppliers) for dropdown"""
     try:
-        # Check user permissions for the requested company
         if company:
             user_permitted_companies = frappe.permissions.get_user_permissions("Company")
             if user_permitted_companies and company not in user_permitted_companies:
@@ -146,12 +143,10 @@ def get_parties(party_type="Customer", company=None):
 def update_match_status():
     """Update match status for GL entries by updating the original document"""
     try:
-        # Get the raw data as bytes and decode to string
         raw_data = frappe.request.get_data()
         data_string = raw_data.decode('utf-8')
         data = frappe.parse_json(data_string)
 
-        # Validate that data is a dictionary
         if not isinstance(data, dict):
             frappe.throw(f"Expected dictionary data, got {type(data)}")
 
@@ -169,13 +164,11 @@ def update_match_status():
         if not frappe.db.exists(voucher_type, voucher_no):
             frappe.throw(f"Document {voucher_type} {voucher_no} not found")
 
-        # Handle matched_with field - convert dict to JSON string if needed
         matched_with_value = matched_with
         if isinstance(matched_with, dict):
             matched_with_value = frappe.as_json(matched_with)
 
 
-        # Combine all updates into a single operation to avoid concurrency issues
         update_data = {
             "intercompany_match_status": match_status,
             "intercompany_matched_with": matched_with_value,
@@ -189,7 +182,6 @@ def update_match_status():
 
         while retry_count < max_retries:
             try:
-                # Use frappe.db.set_value with multiple fields in one call
                 frappe.db.set_value(
                     voucher_type,
                     voucher_no,
@@ -276,7 +268,6 @@ def format_gl_entries_for_frontend(data, columns):
              'Closing' in entry.get('account', ''))):
             continue
 
-        # Skip rows without posting_date (these are summary rows)
         if not entry.get('posting_date'):
             continue
 

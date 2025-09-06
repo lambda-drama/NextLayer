@@ -133,19 +133,19 @@ export default function IntercompanyReconciliation() {
   const handleCompanyAChange = (value: string) => {
     setCompanyA(value)
     setPartyA("")
-    setIsAutoFilled(false) // Clear auto-fill flag
+    setIsAutoFilled(false)
   }
 
   // Handle manual changes to Company B
   const handleCompanyBChange = (value: string) => {
     setCompanyB(value)
-    setPartyB("") // Reset party when company changes
+    setPartyB("")
     setIsAutoFilled(false)
   }
 
   const handlePartyTypeBChange = (value: string) => {
     setPartyTypeB(value)
-    setPartyB("") // Reset party when party type changes
+    setPartyB("")
     setIsAutoFilled(false)
   }
 
@@ -336,7 +336,7 @@ export default function IntercompanyReconciliation() {
     }
   }, [totalsA, totalsB])
 
-  const formatCurrency = (amount: number, currencyCode: string = 'INR', partyName?: string, partyType?: string) => {
+  const formatCurrency = (amount: number, currencyCode: string = 'USD', partyName?: string, partyType?: string) => {
     // Use selected currency if it's not "all", otherwise use party currency or provided currencyCode
     let displayCurrency = currencyCode
     if (currency !== 'all') {
@@ -345,7 +345,17 @@ export default function IntercompanyReconciliation() {
       displayCurrency = getPartyCurrency(partyName, partyType)
     }
 
-    return new Intl.NumberFormat('en-IN', {
+    // Choose appropriate locale based on currency
+    let locale = 'en-US' // Default to US formatting
+    if (displayCurrency === 'INR') {
+      locale = 'en-IN' // Indian formatting for INR
+    } else if (displayCurrency === 'EUR') {
+      locale = 'en-EU' // European formatting for EUR
+    } else if (displayCurrency === 'GBP') {
+      locale = 'en-GB' // British formatting for GBP
+    }
+
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: displayCurrency,
       minimumFractionDigits: 0
@@ -430,13 +440,13 @@ export default function IntercompanyReconciliation() {
 
       if (!debitCreditMatch && !creditDebitMatch) {
         const errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
-              `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, 'INR', partyA, 'Customer')}\n` +
-              `${companyA} Total Credit: ${formatCurrency(totalCreditLeft, 'INR', partyA, 'Customer')}\n` +
-              `${companyB} Total Debit: ${formatCurrency(totalDebitRight, 'INR', partyB, partyTypeB)}\n` +
-              `${companyB} Total Credit: ${formatCurrency(totalCreditRight, 'INR', partyB, partyTypeB)}\n\n` +
+              `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+              `${companyA} Total Credit: ${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+              `${companyB} Total Debit: ${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n` +
+              `${companyB} Total Credit: ${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n\n` +
               `For matching, either:\n` +
-              `- ${companyA} Debit (${formatCurrency(totalDebitLeft, 'INR', partyA, 'Customer')}) should equal ${companyB} Credit (${formatCurrency(totalCreditRight, 'INR', partyB, partyTypeB)})\n` +
-              `- ${companyA} Credit (${formatCurrency(totalCreditLeft, 'INR', partyA, 'Customer')}) should equal ${companyB} Debit (${formatCurrency(totalDebitRight, 'INR', partyB, partyTypeB)})`
+              `- ${companyA} Debit (${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Credit (${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
+              `- ${companyA} Credit (${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Debit (${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})`
 
         setValidationErrorMessage(errorMessage)
         setShowValidationError(true)
@@ -964,13 +974,13 @@ export default function IntercompanyReconciliation() {
                     <div className="grid grid-cols-2 gap-4">
                                               <div className="text-center">
                           <div className="text-2xl font-bold text-blue-600">
-                            {formatCurrency(reconciliationAnalysis.totalDebitA, 'INR', partyA, 'Customer')}
+                            {formatCurrency(reconciliationAnalysis.totalDebitA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                           </div>
                           <div className="text-sm text-gray-600">Total Debit ({getPartyCurrency(partyA, 'Customer')})</div>
                         </div>
                         <div className="text-center">
                           <div className="text-2xl font-bold text-green-600">
-                            {formatCurrency(reconciliationAnalysis.totalCreditA, 'INR', partyA, 'Customer')}
+                            {formatCurrency(reconciliationAnalysis.totalCreditA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                           </div>
                           <div className="text-sm text-gray-600">Total Credit ({getPartyCurrency(partyA, 'Customer')})</div>
                         </div>
@@ -989,13 +999,13 @@ export default function IntercompanyReconciliation() {
                     <div className="grid grid-cols-2 gap-4">
                                               <div className="text-center">
                           <div className="text-2xl font-bold text-blue-600">
-                            {formatCurrency(reconciliationAnalysis.totalDebitB, 'INR', partyB, partyTypeB)}
+                            {formatCurrency(reconciliationAnalysis.totalDebitB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
                           <div className="text-sm text-gray-600">Total Debit ({getPartyCurrency(partyB, partyTypeB)})</div>
                         </div>
                         <div className="text-center">
                           <div className="text-2xl font-bold text-green-600">
-                            {formatCurrency(reconciliationAnalysis.totalCreditB, 'INR', partyB, partyTypeB)}
+                            {formatCurrency(reconciliationAnalysis.totalCreditB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
                           <div className="text-sm text-gray-600">Total Credit ({getPartyCurrency(partyB, partyTypeB)})</div>
                         </div>
@@ -1017,12 +1027,12 @@ export default function IntercompanyReconciliation() {
                     <AlertDescription
                       className={reconciliationAnalysis.debitCreditMatch ? "text-green-800" : "text-red-800"}
                     >
-                      <strong>Debit-Credit Match:</strong> Company A Debit ({formatCurrency(reconciliationAnalysis.totalDebitA, 'INR', partyA, 'Customer')})
+                      <strong>Debit-Credit Match:</strong> Company A Debit ({formatCurrency(reconciliationAnalysis.totalDebitA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')})
                       {reconciliationAnalysis.debitCreditMatch ? " matches " : " does not match "}
-                      Company B Credit ({formatCurrency(reconciliationAnalysis.totalCreditB, 'INR', partyB, partyTypeB)})
+                      Company B Credit ({formatCurrency(reconciliationAnalysis.totalCreditB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})
                       {!reconciliationAnalysis.debitCreditMatch && (
                         <div className="mt-1">
-                          Difference: {formatCurrency(Math.abs(reconciliationAnalysis.totalDebitA - reconciliationAnalysis.totalCreditB), 'INR', partyA, 'Customer')}
+                          Difference: {formatCurrency(Math.abs(reconciliationAnalysis.totalDebitA - reconciliationAnalysis.totalCreditB), getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                         </div>
                       )}
                     </AlertDescription>
@@ -1041,12 +1051,12 @@ export default function IntercompanyReconciliation() {
                     <AlertDescription
                       className={reconciliationAnalysis.creditDebitMatch ? "text-green-800" : "text-red-800"}
                     >
-                      <strong>Credit-Debit Match:</strong> Company A Credit ({formatCurrency(reconciliationAnalysis.totalCreditA, 'INR', partyA, 'Customer')})
+                      <strong>Credit-Debit Match:</strong> Company A Credit ({formatCurrency(reconciliationAnalysis.totalCreditA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')})
                       {reconciliationAnalysis.creditDebitMatch ? " matches " : " does not match "}
-                      Company B Debit ({formatCurrency(reconciliationAnalysis.totalDebitB, 'INR', partyB, partyTypeB)})
+                      Company B Debit ({formatCurrency(reconciliationAnalysis.totalDebitB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})
                       {!reconciliationAnalysis.creditDebitMatch && (
                         <div className="mt-1">
-                          Difference: {formatCurrency(Math.abs(reconciliationAnalysis.totalCreditA - reconciliationAnalysis.totalDebitB), 'INR', partyA, 'Customer')}
+                          Difference: {formatCurrency(Math.abs(reconciliationAnalysis.totalCreditA - reconciliationAnalysis.totalDebitB), getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                         </div>
                       )}
                     </AlertDescription>
@@ -1060,8 +1070,8 @@ export default function IntercompanyReconciliation() {
                     <AlertDescription className="text-blue-800">
                       <strong>Balance Summary:</strong>
                                               <div className="mt-2 grid grid-cols-2 gap-4">
-                          <div>{companyA} Balance: {formatCurrency(reconciliationAnalysis.balanceA, 'INR', partyA, 'Customer')}</div>
-                          <div>{companyB} Balance: {formatCurrency(reconciliationAnalysis.balanceB, 'INR', partyB, partyTypeB)}</div>
+                          <div>{companyA} Balance: {formatCurrency(reconciliationAnalysis.balanceA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}</div>
+                          <div>{companyB} Balance: {formatCurrency(reconciliationAnalysis.balanceB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}</div>
                         </div>
                     </AlertDescription>
                   </div>
@@ -1209,13 +1219,13 @@ export default function IntercompanyReconciliation() {
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-medium text-blue-600">
-                              {entry.debit > 0 ? formatCurrency(entry.debit, 'INR', partyA, 'Customer') : "-"}
+                              {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium text-green-600">
-                              {entry.credit > 0 ? formatCurrency(entry.credit, 'INR', partyA, 'Customer') : "-"}
+                              {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              {formatCurrency(entry.balance, 'INR', partyA, 'Customer')}
+                              {formatCurrency(entry.balance, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                             </TableCell>
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
@@ -1311,13 +1321,13 @@ export default function IntercompanyReconciliation() {
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-medium text-blue-600">
-                              {entry.debit > 0 ? formatCurrency(entry.debit, 'INR', partyB, partyTypeB) : "-"}
+                              {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium text-green-600">
-                              {entry.credit > 0 ? formatCurrency(entry.credit, 'INR', partyB, partyTypeB) : "-"}
+                              {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              {formatCurrency(entry.balance, 'INR', partyB, partyTypeB)}
+                              {formatCurrency(entry.balance, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                             </TableCell>
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
