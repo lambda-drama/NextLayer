@@ -132,7 +132,7 @@ export default function IntercompanyReconciliation() {
   // Handle manual changes to Company A
   const handleCompanyAChange = (value: string) => {
     setCompanyA(value)
-    setPartyA("") 
+    setPartyA("")
     setIsAutoFilled(false) // Clear auto-fill flag
   }
 
@@ -533,7 +533,7 @@ export default function IntercompanyReconciliation() {
         return
       }
 
-     
+
       const allEntries = [...glDataA, ...glDataB].map(entry => ({
         voucher_type: entry.voucher_type,
         voucher_no: entry.voucher_no,
@@ -547,7 +547,7 @@ export default function IntercompanyReconciliation() {
       setSelectedEntries(new Set())
       setIsProcessing(false)
       setShowMatchModal(false)
-     
+
       // Force close modal after a short delay to ensure it closes
       setTimeout(() => {
         setShowMatchModal(false)
@@ -683,9 +683,13 @@ export default function IntercompanyReconciliation() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select value={companyA} onValueChange={handleCompanyAChange} disabled={companiesLoading}>
+                    <Select value={companyA} onValueChange={handleCompanyAChange} disabled={companiesLoading || companies.length === 0}>
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={companiesLoading ? "Loading..." : "Select Company"} />
+                        <SelectValue placeholder={
+                          companiesLoading ? "Loading..." :
+                          companies.length === 0 ? "No companies available" :
+                          "Select Company"
+                        } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
                         {companies.map((company) => (
@@ -742,10 +746,14 @@ export default function IntercompanyReconciliation() {
                     <Select
                       value={companyB}
                       onValueChange={handleCompanyBChange}
-                      disabled={companiesLoading}
+                      disabled={companiesLoading || companies.length === 0}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={companiesLoading ? "Loading..." : "Select Company"} />
+                        <SelectValue placeholder={
+                          companiesLoading ? "Loading..." :
+                          companies.length === 0 ? "No companies available" :
+                          "Select Company"
+                        } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
                         {companies.map((company) => (
@@ -844,7 +852,7 @@ export default function IntercompanyReconciliation() {
             </div>
 
                         {/* Debug Section */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
+            {/* <div className="mt-6 pt-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-medium text-gray-600">Debug Tools</h4>
                 <div className="flex gap-2">
@@ -874,14 +882,42 @@ export default function IntercompanyReconciliation() {
                   </AlertDescription>
                 </Alert>
               )}
-            </div>
+            </div> */}
 
             {error && (
-              <Alert className="mt-4 border-red-200 bg-red-50">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-800">{error}</AlertDescription>
+                <Alert className="mt-4 border-red-200 bg-red-50">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    {error.includes("permission") ?
+                      "You don't have permission to access this company's data. Please contact your administrator to request access." :
+                      "You don't have permission to perform this action."
+                    }
+                  </AlertDescription>
+                </Alert>
+              )}
+
+            {/* Show info when companies are filtered by permissions */}
+            {companies.length > 0 && companies.length < 10 && (
+              <Alert className="mt-4 border-blue-200 bg-blue-50">
+                <AlertTriangle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  You have access to {companies.length} company{companies.length !== 1 ? 'ies' : ''} based on your user permissions.
+                  Contact your administrator if you need access to additional companies.
+                </AlertDescription>
               </Alert>
             )}
+
+            {/* Show warning when no companies are available */}
+            {companies.length === 0 && !companiesLoading && !companiesError && (
+              <Alert className="mt-4 border-orange-200 bg-orange-50">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  <strong>No companies available:</strong> You don't have permission to access any companies.
+                  Please contact your administrator to set up company permissions for your user account.
+                </AlertDescription>
+              </Alert>
+            )}
+
 
             <div className="flex justify-center mt-6">
               <Button
@@ -1068,9 +1104,7 @@ export default function IntercompanyReconciliation() {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => {
-                      console.log("Opening match modal with", selectedEntries.size, "selected entries")
-                      console.log("Current matchLoading state:", matchLoading)
-                      console.log("Current isProcessing state:", isProcessing)
+
                       setShowMatchModal(true)
                     }}
                     disabled={selectedEntries.size === 0 || isProcessing}
@@ -1094,7 +1128,6 @@ export default function IntercompanyReconciliation() {
                   {selectedEntries.size > 0 && !isProcessing && (
                     <Button
                       onClick={() => {
-                        console.log("Clearing all selected entries")
                         setSelectedEntries(new Set())
                       }}
                       variant="outline"
