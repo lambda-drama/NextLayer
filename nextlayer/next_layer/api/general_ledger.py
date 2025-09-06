@@ -22,6 +22,11 @@ def get_general_ledger_data(filters):
         if not filters.get("from_date") or not filters.get("to_date"):
             frappe.throw(_("From Date and To Date are required"))
 
+        # Check user permissions for the requested company
+        user_permitted_companies = frappe.permissions.get_user_permissions("Company")
+        if user_permitted_companies and filters.get("company") not in user_permitted_companies:
+            frappe.throw(_("You don't have permission to access data for company: {0}").format(filters.get("company")))
+
         # Set default values
         filters.setdefault("show_remarks", 1)
         filters.setdefault("categorize_by", "Categorize by Voucher (Consolidated)")
@@ -63,19 +68,34 @@ def get_general_ledger_data(filters):
 
 @frappe.whitelist()
 def get_companies():
-    """Get list of companies for dropdown"""
+    """Get list of companies for dropdown based on user permissions"""
     try:
+        # Get user's permitted companies using ERPNext's permission system
+        user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
+        user_permitted_companies = user_permitted.get("Company")
 
-        companies = frappe.get_all(
-            "Company",
-            fields=["name", "default_currency"],
-            order_by="name"
-        )
+        if user_permitted_companies:
+            # Extract just the company names from the list of dicts
+            permitted_company_names = [c["doc"] for c in user_permitted_companies]
+
+            companies = frappe.get_all(
+                "Company",
+                fields=["name", "default_currency"],
+                filters={"name": ["in", permitted_company_names]},
+                order_by="name"
+            )
+        else:
+            # If no specific permissions, return all companies
+            companies = frappe.get_all(
+                "Company",
+                fields=["name", "default_currency"],
+                order_by="name"
+            )
 
         return {"success": True, "data": companies}
 
     except Exception as e:
-        frappe.log_error(f"get_companies API Error: {str(e)}")
+        frappe.log_error(f"get_companies API Error: {frappe.get_traceback()}")
         return {
             "success": False,
             "error": str(e),
@@ -86,6 +106,12 @@ def get_companies():
 def get_parties(party_type="Customer", company=None):
     """Get list of parties (customers/suppliers) for dropdown"""
     try:
+        # Check user permissions for the requested company
+        if company:
+            user_permitted_companies = frappe.permissions.get_user_permissions("Company")
+            if user_permitted_companies and company not in user_permitted_companies:
+                frappe.throw(_("You don't have permission to access data for company: {0}").format(company))
+
         filters = {}
 
         # add internal customer/supplier filter
@@ -135,7 +161,7 @@ def update_match_status():
         match_status = data.get("status")
         matched_with = data.get("matched_with")
 
-    
+
         if not all([voucher_type, voucher_no, company, match_status]):
             frappe.throw("Missing required fields: voucher_type, voucher_no, company, status")
 
@@ -148,7 +174,7 @@ def update_match_status():
         if isinstance(matched_with, dict):
             matched_with_value = frappe.as_json(matched_with)
 
-       
+
         # Combine all updates into a single operation to avoid concurrency issues
         update_data = {
             "intercompany_match_status": match_status,

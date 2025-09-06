@@ -60,6 +60,31 @@ Parameters:
 - `voucher_no`: Document number
 - `company`: Company name
 
+## User Permissions & Company Access Control
+
+The intercompany reconciliation feature respects ERPNext's User Permissions system for company access control:
+
+### How It Works
+- Users can only see and access companies they have permission for
+- The frontend automatically filters the company dropdown based on user permissions
+- All API endpoints validate company access before returning data
+- Users without company permissions will see appropriate error messages
+
+### Setting Up Company Permissions
+1. Go to **User Permissions** in ERPNext (`Home > Users and Permissions > User Permissions`)
+2. Create a new User Permission:
+   - Select the user you want to restrict
+   - In the **Allow** field, choose "Company"
+   - In the **For Value** field, select the specific company
+   - Check **Apply to All Document Types**
+   - Save the User Permission
+
+### User Experience
+- **Admin users**: See all companies (no restrictions)
+- **Restricted users**: Only see companies they have permission for
+- **Users with no permissions**: See a message to contact administrator
+- **Permission errors**: Clear error messages when trying to access unauthorized companies
+
 ## Installation
 
 The custom fields are automatically installed when you install or update the NextLayer app. The installation is handled by a Frappe patch that runs during the app migration process.
