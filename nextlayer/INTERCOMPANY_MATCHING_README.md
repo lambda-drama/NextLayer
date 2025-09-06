@@ -22,7 +22,13 @@ The intercompany matching feature allows users to:
 - Bulk selection with checkboxes
 - Confirmation modal for bulk matching
 
-### 3. Backend Integration
+### 3. Data Filtering Options
+- **Currency Filter**: Filter by specific currency or view all currencies
+- **Date Range**: Select from and to dates for data retrieval
+- **Ignore Exchange Rate Revaluation Journals**: Checkbox to exclude exchange rate revaluation journal entries from the reconciliation
+- **Ignore System Generated Credit / Debit Notes**: Checkbox to exclude system-generated credit/debit notes from the reconciliation
+
+### 4. Backend Integration
 - Custom fields added to Payment Entry, Journal Entry, Purchase Invoice, and Sales Invoice
 - API endpoints for updating and retrieving match status
 - Persistent storage of matching information

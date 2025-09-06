@@ -13,6 +13,7 @@ import { useParties } from "../hook/useParties"
 import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
 import { useMatchStatus } from "../hook/useMatchStatus"
 
+
 export interface GLEntry {
   gl_entry?: string
   posting_date: string
@@ -45,9 +46,11 @@ export default function IntercompanyReconciliation() {
   const [companyB, setCompanyB] = useState<string>("")
   const [partyTypeB, setPartyTypeB] = useState<string>("Supplier")
   const [partyB, setPartyB] = useState<string>("")
-  const [fromDate, setFromDate] = useState<string>("2024-01-01")
-  const [toDate, setToDate] = useState<string>("2024-12-31")
+  const [fromDate, setFromDate] = useState<string>(`${new Date().getFullYear()}-01-01`)
+  const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [currency, setCurrency] = useState<string>("all")
+  const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(false)
+  const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(false)
   const [shouldLoadData, setShouldLoadData] = useState(false)
   const [isAutoFilled, setIsAutoFilled] = useState(false)
 
@@ -60,6 +63,7 @@ export default function IntercompanyReconciliation() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingCancelled, setProcessingCancelled] = useState(false)
   const [processingSuccess, setProcessingSuccess] = useState(false)
+  const [showRestoreNotification, setShowRestoreNotification] = useState(false)
 
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint, refreshCSRFToken } = useCompanies()
@@ -75,7 +79,6 @@ export default function IntercompanyReconciliation() {
     companyB
   )
 
-
   // GL Data hooks - only fetch when shouldLoadData is true
   const {
     data: glDataA,
@@ -88,7 +91,9 @@ export default function IntercompanyReconciliation() {
     party: shouldLoadData ? partyA : "",
     fromDate,
     toDate,
-    currency: shouldLoadData ? (currency === "all" ? "" : currency) : ""
+    currency: shouldLoadData ? (currency === "all" ? "" : currency) : "",
+    ignoreExchangeRateRevaluation: shouldLoadData ? ignoreExchangeRateRevaluation : false,
+    ignoreSystemGeneratedNotes: shouldLoadData ? ignoreSystemGeneratedNotes : false
   })
 
   const {
@@ -102,7 +107,9 @@ export default function IntercompanyReconciliation() {
     party: shouldLoadData ? partyB : "",
     fromDate,
     toDate,
-    currency: shouldLoadData ? (currency === "all" ? "" : currency) : ""
+    currency: shouldLoadData ? (currency === "all" ? "" : currency) : "",
+    ignoreExchangeRateRevaluation: shouldLoadData ? ignoreExchangeRateRevaluation : false,
+    ignoreSystemGeneratedNotes: shouldLoadData ? ignoreSystemGeneratedNotes : false
   })
 
   // Auto-fill Company B when Company A and Party A are selected
@@ -161,10 +168,101 @@ export default function IntercompanyReconciliation() {
     setShouldLoadData(true)
   }
 
+  // Handle voucher click - cache data and navigate to ERPNext
+  const handleVoucherClick = (entry: GLEntry) => {
+    // Cache current state
+    const currentState = {
+      companyA,
+      partyA,
+      companyB,
+      partyTypeB,
+      partyB,
+      fromDate,
+      toDate,
+      currency,
+      ignoreExchangeRateRevaluation,
+      ignoreSystemGeneratedNotes,
+      statusFilter,
+      selectedEntries: Array.from(selectedEntries),
+      glDataA,
+      glDataB,
+      totalsA,
+      totalsB,
+      backendMatchStatus,
+      timestamp: Date.now()
+    }
+
+    localStorage.setItem('intercompanyReconciliationState', JSON.stringify(currentState))
+
+    // Show a brief notification
+    console.log(`Navigating to ${entry.voucher_type} ${entry.voucher_no}. Your data will be preserved when you return.`)
+  }
+
+  // Generate proper ERPNext URL for different voucher types
+  const getVoucherUrl = (voucherType: string, voucherNo: string) => {
+    const typeMap: { [key: string]: string } = {
+      'Journal Entry': 'journal-entry',
+      'Sales Invoice': 'sales-invoice',
+      'Purchase Invoice': 'purchase-invoice',
+      'Payment Entry': 'payment-entry',
+      'Sales Order': 'sales-order',
+      'Purchase Order': 'purchase-order',
+      'Delivery Note': 'delivery-note',
+      'Purchase Receipt': 'purchase-receipt',
+      'Stock Entry': 'stock-entry',
+      'Material Request': 'material-request',
+      'Request for Quotation': 'request-for-quotation',
+      'Supplier Quotation': 'supplier-quotation'
+    }
+
+    const docType = typeMap[voucherType] || voucherType.toLowerCase().replace(/\s+/g, '-')
+    return `/app/${docType}/${voucherNo}`
+  }
+
+  // Restore cached data on component mount
+  useEffect(() => {
+    const cachedState = localStorage.getItem('intercompanyReconciliationState')
+    if (cachedState) {
+      try {
+        const state = JSON.parse(cachedState)
+        // Only restore if cache is less than 1 hour old
+        if (Date.now() - state.timestamp < 3600000) {
+          setCompanyA(state.companyA || "")
+          setPartyA(state.partyA || "")
+          setCompanyB(state.companyB || "")
+          setPartyTypeB(state.partyTypeB || "Supplier")
+          setPartyB(state.partyB || "")
+          setFromDate(state.fromDate || `${new Date().getFullYear()}-01-01`)
+          setToDate(state.toDate || new Date().toISOString().split('T')[0])
+          setCurrency(state.currency || "all")
+          setIgnoreExchangeRateRevaluation(state.ignoreExchangeRateRevaluation || false)
+          setIgnoreSystemGeneratedNotes(state.ignoreSystemGeneratedNotes || false)
+          setStatusFilter(state.statusFilter || "Mismatch")
+          setSelectedEntries(new Set(state.selectedEntries || []))
+
+          // Restore data if available
+          if (state.glDataA && state.glDataB) {
+            // Note: We can't directly set the hook data, but we can trigger a refetch
+            // The user will need to click "Load General Ledger Data" to refresh
+            setShowRestoreNotification(true)
+            // Auto-hide notification after 5 seconds
+            setTimeout(() => setShowRestoreNotification(false), 5000)
+          }
+
+          // Clear the cache after restoring
+          localStorage.removeItem('intercompanyReconciliationState')
+        }
+      } catch (error) {
+        console.error('Error restoring cached state:', error)
+        localStorage.removeItem('intercompanyReconciliationState')
+      }
+    }
+  }, [])
+
   // Reset data loading flag when selections change
   useEffect(() => {
     setShouldLoadData(false)
-  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate])
+  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes])
 
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
@@ -348,11 +446,11 @@ export default function IntercompanyReconciliation() {
     // Choose appropriate locale based on currency
     let locale = 'en-US' // Default to US formatting
     if (displayCurrency === 'INR') {
-      locale = 'en-IN' // Indian formatting for INR
+      locale = 'en-IN'
     } else if (displayCurrency === 'EUR') {
-      locale = 'en-EU' // European formatting for EUR
+      locale = 'en-EU'
     } else if (displayCurrency === 'GBP') {
-      locale = 'en-GB' // British formatting for GBP
+      locale = 'en-GB'
     }
 
     return new Intl.NumberFormat(locale, {
@@ -399,7 +497,6 @@ export default function IntercompanyReconciliation() {
     try {
       // Get all selected entries that have potential matches
       const entriesToMatch: Array<{ entryA: GLEntry; entryB: GLEntry }> = []
-
 
       // First, validate that selected entries can be matched by checking amounts
       const selectedEntriesArray = Array.from(selectedEntries)
@@ -809,8 +906,8 @@ export default function IntercompanyReconciliation() {
               </div>
             </div>
 
-            {/* Date Range and Currency */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Date Range, Currency and Filters */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">From Date</label>
                 <input
@@ -858,6 +955,50 @@ export default function IntercompanyReconciliation() {
                     <SelectItem value="XOF">XOF (West African CFA Franc)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Ignore Exchange Rate Revaluation</label>
+                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
+                  <input
+                    type="checkbox"
+                    id="ignoreExchangeRateRevaluation"
+                    checked={ignoreExchangeRateRevaluation}
+                    onChange={(e) => setIgnoreExchangeRateRevaluation(e.target.checked)}
+                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="ignoreExchangeRateRevaluation" className="text-sm text-gray-700">
+                    Enable
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Ignore System Generated Notes</label>
+                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
+                  <input
+                    type="checkbox"
+                    id="ignoreSystemGeneratedNotes"
+                    checked={ignoreSystemGeneratedNotes}
+                    onChange={(e) => setIgnoreSystemGeneratedNotes(e.target.checked)}
+                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="ignoreSystemGeneratedNotes" className="text-sm text-gray-700">
+                    Enable
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Additional Filters</label>
+                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
+                  <input
+                    type="checkbox"
+                    id="placeholderFilter"
+                    disabled
+                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="placeholderFilter" className="text-sm text-gray-500">
+                    Coming Soon
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -924,6 +1065,17 @@ export default function IntercompanyReconciliation() {
                 <AlertDescription className="text-orange-800">
                   <strong>No companies available:</strong> You don't have permission to access any companies.
                   Please contact your administrator to set up company permissions for your user account.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Show restore notification */}
+            {showRestoreNotification && (
+              <Alert className="mt-4 border-green-200 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <strong>Data Restored:</strong> Your previous session has been restored.
+                  Click "Load General Ledger Data" to refresh the data.
                 </AlertDescription>
               </Alert>
             )}
@@ -1215,7 +1367,18 @@ export default function IntercompanyReconciliation() {
                             <TableCell>
                               <div>
                                 <div className="font-medium">{entry.voucher_type}</div>
-                                <div className="text-sm text-gray-600">{entry.voucher_no}</div>
+                                <div className="text-sm text-gray-600">
+                                  <a
+                                    href={getVoucherUrl(entry.voucher_type, entry.voucher_no)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                    onClick={() => handleVoucherClick(entry)}
+                                    title={`Click to view ${entry.voucher_type} ${entry.voucher_no} in ERPNext`}
+                                  >
+                                    {entry.voucher_no}
+                                  </a>
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-medium text-blue-600">
@@ -1317,7 +1480,18 @@ export default function IntercompanyReconciliation() {
                             <TableCell>
                               <div>
                                 <div className="font-medium">{entry.voucher_type}</div>
-                                <div className="text-sm text-gray-600">{entry.voucher_no}</div>
+                                <div className="text-sm text-gray-600">
+                                  <a
+                                    href={getVoucherUrl(entry.voucher_type, entry.voucher_no)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                    onClick={() => handleVoucherClick(entry)}
+                                    title={`Click to view ${entry.voucher_type} ${entry.voucher_no} in ERPNext`}
+                                  >
+                                    {entry.voucher_no}
+                                  </a>
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-medium text-blue-600">
