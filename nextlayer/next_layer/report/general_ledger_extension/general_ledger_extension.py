@@ -285,7 +285,7 @@ def get_conditions(filters):
 
     if filters.get("ignore_cr_dr_notes"):
         # Get system generated credit/debit notes
-        cr_dr_notes = frappe.db.get_all(
+        sales_invoice_returns = frappe.db.get_all(
             "Sales Invoice",
             filters={
                 "company": filters.get("company"),
@@ -295,22 +295,27 @@ def get_conditions(filters):
             },
             as_list=True,
         )
-        # Also get Purchase Invoice returns
-        cr_dr_notes.extend(
-            frappe.db.get_all(
-                "Purchase Invoice",
-                filters={
-                    "company": filters.get("company"),
-                    "docstatus": 1,
-                    "is_return": 1,
-                    "is_internal_supplier": 1,
-                },
-                as_list=True,
-            )
+
+        purchase_invoice_returns = frappe.db.get_all(
+            "Purchase Invoice",
+            filters={
+                "company": filters.get("company"),
+                "docstatus": 1,
+                "is_return": 1,
+                "is_internal_supplier": 1,
+            },
+            as_list=True,
         )
-        if cr_dr_notes:
-            existing_vouchers = filters.get("voucher_no_not_in", [])
-            existing_vouchers.extend([x[0] for x in cr_dr_notes])
+
+        # Convert tuples to lists and combine
+        cr_dr_vouchers = []
+        for item in list(sales_invoice_returns) + list(purchase_invoice_returns):
+            if item and len(item) > 0:
+                cr_dr_vouchers.append(item[0])
+
+        if cr_dr_vouchers:
+            existing_vouchers = list(filters.get("voucher_no_not_in", []))
+            existing_vouchers.extend(cr_dr_vouchers)
             filters.update({"voucher_no_not_in": existing_vouchers})
 
     if filters.get("voucher_no_not_in"):
