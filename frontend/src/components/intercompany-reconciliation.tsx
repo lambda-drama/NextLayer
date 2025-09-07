@@ -1034,7 +1034,7 @@ export default function IntercompanyReconciliation() {
                 </Alert>
               )}
             </div> */}
-
+          
             {error && (
                 <Alert className="mt-4 border-red-200 bg-red-50">
                   <XCircle className="h-4 w-4 text-red-600" />

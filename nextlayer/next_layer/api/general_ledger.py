@@ -253,6 +253,7 @@ def get_match_status(voucher_type, voucher_no, company):
             "message": "Failed to get match status"
         }
 
+
 def format_gl_entries_for_frontend(data, columns):
     """
     Format the GL entries data from the report for frontend consumption
