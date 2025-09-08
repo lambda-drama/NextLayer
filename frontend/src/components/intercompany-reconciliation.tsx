@@ -52,6 +52,7 @@ export default function IntercompanyReconciliation() {
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(false)
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(false)
   const [shouldLoadData, setShouldLoadData] = useState(false)
+  const [hasLoadedData, setHasLoadedData] = useState(false)
   const [isAutoFilled, setIsAutoFilled] = useState(false)
 
   // Status filtering and matching
@@ -79,21 +80,22 @@ export default function IntercompanyReconciliation() {
     companyB
   )
 
-  // GL Data hooks - only fetch when shouldLoadData is true
+  // GL Data hooks - always pass actual values, let the hook handle shouldLoadData logic
   const {
     data: glDataA,
     reconciliationTotals: totalsA,
     loading: glLoadingA,
     error: glErrorA
   } = useGeneralLedgerData({
-    company: shouldLoadData ? companyA : "",
+    company: companyA,
     partyType: "Customer",
-    party: shouldLoadData ? partyA : "",
+    party: partyA,
     fromDate,
     toDate,
-    currency: shouldLoadData ? (currency === "all" ? "" : currency) : "",
-    ignoreExchangeRateRevaluation: shouldLoadData ? ignoreExchangeRateRevaluation : false,
-    ignoreSystemGeneratedNotes: shouldLoadData ? ignoreSystemGeneratedNotes : false
+    currency: currency === "all" ? "" : currency,
+    ignoreExchangeRateRevaluation,
+    ignoreSystemGeneratedNotes,
+    shouldLoadData
   })
 
   const {
@@ -102,14 +104,15 @@ export default function IntercompanyReconciliation() {
     loading: glLoadingB,
     error: glErrorB
   } = useGeneralLedgerData({
-    company: shouldLoadData ? companyB : "",
+    company: companyB,
     partyType: partyTypeB,
-    party: shouldLoadData ? partyB : "",
+    party: partyB,
     fromDate,
     toDate,
-    currency: shouldLoadData ? (currency === "all" ? "" : currency) : "",
-    ignoreExchangeRateRevaluation: shouldLoadData ? ignoreExchangeRateRevaluation : false,
-    ignoreSystemGeneratedNotes: shouldLoadData ? ignoreSystemGeneratedNotes : false
+    currency: currency === "all" ? "" : currency,
+    ignoreExchangeRateRevaluation,
+    ignoreSystemGeneratedNotes,
+    shouldLoadData
   })
 
   // Auto-fill Company B when Company A and Party A are selected
@@ -166,6 +169,7 @@ export default function IntercompanyReconciliation() {
       return
     }
     setShouldLoadData(true)
+    setHasLoadedData(true)
   }
 
   // Handle voucher click - cache data and navigate to ERPNext
@@ -259,10 +263,16 @@ export default function IntercompanyReconciliation() {
     }
   }, [])
 
-  // Reset data loading flag when selections change
+  // Reset data loading flag when selections change, but allow refetch if data was previously loaded
   useEffect(() => {
-    setShouldLoadData(false)
-  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes])
+    if (hasLoadedData) {
+      // If data was previously loaded, keep shouldLoadData true to allow refetch with new parameters
+      setShouldLoadData(true)
+    } else {
+      // If data was never loaded, reset the flag
+      setShouldLoadData(false)
+    }
+  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, hasLoadedData])
 
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
@@ -1034,7 +1044,7 @@ export default function IntercompanyReconciliation() {
                 </Alert>
               )}
             </div> */}
-          
+
             {error && (
                 <Alert className="mt-4 border-red-200 bg-red-50">
                   <XCircle className="h-4 w-4 text-red-600" />

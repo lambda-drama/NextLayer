@@ -52,6 +52,7 @@ interface UseGLDataOptions {
   currency?: string
   ignoreExchangeRateRevaluation?: boolean
   ignoreSystemGeneratedNotes?: boolean
+  shouldLoadData?: boolean
 }
 
 export function useGeneralLedgerData({
@@ -63,6 +64,7 @@ export function useGeneralLedgerData({
   currency,
   ignoreExchangeRateRevaluation,
   ignoreSystemGeneratedNotes,
+  shouldLoadData = true,
 }: UseGLDataOptions) {
   const [data, setData] = useState<GLEntry[]>([])
   const [reconciliationTotals, setReconciliationTotals] = useState<ReconciliationTotals | null>(null)
@@ -70,7 +72,7 @@ export function useGeneralLedgerData({
   const [error, setError] = useState<string | null>(null)
 
   const fetchGLData = useCallback(async () => {
-    if (!company || !partyType || !party) return
+    if (!shouldLoadData || !company || !partyType || !party) return
 
     setLoading(true)
     setError(null)
@@ -115,15 +117,29 @@ export function useGeneralLedgerData({
 const rawEntries = result.message?.data?.entries || []
 
 
-      const openingEntry = rawEntries.find((entry: any) =>
-        entry.account && entry.account.includes("'Opening'")
+      // Find the final overall Closing entry (should be the last one in the data)
+      const closingEntries = rawEntries.filter((entry: any) =>
+        entry.account && entry.account.includes("'Closing (Opening + Total)'")
       )
 
-      if (openingEntry) {
+      console.log("Found closing entries:", closingEntries.length)
+      console.log("All closing entries:", closingEntries)
+
+      // Get the last Closing entry which should be the final overall balance
+      const closingEntry = closingEntries[closingEntries.length - 1]
+
+      console.log("Using final closing entry:", closingEntry)
+
+      if (closingEntry) {
         setReconciliationTotals({
-          totalDebit: parseFloat(openingEntry.debit) || 0,
-          totalCredit: parseFloat(openingEntry.credit) || 0,
-          balance: parseFloat(openingEntry.balance) || 0,
+          totalDebit: parseFloat(closingEntry.debit) || 0,
+          totalCredit: parseFloat(closingEntry.credit) || 0,
+          balance: parseFloat(closingEntry.balance) || 0,
+        })
+        console.log("Set reconciliation totals:", {
+          totalDebit: parseFloat(closingEntry.debit) || 0,
+          totalCredit: parseFloat(closingEntry.credit) || 0,
+          balance: parseFloat(closingEntry.balance) || 0,
         })
       }
 
@@ -136,7 +152,7 @@ const rawEntries = result.message?.data?.entries || []
           // Exclude special summary rows
           return !entry.account.includes("'Opening'") &&
                  !entry.account.includes("'Total'") &&
-                 !entry.account.includes("'Closing'")
+                 !entry.account.includes("'Closing (Opening + Total)'")
         })
         .map((entry: any, index: number) => {
           let balance = 0
@@ -146,7 +162,7 @@ const rawEntries = result.message?.data?.entries || []
               typeof e.account === "string" &&
               !e.account.includes("'Opening'") &&
               !e.account.includes("'Total'") &&
-              !e.account.includes("'Closing'")
+              !e.account.includes("'Closing (Opening + Total)'")
             )[i]
 
             if (prevEntry) {
@@ -179,7 +195,7 @@ const rawEntries = result.message?.data?.entries || []
     } finally {
       setLoading(false)
     }
-  }, [company, partyType, party, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes])
+  }, [shouldLoadData, company, partyType, party, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes])
 
   useEffect(() => {
     fetchGLData()
