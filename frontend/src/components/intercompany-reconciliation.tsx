@@ -499,7 +499,126 @@ export default function IntercompanyReconciliation() {
     setSelectedEntries(newSelected)
   }
 
-      // Handle bulk matching
+      // Check if selected entries are already matched
+  const areSelectedEntriesMatched = useMemo(() => {
+    if (selectedEntries.size === 0) return false
+
+    const selectedEntriesArray = Array.from(selectedEntries)
+
+    // Check if all selected entries have Match status
+    for (const entryKey of selectedEntriesArray) {
+      const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
+        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+      )
+      const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
+        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+      )
+
+      const entry = entryA || entryB
+      if (entry && entry.status !== 'Match') {
+        return false
+      }
+    }
+
+    return true
+  }, [selectedEntries, findMatchingEntries])
+
+  // Handle bulk unmatching
+  const handleBulkUnmatch = async () => {
+    setIsProcessing(true)
+    setProcessingCancelled(false)
+
+    try {
+      const selectedEntriesArray = Array.from(selectedEntries)
+      const bulkData = []
+
+      for (const entryKey of selectedEntriesArray) {
+        // Check if processing was cancelled
+        if (processingCancelled) {
+          console.log("Processing cancelled by user")
+          return
+        }
+
+        // Find the entry in both Company A and Company B data
+        const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
+          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        )
+        const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
+          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        )
+
+        if (entryA) {
+          bulkData.push({
+            voucher_type: entryA.voucher_type,
+            voucher_no: entryA.voucher_no,
+            company: companyA,
+            status: 'Mismatch' as const,
+            matched_with: null
+          })
+        }
+
+        if (entryB) {
+          bulkData.push({
+            voucher_type: entryB.voucher_type,
+            voucher_no: entryB.voucher_no,
+            company: companyB,
+            status: 'Mismatch' as const,
+            matched_with: null
+          })
+        }
+      }
+
+      console.log("Prepared bulk unmatch data:", bulkData)
+
+      // Check if processing was cancelled before API call
+      if (processingCancelled) {
+        console.log("Processing cancelled before API call")
+        return
+      }
+
+      // Perform bulk update
+      console.log("Calling bulkUpdateMatchStatus for unmatch...")
+      const result = await bulkUpdateMatchStatus(bulkData)
+      console.log("Bulk unmatch result:", result)
+
+      if (result.failed > 0) {
+        alert(`Bulk unmatching completed with ${result.success} successful and ${result.failed} failed updates.\n\nErrors:\n${result.errors.join('\n')}`)
+      } else {
+        setProcessingSuccess(true)
+        // Auto-close modal after 2 seconds
+        setTimeout(() => {
+          setShowMatchModal(false)
+          setIsProcessing(false)
+          setProcessingSuccess(false)
+        }, 2000)
+      }
+
+      // Check if processing was cancelled before refresh
+      if (processingCancelled) {
+        console.log("Processing cancelled before refresh")
+        return
+      }
+
+      // Refresh match statuses
+      console.log("Refreshing match statuses after unmatch...")
+      await refreshMatchStatuses(bulkData.map(entry => ({
+        voucher_type: entry.voucher_type,
+        voucher_no: entry.voucher_no,
+        company: entry.company
+      })))
+
+      setSelectedEntries(new Set())
+      console.log("Bulk unmatch process completed successfully")
+    } catch (error) {
+      console.error("Bulk unmatch process failed:", error)
+      alert(`Bulk unmatch failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsProcessing(false)
+      console.log("Bulk unmatch process failed, processing state reset")
+    }
+  }
+
+  // Handle bulk matching
   const handleBulkMatch = async () => {
     setIsProcessing(true)
     setProcessingCancelled(false)
@@ -1276,12 +1395,18 @@ export default function IntercompanyReconciliation() {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => {
-
-                      setShowMatchModal(true)
+                      if (areSelectedEntriesMatched) {
+                        handleBulkUnmatch()
+                      } else {
+                        setShowMatchModal(true)
+                      }
                     }}
                     disabled={selectedEntries.size === 0 || isProcessing}
                     variant="outline"
-                    className="border-green-200 text-green-700 hover:bg-green-50"
+                    className={areSelectedEntriesMatched
+                      ? "border-red-200 text-red-700 hover:bg-red-50"
+                      : "border-green-200 text-green-700 hover:bg-green-50"
+                    }
                   >
                     {isProcessing ? (
                       <>
@@ -1290,8 +1415,17 @@ export default function IntercompanyReconciliation() {
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Match Selected ({selectedEntries.size})
+                        {areSelectedEntriesMatched ? (
+                          <>
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Unmatch Selected ({selectedEntries.size})
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Match Selected ({selectedEntries.size})
+                          </>
+                        )}
                       </>
                     )}
                   </Button>
@@ -1552,14 +1686,14 @@ export default function IntercompanyReconciliation() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold mb-4">
-                {processingSuccess ? "Success!" : isProcessing ? "Processing Bulk Matching" : "Confirm Bulk Matching"}
+                {processingSuccess ? "Success!" : isProcessing ? `Processing Bulk ${areSelectedEntriesMatched ? 'Unmatching' : 'Matching'}` : `Confirm Bulk ${areSelectedEntriesMatched ? 'Unmatching' : 'Matching'}`}
               </h3>
               <p className="text-gray-600 mb-4">
                 {processingSuccess
-                  ? `Successfully matched ${selectedEntries.size} entries! Modal will close automatically.`
+                  ? `Successfully ${areSelectedEntriesMatched ? 'unmatched' : 'matched'} ${selectedEntries.size} entries! Modal will close automatically.`
                   : isProcessing
                     ? `Processing ${selectedEntries.size} selected entries... This may take a moment.`
-                    : `Are you sure you want to mark ${selectedEntries.size} selected entries as matched? This action will update the status in the backend.`
+                    : `Are you sure you want to ${areSelectedEntriesMatched ? 'unmatch' : 'match'} ${selectedEntries.size} selected entries? This action will update the status in the backend.`
                 }
               </p>
               {isProcessing && (
@@ -1630,10 +1764,17 @@ export default function IntercompanyReconciliation() {
                     </Button>
                     <Button
                       onClick={() => {
-                        console.log("Confirm button clicked, starting bulk match process")
-                        handleBulkMatch()
+                        console.log(`Confirm button clicked, starting bulk ${areSelectedEntriesMatched ? 'unmatch' : 'match'} process`)
+                        if (areSelectedEntriesMatched) {
+                          handleBulkUnmatch()
+                        } else {
+                          handleBulkMatch()
+                        }
                       }}
-                      className="bg-green-600 hover:bg-green-700"
+                      className={areSelectedEntriesMatched
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-green-600 hover:bg-green-700"
+                      }
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
@@ -1642,7 +1783,7 @@ export default function IntercompanyReconciliation() {
                           Processing...
                         </>
                       ) : (
-                        `Confirm Match (${selectedEntries.size})`
+                        `Confirm ${areSelectedEntriesMatched ? 'Unmatch' : 'Match'} (${selectedEntries.size})`
                       )}
                     </Button>
                   </>

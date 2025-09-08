@@ -122,21 +122,11 @@ const rawEntries = result.message?.data?.entries || []
         entry.account && entry.account.includes("'Closing (Opening + Total)'")
       )
 
-      console.log("Found closing entries:", closingEntries.length)
-      console.log("All closing entries:", closingEntries)
-
       // Get the last Closing entry which should be the final overall balance
       const closingEntry = closingEntries[closingEntries.length - 1]
 
-      console.log("Using final closing entry:", closingEntry)
-
       if (closingEntry) {
         setReconciliationTotals({
-          totalDebit: parseFloat(closingEntry.debit) || 0,
-          totalCredit: parseFloat(closingEntry.credit) || 0,
-          balance: parseFloat(closingEntry.balance) || 0,
-        })
-        console.log("Set reconciliation totals:", {
           totalDebit: parseFloat(closingEntry.debit) || 0,
           totalCredit: parseFloat(closingEntry.credit) || 0,
           balance: parseFloat(closingEntry.balance) || 0,
