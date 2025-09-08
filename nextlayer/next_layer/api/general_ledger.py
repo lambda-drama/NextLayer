@@ -42,9 +42,8 @@ def get_general_ledger_data(filters):
             filters.setdefault("account_currency", company_currency)
 
         filters.setdefault("company_fb", "")
-        print("Filters", str(filters))
         columns, data = execute(filters)
-
+        print("Data+++", str(data))
         # Format the response
         return {
             "success": True,
