@@ -116,7 +116,6 @@ export function useGeneralLedgerData({
 
 const rawEntries = result.message?.data?.entries || []
 
-
       // Find the final overall Closing entry (should be the last one in the data)
       const closingEntries = rawEntries.filter((entry: any) =>
         entry.account && entry.account.includes("'Closing (Opening + Total)'")

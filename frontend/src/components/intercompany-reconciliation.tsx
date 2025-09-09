@@ -9,9 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Alert, AlertDescription } from "./ui/alert"
 import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw } from "lucide-react"
 import { useCompanies } from "../hook/useCompanies"
+import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
 import { useParties } from "../hook/useParties"
+import { usePartiesForAutofill } from "../hook/usePartiesForAutofill"
 import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
+import { usePermissionAwareGLData } from "../hook/usePermissionAwareGLData"
 import { useMatchStatus } from "../hook/useMatchStatus"
+import HiddenDocumentsSummary from "./hidden-documents-summary"
 
 
 export interface GLEntry {
@@ -67,8 +71,9 @@ export default function IntercompanyReconciliation() {
   const [showRestoreNotification, setShowRestoreNotification] = useState(false)
 
   // Use the custom hooks
-  const { companies, isLoading: companiesLoading, error: companiesError, testEndpoint, refreshCSRFToken } = useCompanies()
-  const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, loading: matchLoading, error: matchError, clearError } = useMatchStatus()
+  const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
+  const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
+  const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, error: matchError, clearError } = useMatchStatus()
 
   const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = useParties(
     "Customer",
@@ -79,6 +84,10 @@ export default function IntercompanyReconciliation() {
     partyTypeB,
     companyB
   )
+
+  // Auto-fill parties hooks - bypasses permission checks for UI auto-filling
+  const { parties: autofillPartiesA } = usePartiesForAutofill("Customer", companyA)
+  const { parties: autofillPartiesB } = usePartiesForAutofill(partyTypeB, companyB)
 
   // GL Data hooks - always pass actual values, let the hook handle shouldLoadData logic
   const {
@@ -104,6 +113,37 @@ export default function IntercompanyReconciliation() {
     loading: glLoadingB,
     error: glErrorB
   } = useGeneralLedgerData({
+    company: companyB,
+    partyType: partyTypeB,
+    party: partyB,
+    fromDate,
+    toDate,
+    currency: currency === "all" ? "" : currency,
+    ignoreExchangeRateRevaluation,
+    ignoreSystemGeneratedNotes,
+    shouldLoadData
+  })
+
+  // Permission-aware GL Data hooks for enhanced security
+  const {
+    hiddenSummary: hiddenSummaryA,
+    totalHiddenEntries: totalHiddenA
+  } = usePermissionAwareGLData({
+    company: companyA,
+    partyType: "Customer",
+    party: partyA,
+    fromDate,
+    toDate,
+    currency: currency === "all" ? "" : currency,
+    ignoreExchangeRateRevaluation,
+    ignoreSystemGeneratedNotes,
+    shouldLoadData
+  })
+
+  const {
+    hiddenSummary: hiddenSummaryB,
+    totalHiddenEntries: totalHiddenB
+  } = usePermissionAwareGLData({
     company: companyB,
     partyType: partyTypeB,
     party: partyB,
@@ -874,7 +914,7 @@ export default function IntercompanyReconciliation() {
 
   // Determine loading and error states
   const isLoading = glLoadingA || glLoadingB
-  const error = companiesError || partiesAError || partiesBError || glErrorA || glErrorB
+  const error = companiesError || allCompaniesError || partiesAError || partiesBError || glErrorA || glErrorB
 
   // Get status badge component
   const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending') => {
@@ -919,16 +959,17 @@ export default function IntercompanyReconciliation() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select value={companyA} onValueChange={handleCompanyAChange} disabled={companiesLoading || companies.length === 0}>
+                    <Select value={companyA} onValueChange={handleCompanyAChange} disabled={allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}>
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
                         <SelectValue placeholder={
-                          companiesLoading ? "Loading..." :
-                          companies.length === 0 ? "No companies available" :
+                          allCompaniesLoading ? "Loading..." :
+                          (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
                           "Select Company"
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {companies.map((company) => (
+                        {/* Use allCompanies if available, otherwise fall back to companies */}
+                        {(allCompanies.length > 0 ? allCompanies : companies).map((company) => (
                           <SelectItem key={company.name} value={company.name}>
                             {company.name}
                           </SelectItem>
@@ -955,7 +996,8 @@ export default function IntercompanyReconciliation() {
                         <SelectValue placeholder={partiesALoading ? "Loading..." : "Select Party"} />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {partiesA.map((party) => (
+                        {/* Use autofill parties as fallback if regular parties fail due to permissions */}
+                        {(partiesA.length > 0 ? partiesA : autofillPartiesA).map((party) => (
                           <SelectItem key={party.name} value={party.name}>
                             {party.name}
                           </SelectItem>
@@ -982,17 +1024,18 @@ export default function IntercompanyReconciliation() {
                     <Select
                       value={companyB}
                       onValueChange={handleCompanyBChange}
-                      disabled={companiesLoading || companies.length === 0}
+                      disabled={allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
                         <SelectValue placeholder={
-                          companiesLoading ? "Loading..." :
-                          companies.length === 0 ? "No companies available" :
+                          allCompaniesLoading ? "Loading..." :
+                          (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
                           "Select Company"
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {companies.map((company) => (
+                        {/* Use allCompanies if available, otherwise fall back to companies */}
+                        {(allCompanies.length > 0 ? allCompanies : companies).map((company) => (
                           <SelectItem key={company.name} value={company.name}>
                             {company.name}
                           </SelectItem>
@@ -1023,7 +1066,8 @@ export default function IntercompanyReconciliation() {
                         <SelectValue placeholder={partiesBLoading ? "Loading..." : "Select Party"} />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {partiesB.map((party) => (
+                        {/* Use autofill parties as fallback if regular parties fail due to permissions */}
+                        {(partiesB.length > 0 ? partiesB : autofillPartiesB).map((party) => (
                           <SelectItem key={party.name} value={party.name}>
                             {party.name}
                           </SelectItem>
@@ -1168,13 +1212,14 @@ export default function IntercompanyReconciliation() {
                 <Alert className="mt-4 border-red-200 bg-red-50">
                   <XCircle className="h-4 w-4 text-red-600" />
                   <AlertDescription className="text-red-800">
-                    {error.includes("permission") ?
+                    {typeof error === 'string' && error.includes("permission") ?
                       "You don't have permission to access this company's data. Please contact your administrator to request access." :
-                      "You don't have permission to perform this action."
+                      typeof error === 'string' ? error :
+                      "An error occurred while loading data. Please try again."
                     }
                   </AlertDescription>
                 </Alert>
-              )}
+            )}
 
             {/* Show info when companies are filtered by permissions */}
             {companies.length > 0 && companies.length < 10 && (
@@ -1450,6 +1495,26 @@ export default function IntercompanyReconciliation() {
           </Card>
         )}
 
+        {/* Hidden Documents Summary */}
+        {(totalHiddenA > 0 || totalHiddenB > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {totalHiddenA > 0 && (
+              <HiddenDocumentsSummary
+                hiddenSummary={hiddenSummaryA}
+                totalHiddenEntries={totalHiddenA}
+                companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyA)?.name || companyA}
+              />
+            )}
+            {totalHiddenB > 0 && (
+              <HiddenDocumentsSummary
+                hiddenSummary={hiddenSummaryB}
+                totalHiddenEntries={totalHiddenB}
+                companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyB)?.name || companyB}
+              />
+            )}
+          </div>
+        )}
+
         {/* General Ledger Data */}
         {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1457,7 +1522,7 @@ export default function IntercompanyReconciliation() {
             <Card className="border-blue-200 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
                 <CardTitle>
-                  {companies.find((c) => c.name === companyA)?.name || companyA} - General Ledger
+                  {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyA)?.name || companyA} - General Ledger
                   <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">
                     Customer View
                   </Badge>
@@ -1570,7 +1635,7 @@ export default function IntercompanyReconciliation() {
             <Card className="border-blue-200 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
                 <CardTitle>
-                  {companies.find((c) => c.name === companyB)?.name || companyB} - General Ledger
+                  {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyB)?.name || companyB} - General Ledger
                   <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">
                     {partyTypeB} View
                   </Badge>
