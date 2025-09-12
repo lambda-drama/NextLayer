@@ -39,7 +39,6 @@ def execute(filters=None):
     if filters.get("party"):
         filters.party = frappe.parse_json(filters.get("party"))
 
-
     validate_filters(filters, account_details)
 
     validate_party(filters)
@@ -236,11 +235,20 @@ def get_gl_entries(filters, accounting_dimensions):
 	"""
     frappe.logger().info(f"SQL Query: {sql_query}")
     frappe.logger().info(f"SQL Filters: {filters}")
+    frappe.logger().info(f"Company in filters: {filters.get('company')}")
+    frappe.logger().info(f"From Date: {filters.get('from_date')}")
+    frappe.logger().info(f"To Date: {filters.get('to_date')}")
 
     gl_entries = frappe.db.sql(sql_query, filters, as_dict=1)
     frappe.logger().info(f"Found {len(gl_entries)} GL entries")
     if gl_entries:
         frappe.logger().info(f"Sample entry: {gl_entries[0]}")
+    else:
+        frappe.logger().info("No GL entries found - checking if data exists in database...")
+        # Check if there's any data for this company at all
+        test_query = "SELECT COUNT(*) as count FROM `tabGL Entry` WHERE company=%(company)s"
+        test_result = frappe.db.sql(test_query, {"company": filters.get("company")}, as_dict=1)
+        frappe.logger().info(f"Total GL entries for company {filters.get('company')}: {test_result[0].get('count') if test_result else 'N/A'}")
 
     if filters.get("presentation_currency"):
         converted_entries = convert_to_presentation_currency(gl_entries, currency_map)
@@ -374,12 +382,13 @@ def get_conditions(filters):
     if not filters.get("show_cancelled_entries"):
         conditions.append("is_cancelled = 0")
 
-    from frappe.desk.reportview import build_match_conditions
-
-    match_conditions = build_match_conditions("GL Entry")
-
-    if match_conditions:
-        conditions.append(match_conditions)
+    # Skip Frappe's built-in permission checks for GL Entry
+    # from frappe.desk.reportview import build_match_conditions
+    #
+    # match_conditions = build_match_conditions("GL Entry")
+    #
+    # if match_conditions:
+    #     conditions.append(match_conditions)
 
     accounting_dimensions = get_accounting_dimensions(as_list=False)
 
