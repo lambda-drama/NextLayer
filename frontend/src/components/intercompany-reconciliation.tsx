@@ -89,7 +89,7 @@ export default function IntercompanyReconciliation() {
   const { parties: autofillPartiesA } = usePartiesForAutofill("Customer", companyA)
   const { parties: autofillPartiesB } = usePartiesForAutofill(partyTypeB, companyB)
 
-  // GL Data hooks - always pass actual values, let the hook handle shouldLoadData logic
+  // GL Data hooks - get all data for transaction tables
   const {
     data: glDataA,
     reconciliationTotals: totalsA,
@@ -126,6 +126,7 @@ export default function IntercompanyReconciliation() {
 
   // Permission-aware GL Data hooks for enhanced security
   const {
+    data: permissionAwareDataA,
     hiddenSummary: hiddenSummaryA,
     totalHiddenEntries: totalHiddenA
   } = usePermissionAwareGLData({
@@ -141,6 +142,7 @@ export default function IntercompanyReconciliation() {
   })
 
   const {
+    data: permissionAwareDataB,
     hiddenSummary: hiddenSummaryB,
     totalHiddenEntries: totalHiddenB
   } = usePermissionAwareGLData({
@@ -154,6 +156,14 @@ export default function IntercompanyReconciliation() {
     ignoreSystemGeneratedNotes,
     shouldLoadData
   })
+  // Debug log for hidden summary - only log when value changes
+  useEffect(() => {
+    console.log("Hidden Summary A:", hiddenSummaryA)
+    console.log("Hidden Summary B:", hiddenSummaryB)
+    console.log("Permission-aware Data A:", permissionAwareDataA.length, "entries")
+    console.log("Permission-aware Data B:", permissionAwareDataB.length, "entries")
+    console.log("Data", permissionAwareDataB)
+  }, [hiddenSummaryA, hiddenSummaryB, permissionAwareDataA, permissionAwareDataB])
 
   // Auto-fill Company B when Company A and Party A are selected
   useEffect(() => {
@@ -356,15 +366,22 @@ export default function IntercompanyReconciliation() {
     fetchMatchStatus()
   }, [glDataA, glDataB, companyA, companyB])
 
-  // Function to find matching entries between Company A and Company B
+  // Function to find matching entries between Company A and Company B (on FULL data first)
   const findMatchingEntries = useMemo(() => {
-    if (!glDataA.length || !glDataB.length) return { glDataAWithStatus: [], glDataBWithStatus: [] }
+    console.log("Starting matching process with FULL data...")
+    console.log("glDataA:", glDataA.length, "glDataB:", glDataB.length)
+
+    if (!glDataA.length || !glDataB.length) {
+      console.log("Returning empty arrays - no data for matching")
+      return { glDataAWithStatus: [], glDataBWithStatus: [] }
+    }
 
     // Create a map to track which entries have been matched to prevent duplicates
     const matchedEntriesB = new Set<string>()
     const matchedEntriesA = new Set<string>()
 
     // First pass: Process Company A entries and find their matches
+    console.log("Processing Company A entries...")
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
       // Find matching entry in Company B based on amount only (date can be different)
       // But ensure we don't match with an entry that's already been matched
@@ -411,6 +428,7 @@ export default function IntercompanyReconciliation() {
     })
 
     // Second pass: Process Company B entries and find their matches
+    console.log("Processing Company B entries...")
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
       // Find matching entry in Company A
       const matchingEntry = glDataA.find(entryA => {
@@ -455,8 +473,41 @@ export default function IntercompanyReconciliation() {
       }
     })
 
-    return { glDataAWithStatus, glDataBWithStatus }
-  }, [glDataA, glDataB, backendMatchStatus])
+    console.log("Matching completed - glDataAWithStatus:", glDataAWithStatus.length)
+    console.log("Matching completed - glDataBWithStatus:", glDataBWithStatus.length)
+
+    // Now apply permission filtering to only show visible entries
+    console.log("Applying permission filtering...")
+    console.log("permissionAwareDataA:", permissionAwareDataA.length, "permissionAwareDataB:", permissionAwareDataB.length)
+
+    // Create sets of visible voucher keys for quick lookup
+    const visibleKeysA = new Set(permissionAwareDataA.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
+    const visibleKeysB = new Set(permissionAwareDataB.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
+
+    // Filter the matched entries to only show visible ones
+    const filteredGlDataAWithStatus = glDataAWithStatus.filter(entry => {
+      const key = `${entry.voucher_type}-${entry.voucher_no}`
+      const isVisible = visibleKeysA.has(key)
+      if (!isVisible) {
+        console.log(`HIDING Company A matched entry: ${key}`)
+      }
+      return isVisible
+    })
+
+    const filteredGlDataBWithStatus = glDataBWithStatus.filter(entry => {
+      const key = `${entry.voucher_type}-${entry.voucher_no}`
+      const isVisible = visibleKeysB.has(key)
+      if (!isVisible) {
+        console.log(`HIDING Company B matched entry: ${key}`)
+      }
+      return isVisible
+    })
+
+    console.log("Final filtered results - glDataAWithStatus:", filteredGlDataAWithStatus.length)
+    console.log("Final filtered results - glDataBWithStatus:", filteredGlDataBWithStatus.length)
+
+    return { glDataAWithStatus: filteredGlDataAWithStatus, glDataBWithStatus: filteredGlDataBWithStatus }
+  }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus])
 
   // Updated reconciliation analysis using reconciliationTotals
   const reconciliationAnalysis = useMemo(() => {
@@ -1175,40 +1226,9 @@ export default function IntercompanyReconciliation() {
               </div>
             </div>
 
-                        {/* Debug Section */}
-            {/* <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-gray-600">Debug Tools</h4>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={testEndpoint}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                  >
-                    Test API Endpoint
-                  </Button>
-                  <Button
-                    onClick={refreshCSRFToken}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                  >
-                    Refresh CSRF Token
-                  </Button>
-                </div>
-              </div>
-              {companiesError && (
-                <Alert className="mt-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Companies Error: {companiesError}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div> */}
 
-            {error && (
+
+            {/* {error && (
                 <Alert className="mt-4 border-red-200 bg-red-50">
                   <XCircle className="h-4 w-4 text-red-600" />
                   <AlertDescription className="text-red-800">
@@ -1219,7 +1239,7 @@ export default function IntercompanyReconciliation() {
                     }
                   </AlertDescription>
                 </Alert>
-            )}
+            )} */}
 
             {/* Show info when companies are filtered by permissions */}
             {companies.length > 0 && companies.length < 10 && (
@@ -1407,6 +1427,26 @@ export default function IntercompanyReconciliation() {
           </Card>
         )}
 
+         {/* Hidden Documents Summary */}
+        {(totalHiddenA > 0 || totalHiddenB > 0) && (
+          <div className="grid grid-cols-1 gap-6 mb-6">
+            {totalHiddenA > 0 && (
+              <HiddenDocumentsSummary
+                hiddenSummary={hiddenSummaryA}
+                totalHiddenEntries={totalHiddenA}
+                companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyA)?.name || companyA}
+              />
+            )}
+            {totalHiddenB > 0 && (
+              <HiddenDocumentsSummary
+                hiddenSummary={hiddenSummaryB}
+                totalHiddenEntries={totalHiddenB}
+                companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyB)?.name || companyB}
+              />
+            )}
+          </div>
+        )}
+
         {/* Status Filter and Actions */}
         {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (
           <Card className="border-blue-200 shadow-lg">
@@ -1495,25 +1535,7 @@ export default function IntercompanyReconciliation() {
           </Card>
         )}
 
-        {/* Hidden Documents Summary */}
-        {(totalHiddenA > 0 || totalHiddenB > 0) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {totalHiddenA > 0 && (
-              <HiddenDocumentsSummary
-                hiddenSummary={hiddenSummaryA}
-                totalHiddenEntries={totalHiddenA}
-                companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyA)?.name || companyA}
-              />
-            )}
-            {totalHiddenB > 0 && (
-              <HiddenDocumentsSummary
-                hiddenSummary={hiddenSummaryB}
-                totalHiddenEntries={totalHiddenB}
-                companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyB)?.name || companyB}
-              />
-            )}
-          </div>
-        )}
+
 
         {/* General Ledger Data */}
         {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (

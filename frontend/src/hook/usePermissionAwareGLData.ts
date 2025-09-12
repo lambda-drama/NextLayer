@@ -43,13 +43,14 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!filters.shouldLoadData || !filters.company || !filters.party || !filters.fromDate || !filters.toDate) {
-        return
-      }
+      // if (!filters.shouldLoadData || !filters.company || !filters.party || !filters.fromDate || !filters.toDate) {
+      //   return
+      // }
 
       setLoading(true)
       setError(null)
-
+      // console.log("Starting permission-aware GL data fetch...")
+      // console.log("Filters being sent:", filters)
       try {
         const requestBody = {
           company: filters.company,
@@ -62,24 +63,38 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
           ignore_system_generated_notes: filters.ignoreSystemGeneratedNotes
         }
 
+        // console.log("Making API request to:", '/api/method/nextlayer.next_layer.api.general_ledger.get_permission_aware_gl_data')
+        // console.log("Request body:", JSON.stringify({ filters: requestBody }))
+
         const response = await fetch('/api/method/nextlayer.next_layer.api.general_ledger.get_permission_aware_gl_data', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
             'X-Frappe-CSRF-Token': window.csrf_token || ''
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify({ filters: requestBody }),
+          credentials: 'include'
         })
 
-        const result: GLDataResponse = await response.json()
+        // console.log("Response status:", response.status)
+        // console.log("Response ok:", response.ok)
 
-        if (result.success) {
-          setData(result.data.entries)
-          setHiddenSummary(result.data.hidden_summary)
-          setTotalVisibleEntries(result.data.total_visible_entries)
-          setTotalHiddenEntries(result.data.total_hidden_entries)
+        const result = await response.json()
+        // console.log("Permission-aware API response:", result)
+
+        // Handle Frappe API response structure (wrapped in message object)
+        const responseData = result.message || result
+          // console.log("Mania", responseData.data.entries)
+        if (responseData.success) {
+          // console.log("Permission-aware data received:", responseData.data.entries.length, "entries")
+          // console.log("Hidden summary:", responseData.data.hidden_summary)
+          setData(responseData.data.entries)
+          setHiddenSummary(responseData.data.hidden_summary)
+          setTotalVisibleEntries(responseData.data.total_visible_entries)
+          setTotalHiddenEntries(responseData.data.total_hidden_entries)
         } else {
-          setError(result.message || 'Failed to fetch GL data')
+          setError(responseData.message || responseData.error || 'Failed to fetch GL data')
         }
       } catch (err) {
         console.error('Error fetching permission-aware GL data:', err)
@@ -111,3 +126,4 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
     error
   }
 }
+
