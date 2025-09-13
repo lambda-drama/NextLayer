@@ -31,6 +31,8 @@ export const useMatchStatus = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Frappe-CSRF-Token': window.csrf_token || ''
         },
         body: JSON.stringify({
           voucher_type: data.voucher_type,
@@ -38,7 +40,8 @@ export const useMatchStatus = () => {
           company: data.company,
           status: data.status,
           matched_with: data.matched_with
-        })
+        }),
+        credentials: 'include'
       })
 
       const result = await response.json()
@@ -71,7 +74,14 @@ export const useMatchStatus = () => {
     setError(null)
 
     try {
-      const response = await fetch(`/api/method/nextlayer.next_layer.api.general_ledger.get_match_status?voucher_type=${encodeURIComponent(voucherType)}&voucher_no=${encodeURIComponent(voucherNo)}&company=${encodeURIComponent(company)}`)
+      const response = await fetch(`/api/method/nextlayer.next_layer.api.general_ledger.get_match_status?voucher_type=${encodeURIComponent(voucherType)}&voucher_no=${encodeURIComponent(voucherNo)}&company=${encodeURIComponent(company)}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'X-Frappe-CSRF-Token': window.csrf_token || ''
+        },
+        credentials: 'include'
+      })
       const result = await response.json()
 
       // Handle Frappe API response structure (wrapped in message object)
