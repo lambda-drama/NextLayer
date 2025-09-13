@@ -55,6 +55,7 @@ export default function IntercompanyReconciliation() {
   const [currency, setCurrency] = useState<string>("all")
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(false)
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(false)
+  const [showOpeningEntries, setShowOpeningEntries] = useState<boolean>(false)
   const [shouldLoadData, setShouldLoadData] = useState(false)
   const [hasLoadedData, setHasLoadedData] = useState(false)
   const [isAutoFilled, setIsAutoFilled] = useState(false)
@@ -104,6 +105,7 @@ export default function IntercompanyReconciliation() {
     currency: currency === "all" ? "" : currency,
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
+    showOpeningEntries,
     shouldLoadData
   })
 
@@ -121,6 +123,7 @@ export default function IntercompanyReconciliation() {
     currency: currency === "all" ? "" : currency,
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
+    showOpeningEntries,
     shouldLoadData
   })
 
@@ -138,6 +141,7 @@ export default function IntercompanyReconciliation() {
     currency: currency === "all" ? "" : currency,
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
+    showOpeningEntries,
     shouldLoadData
   })
 
@@ -154,6 +158,7 @@ export default function IntercompanyReconciliation() {
     currency: currency === "all" ? "" : currency,
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
+    showOpeningEntries,
     shouldLoadData
   })
   // Debug log for hidden summary - only log when value changes
@@ -236,6 +241,7 @@ export default function IntercompanyReconciliation() {
       currency,
       ignoreExchangeRateRevaluation,
       ignoreSystemGeneratedNotes,
+      showOpeningEntries,
       statusFilter,
       selectedEntries: Array.from(selectedEntries),
       glDataA,
@@ -291,6 +297,7 @@ export default function IntercompanyReconciliation() {
           setCurrency(state.currency || "all")
           setIgnoreExchangeRateRevaluation(state.ignoreExchangeRateRevaluation || false)
           setIgnoreSystemGeneratedNotes(state.ignoreSystemGeneratedNotes || false)
+          setShowOpeningEntries(state.showOpeningEntries || false)
           setStatusFilter(state.statusFilter || "Mismatch")
           setSelectedEntries(new Set(state.selectedEntries || []))
 
@@ -322,7 +329,7 @@ export default function IntercompanyReconciliation() {
       // If data was never loaded, reset the flag
       setShouldLoadData(false)
     }
-  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, hasLoadedData])
+  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries, hasLoadedData])
 
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
@@ -1000,7 +1007,7 @@ export default function IntercompanyReconciliation() {
               General Ledger Selection
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-6 w-full">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Company A Selection */}
               <div className="space-y-4">
@@ -1131,7 +1138,7 @@ export default function IntercompanyReconciliation() {
             </div>
 
             {/* Date Range, Currency and Filters */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 w-full">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">From Date</label>
                 <input
@@ -1211,16 +1218,17 @@ export default function IntercompanyReconciliation() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Additional Filters</label>
+                <label className="text-sm font-medium text-gray-700">Show Opening Entries</label>
                 <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
                   <input
                     type="checkbox"
-                    id="placeholderFilter"
-                    disabled
+                    id="showOpeningEntries"
+                    checked={showOpeningEntries}
+                    onChange={(e) => setShowOpeningEntries(e.target.checked)}
                     className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <label htmlFor="placeholderFilter" className="text-sm text-gray-500">
-                    Coming Soon
+                  <label htmlFor="showOpeningEntries" className="text-sm text-gray-700">
+                    Enable
                   </label>
                 </div>
               </div>
@@ -1359,6 +1367,71 @@ export default function IntercompanyReconciliation() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Opening Amounts Display */}
+              {showOpeningEntries && (totalsA?.openingDebit !== undefined || totalsB?.openingDebit !== undefined) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  {/* Company A Opening */}
+                  <Card className="border-orange-200">
+                    <CardHeader className="bg-orange-50 border-b border-orange-200">
+                      <CardTitle className="text-lg text-orange-800">
+                        {companyA} Opening Amounts
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {formatCurrency(totalsA?.openingDebit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
+                          </div>
+                          <div className="text-sm text-gray-600">Opening Debit ({getPartyCurrency(partyA, 'Customer')})</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {formatCurrency(totalsA?.openingCredit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
+                          </div>
+                          <div className="text-sm text-gray-600">Opening Credit ({getPartyCurrency(partyA, 'Customer')})</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-center">
+                        <div className="text-lg font-semibold text-orange-700">
+                          Opening Balance: {formatCurrency(totalsA?.openingBalance || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Company B Opening */}
+                  <Card className="border-orange-200">
+                    <CardHeader className="bg-orange-50 border-b border-orange-200">
+                      <CardTitle className="text-lg text-orange-800">
+                        {companyB} Opening Amounts
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {formatCurrency(totalsB?.openingDebit || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
+                          </div>
+                          <div className="text-sm text-gray-600">Opening Debit ({getPartyCurrency(partyB, partyTypeB)})</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {formatCurrency(totalsB?.openingCredit || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
+                          </div>
+                          <div className="text-sm text-gray-600">Opening Credit ({getPartyCurrency(partyB, partyTypeB)})</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-center">
+                        <div className="text-lg font-semibold text-orange-700">
+                          Opening Balance: {formatCurrency(totalsB?.openingBalance || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <Alert

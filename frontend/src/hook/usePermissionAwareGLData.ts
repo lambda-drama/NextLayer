@@ -9,6 +9,7 @@ interface GLFilters {
   currency: string
   ignoreExchangeRateRevaluation: boolean
   ignoreSystemGeneratedNotes: boolean
+  showOpeningEntries: boolean
 }
 
 interface HiddenSummary {
@@ -60,7 +61,8 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
           to_date: filters.toDate,
           currency: filters.currency === "all" ? "" : filters.currency,
           ignore_exchange_rate_revaluation: filters.ignoreExchangeRateRevaluation,
-          ignore_system_generated_notes: filters.ignoreSystemGeneratedNotes
+          ignore_system_generated_notes: filters.ignoreSystemGeneratedNotes,
+          show_opening_entries: filters.showOpeningEntries
         }
 
         // console.log("Making API request to:", '/api/method/nextlayer.next_layer.api.general_ledger.get_permission_aware_gl_data')
@@ -114,7 +116,8 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
     filters.toDate,
     filters.currency,
     filters.ignoreExchangeRateRevaluation,
-    filters.ignoreSystemGeneratedNotes
+    filters.ignoreSystemGeneratedNotes,
+    filters.showOpeningEntries
   ])
 
   return {

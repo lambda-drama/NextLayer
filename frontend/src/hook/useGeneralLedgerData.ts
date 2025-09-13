@@ -27,6 +27,9 @@ export interface ReconciliationTotals {
   totalDebit: number
   totalCredit: number
   balance: number
+  openingDebit?: number
+  openingCredit?: number
+  openingBalance?: number
 }
 
 interface APIResponse {
@@ -52,6 +55,7 @@ interface UseGLDataOptions {
   currency?: string
   ignoreExchangeRateRevaluation?: boolean
   ignoreSystemGeneratedNotes?: boolean
+  showOpeningEntries?: boolean
   shouldLoadData?: boolean
 }
 
@@ -64,6 +68,7 @@ export function useGeneralLedgerData({
   currency,
   ignoreExchangeRateRevaluation,
   ignoreSystemGeneratedNotes,
+  showOpeningEntries,
   shouldLoadData = true,
 }: UseGLDataOptions) {
   const [data, setData] = useState<GLEntry[]>([])
@@ -88,6 +93,7 @@ export function useGeneralLedgerData({
       ...(currency && currency !== "all" && { currency }),
       ...(ignoreExchangeRateRevaluation && { ignore_err: 1 }),
       ...(ignoreSystemGeneratedNotes && { ignore_cr_dr_notes: 1 }),
+      ...(showOpeningEntries && { show_opening_entries: 1 }),
     }
 
     try {
@@ -121,14 +127,23 @@ const rawEntries = result.message?.data?.entries || []
         entry.account && entry.account.includes("'Closing (Opening + Total)'")
       )
 
+      // Find the Opening entry
+      const openingEntries = rawEntries.filter((entry: any) =>
+        entry.account && entry.account.includes("'Opening'")
+      )
+
       // Get the last Closing entry which should be the final overall balance
       const closingEntry = closingEntries[closingEntries.length - 1]
+      const openingEntry = openingEntries[openingEntries.length - 1]
 
       if (closingEntry) {
         setReconciliationTotals({
           totalDebit: parseFloat(closingEntry.debit) || 0,
           totalCredit: parseFloat(closingEntry.credit) || 0,
           balance: parseFloat(closingEntry.balance) || 0,
+          openingDebit: openingEntry ? parseFloat(openingEntry.debit) || 0 : 0,
+          openingCredit: openingEntry ? parseFloat(openingEntry.credit) || 0 : 0,
+          openingBalance: openingEntry ? parseFloat(openingEntry.balance) || 0 : 0,
         })
       }
 
@@ -184,7 +199,7 @@ const rawEntries = result.message?.data?.entries || []
     } finally {
       setLoading(false)
     }
-  }, [shouldLoadData, company, partyType, party, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes])
+  }, [shouldLoadData, company, partyType, party, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries])
 
   useEffect(() => {
     fetchGLData()
