@@ -1407,13 +1407,13 @@ export default function IntercompanyReconciliation() {
                   <CardContent className="p-4">
                     <div className="grid grid-cols-2 gap-4">
                                               <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">
+                          <div className="text-2xl font-bold text-green-600">
                             {formatCurrency(reconciliationAnalysis.totalDebitB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
                           <div className="text-sm text-gray-600">Total Debit ({getPartyCurrency(partyB, partyTypeB)})</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">
+                          <div className="text-2xl font-bold text-blue-600">
                             {formatCurrency(reconciliationAnalysis.totalCreditB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
                           <div className="text-sm text-gray-600">Total Credit ({getPartyCurrency(partyB, partyTypeB)})</div>
