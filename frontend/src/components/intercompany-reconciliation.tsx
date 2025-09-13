@@ -53,8 +53,8 @@ export default function IntercompanyReconciliation() {
   const [fromDate, setFromDate] = useState<string>(`${new Date().getFullYear()}-01-01`)
   const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [currency, setCurrency] = useState<string>("all")
-  const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(false)
-  const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(false)
+  const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
+  const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(true)
   const [showOpeningEntries, setShowOpeningEntries] = useState<boolean>(false)
   const [shouldLoadData, setShouldLoadData] = useState(false)
   const [hasLoadedData, setHasLoadedData] = useState(false)
@@ -295,8 +295,8 @@ export default function IntercompanyReconciliation() {
           setFromDate(state.fromDate || `${new Date().getFullYear()}-01-01`)
           setToDate(state.toDate || new Date().toISOString().split('T')[0])
           setCurrency(state.currency || "all")
-          setIgnoreExchangeRateRevaluation(state.ignoreExchangeRateRevaluation || false)
-          setIgnoreSystemGeneratedNotes(state.ignoreSystemGeneratedNotes || false)
+          setIgnoreExchangeRateRevaluation(state.ignoreExchangeRateRevaluation !== undefined ? state.ignoreExchangeRateRevaluation : true)
+          setIgnoreSystemGeneratedNotes(state.ignoreSystemGeneratedNotes !== undefined ? state.ignoreSystemGeneratedNotes : true)
           setShowOpeningEntries(state.showOpeningEntries || false)
           setStatusFilter(state.statusFilter || "Mismatch")
           setSelectedEntries(new Set(state.selectedEntries || []))
@@ -961,6 +961,61 @@ export default function IntercompanyReconciliation() {
     } catch (error) {
       console.error('Error matching entries:', error)
       alert('Failed to match entries. Please try again.')
+    }
+  }
+
+  // Handle individual unmatch
+  const handleIndividualUnmatch = async (entry: GLEntry) => {
+    try {
+      if (!entry.matchedEntry) {
+        alert('No matched entry found to unmatch.')
+        return
+      }
+
+      // Update both entries to Mismatch status
+      await updateMatchStatus({
+        voucher_type: entry.voucher_type,
+        voucher_no: entry.voucher_no,
+        company: companyA,
+        status: 'Mismatch',
+        matched_with: null
+      })
+
+      await updateMatchStatus({
+        voucher_type: entry.matchedEntry.voucher_type,
+        voucher_no: entry.matchedEntry.voucher_no,
+        company: companyB,
+        status: 'Mismatch',
+        matched_with: null
+      })
+
+      // Refresh backend match status
+      const statusMap = { ...backendMatchStatus }
+
+      // Update the status map with new data
+      const keyA = `${entry.voucher_type}-${entry.voucher_no}`
+      const keyB = `${entry.matchedEntry.voucher_type}-${entry.matchedEntry.voucher_no}`
+
+      statusMap[keyA] = {
+        success: true,
+        status: 'Mismatch',
+        matched_with: null,
+        matched_by: 'current_user',
+        matched_on: new Date().toISOString()
+      }
+
+      statusMap[keyB] = {
+        success: true,
+        status: 'Mismatch',
+        matched_with: null,
+        matched_by: 'current_user',
+        matched_on: new Date().toISOString()
+      }
+
+      setBackendMatchStatus(statusMap)
+    } catch (error) {
+      console.error('Error unmatching entries:', error)
+      alert('Failed to unmatch entries. Please try again.')
     }
   }
 
@@ -1651,6 +1706,7 @@ export default function IntercompanyReconciliation() {
                         <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
+                        <TableHead className="text-blue-800 text-center">Matched With</TableHead>
                         <TableHead className="text-blue-800 text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1698,6 +1754,20 @@ export default function IntercompanyReconciliation() {
                               {getStatusBadge(entry.status || 'Pending')}
                             </TableCell>
                             <TableCell className="text-center">
+                              {entry.matchedEntry ? (
+                                <div className="text-sm">
+                                  <div className="font-medium text-blue-600">
+                                    {entry.matchedEntry.voucher_type}
+                                  </div>
+                                  <div className="text-gray-600">
+                                    {entry.matchedEntry.voucher_no}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
                               {entry.status === 'Mismatch' && entry.matchedEntry && (
                                 <Button
                                   onClick={() => handleManualMatch(entry, entry.matchedEntry!)}
@@ -1709,13 +1779,24 @@ export default function IntercompanyReconciliation() {
                                   Match
                                 </Button>
                               )}
+                              {entry.status === 'Match' && entry.matchedEntry && (
+                                <Button
+                                  onClick={() => handleIndividualUnmatch(entry)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-200 text-red-700 hover:bg-red-50"
+                                >
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Unmatch
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         )
                       })}
                       {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
@@ -1764,6 +1845,7 @@ export default function IntercompanyReconciliation() {
                         <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
+                        <TableHead className="text-blue-800 text-center">Matched With</TableHead>
                         <TableHead className="text-blue-800 text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1811,6 +1893,20 @@ export default function IntercompanyReconciliation() {
                               {getStatusBadge(entry.status || 'Pending')}
                             </TableCell>
                             <TableCell className="text-center">
+                              {entry.matchedEntry ? (
+                                <div className="text-sm">
+                                  <div className="font-medium text-blue-600">
+                                    {entry.matchedEntry.voucher_type}
+                                  </div>
+                                  <div className="text-gray-600">
+                                    {entry.matchedEntry.voucher_no}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
                               {entry.status === 'Mismatch' && entry.matchedEntry && (
                                 <Button
                                   onClick={() => handleManualMatch(entry, entry.matchedEntry!)}
@@ -1822,13 +1918,24 @@ export default function IntercompanyReconciliation() {
                                   Match
                                 </Button>
                               )}
+                              {entry.status === 'Match' && entry.matchedEntry && (
+                                <Button
+                                  onClick={() => handleIndividualUnmatch(entry)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-200 text-red-700 hover:bg-red-50"
+                                >
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Unmatch
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         )
                       })}
                       {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
@@ -1953,6 +2060,7 @@ export default function IntercompanyReconciliation() {
           </div>
         )}
       </div>
+
 
       {/* Validation Error Modal */}
       {showValidationError && (
