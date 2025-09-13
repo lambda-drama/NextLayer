@@ -51,7 +51,7 @@ export default function HiddenDocumentsSummary({
             <AlertTriangle className="h-4 w-4" />
             <span>
               {totalHiddenEntries} documents from {companyName} require permission to view.
-              These documents are not matching but hidden due to access restrictions.
+              These documents are hidden due to access restrictions.
             </span>
           </div>
 

@@ -51,7 +51,6 @@ def get_general_ledger_data(filters):
 		finally:
 			frappe.set_user(original_user)
 
-		# print("Data+++", str(data))
 		# Format the response
 		return {
 			"success": True,
@@ -178,8 +177,6 @@ def get_permission_aware_gl_data(filters):
 				# Include entries without voucher info
 				visible_entries.append(entry)
 
-		print(f"Processed {processed_count} entries, {hidden_count} hidden")
-		print("Visible entries", visible_entries)
 		return {
 			"success": True,
 			"data": {
@@ -199,37 +196,6 @@ def get_permission_aware_gl_data(filters):
 			"error": str(e),
 			"message": _("Failed to fetch General Ledger data"),
 		}
-
-
-def check_document_permission(voucher_type, voucher_no):
-	"""
-	Check if current user has permission to view a specific document.
-	Respects Frappe's sharing and role-based permissions.
-	"""
-	try:
-		# Check if document exists
-		if not frappe.db.exists(voucher_type, voucher_no):
-			return False
-
-		# Load document
-		doc = frappe.get_doc(voucher_type, voucher_no)
-
-		# Explicit permission check
-		if frappe.has_permission(voucher_type, doc=doc, ptype="read", user=frappe.session.user):
-			return True
-		else:
-			return False
-
-	except frappe.PermissionError:
-		return False
-	except Exception as e:
-		frappe.log_error(
-			f"Permission check error for {voucher_type} {voucher_no}: {str(e)}"
-		)
-		# To be safe, deny access on unexpected errors
-		return False
-
-
 
 def check_document_permission_as_original_user(voucher_type, voucher_no, original_user):
 	try:
@@ -255,41 +221,6 @@ def check_document_permission_as_original_user(voucher_type, voucher_no, origina
 		)
 		return False
 
-
-
-# @frappe.whitelist()
-# def get_companies():
-#     """Get list of companies for dropdown based on user permissions"""
-#     try:
-#         # Get user's permitted companies using ERPNext's permission system
-#         user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
-#         user_permitted_companies = user_permitted.get("Company")
-
-#         if user_permitted_companies:
-#             permitted_company_names = [c["doc"] for c in user_permitted_companies]
-
-#             companies = frappe.get_all(
-#                 "Company",
-#                 fields=["name", "default_currency"],
-#                 filters={"name": ["in", permitted_company_names]},
-#                 order_by="name"
-#             )
-#         else:
-#             companies = frappe.get_all(
-#                 "Company",
-#                 fields=["name", "default_currency"],
-#                 order_by="name"
-#             )
-
-#         return {"success": True, "data": companies}
-
-#     except Exception as e:
-#         frappe.log_error(f"get_companies API Error: {frappe.get_traceback()}")
-#         return {
-#             "success": False,
-#             "error": str(e),
-#             "message": "Failed to fetch companies"
-#         }
 
 @frappe.whitelist()
 def get_companies():
