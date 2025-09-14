@@ -71,6 +71,19 @@ export default function IntercompanyReconciliation() {
   const [processingSuccess, setProcessingSuccess] = useState(false)
   const [showRestoreNotification, setShowRestoreNotification] = useState(false)
 
+  // Individual confirmation dialogs
+  const [showIndividualMatchModal, setShowIndividualMatchModal] = useState(false)
+  const [showIndividualUnmatchModal, setShowIndividualUnmatchModal] = useState(false)
+  const [selectedEntryForAction, setSelectedEntryForAction] = useState<GLEntry | null>(null)
+  const [isIndividualProcessing, setIsIndividualProcessing] = useState(false)
+
+  // Bulk modal details expansion
+  const [showBulkMatchDetails, setShowBulkMatchDetails] = useState(false)
+
+  // Manual matching state
+  const [manualMatchMode, setManualMatchMode] = useState(false)
+  const [selectedForManualMatch, setSelectedForManualMatch] = useState<GLEntry | null>(null)
+
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
@@ -390,7 +403,7 @@ export default function IntercompanyReconciliation() {
     // First pass: Process Company A entries and find their matches
     console.log("Processing Company A entries...")
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
-      // Find matching entry in Company B based on amount only (date can be different)
+      // Find matching entry in Company B based on amount AND date equality
       // But ensure we don't match with an entry that's already been matched
       const matchingEntry = glDataB.find(entryB => {
         const entryBKey = `${entryB.voucher_type}-${entryB.voucher_no}`
@@ -404,8 +417,11 @@ export default function IntercompanyReconciliation() {
         const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
         const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
 
-        // Return true if either debit matches credit OR credit matches debit (no date requirement)
-        return debitCreditMatch || creditDebitMatch
+        // Check if dates match (both entries must be on the same date)
+        const dateMatch = entryA.posting_date === entryB.posting_date
+
+        // Return true only if amounts match AND dates match
+        return (debitCreditMatch || creditDebitMatch) && dateMatch
       })
 
       // If we found a match, mark it as used
@@ -437,7 +453,7 @@ export default function IntercompanyReconciliation() {
     // Second pass: Process Company B entries and find their matches
     console.log("Processing Company B entries...")
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
-      // Find matching entry in Company A
+      // Find matching entry in Company A based on amount AND date equality
       const matchingEntry = glDataA.find(entryA => {
         const entryAKey = `${entryA.voucher_type}-${entryA.voucher_no}`
 
@@ -450,8 +466,11 @@ export default function IntercompanyReconciliation() {
         const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
         const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
 
-        // Return true if either debit matches credit OR credit matches debit (no date requirement)
-        return debitCreditMatch || creditDebitMatch
+        // Check if dates match (both entries must be on the same date)
+        const dateMatch = entryA.posting_date === entryB.posting_date
+
+        // Return true only if amounts match AND dates match
+        return (debitCreditMatch || creditDebitMatch) && dateMatch
       })
 
       // If we found a match, mark it as used
@@ -597,7 +616,31 @@ export default function IntercompanyReconciliation() {
     setSelectedEntries(newSelected)
   }
 
-      // Check if selected entries are already matched
+  // Get selected entries for bulk modal display (shows all selected, not just matched ones)
+  const getSelectedEntriesForDisplay = useMemo(() => {
+    const selectedEntriesArray = Array.from(selectedEntries)
+    const selectedEntriesList: Array<{ entry: GLEntry; side: 'A' | 'B' }> = []
+
+    for (const entryKey of selectedEntriesArray) {
+      // Find the entry in both Company A and Company B data
+      const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
+        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+      )
+      const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
+        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+      )
+
+      if (entryA) {
+        selectedEntriesList.push({ entry: entryA, side: 'A' })
+      } else if (entryB) {
+        selectedEntriesList.push({ entry: entryB, side: 'B' })
+      }
+    }
+
+    return selectedEntriesList
+  }, [selectedEntries, findMatchingEntries])
+
+  // Check if selected entries are already matched
   const areSelectedEntriesMatched = useMemo(() => {
     if (selectedEntries.size === 0) return false
 
@@ -722,10 +765,7 @@ export default function IntercompanyReconciliation() {
     setProcessingCancelled(false)
 
     try {
-      // Get all selected entries that have potential matches
-      const entriesToMatch: Array<{ entryA: GLEntry; entryB: GLEntry }> = []
-
-      // First, validate that selected entries can be matched by checking amounts
+      // First, validate that selected entries can be matched by checking total amounts
       const selectedEntriesArray = Array.from(selectedEntries)
       const selectedEntriesA = selectedEntriesArray.filter(entryKey =>
         findMatchingEntries.glDataAWithStatus.some(entry =>
@@ -778,13 +818,16 @@ export default function IntercompanyReconciliation() {
         return
       }
 
+      // If totals balance, mark all selected entries as matched
+      // We don't need individual matches - just mark all selected entries as matched
+      const bulkData = []
+
       for (const entryKey of selectedEntries) {
         // Check if processing was cancelled
         if (processingCancelled) {
           console.log("Processing cancelled by user")
           return
         }
-
 
         // Find the entry in both Company A and Company B data
         const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
@@ -794,46 +837,25 @@ export default function IntercompanyReconciliation() {
           `${entry.voucher_type}-${entry.voucher_no}` === entryKey
         )
 
-        if (entryA && entryA.matchedEntry) {
-          entriesToMatch.push({ entryA, entryB: entryA.matchedEntry })
-          console.log("Found match for entry A:", entryA.voucher_no)
-        } else if (entryB && entryB.matchedEntry) {
-          entriesToMatch.push({ entryA: entryB.matchedEntry, entryB })
-          console.log("Found match for entry B:", entryB.voucher_no)
-        }
-      }
-
-      if (entriesToMatch.length === 0) {
-        alert('No valid matches found for selected entries.')
-        setIsProcessing(false)
-        return
-      }
-
-      console.log("Total entries to match:", entriesToMatch.length)
-
-      // Prepare data for bulk update
-      const bulkData = []
-      for (const { entryA, entryB } of entriesToMatch) {
-        // Check if processing was cancelled
-        if (processingCancelled) {
-          console.log("Processing cancelled during data preparation")
-          return
+        if (entryA) {
+          bulkData.push({
+            voucher_type: entryA.voucher_type,
+            voucher_no: entryA.voucher_no,
+            company: companyA,
+            status: 'Match' as const,
+            matched_with: null // No specific match - just mark as matched
+          })
         }
 
-        bulkData.push({
-          voucher_type: entryA.voucher_type,
-          voucher_no: entryA.voucher_no,
-          company: companyA,
-          status: 'Match' as const,
-          matched_with: entryB
-        })
-        bulkData.push({
-          voucher_type: entryB.voucher_type,
-          voucher_no: entryB.voucher_no,
-          company: companyB,
-          status: 'Match' as const,
-          matched_with: entryA
-        })
+        if (entryB) {
+          bulkData.push({
+            voucher_type: entryB.voucher_type,
+            voucher_no: entryB.voucher_no,
+            company: companyB,
+            status: 'Match' as const,
+            matched_with: null // No specific match - just mark as matched
+          })
+        }
       }
 
       console.log("Prepared bulk data:", bulkData)
@@ -901,6 +923,7 @@ export default function IntercompanyReconciliation() {
       setIsProcessing(false)
       setProcessingCancelled(false)
       setProcessingSuccess(false)
+      setShowBulkMatchDetails(false) // Reset details expansion
       // Clear any existing errors when modal opens
       if (matchError) {
         console.log("Clearing match error:", matchError)
@@ -914,8 +937,50 @@ export default function IntercompanyReconciliation() {
     setIsProcessing(false)
   }
 
-  const handleManualMatch = async (entryA: GLEntry, entryB: GLEntry) => {
+  // Show confirmation dialog for individual match
+  const handleShowMatchConfirmation = (entryA: GLEntry, entryB: GLEntry) => {
+    setSelectedEntryForAction({ ...entryA, matchedEntry: entryB })
+    setShowIndividualMatchModal(true)
+  }
+
+  // Handle manual match selection
+  const handleManualMatchSelection = (entry: GLEntry) => {
+    if (!manualMatchMode) {
+      // Start manual match mode
+      setManualMatchMode(true)
+      setSelectedForManualMatch(entry)
+    } else if (selectedForManualMatch) {
+      // Second selection - show confirmation
+      if (selectedForManualMatch.voucher_type === entry.voucher_type &&
+          selectedForManualMatch.voucher_no === entry.voucher_no) {
+        // Same entry selected - cancel manual match mode
+        setManualMatchMode(false)
+        setSelectedForManualMatch(null)
+      } else {
+        // Different entry selected - show confirmation dialog
+        setSelectedEntryForAction({ ...selectedForManualMatch, matchedEntry: entry })
+        setShowIndividualMatchModal(true)
+        setManualMatchMode(false)
+        setSelectedForManualMatch(null)
+      }
+    }
+  }
+
+  // Cancel manual match mode
+  const handleCancelManualMatch = () => {
+    setManualMatchMode(false)
+    setSelectedForManualMatch(null)
+  }
+
+  // Execute individual match after confirmation
+  const handleConfirmIndividualMatch = async () => {
+    if (!selectedEntryForAction || !selectedEntryForAction.matchedEntry) return
+
+    setIsIndividualProcessing(true)
     try {
+      const entryA = selectedEntryForAction
+      const entryB = selectedEntryForAction.matchedEntry
+
       // Update both entries to Match status using the hook
       await updateMatchStatus({
         voucher_type: entryA.voucher_type,
@@ -957,20 +1022,29 @@ export default function IntercompanyReconciliation() {
       }
 
       setBackendMatchStatus(statusMap)
-      setShowMatchModal(false)
+      setShowIndividualMatchModal(false)
+      setSelectedEntryForAction(null)
     } catch (error) {
       console.error('Error matching entries:', error)
       alert('Failed to match entries. Please try again.')
+    } finally {
+      setIsIndividualProcessing(false)
     }
   }
 
-  // Handle individual unmatch
-  const handleIndividualUnmatch = async (entry: GLEntry) => {
+  // Show confirmation dialog for individual unmatch
+  const handleShowUnmatchConfirmation = (entry: GLEntry) => {
+    setSelectedEntryForAction(entry)
+    setShowIndividualUnmatchModal(true)
+  }
+
+  // Execute individual unmatch after confirmation
+  const handleConfirmIndividualUnmatch = async () => {
+    if (!selectedEntryForAction || !selectedEntryForAction.matchedEntry) return
+
+    setIsIndividualProcessing(true)
     try {
-      if (!entry.matchedEntry) {
-        alert('No matched entry found to unmatch.')
-        return
-      }
+      const entry = selectedEntryForAction
 
       // Update both entries to Mismatch status
       await updateMatchStatus({
@@ -982,8 +1056,8 @@ export default function IntercompanyReconciliation() {
       })
 
       await updateMatchStatus({
-        voucher_type: entry.matchedEntry.voucher_type,
-        voucher_no: entry.matchedEntry.voucher_no,
+        voucher_type: entry.matchedEntry!.voucher_type,
+        voucher_no: entry.matchedEntry!.voucher_no,
         company: companyB,
         status: 'Mismatch',
         matched_with: null
@@ -994,7 +1068,7 @@ export default function IntercompanyReconciliation() {
 
       // Update the status map with new data
       const keyA = `${entry.voucher_type}-${entry.voucher_no}`
-      const keyB = `${entry.matchedEntry.voucher_type}-${entry.matchedEntry.voucher_no}`
+      const keyB = `${entry.matchedEntry!.voucher_type}-${entry.matchedEntry!.voucher_no}`
 
       statusMap[keyA] = {
         success: true,
@@ -1013,9 +1087,13 @@ export default function IntercompanyReconciliation() {
       }
 
       setBackendMatchStatus(statusMap)
+      setShowIndividualUnmatchModal(false)
+      setSelectedEntryForAction(null)
     } catch (error) {
       console.error('Error unmatching entries:', error)
       alert('Failed to unmatch entries. Please try again.')
+    } finally {
+      setIsIndividualProcessing(false)
     }
   }
 
@@ -1657,6 +1735,20 @@ export default function IntercompanyReconciliation() {
                       <XCircle className="h-4 w-4" />
                     </Button>
                   )}
+
+                  {/* Cancel Manual Match Button */}
+                  {manualMatchMode && (
+                    <Button
+                      onClick={handleCancelManualMatch}
+                      variant="outline"
+                      size="sm"
+                      className="border-orange-200 text-orange-600 hover:bg-orange-50 px-2"
+                      title="Cancel manual match mode"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Cancel Manual Match
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1770,7 +1862,7 @@ export default function IntercompanyReconciliation() {
                             <TableCell className="text-center">
                               {entry.status === 'Mismatch' && entry.matchedEntry && (
                                 <Button
-                                  onClick={() => handleManualMatch(entry, entry.matchedEntry!)}
+                                  onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
                                   size="sm"
                                   variant="outline"
                                   className="border-green-200 text-green-700 hover:bg-green-50"
@@ -1781,13 +1873,31 @@ export default function IntercompanyReconciliation() {
                               )}
                               {entry.status === 'Match' && entry.matchedEntry && (
                                 <Button
-                                  onClick={() => handleIndividualUnmatch(entry)}
+                                  onClick={() => handleShowUnmatchConfirmation(entry)}
                                   size="sm"
                                   variant="outline"
                                   className="border-red-200 text-red-700 hover:bg-red-50"
                                 >
                                   <XCircle className="h-3 w-3 mr-1" />
                                   Unmatch
+                                </Button>
+                              )}
+                              {!entry.matchedEntry && (
+                                <Button
+                                  onClick={() => handleManualMatchSelection(entry)}
+                                  size="sm"
+                                  variant="outline"
+                                  className={`${
+                                    manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                      ? "border-blue-200 text-blue-700 bg-blue-50"
+                                      : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                                  }`}
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  {manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                    ? "Selected"
+                                    : "Manual Match"
+                                  }
                                 </Button>
                               )}
                             </TableCell>
@@ -1909,7 +2019,7 @@ export default function IntercompanyReconciliation() {
                             <TableCell className="text-center">
                               {entry.status === 'Mismatch' && entry.matchedEntry && (
                                 <Button
-                                  onClick={() => handleManualMatch(entry, entry.matchedEntry!)}
+                                  onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
                                   size="sm"
                                   variant="outline"
                                   className="border-green-200 text-green-700 hover:bg-green-50"
@@ -1920,13 +2030,31 @@ export default function IntercompanyReconciliation() {
                               )}
                               {entry.status === 'Match' && entry.matchedEntry && (
                                 <Button
-                                  onClick={() => handleIndividualUnmatch(entry)}
+                                  onClick={() => handleShowUnmatchConfirmation(entry)}
                                   size="sm"
                                   variant="outline"
                                   className="border-red-200 text-red-700 hover:bg-red-50"
                                 >
                                   <XCircle className="h-3 w-3 mr-1" />
                                   Unmatch
+                                </Button>
+                              )}
+                              {!entry.matchedEntry && (
+                                <Button
+                                  onClick={() => handleManualMatchSelection(entry)}
+                                  size="sm"
+                                  variant="outline"
+                                  className={`${
+                                    manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                      ? "border-blue-200 text-blue-700 bg-blue-50"
+                                      : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                                  }`}
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  {manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                    ? "Selected"
+                                    : "Manual Match"
+                                  }
                                 </Button>
                               )}
                             </TableCell>
@@ -1951,7 +2079,7 @@ export default function IntercompanyReconciliation() {
         {/* Match Confirmation Modal */}
         {showMatchModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-4">
                 {processingSuccess ? "Success!" : isProcessing ? `Processing Bulk ${areSelectedEntriesMatched ? 'Unmatching' : 'Matching'}` : `Confirm Bulk ${areSelectedEntriesMatched ? 'Unmatching' : 'Matching'}`}
               </h3>
@@ -1963,6 +2091,84 @@ export default function IntercompanyReconciliation() {
                     : `Are you sure you want to ${areSelectedEntriesMatched ? 'unmatch' : 'match'} ${selectedEntries.size} selected entries? This action will update the status in the backend.`
                 }
               </p>
+
+              {/* Expandable Transaction Details */}
+              {!processingSuccess && !isProcessing && selectedEntries.size > 0 && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => setShowBulkMatchDetails(!showBulkMatchDetails)}
+                    className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    {showBulkMatchDetails ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                        Hide Transaction Details
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        Show Transaction Details ({getSelectedEntriesForDisplay.length} selected)
+                      </>
+                    )}
+                  </button>
+
+                  {showBulkMatchDetails && (
+                    <div className="mt-3 bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
+                      <div className="space-y-3">
+                        {getSelectedEntriesForDisplay.map((item, index) => (
+                          <div key={index} className="bg-white p-3 rounded border">
+                            <div className="flex items-center">
+                              <div className="flex-1">
+                                <div className="font-medium text-blue-600">
+                                  {item.entry.voucher_type} {item.entry.voucher_no}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {item.side === 'A' ? companyA : companyB} - {item.entry.posting_date}
+                                </div>
+                                <div className="text-sm font-medium">
+                                  {item.entry.debit > 0 ?
+                                    `Debit: ${formatCurrency(item.entry.debit,
+                                      item.side === 'A' ? getPartyCurrency(partyA, 'Customer') : getPartyCurrency(partyB, partyTypeB),
+                                      item.side === 'A' ? partyA : partyB,
+                                      item.side === 'A' ? 'Customer' : partyTypeB
+                                    )}` :
+                                    `Credit: ${formatCurrency(item.entry.credit,
+                                      item.side === 'A' ? getPartyCurrency(partyA, 'Customer') : getPartyCurrency(partyB, partyTypeB),
+                                      item.side === 'A' ? partyA : partyB,
+                                      item.side === 'A' ? 'Customer' : partyTypeB
+                                    )}`
+                                  }
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Status: {item.entry.status || 'Pending'}
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                <div className={`px-2 py-1 rounded text-xs font-medium ${
+                                  item.side === 'A'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-green-100 text-green-700'
+                                }`}>
+                                  {item.side === 'A' ? 'Company A' : 'Company B'}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {getSelectedEntriesForDisplay.length === 0 && (
+                          <div className="text-center text-gray-500 py-4">
+                            No entries selected
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {isProcessing && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -2088,7 +2294,164 @@ export default function IntercompanyReconciliation() {
           </Card>
         </div>
       )}
+
+      {/* Individual Match Confirmation Modal */}
+      {showIndividualMatchModal && selectedEntryForAction && selectedEntryForAction.matchedEntry && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-green-700">
+              Confirm Match
+            </h3>
+            <div className="mb-4">
+              <p className="text-gray-700 mb-3">
+                Are you sure you want to match these transactions?
+              </p>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-medium text-blue-600">
+                      {selectedEntryForAction.voucher_type} {selectedEntryForAction.voucher_no}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {companyA} - {selectedEntryForAction.posting_date}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {selectedEntryForAction.debit > 0 ?
+                        `Debit: ${formatCurrency(selectedEntryForAction.debit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}` :
+                        `Credit: ${formatCurrency(selectedEntryForAction.credit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}`
+                      }
+                    </div>
+                  </div>
+                  <div className="text-2xl text-gray-400">↔</div>
+                  <div>
+                    <div className="font-medium text-blue-600">
+                      {selectedEntryForAction.matchedEntry.voucher_type} {selectedEntryForAction.matchedEntry.voucher_no}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {companyB} - {selectedEntryForAction.matchedEntry.posting_date}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {selectedEntryForAction.matchedEntry.debit > 0 ?
+                        `Debit: ${formatCurrency(selectedEntryForAction.matchedEntry.debit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}` :
+                        `Credit: ${formatCurrency(selectedEntryForAction.matchedEntry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}`
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                onClick={() => {
+                  setShowIndividualMatchModal(false)
+                  setSelectedEntryForAction(null)
+                }}
+                variant="outline"
+                disabled={isIndividualProcessing}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmIndividualMatch}
+                className="bg-green-600 hover:bg-green-700"
+                disabled={isIndividualProcessing}
+              >
+                {isIndividualProcessing ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Matching...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm Match
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Individual Unmatch Confirmation Modal */}
+      {showIndividualUnmatchModal && selectedEntryForAction && selectedEntryForAction.matchedEntry && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-red-700">
+              Confirm Unmatch
+            </h3>
+            <div className="mb-4">
+              <p className="text-gray-700 mb-3">
+                Are you sure you want to unmatch these transactions?
+              </p>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-medium text-blue-600">
+                      {selectedEntryForAction.voucher_type} {selectedEntryForAction.voucher_no}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {companyA} - {selectedEntryForAction.posting_date}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {selectedEntryForAction.debit > 0 ?
+                        `Debit: ${formatCurrency(selectedEntryForAction.debit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}` :
+                        `Credit: ${formatCurrency(selectedEntryForAction.credit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}`
+                      }
+                    </div>
+                  </div>
+                  <div className="text-2xl text-gray-400">↔</div>
+                  <div>
+                    <div className="font-medium text-blue-600">
+                      {selectedEntryForAction.matchedEntry.voucher_type} {selectedEntryForAction.matchedEntry.voucher_no}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {companyB} - {selectedEntryForAction.matchedEntry.posting_date}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {selectedEntryForAction.matchedEntry.debit > 0 ?
+                        `Debit: ${formatCurrency(selectedEntryForAction.matchedEntry.debit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}` :
+                        `Credit: ${formatCurrency(selectedEntryForAction.matchedEntry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}`
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                onClick={() => {
+                  setShowIndividualUnmatchModal(false)
+                  setSelectedEntryForAction(null)
+                }}
+                variant="outline"
+                disabled={isIndividualProcessing}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmIndividualUnmatch}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={isIndividualProcessing}
+              >
+                {isIndividualProcessing ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Unmatching...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Confirm Unmatch
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
