@@ -12,6 +12,7 @@ export interface MatchStatusResponse {
   success: boolean
   status?: string
   matched_with?: string
+  matched_with_parsed?: any
   matched_by?: string
   matched_on?: string
   message?: string
@@ -25,7 +26,7 @@ export const useMatchStatus = () => {
   const updateMatchStatus = useCallback(async (data: MatchStatusData): Promise<MatchStatusResponse> => {
     setLoading(true)
     setError(null)
-    // console.log("Data", data)
+    console.log("Data", data)
     try {
       const response = await fetch('/api/method/nextlayer.next_layer.api.general_ledger.update_match_status', {
         method: 'POST',
