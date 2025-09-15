@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "Data Visualizer",
  "links": [],
- "modified": "2025-08-29 18:22:34.978735",
+ "modified": "2025-09-15 23:12:25.373753",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Data Visualizer",
@@ -22,7 +22,11 @@
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
- "roles": [],
+ "roles": [
+  {
+   "role": "Intercompany"
+  }
+ ],
  "sequence_id": 39.0,
  "shortcuts": [
   {
