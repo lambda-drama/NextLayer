@@ -361,7 +361,7 @@ def update_match_status():
 
 		if not isinstance(data, dict):
 			frappe.throw(f"Expected dictionary data, got {type(data)}")
-
+		print("Data received for update_match_status:", data)
 		voucher_type = data.get("voucher_type")
 		voucher_no = data.get("voucher_no")
 		company = data.get("company")
@@ -441,10 +441,24 @@ def get_match_status(voucher_type, voucher_no, company):
 	try:
 		try:
 			doc = frappe.get_doc(voucher_type, voucher_no)
+
+			# Get the basic match status
+			matched_with_raw = doc.get("intercompany_matched_with")
+			matched_with_parsed = None
+
+			# Try to parse the matched_with data if it exists
+			if matched_with_raw:
+				try:
+					matched_with_parsed = frappe.parse_json(matched_with_raw)
+				except:
+					# If parsing fails, keep as string
+					matched_with_parsed = matched_with_raw
+
 			return {
 				"success": True,
 				"status": doc.get("intercompany_match_status", "Pending"),
-				"matched_with": doc.get("intercompany_matched_with"),
+				"matched_with": matched_with_raw,  # Raw JSON string
+				"matched_with_parsed": matched_with_parsed,  # Parsed object
 				"matched_by": doc.get("intercompany_matched_by"),
 				"matched_on": doc.get("intercompany_matched_on")
 			}
@@ -453,6 +467,7 @@ def get_match_status(voucher_type, voucher_no, company):
 				"success": True,
 				"status": "Pending",
 				"matched_with": None,
+				"matched_with_parsed": None,
 				"matched_by": None,
 				"matched_on": None
 			}

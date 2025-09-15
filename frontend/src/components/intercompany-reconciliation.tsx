@@ -38,6 +38,7 @@ export interface GLEntry {
   backendMatchData?: {
     status: string
     matched_with?: string
+    matched_with_parsed?: any
     matched_by?: string
     matched_on?: string
   }
@@ -176,11 +177,11 @@ export default function IntercompanyReconciliation() {
   })
   // Debug log for hidden summary - only log when value changes
   useEffect(() => {
-    console.log("Hidden Summary A:", hiddenSummaryA)
-    console.log("Hidden Summary B:", hiddenSummaryB)
-    console.log("Permission-aware Data A:", permissionAwareDataA.length, "entries")
-    console.log("Permission-aware Data B:", permissionAwareDataB.length, "entries")
-    console.log("Data", permissionAwareDataB)
+    // console.log("Hidden Summary A:", hiddenSummaryA)
+    // console.log("Hidden Summary B:", hiddenSummaryB)
+    // console.log("Permission-aware Data A:", permissionAwareDataA.length, "entries")
+    // console.log("Permission-aware Data B:", permissionAwareDataB.length, "entries")
+    // console.log("Data", permissionAwareDataB)
   }, [hiddenSummaryA, hiddenSummaryB, permissionAwareDataA, permissionAwareDataB])
 
   // Auto-fill Company B when Company A and Party A are selected
@@ -268,7 +269,7 @@ export default function IntercompanyReconciliation() {
     localStorage.setItem('intercompanyReconciliationState', JSON.stringify(currentState))
 
     // Show a brief notification
-    console.log(`Navigating to ${entry.voucher_type} ${entry.voucher_no}. Your data will be preserved when you return.`)
+    // console.log(`Navigating to ${entry.voucher_type} ${entry.voucher_no}. Your data will be preserved when you return.`)
   }
 
   // Generate proper ERPNext URL for different voucher types
@@ -388,11 +389,11 @@ export default function IntercompanyReconciliation() {
 
   // Function to find matching entries between Company A and Company B (on FULL data first)
   const findMatchingEntries = useMemo(() => {
-    console.log("Starting matching process with FULL data...")
-    console.log("glDataA:", glDataA.length, "glDataB:", glDataB.length)
+    // console.log("Starting matching process with FULL data...")
+    // console.log("glDataA:", glDataA.length, "glDataB:", glDataB.length)
 
     if (!glDataA.length || !glDataB.length) {
-      console.log("Returning empty arrays - no data for matching")
+      // console.log("Returning empty arrays - no data for matching")
       return { glDataAWithStatus: [], glDataBWithStatus: [] }
     }
 
@@ -401,7 +402,7 @@ export default function IntercompanyReconciliation() {
     const matchedEntriesA = new Set<string>()
 
     // First pass: Process Company A entries and find their matches
-    console.log("Processing Company A entries...")
+    // console.log("Processing Company A entries...")
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
       // Find matching entry in Company B based on amount AND date equality
       // But ensure we don't match with an entry that's already been matched
@@ -451,7 +452,7 @@ export default function IntercompanyReconciliation() {
     })
 
     // Second pass: Process Company B entries and find their matches
-    console.log("Processing Company B entries...")
+    // console.log("Processing Company B entries...")
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
       // Find matching entry in Company A based on amount AND date equality
       const matchingEntry = glDataA.find(entryA => {
@@ -499,12 +500,12 @@ export default function IntercompanyReconciliation() {
       }
     })
 
-    console.log("Matching completed - glDataAWithStatus:", glDataAWithStatus.length)
-    console.log("Matching completed - glDataBWithStatus:", glDataBWithStatus.length)
+    // console.log("Matching completed - glDataAWithStatus:", glDataAWithStatus.length)
+    // console.log("Matching completed - glDataBWithStatus:", glDataBWithStatus.length)
 
     // Now apply permission filtering to only show visible entries
-    console.log("Applying permission filtering...")
-    console.log("permissionAwareDataA:", permissionAwareDataA.length, "permissionAwareDataB:", permissionAwareDataB.length)
+    // console.log("Applying permission filtering...")
+    // console.log("permissionAwareDataA:", permissionAwareDataA.length, "permissionAwareDataB:", permissionAwareDataB.length)
 
     // Create sets of visible voucher keys for quick lookup
     const visibleKeysA = new Set(permissionAwareDataA.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
@@ -515,7 +516,7 @@ export default function IntercompanyReconciliation() {
       const key = `${entry.voucher_type}-${entry.voucher_no}`
       const isVisible = visibleKeysA.has(key)
       if (!isVisible) {
-        console.log(`HIDING Company A matched entry: ${key}`)
+        // console.log(`HIDING Company A matched entry: ${key}`)
       }
       return isVisible
     })
@@ -529,8 +530,8 @@ export default function IntercompanyReconciliation() {
       return isVisible
     })
 
-    console.log("Final filtered results - glDataAWithStatus:", filteredGlDataAWithStatus.length)
-    console.log("Final filtered results - glDataBWithStatus:", filteredGlDataBWithStatus.length)
+    // console.log("Final filtered results - glDataAWithStatus:", filteredGlDataAWithStatus.length)
+    // console.log("Final filtered results - glDataBWithStatus:", filteredGlDataBWithStatus.length)
 
     return { glDataAWithStatus: filteredGlDataAWithStatus, glDataBWithStatus: filteredGlDataBWithStatus }
   }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus])
@@ -676,7 +677,7 @@ export default function IntercompanyReconciliation() {
       for (const entryKey of selectedEntriesArray) {
         // Check if processing was cancelled
         if (processingCancelled) {
-          console.log("Processing cancelled by user")
+          // console.log("Processing cancelled by user")
           return
         }
 
@@ -709,18 +710,18 @@ export default function IntercompanyReconciliation() {
         }
       }
 
-      console.log("Prepared bulk unmatch data:", bulkData)
+      // console.log("Prepared bulk unmatch data:", bulkData)
 
       // Check if processing was cancelled before API call
       if (processingCancelled) {
-        console.log("Processing cancelled before API call")
+        // console.log("Processing cancelled before API call")
         return
       }
 
       // Perform bulk update
-      console.log("Calling bulkUpdateMatchStatus for unmatch...")
+      // console.log("Calling bulkUpdateMatchStatus for unmatch...")
       const result = await bulkUpdateMatchStatus(bulkData)
-      console.log("Bulk unmatch result:", result)
+      // console.log("Bulk unmatch result:", result)
 
       if (result.failed > 0) {
         alert(`Bulk unmatching completed with ${result.success} successful and ${result.failed} failed updates.\n\nErrors:\n${result.errors.join('\n')}`)
@@ -736,12 +737,12 @@ export default function IntercompanyReconciliation() {
 
       // Check if processing was cancelled before refresh
       if (processingCancelled) {
-        console.log("Processing cancelled before refresh")
+        // console.log("Processing cancelled before refresh")
         return
       }
 
       // Refresh match statuses
-      console.log("Refreshing match statuses after unmatch...")
+      // console.log("Refreshing match statuses after unmatch...")
       await refreshMatchStatuses(bulkData.map(entry => ({
         voucher_type: entry.voucher_type,
         voucher_no: entry.voucher_no,
@@ -749,13 +750,13 @@ export default function IntercompanyReconciliation() {
       })))
 
       setSelectedEntries(new Set())
-      console.log("Bulk unmatch process completed successfully")
+      // console.log("Bulk unmatch process completed successfully")
     } catch (error) {
-      console.error("Bulk unmatch process failed:", error)
+      // console.error("Bulk unmatch process failed:", error)
       alert(`Bulk unmatch failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsProcessing(false)
-      console.log("Bulk unmatch process failed, processing state reset")
+      // console.log("Bulk unmatch process failed, processing state reset")
     }
   }
 
@@ -819,8 +820,12 @@ export default function IntercompanyReconciliation() {
       }
 
       // If totals balance, mark all selected entries as matched
-      // We don't need individual matches - just mark all selected entries as matched
+      // Create proper pairing between Company A and Company B entries
       const bulkData = []
+
+      // Separate selected entries by company
+      const companyAEntries = []
+      const companyBEntries = []
 
       for (const entryKey of selectedEntries) {
         // Check if processing was cancelled
@@ -838,38 +843,91 @@ export default function IntercompanyReconciliation() {
         )
 
         if (entryA) {
+          companyAEntries.push(entryA)
+        }
+        if (entryB) {
+          companyBEntries.push(entryB)
+        }
+      }
+
+      // Create pairs: match entries from Company A with entries from Company B
+      const maxPairs = Math.max(companyAEntries.length, companyBEntries.length)
+
+      for (let i = 0; i < maxPairs; i++) {
+        const entryA = companyAEntries[i]
+        const entryB = companyBEntries[i]
+
+        if (entryA) {
+          // Find the matched entry for entryA
+          let matchedEntry = entryA.matchedEntry
+
+          // If no matchedEntry found by frontend logic, try to find it manually
+          if (!matchedEntry) {
+            // Look for a corresponding entry in Company B with same amount and date
+            matchedEntry = findMatchingEntries.glDataBWithStatus.find(entryB => {
+              const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+              const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+              const dateMatch = entryA.posting_date === entryB.posting_date
+              return (debitCreditMatch || creditDebitMatch) && dateMatch
+            })
+          }
+
+          // If still no match found, pair with the corresponding entryB from our selection
+          if (!matchedEntry && entryB) {
+            matchedEntry = entryB
+          }
+
           bulkData.push({
             voucher_type: entryA.voucher_type,
             voucher_no: entryA.voucher_no,
             company: companyA,
             status: 'Match' as const,
-            matched_with: null // No specific match - just mark as matched
+            matched_with: matchedEntry || null
           })
         }
 
         if (entryB) {
+          // Find the matched entry for entryB
+          let matchedEntry = entryB.matchedEntry
+
+          // If no matchedEntry found by frontend logic, try to find it manually
+          if (!matchedEntry) {
+            // Look for a corresponding entry in Company A with same amount and date
+            matchedEntry = findMatchingEntries.glDataAWithStatus.find(entryA => {
+              const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+              const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+              const dateMatch = entryA.posting_date === entryB.posting_date
+              return (debitCreditMatch || creditDebitMatch) && dateMatch
+            })
+          }
+
+          // If still no match found, pair with the corresponding entryA from our selection
+          if (!matchedEntry && entryA) {
+            matchedEntry = entryA
+          }
+
           bulkData.push({
             voucher_type: entryB.voucher_type,
             voucher_no: entryB.voucher_no,
             company: companyB,
             status: 'Match' as const,
-            matched_with: null // No specific match - just mark as matched
+            matched_with: matchedEntry || null
           })
         }
       }
 
-      console.log("Prepared bulk data:", bulkData)
+      // console.log("Prepared bulk data:", bulkData)
 
       // Check if processing was cancelled before API call
       if (processingCancelled) {
-        console.log("Processing cancelled before API call")
+        // console.log("Processing cancelled before API call")
         return
       }
 
       // Perform bulk update
-      console.log("Calling bulkUpdateMatchStatus...")
+      // console.log("Calling bulkUpdateMatchStatus...")
       const result = await bulkUpdateMatchStatus(bulkData)
-      console.log("Bulk update result:", result)
+      // console.log("Bulk update result:", result)
 
       if (result.failed > 0) {
         alert(`Bulk matching completed with ${result.success} successful and ${result.failed} failed updates.\n\nErrors:\n${result.errors.join('\n')}`)
@@ -885,7 +943,7 @@ export default function IntercompanyReconciliation() {
 
       // Check if processing was cancelled before refresh
       if (processingCancelled) {
-        console.log("Processing cancelled before refresh")
+        // console.log("Processing cancelled before refresh")
         return
       }
 
@@ -914,7 +972,7 @@ export default function IntercompanyReconciliation() {
       console.error('Error in bulk matching:', error)
       alert('Failed to perform bulk matching. Please try again.')
       setIsProcessing(false)
-      console.log("Bulk match process failed, processing state reset")
+      // console.log("Bulk match process failed, processing state reset")
     }
   }
   // Reset processing state when modal opens
@@ -926,7 +984,7 @@ export default function IntercompanyReconciliation() {
       setShowBulkMatchDetails(false) // Reset details expansion
       // Clear any existing errors when modal opens
       if (matchError) {
-        console.log("Clearing match error:", matchError)
+        // console.log("Clearing match error:", matchError)
         clearError()
       }
     }
@@ -1846,18 +1904,72 @@ export default function IntercompanyReconciliation() {
                               {getStatusBadge(entry.status || 'Pending')}
                             </TableCell>
                             <TableCell className="text-center">
-                              {entry.matchedEntry ? (
-                                <div className="text-sm">
-                                  <div className="font-medium text-blue-600">
-                                    {entry.matchedEntry.voucher_type}
-                                  </div>
-                                  <div className="text-gray-600">
-                                    {entry.matchedEntry.voucher_no}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 text-sm">-</span>
-                              )}
+                              {(() => {
+                                // First check if we have backend match data with parsed matched entry
+                                if (entry.backendMatchData?.matched_with_parsed) {
+                                  const matchedData = entry.backendMatchData.matched_with_parsed
+                                  return (
+                                    <div className="text-sm">
+                                      <div className="font-medium text-blue-600">
+                                        <a
+                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {matchedData.voucher_type}
+                                        </a>
+                                      </div>
+                                      <div className="text-gray-600">
+                                        <a
+                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {matchedData.voucher_no}
+                                        </a>
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        (Manual Match)
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                // Fallback to frontend matched entry
+                                if (entry.matchedEntry) {
+                                  return (
+                                    <div className="text-sm">
+                                      <div className="font-medium text-blue-600">
+                                        <a
+                                          href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {entry.matchedEntry.voucher_type}
+                                        </a>
+                                      </div>
+                                      <div className="text-gray-600">
+                                        <a
+                                          href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {entry.matchedEntry.voucher_no}
+                                        </a>
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        (Automatic Match)
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                return <span className="text-gray-400 text-sm">-</span>
+                              })()}
                             </TableCell>
                             <TableCell className="text-center">
                               {entry.status === 'Mismatch' && entry.matchedEntry && (
@@ -2003,18 +2115,72 @@ export default function IntercompanyReconciliation() {
                               {getStatusBadge(entry.status || 'Pending')}
                             </TableCell>
                             <TableCell className="text-center">
-                              {entry.matchedEntry ? (
-                                <div className="text-sm">
-                                  <div className="font-medium text-blue-600">
-                                    {entry.matchedEntry.voucher_type}
-                                  </div>
-                                  <div className="text-gray-600">
-                                    {entry.matchedEntry.voucher_no}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 text-sm">-</span>
-                              )}
+                              {(() => {
+                                // First check if we have backend match data with parsed matched entry
+                                if (entry.backendMatchData?.matched_with_parsed) {
+                                  const matchedData = entry.backendMatchData.matched_with_parsed
+                                  return (
+                                    <div className="text-sm">
+                                      <div className="font-medium text-blue-600">
+                                        <a
+                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {matchedData.voucher_type}
+                                        </a>
+                                      </div>
+                                      <div className="text-gray-600">
+                                        <a
+                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {matchedData.voucher_no}
+                                        </a>
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        (Manual Match)
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                // Fallback to frontend matched entry
+                                if (entry.matchedEntry) {
+                                  return (
+                                    <div className="text-sm">
+                                      <div className="font-medium text-blue-600">
+                                        <a
+                                          href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {entry.matchedEntry.voucher_type}
+                                        </a>
+                                      </div>
+                                      <div className="text-gray-600">
+                                        <a
+                                          href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="hover:underline"
+                                        >
+                                          {entry.matchedEntry.voucher_no}
+                                        </a>
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        (Automatic Match)
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                return <span className="text-gray-400 text-sm">-</span>
+                              })()}
                             </TableCell>
                             <TableCell className="text-center">
                               {entry.status === 'Mismatch' && entry.matchedEntry && (
@@ -2227,7 +2393,7 @@ export default function IntercompanyReconciliation() {
                   <>
                     <Button
                       onClick={() => {
-                        console.log("Modal cancelled, closing modal")
+                        // console.log("Modal cancelled, closing modal")
                         setShowMatchModal(false)
                       }}
                       variant="outline"
@@ -2237,7 +2403,7 @@ export default function IntercompanyReconciliation() {
                     </Button>
                     <Button
                       onClick={() => {
-                        console.log(`Confirm button clicked, starting bulk ${areSelectedEntriesMatched ? 'unmatch' : 'match'} process`)
+                        // console.log(`Confirm button clicked, starting bulk ${areSelectedEntriesMatched ? 'unmatch' : 'match'} process`)
                         if (areSelectedEntriesMatched) {
                           handleBulkUnmatch()
                         } else {
