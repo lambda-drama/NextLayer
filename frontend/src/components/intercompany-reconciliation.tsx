@@ -7,8 +7,10 @@ import { Badge } from "./ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
+import { Checkbox } from "../../components/ui/checkbox"
 import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw } from "lucide-react"
 import { useCompanies } from "../hook/useCompanies"
+import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
 import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
 import { useParties } from "../hook/useParties"
 import { usePartiesForAutofill } from "../hook/usePartiesForAutofill"
@@ -56,10 +58,14 @@ export default function IntercompanyReconciliation() {
   const [currency, setCurrency] = useState<string>("all")
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(true)
+  const [isAutoFilled, setIsAutoFilled] = useState(false)
+
+  // State for view checkboxes
+  const [customerViewEnabled, setCustomerViewEnabled] = useState<boolean>(true)
+  const [supplierViewEnabled, setSupplierViewEnabled] = useState<boolean>(false)
   const [showOpeningEntries, setShowOpeningEntries] = useState<boolean>(false)
   const [shouldLoadData, setShouldLoadData] = useState(false)
   const [hasLoadedData, setHasLoadedData] = useState(false)
-  const [isAutoFilled, setIsAutoFilled] = useState(false)
 
   // Status filtering and matching
   const [statusFilter, setStatusFilter] = useState<string>("Mismatch")
@@ -87,6 +93,7 @@ export default function IntercompanyReconciliation() {
 
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
+  const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
   const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, error: matchError, clearError } = useMatchStatus()
 
@@ -208,11 +215,52 @@ export default function IntercompanyReconciliation() {
     }
   }, [companyB, partyB, partiesB, companyA, partyA])
 
+  // Helper function to find corresponding company for intercompany transactions
+  const findCorrespondingCompany = (selectedCompany: string): string | null => {
+    if (!allCompanies.length) return null
+
+    // Define company relationships/mappings
+    const companyMappings: {[key: string]: string[]} = {
+      // Add your specific company relationships here
+      // Example: 'Company A' should be paired with 'Company B'
+    }
+
+    // If there's a specific mapping, use it
+    if (companyMappings[selectedCompany]) {
+      const mappedCompany = companyMappings[selectedCompany].find(company =>
+        allCompanies.some(c => c.name === company)
+      )
+      if (mappedCompany) return mappedCompany
+    }
+
+    // Fallback: find a different company (preferably one the user has permission to)
+    const otherCompanies = allCompanies.filter(company => company.name !== selectedCompany)
+
+    // First try to find a company the user has permission to
+    const permittedCompany = otherCompanies.find(company =>
+      permissionAwareCompanies.some(pc => pc.name === company.name)
+    )
+
+    if (permittedCompany) return permittedCompany.name
+
+    // If no permitted company found, return the first available company
+    return otherCompanies.length > 0 ? otherCompanies[0].name : null
+  }
+
   // Handle manual changes to Company A
   const handleCompanyAChange = (value: string) => {
     setCompanyA(value)
     setPartyA("")
     setIsAutoFilled(false)
+
+    // Autofill Company B using all companies API (only if customer view is enabled)
+    if (value && customerViewEnabled && allCompanies.length > 0) {
+      const correspondingCompany = findCorrespondingCompany(value)
+      if (correspondingCompany) {
+        setCompanyB(correspondingCompany)
+        setIsAutoFilled(true)
+      }
+    }
   }
 
   // Handle manual changes to Company B
@@ -220,12 +268,42 @@ export default function IntercompanyReconciliation() {
     setCompanyB(value)
     setPartyB("")
     setIsAutoFilled(false)
+
+    // Autofill Company A using all companies API (only if supplier view is enabled)
+    if (value && supplierViewEnabled && allCompanies.length > 0) {
+      const correspondingCompany = findCorrespondingCompany(value)
+      if (correspondingCompany) {
+        setCompanyA(correspondingCompany)
+        setIsAutoFilled(true)
+      }
+    }
   }
 
   const handlePartyTypeBChange = (value: string) => {
     setPartyTypeB(value)
     setPartyB("")
     setIsAutoFilled(false)
+  }
+
+  // Handle checkbox changes
+  const handleCustomerViewChange = (checked: boolean) => {
+    setCustomerViewEnabled(checked)
+    if (checked) {
+      setSupplierViewEnabled(false)
+      // Clear Company B when switching to customer view
+      setCompanyB("")
+      setPartyB("")
+    }
+  }
+
+  const handleSupplierViewChange = (checked: boolean) => {
+    setSupplierViewEnabled(checked)
+    if (checked) {
+      setCustomerViewEnabled(false)
+      // Clear Company A when switching to supplier view
+      setCompanyA("")
+      setPartyA("")
+    }
   }
 
   const handlePartyBChange = (value: string) => {
@@ -242,7 +320,7 @@ export default function IntercompanyReconciliation() {
   }
 
   // Handle voucher click - cache data and navigate to ERPNext
-  const handleVoucherClick = (entry: GLEntry) => {
+  const handleVoucherClick = (_entry: GLEntry) => {
     // Cache current state
     const currentState = {
       companyA,
@@ -1163,7 +1241,7 @@ export default function IntercompanyReconciliation() {
 
   // Determine loading and error states
   const isLoading = glLoadingA || glLoadingB
-  const error = companiesError || allCompaniesError || partiesAError || partiesBError || glErrorA || glErrorB
+  const _error = companiesError || allCompaniesError || partiesAError || partiesBError || glErrorA || glErrorB
 
   // Get status badge component
   const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending') => {
@@ -1202,23 +1280,38 @@ export default function IntercompanyReconciliation() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Company A Selection */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
-                  Company A (Customer View)
-                </h3>
+                <div className="flex items-center justify-between">
+                
+                  <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
+                     <Checkbox
+                     className="mr-2"
+                      id="customer-view"
+                      checked={customerViewEnabled}
+                      onCheckedChange={handleCustomerViewChange}
+                    />
+                    Company A (Customer View)
+                  </h3>
+                  
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select value={companyA} onValueChange={handleCompanyAChange} disabled={allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}>
+                    <Select
+                      value={companyA}
+                      onValueChange={handleCompanyAChange}
+                      disabled={!customerViewEnabled || allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
+                    >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
                         <SelectValue placeholder={
+                          !customerViewEnabled ? "Enable Customer View to select" :
                           allCompaniesLoading ? "Loading..." :
                           (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
                           "Select Company"
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use allCompanies if available, otherwise fall back to companies */}
-                        {(allCompanies.length > 0 ? allCompanies : companies).map((company) => (
+                        {/* Use permission-aware companies for dropdown display */}
+                        {permissionAwareCompanies.map((company) => (
                           <SelectItem key={company.name} value={company.name}>
                             {company.name}
                           </SelectItem>
@@ -1240,9 +1333,17 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Party</label>
-                    <Select value={partyA} onValueChange={setPartyA} disabled={!companyA || partiesALoading}>
+                    <Select
+                      value={partyA}
+                      onValueChange={setPartyA}
+                      disabled={!customerViewEnabled || !companyA || partiesALoading}
+                    >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={partiesALoading ? "Loading..." : "Select Party"} />
+                        <SelectValue placeholder={
+                          !customerViewEnabled ? "Enable Customer View to select" :
+                          partiesALoading ? "Loading..." :
+                          "Select Party"
+                        } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
                         {/* Use autofill parties as fallback if regular parties fail due to permissions */}
@@ -1259,32 +1360,42 @@ export default function IntercompanyReconciliation() {
 
               {/* Company B Selection */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
-                  Company B (Supplier View)
-                  {isAutoFilled && (
-                    <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
-                      Auto-filled
-                    </Badge>
-                  )}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
+                    <Checkbox
+                      className="mr-2"
+                      id="supplier-view"
+                      checked={supplierViewEnabled}
+                      onCheckedChange={handleSupplierViewChange}
+                    />
+                    Company B (Supplier View)
+                    {isAutoFilled && (
+                      <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
+                        Auto-filled
+                      </Badge>
+                    )}
+                  </h3>
+                  
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Company</label>
                     <Select
                       value={companyB}
                       onValueChange={handleCompanyBChange}
-                      disabled={allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
+                      disabled={!supplierViewEnabled || allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
                         <SelectValue placeholder={
+                          !supplierViewEnabled ? "Enable Supplier View to select" :
                           allCompaniesLoading ? "Loading..." :
                           (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
                           "Select Company"
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use allCompanies if available, otherwise fall back to companies */}
-                        {(allCompanies.length > 0 ? allCompanies : companies).map((company) => (
+                        {/* Use permission-aware companies for dropdown display */}
+                        {permissionAwareCompanies.map((company) => (
                           <SelectItem key={company.name} value={company.name}>
                             {company.name}
                           </SelectItem>
@@ -1309,10 +1420,14 @@ export default function IntercompanyReconciliation() {
                     <Select
                       value={partyB}
                       onValueChange={handlePartyBChange}
-                      disabled={!companyB || partiesBLoading}
+                      disabled={!supplierViewEnabled || !companyB || partiesBLoading}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={partiesBLoading ? "Loading..." : "Select Party"} />
+                        <SelectValue placeholder={
+                          !supplierViewEnabled ? "Enable Supplier View to select" :
+                          partiesBLoading ? "Loading..." :
+                          "Select Party"
+                        } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
                         {/* Use autofill parties as fallback if regular parties fail due to permissions */}
@@ -1477,7 +1592,7 @@ export default function IntercompanyReconciliation() {
             <div className="flex justify-center mt-6">
               <Button
                 onClick={handleLoadData}
-                disabled={!companyA || !partyA || !companyB || !partyB || isLoading}
+                disabled={!customerViewEnabled && !supplierViewEnabled || !companyA || !partyA || !companyB || !partyB || isLoading}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8"
               >
                 {isLoading ? (
