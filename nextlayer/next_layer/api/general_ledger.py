@@ -532,8 +532,73 @@ def validate_intercompany_filters(filters):
 		if not filters.get(field):
 			frappe.throw(f"{field.replace('_', ' ').title()} is required")
 
-	# Ensure party is a list
-	if filters.get('party') and not isinstance(filters.get('party'), list):
-		filters['party'] = [filters.get('party')]
+		# Ensure party is a list
+		if filters.get('party') and not isinstance(filters.get('party'), list):
+				filters['party'] = [filters.get('party')]
 
-	return filters
+		return filters
+
+
+@frappe.whitelist()
+def get_permission_aware_companies():
+	"""Get companies that the current user has permission to access"""
+	try:
+		# Get companies that user has permission to access
+		companies = frappe.get_all("Company",
+			fields=["name", "company_name"],
+			order_by="name"
+		)
+
+		# Get user permitted companies
+		user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
+
+		print("User permitted companies:", user_permitted)
+
+		# Extract permitted company names from the permission data
+		permitted_company_names = []
+		if user_permitted and "Company" in user_permitted:
+			permitted_company_names = [perm.get("doc") for perm in user_permitted["Company"]]
+
+		print("Permitted company names:", permitted_company_names)
+
+		# If user has specific company permissions, filter accordingly
+		if permitted_company_names:
+			allowed_companies = []
+			for company in companies:
+				if company.name in permitted_company_names:
+					allowed_companies.append({
+						"name": company.name,
+						"company_name": company.company_name
+					})
+		else:
+			# If no specific permissions, show all companies
+			allowed_companies = []
+			for company in companies:
+				allowed_companies.append({
+					"name": company.name,
+					"company_name": company.company_name
+				})
+
+		return {
+			"success": True,
+			"companies": allowed_companies
+		}
+
+	except Exception as e:
+		frappe.log_error(f"Get Permission Aware Companies Error: {str(e)}")
+		# Fallback: return all companies if there's an error
+		try:
+			companies = frappe.get_all("Company",
+				fields=["name", "company_name"],
+				order_by="name"
+			)
+			return {
+				"success": True,
+				"companies": [{"name": c.name, "company_name": c.company_name} for c in companies]
+			}
+		except:
+			return {
+				"success": False,
+				"error": str(e),
+				"companies": []
+			}
