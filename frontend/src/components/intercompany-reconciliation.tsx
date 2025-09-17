@@ -468,6 +468,7 @@ export default function IntercompanyReconciliation() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+           'X-Frappe-CSRF-Token': window.csrf_token || ''
         },
         body: JSON.stringify({
           admin_password: password,
@@ -482,7 +483,8 @@ export default function IntercompanyReconciliation() {
           ignore_exchange_rate_revaluation: ignoreExchangeRateRevaluation,
           ignore_system_generated_notes: ignoreSystemGeneratedNotes,
           show_opening_entries: showOpeningEntries
-        })
+        }),
+        credentials: 'include'
       })
 
       const data = await response.json()
