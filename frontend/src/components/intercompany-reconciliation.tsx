@@ -1447,6 +1447,12 @@ export default function IntercompanyReconciliation() {
                             {company.name}
                           </SelectItem>
                         ))}
+                        {/* Show autofilled company if it's not in permission-aware list */}
+                        {companyB && !permissionAwareCompanies.some(c => c.name === companyB) && (
+                          <SelectItem key={companyB} value={companyB}>
+                            {companyB}
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
