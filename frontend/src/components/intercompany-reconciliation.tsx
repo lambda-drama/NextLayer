@@ -18,33 +18,9 @@ import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
 import { usePermissionAwareGLData } from "../hook/usePermissionAwareGLData"
 import { useMatchStatus } from "../hook/useMatchStatus"
 import HiddenDocumentsSummary from "./hidden-documents-summary"
-
-
-export interface GLEntry {
-  gl_entry?: string
-  posting_date: string
-  account: string
-  voucher_type: string
-  voucher_no: string
-  debit: number
-  credit: number
-  balance: number
-  against: string
-  remarks?: string
-  party_type?: string
-  party?: string
-  cost_center?: string
-  project?: string
-  status?: 'Match' | 'Mismatch' | 'Pending'
-  matchedEntry?: GLEntry
-  backendMatchData?: {
-    status: string
-    matched_with?: string
-    matched_with_parsed?: any
-    matched_by?: string
-    matched_on?: string
-  }
-}
+import AdminPasswordDialog from "./admin-password-dialog"
+import HiddenTransactionsModal from "./hidden-transactions-modal"
+import { GLEntry } from "../types/gl-entry"
 
 export default function IntercompanyReconciliation() {
   // State for selections
@@ -75,6 +51,16 @@ export default function IntercompanyReconciliation() {
   const [validationErrorMessage, setValidationErrorMessage] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingCancelled, setProcessingCancelled] = useState(false)
+
+  // State for hidden transactions modal
+  const [showAdminPasswordDialog, setShowAdminPasswordDialog] = useState(false)
+  const [showHiddenTransactionsModal, setShowHiddenTransactionsModal] = useState(false)
+  const [isVerifyingPassword, setIsVerifyingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
+  const [hiddenTransactionsData, setHiddenTransactionsData] = useState<{
+    companyA: GLEntry[]
+    companyB: GLEntry[]
+  }>({ companyA: [], companyB: [] })
   const [processingSuccess, setProcessingSuccess] = useState(false)
   const [showRestoreNotification, setShowRestoreNotification] = useState(false)
 
@@ -464,6 +450,67 @@ export default function IntercompanyReconciliation() {
 
     fetchMatchStatus()
   }, [glDataA, glDataB, companyA, companyB])
+
+  // Function to handle viewing hidden transactions
+  const handleViewHiddenTransactions = () => {
+    setShowAdminPasswordDialog(true)
+    setPasswordError("")
+  }
+
+  // Function to verify admin password and fetch hidden transactions
+  const handlePasswordVerification = async (password: string) => {
+    setIsVerifyingPassword(true)
+    setPasswordError("")
+
+    try {
+      // Call Frappe API to verify admin password and fetch hidden transactions
+      const response = await fetch('/api/method/nextlayer.next_layer.api.general_ledger.verify_admin_password_and_get_hidden_transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          admin_password: password,
+          company_a: companyA,
+          company_b: companyB,
+          party_a: partyA,
+          party_b: partyB,
+          party_type_b: partyTypeB,
+          from_date: fromDate,
+          to_date: toDate,
+          currency: currency,
+          ignore_exchange_rate_revaluation: ignoreExchangeRateRevaluation,
+          ignore_system_generated_notes: ignoreSystemGeneratedNotes,
+          show_opening_entries: showOpeningEntries
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error?.message || 'Invalid admin password')
+      }
+
+      if (!data.message || !data.message.success) {
+        throw new Error(data.message?.error || 'Failed to verify password')
+      }
+
+      // Set the hidden transactions data
+      setHiddenTransactionsData({
+        companyA: data.message.hidden_transactions_a || [],
+        companyB: data.message.hidden_transactions_b || []
+      })
+
+      // Close password dialog and open hidden transactions modal
+      setShowAdminPasswordDialog(false)
+      setShowHiddenTransactionsModal(true)
+
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : 'Failed to verify password')
+    } finally {
+      setIsVerifyingPassword(false)
+    }
+  }
 
   // Function to find matching entries between Company A and Company B (on FULL data first)
   const findMatchingEntries = useMemo(() => {
@@ -1281,7 +1328,7 @@ export default function IntercompanyReconciliation() {
               {/* Company A Selection */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                
+
                   <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
                      <Checkbox
                      className="mr-2"
@@ -1291,7 +1338,7 @@ export default function IntercompanyReconciliation() {
                     />
                     Company A (Customer View)
                   </h3>
-                  
+
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -1375,7 +1422,7 @@ export default function IntercompanyReconciliation() {
                       </Badge>
                     )}
                   </h3>
-                  
+
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -1814,6 +1861,7 @@ export default function IntercompanyReconciliation() {
                 hiddenSummary={hiddenSummaryA}
                 totalHiddenEntries={totalHiddenA}
                 companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyA)?.name || companyA}
+                onViewHiddenTransactions={handleViewHiddenTransactions}
               />
             )}
             {totalHiddenB > 0 && (
@@ -1821,6 +1869,7 @@ export default function IntercompanyReconciliation() {
                 hiddenSummary={hiddenSummaryB}
                 totalHiddenEntries={totalHiddenB}
                 companyName={(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyB)?.name || companyB}
+                onViewHiddenTransactions={handleViewHiddenTransactions}
               />
             )}
           </div>
@@ -1848,7 +1897,7 @@ export default function IntercompanyReconciliation() {
                         <SelectItem value="All">All Entries</SelectItem>
                         <SelectItem value="Match">✓ Matched</SelectItem>
                         <SelectItem value="Mismatch">✗ Mismatched</SelectItem>
-                        <SelectItem value="Pending">? Pending</SelectItem>
+                        {/* <SelectItem value="Pending">? Pending</SelectItem> */}
                       </SelectContent>
                     </Select>
                   </div>
@@ -2731,6 +2780,31 @@ export default function IntercompanyReconciliation() {
           </div>
         </div>
       )}
+
+      {/* Admin Password Dialog */}
+      <AdminPasswordDialog
+        open={showAdminPasswordDialog}
+        onOpenChange={setShowAdminPasswordDialog}
+        onPasswordVerified={handlePasswordVerification}
+        isLoading={isVerifyingPassword}
+        error={passwordError}
+      />
+
+      {/* Hidden Transactions Modal */}
+      <HiddenTransactionsModal
+        open={showHiddenTransactionsModal}
+        onOpenChange={setShowHiddenTransactionsModal}
+        companyA={companyA}
+        companyB={companyB}
+        hiddenDataA={hiddenTransactionsData.companyA}
+        hiddenDataB={hiddenTransactionsData.companyB}
+        isLoading={isVerifyingPassword}
+        error={passwordError}
+        currency={currency}
+        partyA={partyA}
+        partyB={partyB}
+        partyTypeB={partyTypeB}
+      />
     </div>
   )
 }

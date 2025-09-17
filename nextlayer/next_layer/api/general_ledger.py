@@ -602,3 +602,141 @@ def get_permission_aware_companies():
 				"error": str(e),
 				"companies": []
 			}
+from frappe.utils.password import get_decrypted_password
+
+
+@frappe.whitelist()
+def verify_admin_password_and_get_hidden_transactions(admin_password, company_a, company_b, party_a, party_b, party_type_b, from_date, to_date, currency="all", ignore_exchange_rate_revaluation=True, ignore_system_generated_notes=True, show_opening_entries=False):
+	"""
+	Verify admin password from Global Defaults and return hidden transactions for both companies
+	"""
+	try:
+		# Get the admin password from Global Defaults
+		global_defaults = frappe.get_single("Global Defaults")
+		stored_password = get_decrypted_password(
+    "Global Defaults",   # Doctype
+    "Global Defaults",   # Docname (same as Doctype for Single DocTypes)
+    "custom_admin_password"  # Fieldname
+)
+		print("Stored password fetched", stored_password)
+		if not stored_password:
+			frappe.throw(_("Admin password not configured in Global Defaults"))
+
+		# Verify the password
+		if admin_password != stored_password:
+			frappe.throw(_("Invalid admin password"))
+		else:
+			print("Admin password verified successfully")
+		# If password is correct, get hidden transactions for both companies
+		hidden_transactions_a = []
+		hidden_transactions_b = []
+
+		# Get hidden transactions for Company A
+		if company_a and party_a:
+			filters_a = _dict({
+				"company": company_a,
+				"party_type": "Customer",
+				"party": [party_a],  # Convert to list format
+				"from_date": from_date,
+				"to_date": to_date,
+				"currency": currency,
+				"ignore_exchange_rate_revaluation": ignore_exchange_rate_revaluation,
+				"ignore_system_generated_notes": ignore_system_generated_notes,
+				"show_opening_entries": show_opening_entries
+			})
+
+			# Get all GL data for Company A (including hidden ones)
+			original_user = frappe.session.user
+			try:
+				frappe.set_user("Administrator")
+				columns_a, all_data_a = execute(filters_a)
+			finally:
+				frappe.set_user(original_user)
+
+			# Filter to get only hidden transactions (those user doesn't have permission to see)
+			for entry in all_data_a:
+				# Skip summary rows
+				if (isinstance(entry.get('account'), str) and
+					('Opening' in entry.get('account', '') or
+					 'Total' in entry.get('account', '') or
+					 'Closing' in entry.get('account', ''))):
+					continue
+
+				if not entry.get('posting_date'):
+					continue
+
+				voucher_type = entry.get('voucher_type', '')
+				voucher_no = entry.get('voucher_no', '')
+
+				# Check if user has permission to view this document
+				if voucher_type and voucher_no:
+					has_permission = check_document_permission_as_original_user(voucher_type, voucher_no, original_user)
+
+					if not has_permission:
+						# This is a hidden transaction - add it to the list
+						formatted_entry = format_gl_entries_for_frontend([entry], columns_a)[0]
+						formatted_entry['is_hidden'] = True
+						hidden_transactions_a.append(formatted_entry)
+
+		# Get hidden transactions for Company B
+		if company_b and party_b:
+			filters_b = _dict({
+				"company": company_b,
+				"party_type": party_type_b,
+				"party": [party_b],  # Convert to list format
+				"from_date": from_date,
+				"to_date": to_date,
+				"currency": currency,
+				"ignore_exchange_rate_revaluation": ignore_exchange_rate_revaluation,
+				"ignore_system_generated_notes": ignore_system_generated_notes,
+				"show_opening_entries": show_opening_entries
+			})
+
+			# Get all GL data for Company B (including hidden ones)
+			original_user = frappe.session.user
+			try:
+				frappe.set_user("Administrator")
+				columns_b, all_data_b = execute(filters_b)
+			finally:
+				frappe.set_user(original_user)
+
+			# Filter to get only hidden transactions (those user doesn't have permission to see)
+			for entry in all_data_b:
+				# Skip summary rows
+				if (isinstance(entry.get('account'), str) and
+					('Opening' in entry.get('account', '') or
+					 'Total' in entry.get('account', '') or
+					 'Closing' in entry.get('account', ''))):
+					continue
+
+				if not entry.get('posting_date'):
+					continue
+
+				voucher_type = entry.get('voucher_type', '')
+				voucher_no = entry.get('voucher_no', '')
+
+				# Check if user has permission to view this document
+				if voucher_type and voucher_no:
+					has_permission = check_document_permission_as_original_user(voucher_type, voucher_no, original_user)
+
+					if not has_permission:
+						# This is a hidden transaction - add it to the list
+						formatted_entry = format_gl_entries_for_frontend([entry], columns_b)[0]
+						formatted_entry['is_hidden'] = True
+						hidden_transactions_b.append(formatted_entry)
+
+		return {
+			"success": True,
+			"hidden_transactions_a": hidden_transactions_a,
+			"hidden_transactions_b": hidden_transactions_b,
+			"total_hidden_a": len(hidden_transactions_a),
+			"total_hidden_b": len(hidden_transactions_b)
+		}
+
+	except Exception as e:
+		frappe.log_error(f"Verify Admin Password Error: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"message": _("Failed to verify admin password or fetch hidden transactions")
+		}

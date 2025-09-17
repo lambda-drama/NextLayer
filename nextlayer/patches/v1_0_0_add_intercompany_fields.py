@@ -9,7 +9,7 @@ def execute():
             fieldname="intercompany_match_status",
             fieldtype="Select",
             label="Intercompany Match Status",
-            options="Pending\nMatch\nMismatch",
+            options="\nPending\nMatch\nMismatch",
             # default="Pending",
             insert_after="status"
         ),
