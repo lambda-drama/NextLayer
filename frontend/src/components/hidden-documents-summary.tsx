@@ -1,8 +1,9 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
-import { Badge } from "./ui/badge"
-import { AlertTriangle, Lock, Eye } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
+import { Badge } from "../../components/ui/badge"
+import { Button } from "../../components/ui/button"
+import { AlertTriangle, Lock, Eye, Unlock } from "lucide-react"
 
 interface HiddenSummary {
   [key: string]: {
@@ -16,12 +17,14 @@ interface HiddenDocumentsSummaryProps {
   hiddenSummary: HiddenSummary
   totalHiddenEntries: number
   companyName: string
+  onViewHiddenTransactions?: () => void
 }
 
 export default function HiddenDocumentsSummary({
   hiddenSummary,
   totalHiddenEntries,
-  companyName
+  companyName,
+  onViewHiddenTransactions
 }: HiddenDocumentsSummaryProps) {
   if (totalHiddenEntries === 0) {
     return null
@@ -37,12 +40,24 @@ export default function HiddenDocumentsSummary({
   return (
     <Card className="border-orange-200 bg-orange-50">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-orange-800">
-          <Lock className="h-5 w-5" />
-          Documents Requiring Permission to View
-          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
-            {totalHiddenEntries} hidden
-          </Badge>
+        <CardTitle className="flex items-center justify-between text-orange-800">
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            <span>Documents Requiring Permission to View</span>
+            <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
+              {totalHiddenEntries} hidden
+            </Badge>
+          </div>
+          {onViewHiddenTransactions && (
+            <Button
+              onClick={onViewHiddenTransactions}
+              size="sm"
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              <Unlock className="h-4 w-4 mr-2" />
+              View Hidden Transactions
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
