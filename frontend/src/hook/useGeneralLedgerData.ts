@@ -134,7 +134,13 @@ const rawEntries = result.message?.data?.entries || []
 
       // Get the last Closing entry which should be the final overall balance
       const closingEntry = closingEntries[closingEntries.length - 1]
-      const openingEntry = openingEntries[openingEntries.length - 1]
+      // Get the first Opening entry which contains the actual opening balance
+      const openingEntry = openingEntries[0]
+
+      // Debug logging
+      console.log("Opening entries found:", openingEntries.length)
+      console.log("First opening entry:", openingEntry)
+      console.log("Closing entry:", closingEntry)
 
       if (closingEntry) {
         setReconciliationTotals({

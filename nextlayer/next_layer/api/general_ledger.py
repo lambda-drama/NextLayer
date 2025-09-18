@@ -22,11 +22,7 @@ def get_general_ledger_data(filters):
 			frappe.throw(_("From Date and To Date are required"))
 
 		# Skip company permission check - allow access to all companies for reconciliation
-		# user_permitted_companies = frappe.permissions.get_user_permissions("Company")
-		# if user_permitted_companies and filters.get("company") not in user_permitted_companies:
-		#	frappe.throw(_("You don't have permission to access data for company: {0}").format(filters.get("company")))
-
-		# Set default values
+		
 		filters.setdefault("show_remarks", 1)
 		filters.setdefault("categorize_by", "Categorize by Voucher (Consolidated)")
 		filters.setdefault("include_dimensions", 1)
@@ -42,7 +38,7 @@ def get_general_ledger_data(filters):
 			filters.setdefault("account_currency", company_currency)
 
 		filters.setdefault("company_fb", "")
-		print("Filters 1", filters)
+		
 		# Run with elevated permissions to bypass all restrictions
 		original_user = frappe.session.user
 		try:
@@ -50,7 +46,7 @@ def get_general_ledger_data(filters):
 			columns, data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
-
+		print("Test data", str(data))
 		# Format the response
 		return {
 			"success": True,
@@ -77,7 +73,7 @@ def get_permission_aware_gl_data(filters):
 	Enhanced GL data API that bypasses all permission checks for reconciliation
 	Returns all entries without permission filtering
 	"""
-	print("Filters 2", filters)
+	
 	try:
 		if isinstance(filters, str):
 			filters = frappe.parse_json(filters)
@@ -118,7 +114,7 @@ def get_permission_aware_gl_data(filters):
 
 		# Run with elevated permissions to bypass all restrictions
 		original_user = frappe.session.user
-		print("Before everything")
+		
 		try:
 			frappe.set_user("Administrator")
 			# Get all GL data first
@@ -135,7 +131,7 @@ def get_permission_aware_gl_data(filters):
 			"Journal Entry": {"count": 0, "total_debit": 0, "total_credit": 0},
 			"Payment Entry": {"count": 0, "total_debit": 0, "total_credit": 0}
 		}
-
+		print("Not really", str(all_data))
 		processed_count = 0
 		hidden_count = 0
 		for entry in all_data:
