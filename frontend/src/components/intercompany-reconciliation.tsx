@@ -939,9 +939,9 @@ export default function IntercompanyReconciliation() {
 
       const debitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
       const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
-
-      // Only validate amounts if automatch is enabled
-      if (automatchEnabled && !debitCreditMatch && !creditDebitMatch) {
+      console.log("Validating bulk match amounts...", debitCreditMatch, creditDebitMatch)
+      // Always validate amounts for manual matching (regardless of automatch setting)
+      if (!debitCreditMatch || !creditDebitMatch) {
         const errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
               `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
               `${companyA} Total Credit: ${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
@@ -1671,7 +1671,7 @@ export default function IntercompanyReconciliation() {
                 <div className="text-xs text-orange-600">
                   {automatchEnabled
                     ? "Auto-match considers amounts, dates, and transaction status"
-                    : "Only transaction status is considered for matching"
+                    : "Only transaction status is considered for auto-matching. Manual matching always validates amounts."
                   }
                 </div>
               </div>
