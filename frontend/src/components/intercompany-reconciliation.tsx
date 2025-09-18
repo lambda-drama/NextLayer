@@ -35,6 +35,7 @@ export default function IntercompanyReconciliation() {
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(true)
   const [isAutoFilled, setIsAutoFilled] = useState(false)
+  const [automatchEnabled, setAutomatchEnabled] = useState(false)
 
   // State for view checkboxes
   const [customerViewEnabled, setCustomerViewEnabled] = useState<boolean>(true)
@@ -292,6 +293,10 @@ export default function IntercompanyReconciliation() {
     }
   }
 
+  const handleAutomatchChange = (checked: boolean) => {
+    setAutomatchEnabled(checked)
+  }
+
   const handlePartyBChange = (value: string) => {
     setPartyB(value)
     setIsAutoFilled(false)
@@ -531,7 +536,7 @@ export default function IntercompanyReconciliation() {
     // First pass: Process Company A entries and find their matches
     // console.log("Processing Company A entries...")
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
-      // Find matching entry in Company B based on amount AND date equality
+      // Find matching entry in Company B based on automatch setting
       // But ensure we don't match with an entry that's already been matched
       const matchingEntry = glDataB.find(entryB => {
         const entryBKey = `${entryB.voucher_type}-${entryB.voucher_no}`
@@ -539,6 +544,11 @@ export default function IntercompanyReconciliation() {
         // Skip if this entry B has already been matched
         if (matchedEntriesB.has(entryBKey)) {
           return false
+        }
+
+        // If automatch is disabled, only consider transaction status (no amount/date matching)
+        if (!automatchEnabled) {
+          return false // Don't auto-match based on amounts/dates
         }
 
         // Check if amounts match (debit on one side should equal credit on other side)
@@ -661,7 +671,7 @@ export default function IntercompanyReconciliation() {
     // console.log("Final filtered results - glDataBWithStatus:", filteredGlDataBWithStatus.length)
 
     return { glDataAWithStatus: filteredGlDataAWithStatus, glDataBWithStatus: filteredGlDataBWithStatus }
-  }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus])
+  }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled])
 
   // Updated reconciliation analysis using reconciliationTotals
   const reconciliationAnalysis = useMemo(() => {
@@ -929,7 +939,8 @@ export default function IntercompanyReconciliation() {
 
       const debitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
       const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
-
+      console.log("Validating bulk match amounts...", debitCreditMatch, creditDebitMatch)
+      // Always validate amounts for manual matching (regardless of automatch setting)
       if (!debitCreditMatch && !creditDebitMatch) {
         const errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
               `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
@@ -946,9 +957,31 @@ export default function IntercompanyReconciliation() {
         return
       }
 
-      // If totals balance, mark all selected entries as matched
-      // Create proper pairing between Company A and Company B entries
-      const bulkData = []
+      // OPTIMISTIC UPDATE: Immediately update UI and close modal
+
+      // Update backend match status immediately for selected entries
+      const optimisticStatusMap = { ...backendMatchStatus }
+      selectedEntriesArray.forEach(entryKey => {
+        optimisticStatusMap[entryKey] = {
+          status: 'Match',
+          matched_with: null,
+          matched_with_parsed: null,
+          matched_by: 'Manual',
+          matched_on: new Date().toISOString()
+        }
+      })
+      setBackendMatchStatus(optimisticStatusMap)
+
+      // Clear selections and close modal immediately
+      setSelectedEntries(new Set())
+      setShowMatchModal(false)
+      setIsProcessing(false)
+
+      // Perform API call in background
+      try {
+        // If totals balance, mark all selected entries as matched
+        // Create proper pairing between Company A and Company B entries
+        const bulkData = []
 
       // Separate selected entries by company
       const companyAEntries = []
@@ -989,7 +1022,7 @@ export default function IntercompanyReconciliation() {
           let matchedEntry = entryA.matchedEntry
 
           // If no matchedEntry found by frontend logic, try to find it manually
-          if (!matchedEntry) {
+          if (!matchedEntry && automatchEnabled) {
             // Look for a corresponding entry in Company B with same amount and date
             matchedEntry = findMatchingEntries.glDataBWithStatus.find(entryB => {
               const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
@@ -1018,7 +1051,7 @@ export default function IntercompanyReconciliation() {
           let matchedEntry = entryB.matchedEntry
 
           // If no matchedEntry found by frontend logic, try to find it manually
-          if (!matchedEntry) {
+          if (!matchedEntry && automatchEnabled) {
             // Look for a corresponding entry in Company A with same amount and date
             matchedEntry = findMatchingEntries.glDataAWithStatus.find(entryA => {
               const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
@@ -1081,19 +1114,18 @@ export default function IntercompanyReconciliation() {
         company: glDataA.includes(entry) ? companyA : companyB
       }))
 
-      const newStatusMap = await refreshMatchStatuses(allEntries)
-      setBackendMatchStatus(newStatusMap)
-
-      // Clear selections and close modal
-      setSelectedEntries(new Set())
-      setIsProcessing(false)
-      setShowMatchModal(false)
-
-      // Force close modal after a short delay to ensure it closes
-      setTimeout(() => {
-        setShowMatchModal(false)
-        setIsProcessing(false)
-      }, 100)
+        const newStatusMap = await refreshMatchStatuses(allEntries)
+        setBackendMatchStatus(newStatusMap)
+      } catch (apiError) {
+        console.error("API Error in background:", apiError)
+        // Revert optimistic update on API error
+        const revertedStatusMap = { ...backendMatchStatus }
+        selectedEntriesArray.forEach(entryKey => {
+          delete revertedStatusMap[entryKey]
+        })
+        setBackendMatchStatus(revertedStatusMap)
+        alert("Failed to update match status. Please try again.")
+      }
 
     } catch (error) {
       console.error('Error in bulk matching:', error)
@@ -1643,6 +1675,28 @@ export default function IntercompanyReconciliation() {
               </Alert>
             )}
 
+            {/* Auto-Match Toggle */}
+            <div className="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-center justify-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    className="mr-2"
+                    id="automatch-enabled"
+                    checked={automatchEnabled}
+                    onCheckedChange={handleAutomatchChange}
+                  />
+                  <label htmlFor="automatch-enabled" className="text-sm font-medium text-orange-800">
+                    Enable Auto-Match
+                  </label>
+                </div>
+                <div className="text-xs text-orange-600">
+                  {automatchEnabled
+                    ? "Auto-match considers amounts, dates, and transaction status"
+                    : "Only transaction status is considered for auto-matching. Manual matching always validates amounts."
+                  }
+                </div>
+              </div>
+            </div>
 
             <div className="flex justify-center mt-6">
               <Button
@@ -1911,6 +1965,11 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="text-sm text-gray-600">
                     Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length} of {findMatchingEntries.glDataAWithStatus.length} entries
+                    {automatchEnabled && (
+                      <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
+                        Auto-Match Enabled
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
