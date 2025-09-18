@@ -941,7 +941,7 @@ export default function IntercompanyReconciliation() {
       const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
       console.log("Validating bulk match amounts...", debitCreditMatch, creditDebitMatch)
       // Always validate amounts for manual matching (regardless of automatch setting)
-      if (!debitCreditMatch || !creditDebitMatch) {
+      if (!debitCreditMatch && !creditDebitMatch) {
         const errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
               `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
               `${companyA} Total Credit: ${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
@@ -957,9 +957,31 @@ export default function IntercompanyReconciliation() {
         return
       }
 
-      // If totals balance, mark all selected entries as matched
-      // Create proper pairing between Company A and Company B entries
-      const bulkData = []
+      // OPTIMISTIC UPDATE: Immediately update UI and close modal
+
+      // Update backend match status immediately for selected entries
+      const optimisticStatusMap = { ...backendMatchStatus }
+      selectedEntriesArray.forEach(entryKey => {
+        optimisticStatusMap[entryKey] = {
+          status: 'Match',
+          matched_with: null,
+          matched_with_parsed: null,
+          matched_by: 'Manual',
+          matched_on: new Date().toISOString()
+        }
+      })
+      setBackendMatchStatus(optimisticStatusMap)
+
+      // Clear selections and close modal immediately
+      setSelectedEntries(new Set())
+      setShowMatchModal(false)
+      setIsProcessing(false)
+
+      // Perform API call in background
+      try {
+        // If totals balance, mark all selected entries as matched
+        // Create proper pairing between Company A and Company B entries
+        const bulkData = []
 
       // Separate selected entries by company
       const companyAEntries = []
@@ -1092,19 +1114,18 @@ export default function IntercompanyReconciliation() {
         company: glDataA.includes(entry) ? companyA : companyB
       }))
 
-      const newStatusMap = await refreshMatchStatuses(allEntries)
-      setBackendMatchStatus(newStatusMap)
-
-      // Clear selections and close modal
-      setSelectedEntries(new Set())
-      setIsProcessing(false)
-      setShowMatchModal(false)
-
-      // Force close modal after a short delay to ensure it closes
-      setTimeout(() => {
-        setShowMatchModal(false)
-        setIsProcessing(false)
-      }, 100)
+        const newStatusMap = await refreshMatchStatuses(allEntries)
+        setBackendMatchStatus(newStatusMap)
+      } catch (apiError) {
+        console.error("API Error in background:", apiError)
+        // Revert optimistic update on API error
+        const revertedStatusMap = { ...backendMatchStatus }
+        selectedEntriesArray.forEach(entryKey => {
+          delete revertedStatusMap[entryKey]
+        })
+        setBackendMatchStatus(revertedStatusMap)
+        alert("Failed to update match status. Please try again.")
+      }
 
     } catch (error) {
       console.error('Error in bulk matching:', error)
