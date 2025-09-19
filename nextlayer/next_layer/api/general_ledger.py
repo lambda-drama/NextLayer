@@ -14,6 +14,14 @@ def get_general_ledger_data(filters):
 
 		filters = _dict(filters)
 
+		# Create cache key for opening entries
+		cache_key = f"gl_data_{filters.get('company')}_{filters.get('from_date')}_{filters.get('to_date')}_{filters.get('party')}_{filters.get('show_opening_entries', 0)}"
+
+		# Try to get from cache first
+		cached_data = frappe.cache().get_value(cache_key)
+		if cached_data:
+			return cached_data
+
 		# Validate required fields
 		if not filters.get("company"):
 			frappe.throw(_("Company is required"))
@@ -22,7 +30,7 @@ def get_general_ledger_data(filters):
 			frappe.throw(_("From Date and To Date are required"))
 
 		# Skip company permission check - allow access to all companies for reconciliation
-		
+
 		filters.setdefault("show_remarks", 1)
 		filters.setdefault("categorize_by", "Categorize by Voucher (Consolidated)")
 		filters.setdefault("include_dimensions", 1)
@@ -38,7 +46,7 @@ def get_general_ledger_data(filters):
 			filters.setdefault("account_currency", company_currency)
 
 		filters.setdefault("company_fb", "")
-		
+
 		# Run with elevated permissions to bypass all restrictions
 		original_user = frappe.session.user
 		try:
@@ -48,7 +56,7 @@ def get_general_ledger_data(filters):
 			frappe.set_user(original_user)
 		print("Test data", str(data))
 		# Format the response
-		return {
+		result = {
 			"success": True,
 			"data": {
 				"columns": columns,
@@ -57,6 +65,11 @@ def get_general_ledger_data(filters):
 				"total_entries": len(data),
 			},
 		}
+
+		# Cache the result for 5 minutes
+		frappe.cache().set_value(cache_key, result, expires_in_sec=300)
+
+		return result
 
 	except Exception as e:
 		frappe.log_error(f"General Ledger API Error: {str(e)}")
@@ -73,7 +86,7 @@ def get_permission_aware_gl_data(filters):
 	Enhanced GL data API that bypasses all permission checks for reconciliation
 	Returns all entries without permission filtering
 	"""
-	
+
 	try:
 		if isinstance(filters, str):
 			filters = frappe.parse_json(filters)
@@ -114,7 +127,7 @@ def get_permission_aware_gl_data(filters):
 
 		# Run with elevated permissions to bypass all restrictions
 		original_user = frappe.session.user
-		
+
 		try:
 			frappe.set_user("Administrator")
 			# Get all GL data first

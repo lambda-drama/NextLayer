@@ -941,7 +941,7 @@ export default function IntercompanyReconciliation() {
       const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
       console.log("Validating bulk match amounts...", debitCreditMatch, creditDebitMatch)
       // Always validate amounts for manual matching (regardless of automatch setting)
-      if (!debitCreditMatch && !creditDebitMatch) {
+      if (!debitCreditMatch || !creditDebitMatch) {
         const errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
               `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
               `${companyA} Total Credit: ${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
