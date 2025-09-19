@@ -30,7 +30,6 @@ def get_general_ledger_data(filters):
 			frappe.throw(_("From Date and To Date are required"))
 
 		# Skip company permission check - allow access to all companies for reconciliation
-
 		filters.setdefault("show_remarks", 1)
 		filters.setdefault("categorize_by", "Categorize by Voucher (Consolidated)")
 		filters.setdefault("include_dimensions", 1)
@@ -54,7 +53,7 @@ def get_general_ledger_data(filters):
 			columns, data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
-		print("Test data", str(data))
+
 		# Format the response
 		result = {
 			"success": True,
@@ -144,7 +143,7 @@ def get_permission_aware_gl_data(filters):
 			"Journal Entry": {"count": 0, "total_debit": 0, "total_credit": 0},
 			"Payment Entry": {"count": 0, "total_debit": 0, "total_credit": 0}
 		}
-		print("Not really", str(all_data))
+
 		processed_count = 0
 		hidden_count = 0
 		for entry in all_data:
@@ -252,6 +251,7 @@ def get_companies():
 			"error": str(e),
 			"message": "Failed to fetch companies"
 		}
+
 
 @frappe.whitelist()
 def get_all_companies_for_ui():
@@ -460,14 +460,14 @@ def get_match_status(voucher_type, voucher_no, company):
 				try:
 					matched_with_parsed = frappe.parse_json(matched_with_raw)
 				except:
-					# If parsing fails, keep as string
+					
 					matched_with_parsed = matched_with_raw
 
 			return {
 				"success": True,
 				"status": doc.get("intercompany_match_status", "Pending"),
-				"matched_with": matched_with_raw,  # Raw JSON string
-				"matched_with_parsed": matched_with_parsed,  # Parsed object
+				"matched_with": matched_with_raw, 
+				"matched_with_parsed": matched_with_parsed,
 				"matched_by": doc.get("intercompany_matched_by"),
 				"matched_on": doc.get("intercompany_matched_on")
 			}
@@ -561,14 +561,10 @@ def get_permission_aware_companies():
 		# Get user permitted companies
 		user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
 
-		print("User permitted companies:", user_permitted)
-
 		# Extract permitted company names from the permission data
 		permitted_company_names = []
 		if user_permitted and "Company" in user_permitted:
 			permitted_company_names = [perm.get("doc") for perm in user_permitted["Company"]]
-
-		print("Permitted company names:", permitted_company_names)
 
 		# If user has specific company permissions, filter accordingly
 		if permitted_company_names:

@@ -1612,15 +1612,16 @@ export default function IntercompanyReconciliation() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Show Opening Entries</label>
-                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
+                <div className={`flex items-center space-x-2 p-2 border rounded-md ${hasLoadedData ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
                   <input
                     type="checkbox"
                     id="showOpeningEntries"
                     checked={showOpeningEntries}
                     onChange={(e) => setShowOpeningEntries(e.target.checked)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                    disabled={!hasLoadedData}
+                    className={`rounded border-blue-300 text-blue-600 focus:ring-blue-500 ${!hasLoadedData ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
-                  <label htmlFor="showOpeningEntries" className="text-sm text-gray-700">
+                  <label htmlFor="showOpeningEntries" className={`text-sm ${hasLoadedData ? 'text-gray-700' : 'text-gray-400'}`}>
                     Enable
                   </label>
                 </div>
