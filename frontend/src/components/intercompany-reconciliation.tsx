@@ -1349,6 +1349,8 @@ export default function IntercompanyReconciliation() {
 
   // Determine loading and error states
   const isLoading = glLoadingA || glLoadingB
+  const isDataProcessing = !isLoading && (glDataA.length > 0 || glDataB.length > 0) && findMatchingEntries.glDataAWithStatus.length === 0 && findMatchingEntries.glDataBWithStatus.length === 0
+  const isTableLoading = isLoading || isDataProcessing
   const _error = companiesError || allCompaniesError || partiesAError || partiesBError || glErrorA || glErrorB
 
   // Get status badge component
@@ -1729,13 +1731,13 @@ export default function IntercompanyReconciliation() {
             <div className="flex justify-center mt-6">
               <Button
                 onClick={handleLoadData}
-                disabled={!customerViewEnabled && !supplierViewEnabled || !companyA || !partyA || !companyB || !partyB || isLoading}
+                disabled={!customerViewEnabled && !supplierViewEnabled || !companyA || !partyA || !companyB || !partyB || isTableLoading}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8"
               >
-                {isLoading ? (
+                {isTableLoading ? (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Loading...
+                    {isLoading ? "Loading..." : "Processing..."}
                   </>
                 ) : (
                   "Load General Ledger Data"
@@ -2120,7 +2122,25 @@ export default function IntercompanyReconciliation() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).map((entry, index) => {
+                      {isTableLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-8">
+                            <div className="flex items-center justify-center space-x-2">
+                              <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                              <span className="text-gray-600">
+                                {isLoading ? "Loading data..." : "Processing and populating tables..."}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
+                            No data found for selected criteria
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).map((entry, index) => {
                         const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
                         return (
                           <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
@@ -2274,13 +2294,7 @@ export default function IntercompanyReconciliation() {
                             </TableCell>
                           </TableRow>
                         )
-                      })}
-                      {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
-                            No data found for selected criteria
-                          </TableCell>
-                        </TableRow>
+                      })
                       )}
                     </TableBody>
                   </Table>
@@ -2331,7 +2345,25 @@ export default function IntercompanyReconciliation() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).map((entry, index) => {
+                      {isTableLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-8">
+                            <div className="flex items-center justify-center space-x-2">
+                              <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                              <span className="text-gray-600">
+                                {isLoading ? "Loading data..." : "Processing and populating tables..."}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
+                            No data found for selected criteria
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).map((entry, index) => {
                         const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
                         return (
                           <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
@@ -2485,13 +2517,7 @@ export default function IntercompanyReconciliation() {
                             </TableCell>
                           </TableRow>
                         )
-                      })}
-                      {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
-                            No data found for selected criteria
-                          </TableCell>
-                        </TableRow>
+                      })
                       )}
                     </TableBody>
                   </Table>
