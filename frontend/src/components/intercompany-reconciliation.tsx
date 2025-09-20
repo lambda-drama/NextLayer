@@ -416,12 +416,15 @@ export default function IntercompanyReconciliation() {
 
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
+  const [isFetchingBackendStatus, setIsFetchingBackendStatus] = useState(false)
+  const [hasInitialBackendData, setHasInitialBackendData] = useState(false)
 
     // Fetch match status from backend when data is loaded
   useEffect(() => {
     const fetchMatchStatus = async () => {
       if (!glDataA.length || !glDataB.length || !companyA || !companyB) return
 
+      setIsFetchingBackendStatus(true)
       const statusMap: {[key: string]: any} = {}
 
       // Fetch status for Company A entries
@@ -451,10 +454,49 @@ export default function IntercompanyReconciliation() {
       }
 
       setBackendMatchStatus(statusMap)
+      setIsFetchingBackendStatus(false)
+      setHasInitialBackendData(true)
     }
 
     fetchMatchStatus()
   }, [glDataA, glDataB, companyA, companyB])
+
+  // Function to refresh backend statuses when needed (after matching operations)
+  const refreshBackendStatuses = async () => {
+    if (!glDataA.length || !glDataB.length || !companyA || !companyB) return
+
+    setIsFetchingBackendStatus(true)
+    const statusMap: {[key: string]: any} = {}
+
+    // Fetch status for Company A entries
+    for (const entry of glDataA) {
+      try {
+        const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA)
+        if (result.success) {
+          const key = `${entry.voucher_type}-${entry.voucher_no}`
+          statusMap[key] = result
+        }
+      } catch (error) {
+        console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
+      }
+    }
+
+    // Fetch status for Company B entries
+    for (const entry of glDataB) {
+      try {
+        const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB)
+        if (result.success) {
+          const key = `${entry.voucher_type}-${entry.voucher_no}`
+          statusMap[key] = result
+        }
+      } catch (error) {
+        console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
+      }
+    }
+
+    setBackendMatchStatus(statusMap)
+    setIsFetchingBackendStatus(false)
+  }
 
   // Function to handle viewing hidden transactions
   const handleViewHiddenTransactions = () => {
@@ -574,10 +616,16 @@ export default function IntercompanyReconciliation() {
 
       // Use backend status if available, otherwise use client-side logic
       let status: 'Match' | 'Mismatch' | 'Pending'
-      if (backendStatus && backendStatus.status) {
+      if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
         status = backendStatus.status
       } else {
-        status = matchingEntry ? 'Match' : 'Mismatch'
+        // If backend status is null/undefined or doesn't exist, check if there's a frontend match
+        // Only show Match if auto-match is enabled AND there's actually a matching entry
+        if (automatchEnabled && matchingEntry) {
+          status = 'Match'
+        } else {
+          status = 'Mismatch'
+        }
       }
 
       return {
@@ -623,10 +671,16 @@ export default function IntercompanyReconciliation() {
 
       // Use backend status if available, otherwise use client-side logic
       let status: 'Match' | 'Mismatch' | 'Pending'
-      if (backendStatus && backendStatus.status) {
+      if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
         status = backendStatus.status
       } else {
-        status = matchingEntry ? 'Match' : 'Mismatch'
+        // If backend status is null/undefined or doesn't exist, check if there's a frontend match
+        // Only show Match if auto-match is enabled AND there's actually a matching entry
+        if (automatchEnabled && matchingEntry) {
+          status = 'Match'
+        } else {
+          status = 'Mismatch'
+        }
       }
 
       return {
@@ -1350,6 +1404,7 @@ export default function IntercompanyReconciliation() {
   // Determine loading and error states
   const isLoading = glLoadingA || glLoadingB
   const isDataProcessing = !isLoading && (glDataA.length > 0 || glDataB.length > 0) && findMatchingEntries.glDataAWithStatus.length === 0 && findMatchingEntries.glDataBWithStatus.length === 0
+  const isBackendStatusLoading = isFetchingBackendStatus
   const isTableLoading = isLoading || isDataProcessing
   const _error = companiesError || allCompaniesError || partiesAError || partiesBError || glErrorA || glErrorB
 
@@ -1995,6 +2050,12 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="text-sm text-gray-600">
                     Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length} of {findMatchingEntries.glDataAWithStatus.length} entries
+                    {isBackendStatusLoading && (
+                      <span className="ml-2 inline-flex items-center px-2 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                        <RefreshCw className="h-3 w-3 animate-spin text-blue-600 mr-1" />
+                        <span className="text-blue-600 text-xs font-medium">Syncing statuses...</span>
+                      </span>
+                    )}
                     {automatchEnabled && (
                       <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
                         Auto-Match Enabled
