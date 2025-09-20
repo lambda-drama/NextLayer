@@ -417,49 +417,69 @@ export default function IntercompanyReconciliation() {
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
   const [isFetchingBackendStatus, setIsFetchingBackendStatus] = useState(false)
-  const [hasInitialBackendData, setHasInitialBackendData] = useState(false)
+  const [hasBackendStatusData, setHasBackendStatusData] = useState(false)
 
-    // Fetch match status from backend when data is loaded
+  // Smart status fetching: Fetch on initial load and when user changes to "Match" filter
   useEffect(() => {
     const fetchMatchStatus = async () => {
+      // Skip if we already have backend status data
+      if (hasBackendStatusData) return
+
       if (!glDataA.length || !glDataB.length || !companyA || !companyB) return
 
       setIsFetchingBackendStatus(true)
       const statusMap: {[key: string]: any} = {}
 
-      // Fetch status for Company A entries
-      for (const entry of glDataA) {
+      // Create all API calls for Company A entries
+      const companyAPromises = glDataA.map(async (entry) => {
         try {
           const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA)
           if (result.success) {
             const key = `${entry.voucher_type}-${entry.voucher_no}`
-            statusMap[key] = result
+            return { key, result }
           }
         } catch (error) {
           console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
         }
-      }
+        return null
+      })
 
-      // Fetch status for Company B entries
-      for (const entry of glDataB) {
+      // Create all API calls for Company B entries
+      const companyBPromises = glDataB.map(async (entry) => {
         try {
           const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB)
           if (result.success) {
             const key = `${entry.voucher_type}-${entry.voucher_no}`
-            statusMap[key] = result
+            return { key, result }
           }
         } catch (error) {
           console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
         }
-      }
+        return null
+      })
+
+      // Execute all API calls in parallel
+      const allResults = await Promise.all([...companyAPromises, ...companyBPromises])
+
+      // Process results
+      allResults.forEach(item => {
+        if (item) {
+          statusMap[item.key] = item.result
+        }
+      })
 
       setBackendMatchStatus(statusMap)
       setIsFetchingBackendStatus(false)
-      setHasInitialBackendData(true)
+      setHasBackendStatusData(true)
     }
 
     fetchMatchStatus()
-  }, [glDataA, glDataB, companyA, companyB])
+  }, [glDataA, glDataB, companyA, companyB, hasBackendStatusData])
+
+  // Reset backend status cache when GL data changes (new data load)
+  useEffect(() => {
+    setHasBackendStatusData(false)
+  }, [glDataA, glDataB])
 
   // Function to refresh backend statuses when needed (after matching operations)
   const refreshBackendStatuses = async () => {
@@ -468,34 +488,47 @@ export default function IntercompanyReconciliation() {
     setIsFetchingBackendStatus(true)
     const statusMap: {[key: string]: any} = {}
 
-    // Fetch status for Company A entries
-    for (const entry of glDataA) {
+    // Create all API calls for Company A entries
+    const companyAPromises = glDataA.map(async (entry) => {
       try {
         const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA)
         if (result.success) {
           const key = `${entry.voucher_type}-${entry.voucher_no}`
-          statusMap[key] = result
+          return { key, result }
         }
       } catch (error) {
         console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
       }
-    }
+      return null
+    })
 
-    // Fetch status for Company B entries
-    for (const entry of glDataB) {
+    // Create all API calls for Company B entries
+    const companyBPromises = glDataB.map(async (entry) => {
       try {
         const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB)
         if (result.success) {
           const key = `${entry.voucher_type}-${entry.voucher_no}`
-          statusMap[key] = result
+          return { key, result }
         }
       } catch (error) {
         console.error(`Error fetching match status for ${entry.voucher_type} ${entry.voucher_no}:`, error)
       }
-    }
+      return null
+    })
+
+    // Execute all API calls in parallel
+    const allResults = await Promise.all([...companyAPromises, ...companyBPromises])
+
+    // Process results
+    allResults.forEach(item => {
+      if (item) {
+        statusMap[item.key] = item.result
+      }
+    })
 
     setBackendMatchStatus(statusMap)
     setIsFetchingBackendStatus(false)
+    setHasBackendStatusData(true) // Mark that we have fresh backend data
   }
 
   // Function to handle viewing hidden transactions
@@ -876,6 +909,7 @@ export default function IntercompanyReconciliation() {
         }
       })
       setBackendMatchStatus(optimisticStatusMap)
+      setHasBackendStatusData(true) // Mark that we have fresh backend data
 
       // Clear selections and close modal immediately
       setSelectedEntries(new Set())
@@ -1146,6 +1180,7 @@ export default function IntercompanyReconciliation() {
         }
       })
       setBackendMatchStatus(optimisticStatusMap)
+      setHasBackendStatusData(true) // Mark that we have fresh backend data
 
       // Clear selections and close modal immediately
       setSelectedEntries(new Set())
@@ -1318,6 +1353,7 @@ export default function IntercompanyReconciliation() {
       }
 
       setBackendMatchStatus(statusMap)
+      setHasBackendStatusData(true) // Mark that we have fresh backend data
       setShowIndividualMatchModal(false)
       setSelectedEntryForAction(null)
     } catch (error) {
@@ -1385,6 +1421,7 @@ export default function IntercompanyReconciliation() {
       }
 
       setBackendMatchStatus(statusMap)
+      setHasBackendStatusData(true) // Mark that we have fresh backend data
       setShowIndividualUnmatchModal(false)
       setSelectedEntryForAction(null)
     } catch (error) {

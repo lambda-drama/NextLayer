@@ -5,6 +5,8 @@ from frappe import _
 from frappe.utils import flt
 from nextlayer.next_layer.report.general_ledger_extension.general_ledger_extension import execute
 from frappe import _dict
+from frappe.utils.password import get_decrypted_password
+
 
 @frappe.whitelist()
 def get_general_ledger_data(filters):
@@ -171,7 +173,6 @@ def get_permission_aware_gl_data(filters):
 					# User has permission - show full document details in entries list
 					visible_entries.append(entry)
 				else:
-					# User doesn't have permission - don't show in entries list
 					# Only add to hidden summary for reconciliation totals
 					hidden_count += 1
 
@@ -215,7 +216,6 @@ def check_document_permission_as_original_user(voucher_type, voucher_no, origina
 			frappe.set_user(original_user)
 			# Now check permissions as the original user
 			doc = frappe.get_doc(voucher_type, voucher_no)
-			# This respects Frappe's sharing mechanism and role-based permissions
 			return frappe.has_permission(doc, ptype="read")
 		finally:
 			frappe.set_user(current_user)
@@ -233,7 +233,6 @@ def check_document_permission_as_original_user(voucher_type, voucher_no, origina
 def get_companies():
 	"""Get list of companies for dropdown based on user permissions"""
 	try:
-		# Get user's permitted companies using ERPNext's permission system
 
 		companies = frappe.get_all(
 			"Company",
@@ -287,11 +286,7 @@ def get_parties(party_type="Customer", company=None):
 	"""Get list of parties (customers/suppliers) for dropdown"""
 	try:
 		# Skip company permission check - allow access to all companies for reconciliation
-		# if company:
-		#	user_permitted_companies = frappe.permissions.get_user_permissions("Company")
-		#	if user_permitted_companies and company not in user_permitted_companies:
-		#		frappe.throw(_("You don't have permission to access data for company: {0}").format(company))
-
+		
 		filters = {}
 
 		# add internal customer/supplier filter
@@ -606,7 +601,6 @@ def get_permission_aware_companies():
 				"error": str(e),
 				"companies": []
 			}
-from frappe.utils.password import get_decrypted_password
 
 
 @frappe.whitelist()
@@ -631,7 +625,6 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 			frappe.throw(_("Invalid admin password"))
 		else:
 			print("Admin password verified successfully")
-		# If password is correct, get hidden transactions for both companies
 		hidden_transactions_a = []
 		hidden_transactions_b = []
 
