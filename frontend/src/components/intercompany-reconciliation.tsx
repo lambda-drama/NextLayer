@@ -809,6 +809,25 @@ export default function IntercompanyReconciliation() {
 
     try {
       const selectedEntriesArray = Array.from(selectedEntries)
+
+      // OPTIMISTIC UPDATE: Immediately update UI
+      const optimisticStatusMap = { ...backendMatchStatus }
+      selectedEntriesArray.forEach(entryKey => {
+        optimisticStatusMap[entryKey] = {
+          status: 'Mismatch',
+          matched_with: null,
+          matched_with_parsed: null, // Clear the parsed match data
+          matched_by: 'Manual',
+          matched_on: new Date().toISOString()
+        }
+      })
+      setBackendMatchStatus(optimisticStatusMap)
+
+      // Clear selections and close modal immediately
+      setSelectedEntries(new Set())
+      setShowMatchModal(false)
+      setIsProcessing(false)
+
       const bulkData = []
 
       for (const entryKey of selectedEntriesArray) {
@@ -849,45 +868,57 @@ export default function IntercompanyReconciliation() {
 
       // console.log("Prepared bulk unmatch data:", bulkData)
 
-      // Check if processing was cancelled before API call
-      if (processingCancelled) {
-        // console.log("Processing cancelled before API call")
-        return
+      // Perform API call in background
+      try {
+        // Check if processing was cancelled before API call
+        if (processingCancelled) {
+          // console.log("Processing cancelled before API call")
+          return
+        }
+
+        // Perform bulk update
+        // console.log("Calling bulkUpdateMatchStatus for unmatch...")
+        const result = await bulkUpdateMatchStatus(bulkData)
+        // console.log("Bulk unmatch result:", result)
+
+        if (result.failed > 0) {
+          alert(`Bulk unmatching completed with ${result.success} successful and ${result.failed} failed updates.\n\nErrors:\n${result.errors.join('\n')}`)
+        } else {
+          setProcessingSuccess(true)
+          // Auto-close modal after 2 seconds
+          setTimeout(() => {
+            setShowMatchModal(false)
+            setIsProcessing(false)
+            setProcessingSuccess(false)
+          }, 2000)
+        }
+
+        // Check if processing was cancelled before refresh
+        if (processingCancelled) {
+          // console.log("Processing cancelled before refresh")
+          return
+        }
+
+        // Refresh match statuses
+        // console.log("Refreshing match statuses after unmatch...")
+        await refreshMatchStatuses(bulkData.map(entry => ({
+          voucher_type: entry.voucher_type,
+          voucher_no: entry.voucher_no,
+          company: entry.company
+        })))
+
+        setSelectedEntries(new Set())
+        // console.log("Bulk unmatch process completed successfully")
+      } catch (apiError) {
+        console.error("API Error in background:", apiError)
+        // Revert optimistic update on API error
+        const revertedStatusMap = { ...backendMatchStatus }
+        selectedEntriesArray.forEach(entryKey => {
+          delete revertedStatusMap[entryKey]
+        })
+        setBackendMatchStatus(revertedStatusMap)
+        alert("Failed to update match status. Please try again.")
       }
-
-      // Perform bulk update
-      // console.log("Calling bulkUpdateMatchStatus for unmatch...")
-      const result = await bulkUpdateMatchStatus(bulkData)
-      // console.log("Bulk unmatch result:", result)
-
-      if (result.failed > 0) {
-        alert(`Bulk unmatching completed with ${result.success} successful and ${result.failed} failed updates.\n\nErrors:\n${result.errors.join('\n')}`)
-      } else {
-        setProcessingSuccess(true)
-        // Auto-close modal after 2 seconds
-        setTimeout(() => {
-          setShowMatchModal(false)
-          setIsProcessing(false)
-          setProcessingSuccess(false)
-        }, 2000)
-      }
-
-      // Check if processing was cancelled before refresh
-      if (processingCancelled) {
-        // console.log("Processing cancelled before refresh")
-        return
-      }
-
-      // Refresh match statuses
-      // console.log("Refreshing match statuses after unmatch...")
-      await refreshMatchStatuses(bulkData.map(entry => ({
-        voucher_type: entry.voucher_type,
-        voucher_no: entry.voucher_no,
-        company: entry.company
-      })))
-
-      setSelectedEntries(new Set())
-      // console.log("Bulk unmatch process completed successfully")
     } catch (error) {
       // console.error("Bulk unmatch process failed:", error)
       alert(`Bulk unmatch failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -958,42 +989,14 @@ export default function IntercompanyReconciliation() {
       }
 
       // OPTIMISTIC UPDATE: Immediately update UI and close modal
-
-      // Update backend match status immediately for selected entries
-      const optimisticStatusMap = { ...backendMatchStatus }
-      selectedEntriesArray.forEach(entryKey => {
-        optimisticStatusMap[entryKey] = {
-          status: 'Match',
-          matched_with: null,
-          matched_with_parsed: null,
-          matched_by: 'Manual',
-          matched_on: new Date().toISOString()
-        }
-      })
-      setBackendMatchStatus(optimisticStatusMap)
-
-      // Clear selections and close modal immediately
-      setSelectedEntries(new Set())
-      setShowMatchModal(false)
-      setIsProcessing(false)
-
-      // Perform API call in background
-      try {
-        // If totals balance, mark all selected entries as matched
-        // Create proper pairing between Company A and Company B entries
-        const bulkData = []
+      // First, prepare the bulk data to determine proper pairings
+      const bulkData = []
 
       // Separate selected entries by company
       const companyAEntries = []
       const companyBEntries = []
 
       for (const entryKey of selectedEntries) {
-        // Check if processing was cancelled
-        if (processingCancelled) {
-          console.log("Processing cancelled by user")
-          return
-        }
-
         // Find the entry in both Company A and Company B data
         const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
           `${entry.voucher_type}-${entry.voucher_no}` === entryKey
@@ -1076,7 +1079,27 @@ export default function IntercompanyReconciliation() {
         }
       }
 
-      // console.log("Prepared bulk data:", bulkData)
+      // Update backend match status immediately for selected entries with proper pairings
+      const optimisticStatusMap = { ...backendMatchStatus }
+      bulkData.forEach(entry => {
+        const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+        optimisticStatusMap[entryKey] = {
+          status: 'Match',
+          matched_with: entry.matched_with ? JSON.stringify(entry.matched_with) : null,
+          matched_with_parsed: entry.matched_with, // This is what the UI uses to display matches
+          matched_by: 'Manual',
+          matched_on: new Date().toISOString()
+        }
+      })
+      setBackendMatchStatus(optimisticStatusMap)
+
+      // Clear selections and close modal immediately
+      setSelectedEntries(new Set())
+      setShowMatchModal(false)
+      setIsProcessing(false)
+
+      // Perform API call in background
+      try {
 
       // Check if processing was cancelled before API call
       if (processingCancelled) {
@@ -1215,7 +1238,7 @@ export default function IntercompanyReconciliation() {
         matched_with: entryA
       })
 
-      // Refresh backend match status
+      // OPTIMISTIC UPDATE: Update backend match status immediately
       const statusMap = { ...backendMatchStatus }
 
       // Update the status map with new data
@@ -1226,6 +1249,7 @@ export default function IntercompanyReconciliation() {
         success: true,
         status: 'Match',
         matched_with: JSON.stringify(entryB),
+        matched_with_parsed: entryB, // This is what the UI uses to display matches
         matched_by: 'current_user', // This will be set by backend
         matched_on: new Date().toISOString()
       }
@@ -1234,6 +1258,7 @@ export default function IntercompanyReconciliation() {
         success: true,
         status: 'Match',
         matched_with: JSON.stringify(entryA),
+        matched_with_parsed: entryA, // This is what the UI uses to display matches
         matched_by: 'current_user', // This will be set by backend
         matched_on: new Date().toISOString()
       }
@@ -1280,7 +1305,7 @@ export default function IntercompanyReconciliation() {
         matched_with: null
       })
 
-      // Refresh backend match status
+      // OPTIMISTIC UPDATE: Update backend match status immediately
       const statusMap = { ...backendMatchStatus }
 
       // Update the status map with new data
@@ -1291,6 +1316,7 @@ export default function IntercompanyReconciliation() {
         success: true,
         status: 'Mismatch',
         matched_with: null,
+        matched_with_parsed: null, // Clear the parsed match data
         matched_by: 'current_user',
         matched_on: new Date().toISOString()
       }
@@ -1299,6 +1325,7 @@ export default function IntercompanyReconciliation() {
         success: true,
         status: 'Mismatch',
         matched_with: null,
+        matched_with_parsed: null, // Clear the parsed match data
         matched_by: 'current_user',
         matched_on: new Date().toISOString()
       }
