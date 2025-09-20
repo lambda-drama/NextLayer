@@ -2169,8 +2169,8 @@ export default function IntercompanyReconciliation() {
                                   )
                                 }
 
-                                // Fallback to frontend matched entry
-                                if (entry.matchedEntry) {
+                                // Only show frontend matched entry if auto-match is enabled
+                                if (entry.matchedEntry && automatchEnabled) {
                                   return (
                                     <div className="text-sm">
                                       <div className="font-medium text-blue-600">
@@ -2380,8 +2380,8 @@ export default function IntercompanyReconciliation() {
                                   )
                                 }
 
-                                // Fallback to frontend matched entry
-                                if (entry.matchedEntry) {
+                                // Only show frontend matched entry if auto-match is enabled
+                                if (entry.matchedEntry && automatchEnabled) {
                                   return (
                                     <div className="text-sm">
                                       <div className="font-medium text-blue-600">
