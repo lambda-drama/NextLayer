@@ -166,7 +166,6 @@ def get_permission_aware_gl_data(filters):
 			if voucher_type and voucher_no:
 				has_permission = check_document_permission_as_original_user(voucher_type, voucher_no, original_user)
 				company = entry.get('party', 'Unknown')
-				print(f"Document {voucher_type} {voucher_no} (Party: {company}): has_permission = {has_permission}")
 
 				if has_permission:
 					# User has permission - show full document details in entries list
