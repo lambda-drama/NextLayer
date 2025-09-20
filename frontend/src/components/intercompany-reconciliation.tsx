@@ -616,10 +616,16 @@ export default function IntercompanyReconciliation() {
 
       // Use backend status if available, otherwise use client-side logic
       let status: 'Match' | 'Mismatch' | 'Pending'
-      if (backendStatus && backendStatus.status) {
+      if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
         status = backendStatus.status
       } else {
-        status = matchingEntry ? 'Match' : 'Mismatch'
+        // If backend status is null/undefined or doesn't exist, check if there's a frontend match
+        // Only show Match if auto-match is enabled AND there's actually a matching entry
+        if (automatchEnabled && matchingEntry) {
+          status = 'Match'
+        } else {
+          status = 'Mismatch'
+        }
       }
 
       return {
@@ -665,10 +671,16 @@ export default function IntercompanyReconciliation() {
 
       // Use backend status if available, otherwise use client-side logic
       let status: 'Match' | 'Mismatch' | 'Pending'
-      if (backendStatus && backendStatus.status) {
+      if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
         status = backendStatus.status
       } else {
-        status = matchingEntry ? 'Match' : 'Mismatch'
+        // If backend status is null/undefined or doesn't exist, check if there's a frontend match
+        // Only show Match if auto-match is enabled AND there's actually a matching entry
+        if (automatchEnabled && matchingEntry) {
+          status = 'Match'
+        } else {
+          status = 'Mismatch'
+        }
       }
 
       return {
@@ -2038,10 +2050,6 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="text-sm text-gray-600">
                     Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length} of {findMatchingEntries.glDataAWithStatus.length} entries
-                    {/* Debug info - remove this later */}
-                    <span className="ml-2 text-xs text-gray-400">
-                      (Fetching: {isFetchingBackendStatus ? 'Yes' : 'No'}, Initial: {hasInitialBackendData ? 'Yes' : 'No'})
-                    </span>
                     {isBackendStatusLoading && (
                       <span className="ml-2 inline-flex items-center px-2 py-1 bg-blue-50 border border-blue-200 rounded-full">
                         <RefreshCw className="h-3 w-3 animate-spin text-blue-600 mr-1" />
