@@ -55,7 +55,7 @@ def get_general_ledger_data(filters):
 			columns, data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
-
+		print("Data fetched from GL report", data)
 		# Format the response
 		result = {
 			"success": True,
