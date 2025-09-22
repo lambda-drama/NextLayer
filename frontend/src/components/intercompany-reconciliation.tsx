@@ -36,6 +36,7 @@ export default function IntercompanyReconciliation() {
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(true)
   const [isAutoFilled, setIsAutoFilled] = useState(false)
   const [automatchEnabled, setAutomatchEnabled] = useState(false)
+  const [bypassTotalCalculation, setBypassTotalCalculation] = useState(false)
 
   // State for view checkboxes
   const [customerViewEnabled, setCustomerViewEnabled] = useState<boolean>(true)
@@ -295,6 +296,10 @@ export default function IntercompanyReconciliation() {
 
   const handleAutomatchChange = (checked: boolean) => {
     setAutomatchEnabled(checked)
+  }
+
+  const handleBypassTotalCalculationChange = (checked: boolean) => {
+    setBypassTotalCalculation(checked)
   }
 
   const handlePartyBChange = (value: string) => {
@@ -626,15 +631,27 @@ export default function IntercompanyReconciliation() {
           return false // Don't auto-match based on amounts/dates
         }
 
-        // Check if amounts match (debit on one side should equal credit on other side)
-        const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-        const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
-
         // Check if dates match (both entries must be on the same date)
         const dateMatch = entryA.posting_date === entryB.posting_date
 
-        // Return true only if amounts match AND dates match
-        return (debitCreditMatch || creditDebitMatch) && dateMatch
+        // If bypass total calculation is enabled, check net totals instead of individual amounts
+        if (bypassTotalCalculation) {
+          // Calculate net total for both entries (credit - debit)
+          const netTotalA = entryA.credit - entryA.debit
+          const netTotalB = entryB.credit - entryB.debit
+
+          // Check if absolute values of net totals match with small tolerance
+          const netTotalMatch = Math.abs(Math.abs(netTotalA) - Math.abs(netTotalB)) < 0.01
+
+          return netTotalMatch && dateMatch
+        } else {
+          // Original logic: Check if amounts match (debit on one side should equal credit on other side)
+          const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+          const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+
+          // Return true only if amounts match AND dates match
+          return (debitCreditMatch || creditDebitMatch) && dateMatch
+        }
       })
 
       // If we found a match, mark it as used
@@ -681,15 +698,27 @@ export default function IntercompanyReconciliation() {
           return false
         }
 
-        // Check if amounts match (debit on one side should equal credit on other side)
-        const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-        const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
-
         // Check if dates match (both entries must be on the same date)
         const dateMatch = entryA.posting_date === entryB.posting_date
 
-        // Return true only if amounts match AND dates match
-        return (debitCreditMatch || creditDebitMatch) && dateMatch
+        // If bypass total calculation is enabled, check net totals instead of individual amounts
+        if (bypassTotalCalculation) {
+          // Calculate net total for both entries (credit - debit)
+          const netTotalA = entryA.credit - entryA.debit
+          const netTotalB = entryB.credit - entryB.debit
+
+          // Check if absolute values of net totals match with small tolerance
+          const netTotalMatch = Math.abs(Math.abs(netTotalA) - Math.abs(netTotalB)) < 0.01
+
+          return netTotalMatch && dateMatch
+        } else {
+          // Original logic: Check if amounts match (debit on one side should equal credit on other side)
+          const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+          const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+
+          // Return true only if amounts match AND dates match
+          return (debitCreditMatch || creditDebitMatch) && dateMatch
+        }
       })
 
       // If we found a match, mark it as used
@@ -758,7 +787,7 @@ export default function IntercompanyReconciliation() {
     // console.log("Final filtered results - glDataBWithStatus:", filteredGlDataBWithStatus.length)
 
     return { glDataAWithStatus: filteredGlDataAWithStatus, glDataBWithStatus: filteredGlDataBWithStatus }
-  }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled])
+  }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled, bypassTotalCalculation])
 
   // Updated reconciliation analysis using reconciliationTotals
   const reconciliationAnalysis = useMemo(() => {
@@ -769,9 +798,26 @@ export default function IntercompanyReconciliation() {
     const totalDebitB = totalsB.totalDebit
     const totalCreditB = totalsB.totalCredit
 
-    const debitCreditMatch = Math.abs(totalDebitA - totalCreditB) < 0.01
-    const creditDebitMatch = Math.abs(totalCreditA - totalDebitB) < 0.01
-    const isFullyReconciled = debitCreditMatch && creditDebitMatch
+    let debitCreditMatch = false
+    let creditDebitMatch = false
+    let isFullyReconciled = false
+
+    if (bypassTotalCalculation) {
+      // Calculate net totals for both companies
+      const netTotalA = totalCreditA - totalDebitA
+      const netTotalB = totalCreditB - totalDebitB
+      const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
+
+      // For bypass mode, we consider it reconciled if net totals match
+      debitCreditMatch = netTotalMatch
+      creditDebitMatch = netTotalMatch
+      isFullyReconciled = netTotalMatch
+    } else {
+      // Original logic
+      debitCreditMatch = Math.abs(totalDebitA - totalCreditB) < 0.01
+      creditDebitMatch = Math.abs(totalCreditA - totalDebitB) < 0.01
+      isFullyReconciled = debitCreditMatch && creditDebitMatch
+    }
 
     return {
       totalDebitA,
@@ -784,7 +830,7 @@ export default function IntercompanyReconciliation() {
       balanceA: totalsA.balance,
       balanceB: totalsB.balance,
     }
-  }, [totalsA, totalsB])
+  }, [totalsA, totalsB, bypassTotalCalculation])
 
   const formatCurrency = (amount: number, currencyCode: string = 'USD', partyName?: string, partyType?: string) => {
     // Use selected currency if it's not "all", otherwise use party currency or provided currencyCode
@@ -1056,19 +1102,64 @@ export default function IntercompanyReconciliation() {
         return sum + (entry?.credit || 0)
       }, 0)
 
-      const debitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
-      const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
-      console.log("Validating bulk match amounts...", debitCreditMatch, creditDebitMatch)
+      // Check if bypass total calculation is enabled
+      let validationPassed = false
+
+
+      if (bypassTotalCalculation) {
+        // Calculate net totals for both sides
+        const netTotalLeft = totalCreditLeft - totalDebitLeft
+        const netTotalRight = totalCreditRight - totalDebitRight
+
+        // For bypass mode, compare absolute values of net totals with small tolerance
+        // This ensures we match regardless of which side is positive/negative
+        const netTotalMatch = Math.abs(Math.abs(netTotalLeft) - Math.abs(netTotalRight)) < 0.01
+
+        console.log("Validating bulk match with bypass total calculation...", {
+          bypassTotalCalculation,
+          totalCreditLeft,
+          totalDebitLeft,
+          totalCreditRight,
+          totalDebitRight,
+          netTotalLeft,
+          netTotalRight,
+          absNetTotalLeft: Math.abs(netTotalLeft),
+          absNetTotalRight: Math.abs(netTotalRight),
+          comparison: `${Math.abs(netTotalLeft)} === ${Math.abs(netTotalRight)}`,
+          netTotalMatch,
+          validationPassed: netTotalMatch
+        })
+        validationPassed = netTotalMatch
+        console.log("Bypass validation result:", validationPassed)
+      } else {
+        // Original validation logic
+        const debitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
+        const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
+        console.log("Validating bulk match amounts...", debitCreditMatch, creditDebitMatch)
+        validationPassed = debitCreditMatch && creditDebitMatch
+      }
+
+      console.log("Final validation result:", validationPassed)
+
       // Always validate amounts for manual matching (regardless of automatch setting)
-      if (!debitCreditMatch || !creditDebitMatch) {
-        const errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
+      if (!validationPassed) {
+        let errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
               `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
               `${companyA} Total Credit: ${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
               `${companyB} Total Debit: ${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n` +
-              `${companyB} Total Credit: ${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n\n` +
-              `For matching, either:\n` +
-              `- ${companyA} Debit (${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Credit (${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
-              `- ${companyA} Credit (${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Debit (${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})`
+              `${companyB} Total Credit: ${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n\n`
+
+        if (bypassTotalCalculation) {
+          const netTotalLeft = totalCreditLeft - totalDebitLeft
+          const netTotalRight = totalCreditRight - totalDebitRight
+          errorMessage += `For matching with bypass total calculation:\n` +
+                `- ${companyA} Net Total (${formatCurrency(netTotalLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Net Total (${formatCurrency(netTotalRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
+                `- Net Total = Credit - Debit`
+        } else {
+          errorMessage += `For matching, either:\n` +
+                `- ${companyA} Debit (${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Credit (${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
+                `- ${companyA} Credit (${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Debit (${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})`
+        }
 
         setValidationErrorMessage(errorMessage)
         setShowValidationError(true)
@@ -1116,10 +1207,19 @@ export default function IntercompanyReconciliation() {
           if (!matchedEntry && automatchEnabled) {
             // Look for a corresponding entry in Company B with same amount and date
             matchedEntry = findMatchingEntries.glDataBWithStatus.find(entryB => {
-              const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-              const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
               const dateMatch = entryA.posting_date === entryB.posting_date
-              return (debitCreditMatch || creditDebitMatch) && dateMatch
+
+              if (bypassTotalCalculation) {
+                // Calculate net totals for both entries (credit - debit)
+                const netTotalA = entryA.credit - entryA.debit
+                const netTotalB = entryB.credit - entryB.debit
+                const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
+                return netTotalMatch && dateMatch
+              } else {
+                const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+                const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+                return (debitCreditMatch || creditDebitMatch) && dateMatch
+              }
             })
           }
 
@@ -1145,10 +1245,19 @@ export default function IntercompanyReconciliation() {
           if (!matchedEntry && automatchEnabled) {
             // Look for a corresponding entry in Company A with same amount and date
             matchedEntry = findMatchingEntries.glDataAWithStatus.find(entryA => {
-              const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-              const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
               const dateMatch = entryA.posting_date === entryB.posting_date
-              return (debitCreditMatch || creditDebitMatch) && dateMatch
+
+              if (bypassTotalCalculation) {
+                // Calculate net totals for both entries (credit - debit)
+                const netTotalA = entryA.credit - entryA.debit
+                const netTotalB = entryB.credit - entryB.debit
+                const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
+                return netTotalMatch && dateMatch
+              } else {
+                const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+                const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+                return (debitCreditMatch || creditDebitMatch) && dateMatch
+              }
             })
           }
 
@@ -1983,13 +2092,30 @@ export default function IntercompanyReconciliation() {
                     <AlertDescription
                       className={reconciliationAnalysis.debitCreditMatch ? "text-green-800" : "text-red-800"}
                     >
-                      <strong>Debit-Credit Match:</strong> Company A Debit ({formatCurrency(reconciliationAnalysis.totalDebitA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')})
-                      {reconciliationAnalysis.debitCreditMatch ? " matches " : " does not match "}
-                      Company B Credit ({formatCurrency(reconciliationAnalysis.totalCreditB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})
-                      {!reconciliationAnalysis.debitCreditMatch && (
-                        <div className="mt-1">
-                          Difference: {formatCurrency(Math.abs(reconciliationAnalysis.totalDebitA - reconciliationAnalysis.totalCreditB), getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
-                        </div>
+                      {bypassTotalCalculation ? (
+                        <>
+                          <strong>Net Total Match:</strong> Company A Net Total ({formatCurrency(reconciliationAnalysis.totalCreditA - reconciliationAnalysis.totalDebitA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')})
+                          {reconciliationAnalysis.debitCreditMatch ? " matches " : " does not match "}
+                          Company B Net Total ({formatCurrency(reconciliationAnalysis.totalCreditB - reconciliationAnalysis.totalDebitB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})
+                          <br />
+                          <span className="text-xs text-gray-600">Net Total = Credit - Debit</span>
+                          {!reconciliationAnalysis.debitCreditMatch && (
+                            <div className="mt-1">
+                              Difference: {formatCurrency(Math.abs((reconciliationAnalysis.totalCreditA - reconciliationAnalysis.totalDebitA) - (reconciliationAnalysis.totalCreditB - reconciliationAnalysis.totalDebitB)), getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <strong>Debit-Credit Match:</strong> Company A Debit ({formatCurrency(reconciliationAnalysis.totalDebitA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')})
+                          {reconciliationAnalysis.debitCreditMatch ? " matches " : " does not match "}
+                          Company B Credit ({formatCurrency(reconciliationAnalysis.totalCreditB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})
+                          {!reconciliationAnalysis.debitCreditMatch && (
+                            <div className="mt-1">
+                              Difference: {formatCurrency(Math.abs(reconciliationAnalysis.totalDebitA - reconciliationAnalysis.totalCreditB), getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
+                            </div>
+                          )}
+                        </>
                       )}
                     </AlertDescription>
                   </div>
@@ -2085,6 +2211,8 @@ export default function IntercompanyReconciliation() {
                       </SelectContent>
                     </Select>
                   </div>
+
+
                   <div className="text-sm text-gray-600">
                     Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length} of {findMatchingEntries.glDataAWithStatus.length} entries
                     {isBackendStatusLoading && (
@@ -2098,6 +2226,26 @@ export default function IntercompanyReconciliation() {
                         Auto-Match Enabled
                       </span>
                     )}
+                  </div>
+
+                   {/* Bypass Total Calculation Checkbox */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="bypass-total-calculation"
+                        checked={bypassTotalCalculation}
+                        onCheckedChange={handleBypassTotalCalculationChange}
+                      />
+                      <label htmlFor="bypass-total-calculation" className="text-sm text-gray-700">
+                        Match Net Amounts
+                      </label>
+                    </div>
+                    {/* <div className="text-xs text-gray-500">
+                      {bypassTotalCalculation
+                        ? "Match based on net total (credit - debit)"
+                        : "Match based on individual debit/credit amounts"
+                      }
+                    </div> */}
                   </div>
                 </div>
                 <div className="flex gap-2">
