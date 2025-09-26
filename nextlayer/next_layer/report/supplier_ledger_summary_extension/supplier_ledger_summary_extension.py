@@ -3,14 +3,14 @@
 
 # import frappe
 
-from erpnext.accounts.report.customer_ledger_summary.customer_ledger_summary import (
-	PartyLedgerSummaryReport,
+from nextlayer.next_layer.report.customer_ledger_summary_extension.customer_ledger_summary_extension import (
+    PartyLedgerSummaryReport,
 )
 
 
 def execute(filters=None):
-	args = {
-		"party_type": "Supplier",
-		"naming_by": ["Buying Settings", "supp_master_name"],
-	}
-	return PartyLedgerSummaryReport(filters).run(args)
+    args = {
+        "party_type": "Supplier",
+        "naming_by": ["Buying Settings", "supp_master_name"],
+    }
+    return PartyLedgerSummaryReport(filters).run(args)

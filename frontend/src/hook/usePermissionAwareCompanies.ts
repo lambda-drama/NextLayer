@@ -32,7 +32,6 @@ export const usePermissionAwareCompanies = () => {
         })
 
         const result = await response.json()
-        console.log("Here yiy", result)
         // Handle Frappe API response structure (wrapped in message object)
         const responseData = result.message || result
 

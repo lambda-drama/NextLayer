@@ -233,7 +233,6 @@ def get_companies():
 			fields=["name", "default_currency"],
 			order_by="name"
 		)
-
 		return {"success": True, "data": companies}
 
 	except Exception as e:
