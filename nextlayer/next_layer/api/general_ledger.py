@@ -55,7 +55,6 @@ def get_general_ledger_data(filters):
 			columns, data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
-		print("Data fetched from GL report", data)
 		# Format the response
 		result = {
 			"success": True,
@@ -100,11 +99,6 @@ def get_permission_aware_gl_data(filters):
 
 		if not filters.get("from_date") or not filters.get("to_date"):
 			frappe.throw(_("From Date and To Date are required"))
-
-		# Skip company permission check - allow access to all companies for reconciliation
-		# user_permitted_companies = frappe.permissions.get_user_permissions("Company")
-		# if user_permitted_companies and filters.get("company") not in user_permitted_companies:
-		#	frappe.throw(_("You don't have permission to access data for company: {0}").format(filters.get("company")))
 
 		# Set default values
 		filters.setdefault("show_remarks", 1)
