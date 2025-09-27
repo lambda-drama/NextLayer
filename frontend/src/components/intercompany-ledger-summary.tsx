@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "../../components/ui/alert"
-import { ArrowLeftRight, RefreshCw, ArrowLeft, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeftRight, RefreshCw, ArrowLeft, CheckCircle, XCircle, BarChart3, Users, Building2 } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -234,6 +234,64 @@ export default function InterCompanyLedgerSummary() {
     }
   }, [customerLedgerData, supplierLedgerData])
 
+  // Calculate summary statistics
+  const summaryStats = useMemo(() => {
+    if (!customerLedgerData || !supplierLedgerData) return null
+
+    // Customer statistics
+    const totalCustomers = customerLedgerData.entries.length
+    let matchedCustomers = 0
+    let unmatchedCustomers = 0
+
+    customerLedgerData.entries.forEach(entry => {
+      const glClosing = customerGLClosing[entry.party] || 0
+      const isPartyGLLoaded = customerGLClosing.hasOwnProperty(entry.party)
+
+      if (isPartyGLLoaded) {
+        const difference = calculateDifference(entry.closing_balance, glClosing)
+        if (Math.abs(difference) < 0.01) {
+          matchedCustomers++
+        } else {
+          unmatchedCustomers++
+        }
+      }
+    })
+
+    // Supplier statistics
+    const totalSuppliers = supplierLedgerData.entries.length
+    let matchedSuppliers = 0
+    let unmatchedSuppliers = 0
+
+    supplierLedgerData.entries.forEach(entry => {
+      const glClosing = supplierGLClosing[entry.party] || 0
+      const isPartyGLLoaded = supplierGLClosing.hasOwnProperty(entry.party)
+
+      if (isPartyGLLoaded) {
+        const difference = calculateDifference(entry.closing_balance, glClosing)
+        if (Math.abs(difference) < 0.01) {
+          matchedSuppliers++
+        } else {
+          unmatchedSuppliers++
+        }
+      }
+    })
+
+    return {
+      customers: {
+        total: totalCustomers,
+        matched: matchedCustomers,
+        unmatched: unmatchedCustomers,
+        pending: totalCustomers - matchedCustomers - unmatchedCustomers
+      },
+      suppliers: {
+        total: totalSuppliers,
+        matched: matchedSuppliers,
+        unmatched: unmatchedSuppliers,
+        pending: totalSuppliers - matchedSuppliers - unmatchedSuppliers
+      }
+    }
+  }, [customerLedgerData, supplierLedgerData, customerGLClosing, supplierGLClosing])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
       <div className="max-w-8xl mx-auto space-y-6">
@@ -429,7 +487,7 @@ export default function InterCompanyLedgerSummary() {
         )}
 
         {/* Reconciliation Analysis */}
-        {hasLoadedData && reconciliationAnalysis && (
+        {/* {hasLoadedData && reconciliationAnalysis && (
           <Card className="border-blue-200 shadow-lg">
             <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
               <CardTitle className="flex items-center gap-2">
@@ -443,7 +501,6 @@ export default function InterCompanyLedgerSummary() {
             </CardHeader>
             <CardContent className="p-6">
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Customer Summary */}
             <Card className="border-blue-200">
               <CardHeader className="bg-gray-50 border-b border-gray-200">
                 <CardTitle className="text-lg text-gray-800">
@@ -480,7 +537,6 @@ export default function InterCompanyLedgerSummary() {
               </CardContent>
             </Card>
 
-            {/* Supplier Summary */}
             <Card className="border-blue-200">
               <CardHeader className="bg-gray-50 border-b border-gray-200">
                 <CardTitle className="text-lg text-gray-800">
@@ -539,8 +595,87 @@ export default function InterCompanyLedgerSummary() {
               </div>
             </CardContent>
           </Card>
-        )}
+        )} */}
 
+        {/* Summary Statistics */}
+        {hasLoadedData && summaryStats && (
+          <Card className="border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Reconciliation Summary Statistics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Customer Statistics */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Customer Statistics
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <span className="text-blue-700 font-medium">Total Customers:</span>
+                      <span className="text-blue-900 font-bold text-lg">{summaryStats.customers.total}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                      <span className="text-green-700 font-medium">Matched:</span>
+                      <span className="text-green-900 font-bold text-lg">{summaryStats.customers.matched}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                      <span className="text-red-700 font-medium">Unmatched:</span>
+                      <span className="text-red-900 font-bold text-lg">{summaryStats.customers.unmatched}</span>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Supplier Statistics */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Supplier Statistics
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <span className="text-blue-700 font-medium">Total Suppliers:</span>
+                      <span className="text-blue-900 font-bold text-lg">{summaryStats.suppliers.total}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                      <span className="text-green-700 font-medium">Matched:</span>
+                      <span className="text-green-900 font-bold text-lg">{summaryStats.suppliers.matched}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                      <span className="text-red-700 font-medium">Unmatched:</span>
+                      <span className="text-red-900 font-bold text-lg">{summaryStats.suppliers.unmatched}</span>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              {/* Overall Progress */}
+              <div className="mt-6 pt-6 border-t border-blue-200">
+                <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
+                    <div className="text-3xl font-bold text-green-700">
+                      {summaryStats.customers.matched + summaryStats.suppliers.matched}
+                    </div>
+                    <div className="text-lg text-green-600 font-medium">Total Matched</div>
+                  </div>
+                  <div className="text-center p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-lg">
+                    <div className="text-3xl font-bold text-red-700">
+                      {summaryStats.customers.unmatched + summaryStats.suppliers.unmatched}
+                    </div>
+                    <div className="text-lg text-red-600 font-medium">Total Unmatched</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Data Display */}
         {hasLoadedData && customerLedgerData && supplierLedgerData && (
