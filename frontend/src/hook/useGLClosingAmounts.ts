@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 interface UseGLClosingAmountsParams {
   company: string
@@ -22,6 +22,9 @@ export function useGLClosingAmounts({
   const [glClosingAmounts, setGlClosingAmounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Create a stable key for parties to avoid infinite re-renders
+  const partiesKey = useMemo(() => parties.sort().join(','), [parties])
 
   useEffect(() => {
     if (!enabled || !company || !fromDate || !toDate || !parties.length) {
@@ -80,7 +83,7 @@ export function useGLClosingAmounts({
     }
 
     fetchGLClosingAmounts()
-  }, [company, partyType, fromDate, toDate, currency, parties, enabled])
+  }, [company, partyType, fromDate, toDate, currency, partiesKey, enabled])
 
   return {
     glClosingAmounts,

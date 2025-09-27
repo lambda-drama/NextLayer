@@ -201,17 +201,13 @@ export default function InterCompanyLedgerSummary() {
 
   // Get status based on difference and loading state
   const getStatus = (difference: number, glClosing: number, isLoading: boolean) => {
-    // If GL data is still loading, show pending
+    // If GL data is still loading for this specific party, show pending
     if (isLoading) {
       return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
     }
 
-    // If GL closing is 0 (no data loaded yet), show pending
-    if (glClosing === 0) {
-      return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
-    }
-
-    // If GL data is loaded, check for match/unmatched
+    // If GL data is loaded for this party, check for match/unmatched
+    // Note: glClosing can be 0 legitimately, so we don't check for zero here
     const tolerance = 0.01 // Small tolerance for floating point comparison
     if (Math.abs(difference) < tolerance) {
       return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
@@ -573,7 +569,9 @@ export default function InterCompanyLedgerSummary() {
                       {customerLedgerData.entries.map((entry, index) => {
                         const glClosing = customerGLClosing[entry.party] || 0
                         const difference = calculateDifference(entry.closing_balance, glClosing)
-                        const status = getStatus(difference, glClosing, isLoadingCustomerGL)
+                        // Check if this specific party's GL data is loaded
+                        const isPartyGLLoaded = customerGLClosing.hasOwnProperty(entry.party)
+                        const status = getStatus(difference, glClosing, !isPartyGLLoaded)
 
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
@@ -622,7 +620,9 @@ export default function InterCompanyLedgerSummary() {
                       {supplierLedgerData.entries.map((entry, index) => {
                         const glClosing = supplierGLClosing[entry.party] || 0
                         const difference = calculateDifference(entry.closing_balance, glClosing)
-                        const status = getStatus(difference, glClosing, isLoadingSupplierGL)
+                        // Check if this specific party's GL data is loaded
+                        const isPartyGLLoaded = supplierGLClosing.hasOwnProperty(entry.party)
+                        const status = getStatus(difference, glClosing, !isPartyGLLoaded)
 
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
