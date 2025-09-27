@@ -279,8 +279,6 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
         }
 
 
-
-
 @frappe.whitelist()
 def get_intercompany_parties(
     company: str,
@@ -333,4 +331,133 @@ def get_intercompany_parties(
             "success": False,
             "error": str(e),
             "parties": []
+        }
+
+
+@frappe.whitelist()
+def get_gl_closing_amounts(filters: Dict) -> Dict:
+    """
+    Get GL closing amounts for intercompany parties using general ledger report
+
+    Args:
+        filters: Dict containing company, from_date, to_date, currency, party_type, parties
+
+    Returns:
+        Dict containing GL closing amounts for each party
+    """
+    try:
+        # print("GL Closing Amounts - received filters:", filters)
+
+        # Extract parameters from filters
+        company = filters.get("company")
+        from_date = filters.get("from_date")
+        to_date = filters.get("to_date")
+        currency = filters.get("currency", "all")
+        party_type = filters.get("party_type")  # "Customer" or "Supplier"
+        parties = filters.get("parties", [])  # List of party names
+
+        
+
+        # Validate inputs
+        if not all([company, from_date, to_date, party_type]):
+            frappe.throw(_("Company, from_date, to_date, and party_type are required"))
+
+        if not parties:
+            return {
+                "success": True,
+                "gl_closing_amounts": {},
+                "message": "No parties provided"
+            }
+
+        # Import the general ledger report execution function
+        from nextlayer.next_layer.report.general_ledger_extension.general_ledger_extension import execute
+
+        gl_closing_amounts = {}
+
+        # Process each party individually for better debugging and reliability
+        for party in parties:
+            try:
+                # Prepare filters for the general ledger report - match general_ledger.py format exactly
+                gl_filters = {
+                    "company": company,
+                    "from_date": from_date,
+                    "to_date": to_date,
+                    "party": [party],  # Single party
+                    "party_type": party_type,
+                    "show_remarks": 1,
+                    "categorize_by": "Categorize by Voucher (Consolidated)",
+                    "include_dimensions": 1,
+                    "include_default_book_entries": 1,
+                }
+
+                # Add currency filters - match general_ledger.py format
+                if currency != "all":
+                    gl_filters["presentation_currency"] = currency
+                    gl_filters["account_currency"] = currency
+                else:
+                    company_currency = frappe.get_cached_value("Company", company, "default_currency")
+                    gl_filters["company_currency"] = company_currency
+                    gl_filters["account_currency"] = company_currency
+
+                gl_filters["company_fb"] = ""
+
+                # Convert to _dict format like general_ledger.py
+                from frappe import _dict
+                gl_filters = _dict(gl_filters)
+
+                # Run with elevated permissions to bypass all restrictions
+                original_user = frappe.session.user
+                try:
+                    # frappe.set_user("Administrator")
+                    columns, data = execute(gl_filters)
+
+                finally:
+                    frappe.set_user(original_user)
+
+                # Extract closing balance from the GL data
+                closing_balance = 0
+
+                # First pass: find all "Closing (Opening + Total)" rows
+                closing_rows = []
+                for i, row in enumerate(data):
+                    try:
+                        if isinstance(row, dict):
+                            account_name = row.get("account", "")
+                            balance = flt(row.get("balance", 0))
+
+                            if "Closing (Opening + Total)" in account_name:
+                                closing_rows.append((i, balance))
+                    except Exception as row_error:
+                        continue
+
+                # Take the LAST closing row (final balance)
+                if closing_rows:
+                    last_row_index, last_balance = closing_rows[-1]
+                    closing_balance = last_balance
+                else:
+                    closing_balance = 0
+
+                gl_closing_amounts[party] = closing_balance
+
+            except Exception as e:
+                print(f"Error processing party {party}: {str(e)}")
+                import traceback
+                print(f"Traceback: {traceback.format_exc()}")
+                gl_closing_amounts[party] = 0
+
+
+        # Show which parties have non-zero balances
+        non_zero_parties = {k: v for k, v in gl_closing_amounts.items() if v != 0}
+
+        return {
+            "success": True,
+            "gl_closing_amounts": gl_closing_amounts
+        }
+
+    except Exception as e:
+        frappe.log_error(f"GL Closing Amounts Error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": _("Failed to fetch GL closing amounts")
         }

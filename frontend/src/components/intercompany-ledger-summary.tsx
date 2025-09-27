@@ -13,6 +13,7 @@ import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies
 import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
 
 import { useLedgerSummary } from "../hook/useLedgerSummary"
+import { useGLClosingAmounts } from "../hook/useGLClosingAmounts"
 
 // Types
 interface LedgerSummaryEntry {
@@ -43,8 +44,7 @@ interface LedgerSummaryData {
 export default function InterCompanyLedgerSummary() {
 
   // State management
-  const [companyA, setCompanyA] = useState<string>("")
-  const [companyB, setCompanyB] = useState<string>("")
+  const [company, setCompany] = useState<string>("")
   const [fromDate, setFromDate] = useState<string>(`${new Date().getFullYear()}-01-01`)
   const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [currency, setCurrency] = useState<string>("all")
@@ -62,8 +62,8 @@ export default function InterCompanyLedgerSummary() {
   const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
   // Use ledger summary hooks - only fetch when hasLoadedData is true
-  const { data: ledgerDataA, isLoading: isLoadingA, error: errorA } = useLedgerSummary({
-    company: companyA,
+  const { data: customerLedgerData, isLoading: isLoadingCustomer, error: errorCustomer } = useLedgerSummary({
+    company: company,
     partyType: "Customer",
     fromDate,
     toDate,
@@ -75,8 +75,8 @@ export default function InterCompanyLedgerSummary() {
     enabled: hasLoadedData
   })
 
-  const { data: ledgerDataB, isLoading: isLoadingB, error: errorB } = useLedgerSummary({
-    company: companyB,
+  const { data: supplierLedgerData, isLoading: isLoadingSupplier, error: errorSupplier } = useLedgerSummary({
+    company: company,
     partyType: "Supplier",
     fromDate,
     toDate,
@@ -88,17 +88,45 @@ export default function InterCompanyLedgerSummary() {
     enabled: hasLoadedData
   })
 
-  console.log("Ledger Data A:", ledgerDataA)
-  console.log("Ledger Data B:", ledgerDataB)
+  // Extract party names for GL closing amounts
+  const customerParties = customerLedgerData?.entries?.map(entry => entry.party) || []
+  const supplierParties = supplierLedgerData?.entries?.map(entry => entry.party) || []
+
+  // Get GL closing amounts for customers
+  const { glClosingAmounts: customerGLClosing, isLoading: isLoadingCustomerGL } = useGLClosingAmounts({
+    company: company,
+    partyType: "Customer",
+    fromDate,
+    toDate,
+    currency,
+    parties: customerParties,
+    enabled: hasLoadedData && customerParties.length > 0
+  })
+
+  // Get GL closing amounts for suppliers
+  const { glClosingAmounts: supplierGLClosing, isLoading: isLoadingSupplierGL } = useGLClosingAmounts({
+    company: company,
+    partyType: "Supplier",
+    fromDate,
+    toDate,
+    currency,
+    parties: supplierParties,
+    enabled: hasLoadedData && supplierParties.length > 0
+  })
+
+  console.log("Customer Ledger Data:", customerLedgerData)
+  console.log("Supplier Ledger Data:", supplierLedgerData)
+  console.log("Customer GL Closing:", customerGLClosing)
+  console.log("Supplier GL Closing:", supplierGLClosing)
   console.log("hasLoadedData:", hasLoadedData)
-  console.log("Should render tables:", hasLoadedData && ledgerDataA && ledgerDataB)
-  const isLoading = isLoadingA || isLoadingB
+  console.log("Should render tables:", hasLoadedData && customerLedgerData && supplierLedgerData)
+  const isLoading = isLoadingCustomer || isLoadingSupplier || isLoadingCustomerGL || isLoadingSupplierGL
 
   // Handle load data
   const handleLoadData = () => {
-    console.log("handleLoadData called", { companyA, companyB })
-    if (!companyA || !companyB) {
-      setError("Please select both companies")
+    console.log("handleLoadData called", { company })
+    if (!company) {
+      setError("Please select a company")
       return
     }
     setError("")
@@ -160,23 +188,55 @@ export default function InterCompanyLedgerSummary() {
     return company?.default_currency || 'USD'
   }
 
+  // Calculate difference between ledger closing and GL closing
+  const calculateDifference = (ledgerClosing: number, glClosing: number) => {
+    // Handle negative values by taking absolute values for comparison
+    // This ensures we compare the magnitude, not the sign
+    const absLedgerClosing = Math.abs(ledgerClosing)
+    const absGlClosing = Math.abs(glClosing)
+
+    // Return the difference in absolute terms
+    return absLedgerClosing - absGlClosing
+  }
+
+  // Get status based on difference and loading state
+  const getStatus = (difference: number, glClosing: number, isLoading: boolean) => {
+    // If GL data is still loading, show pending
+    if (isLoading) {
+      return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
+    }
+
+    // If GL closing is 0 (no data loaded yet), show pending
+    if (glClosing === 0) {
+      return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
+    }
+
+    // If GL data is loaded, check for match/unmatched
+    const tolerance = 0.01 // Small tolerance for floating point comparison
+    if (Math.abs(difference) < tolerance) {
+      return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
+    } else {
+      return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
+    }
+  }
+
   // Calculate reconciliation analysis
   const reconciliationAnalysis = useMemo(() => {
-    if (!ledgerDataA || !ledgerDataB) return null
+    if (!customerLedgerData || !supplierLedgerData) return null
 
-    const totalsA = ledgerDataA.totals
-    const totalsB = ledgerDataB.totals
+    const customerTotals = customerLedgerData.totals
+    const supplierTotals = supplierLedgerData.totals
 
     // Check if closing balances match (for intercompany reconciliation)
-    const closingBalanceMatch = Math.abs(totalsA.totalClosingBalance - totalsB.totalClosingBalance) < 0.01
+    const closingBalanceMatch = Math.abs(customerTotals.totalClosingBalance - supplierTotals.totalClosingBalance) < 0.01
 
     return {
       closingBalanceMatch,
-      difference: Math.abs(totalsA.totalClosingBalance - totalsB.totalClosingBalance),
-      totalsA,
-      totalsB
+      difference: Math.abs(customerTotals.totalClosingBalance - supplierTotals.totalClosingBalance),
+      customerTotals,
+      supplierTotals
     }
-  }, [ledgerDataA, ledgerDataB])
+  }, [customerLedgerData, supplierLedgerData])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
@@ -188,7 +248,7 @@ export default function InterCompanyLedgerSummary() {
               InterCompany Ledger Summary
             </h1>
             <p className="text-gray-600 text-lg">
-              Compare customer and supplier ledger summaries between intercompany transactions
+              View customer and supplier ledger summaries for intercompany transactions
             </p>
           </div>
           <div className="flex space-x-2">
@@ -213,64 +273,23 @@ export default function InterCompanyLedgerSummary() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Company A Selection */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
-                    Company A (Customer Ledger)
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select value={companyA} onValueChange={setCompanyA}>
-                      <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder="Select Company A" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
-                        {permissionAwareCompanies.map((company) => (
-                          <SelectItem key={company.name} value={company.name}>
-                            {company.company_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Company B Selection */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
-                    Company B (Supplier Ledger)
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select value={companyB} onValueChange={setCompanyB}>
-                      <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder="Select Company B" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
-                        {permissionAwareCompanies.map((company) => (
-                          <SelectItem key={company.name} value={company.name}>
-                            {company.company_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* All Filters in Single Row */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 w-full">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Company</label>
+                <Select value={company} onValueChange={setCompany}>
+                  <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                    <SelectValue placeholder="Select Company" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-blue-200">
+                    {permissionAwareCompanies.map((companyItem) => (
+                      <SelectItem key={companyItem.name} value={companyItem.name}>
+                        {companyItem.company_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">From Date</label>
                 <input
@@ -390,7 +409,7 @@ export default function InterCompanyLedgerSummary() {
                 onClick={() => {
                   handleLoadData()
                 }}
-                disabled={!companyA || !companyB || isLoading}
+                disabled={!company || isLoading}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8"
               >
                 {isLoading ? (
@@ -428,75 +447,75 @@ export default function InterCompanyLedgerSummary() {
             </CardHeader>
             <CardContent className="p-6">
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Company A Summary */}
+            {/* Customer Summary */}
             <Card className="border-blue-200">
               <CardHeader className="bg-gray-50 border-b border-gray-200">
                 <CardTitle className="text-lg text-gray-800">
-                  {companyA} Summary
+                  {company} - Customer Summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(ledgerDataA.totals.totalOpeningBalance, 'USD', companyA)}
+                      {formatCurrency(customerLedgerData.totals.totalOpeningBalance, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(companyA)})</div>
+                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(company)})</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(ledgerDataA.totals.totalInvoicedAmount, 'USD', companyA)}
+                      {formatCurrency(customerLedgerData.totals.totalInvoicedAmount, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(companyA)})</div>
+                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(company)})</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600">
-                      {formatCurrency(ledgerDataA.totals.totalPaidAmount, 'USD', companyA)}
+                      {formatCurrency(customerLedgerData.totals.totalPaidAmount, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(companyA)})</div>
+                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(company)})</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(ledgerDataA.totals.totalClosingBalance, 'USD', companyA)}
+                      {formatCurrency(customerLedgerData.totals.totalClosingBalance, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(companyA)})</div>
+                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(company)})</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Company B Summary */}
+            {/* Supplier Summary */}
             <Card className="border-blue-200">
               <CardHeader className="bg-gray-50 border-b border-gray-200">
                 <CardTitle className="text-lg text-gray-800">
-                  {companyB} Summary
+                  {company} - Supplier Summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(ledgerDataB.totals.totalOpeningBalance, 'USD', companyB)}
+                      {formatCurrency(supplierLedgerData.totals.totalOpeningBalance, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(companyB)})</div>
+                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(company)})</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(ledgerDataB.totals.totalInvoicedAmount, 'USD', companyB)}
+                      {formatCurrency(supplierLedgerData.totals.totalInvoicedAmount, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(companyB)})</div>
+                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(company)})</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600">
-                      {formatCurrency(ledgerDataB.totals.totalPaidAmount, 'USD', companyB)}
+                      {formatCurrency(supplierLedgerData.totals.totalPaidAmount, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(companyB)})</div>
+                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(company)})</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(ledgerDataB.totals.totalClosingBalance, 'USD', companyB)}
+                      {formatCurrency(supplierLedgerData.totals.totalClosingBalance, 'USD', company)}
                     </div>
-                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(companyB)})</div>
+                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(company)})</div>
                   </div>
                 </div>
               </CardContent>
@@ -511,12 +530,12 @@ export default function InterCompanyLedgerSummary() {
                     {reconciliationAnalysis.closingBalanceMatch ? (
                       <>
                         <CheckCircle className="h-4 w-4 inline mr-2" />
-                        <strong>Balances Match:</strong> The closing balances between {companyA} and {companyB} are equal.
+                        <strong>Balances Match:</strong> The customer and supplier closing balances for {company} are equal.
                       </>
                     ) : (
                       <>
                         <XCircle className="h-4 w-4 inline mr-2" />
-                        <strong>Balances Don't Match:</strong> There's a difference of {formatCurrency(Math.abs(reconciliationAnalysis.totalsA.totalClosingBalance - reconciliationAnalysis.totalsB.totalClosingBalance), 'USD', companyA)} between the closing balances.
+                        <strong>Balances Don't Match:</strong> There's a difference of {formatCurrency(Math.abs(reconciliationAnalysis.customerTotals.totalClosingBalance - reconciliationAnalysis.supplierTotals.totalClosingBalance), 'USD', company)} between the customer and supplier closing balances.
                       </>
                     )}
                   </AlertDescription>
@@ -528,13 +547,13 @@ export default function InterCompanyLedgerSummary() {
 
 
         {/* Data Display */}
-        {hasLoadedData && ledgerDataA && ledgerDataB && (
+        {hasLoadedData && customerLedgerData && supplierLedgerData && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Company A Ledger Summary */}
+            {/* Customer Ledger Summary */}
             <Card className="border-blue-200 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
                 <CardTitle>
-                  {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyA)?.name || companyA} - Customer Ledger Summary
+                  {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === company)?.name || company} - Customer Ledger Summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -544,25 +563,33 @@ export default function InterCompanyLedgerSummary() {
                       <TableRow className="bg-blue-50">
                         <TableHead className="text-blue-800">Party</TableHead>
                         <TableHead className="text-blue-800 text-right">Opening</TableHead>
-                        <TableHead className="text-blue-800 text-right">Invoiced</TableHead>
-                        <TableHead className="text-blue-800 text-right">Paid</TableHead>
-                        <TableHead className="text-blue-800 text-right">Debit</TableHead>
-                        <TableHead className="text-blue-800 text-right">Credit</TableHead>
                         <TableHead className="text-blue-800 text-right">Closing</TableHead>
+                        <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
+                        <TableHead className="text-blue-800 text-right">Difference</TableHead>
+                        <TableHead className="text-blue-800 text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ledgerDataA.entries.map((entry, index) => (
-                        <TableRow key={index} className="hover:bg-blue-50">
-                          <TableCell className="font-medium">{entry.party_name}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.opening_balance, entry.currency, companyA)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.invoiced_amount, entry.currency, companyA)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.paid_amount, entry.currency, companyA)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.debit, entry.currency, companyA)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.credit, entry.currency, companyA)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, companyA)}</TableCell>
-                        </TableRow>
-                      ))}
+                      {customerLedgerData.entries.map((entry, index) => {
+                        const glClosing = customerGLClosing[entry.party] || 0
+                        const difference = calculateDifference(entry.closing_balance, glClosing)
+                        const status = getStatus(difference, glClosing, isLoadingCustomerGL)
+
+                        return (
+                          <TableRow key={index} className="hover:bg-blue-50">
+                            <TableCell className="font-medium">{entry.party_name}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(entry.opening_balance, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
+                                {status.text}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -571,11 +598,11 @@ export default function InterCompanyLedgerSummary() {
               </CardContent>
             </Card>
 
-            {/* Company B Ledger Summary */}
+            {/* Supplier Ledger Summary */}
             <Card className="border-blue-200 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
                 <CardTitle>
-                  {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyB)?.name || companyB} - Supplier Ledger Summary
+                  {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === company)?.name || company} - Supplier Ledger Summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -585,25 +612,33 @@ export default function InterCompanyLedgerSummary() {
                       <TableRow className="bg-blue-50">
                         <TableHead className="text-blue-800">Party</TableHead>
                         <TableHead className="text-blue-800 text-right">Opening</TableHead>
-                        <TableHead className="text-blue-800 text-right">Invoiced</TableHead>
-                        <TableHead className="text-blue-800 text-right">Paid</TableHead>
-                        <TableHead className="text-blue-800 text-right">Debit</TableHead>
-                        <TableHead className="text-blue-800 text-right">Credit</TableHead>
                         <TableHead className="text-blue-800 text-right">Closing</TableHead>
+                        <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
+                        <TableHead className="text-blue-800 text-right">Difference</TableHead>
+                        <TableHead className="text-blue-800 text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ledgerDataB.entries.map((entry, index) => (
-                        <TableRow key={index} className="hover:bg-blue-50">
-                          <TableCell className="font-medium">{entry.party_name}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.opening_balance, entry.currency, companyB)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.invoiced_amount, entry.currency, companyB)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.paid_amount, entry.currency, companyB)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.debit, entry.currency, companyB)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.credit, entry.currency, companyB)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, companyB)}</TableCell>
-                        </TableRow>
-                      ))}
+                      {supplierLedgerData.entries.map((entry, index) => {
+                        const glClosing = supplierGLClosing[entry.party] || 0
+                        const difference = calculateDifference(entry.closing_balance, glClosing)
+                        const status = getStatus(difference, glClosing, isLoadingSupplierGL)
+
+                        return (
+                          <TableRow key={index} className="hover:bg-blue-50">
+                            <TableCell className="font-medium">{entry.party_name}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(entry.opening_balance, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
+                                {status.text}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>
