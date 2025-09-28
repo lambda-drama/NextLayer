@@ -4,7 +4,7 @@ import InterCompanyLedgerSummary from "./components/intercompany-ledger-summary"
 
 function App() {
   return (
-    <Router>
+    <Router basename="/frontend">
       <main className="min-h-screen bg-background">
         <Routes>
           <Route path="/" element={<IntercompanyReconciliation />} />
