@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw } from "lucide-react"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2 } from "lucide-react"
+import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
 import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
@@ -1130,16 +1131,13 @@ export default function IntercompanyReconciliation() {
           validationPassed: netTotalMatch
         })
         validationPassed = netTotalMatch
-        console.log("Bypass validation result:", validationPassed)
       } else {
         // Original validation logic
         const debitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
         const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
-        console.log("Validating bulk match amounts...", debitCreditMatch, creditDebitMatch)
         validationPassed = debitCreditMatch && creditDebitMatch
       }
 
-      console.log("Final validation result:", validationPassed)
 
       // Always validate amounts for manual matching (regardless of automatch setting)
       if (!validationPassed) {
@@ -1570,13 +1568,26 @@ export default function IntercompanyReconciliation() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
       <div className="max-w-8xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-            Intercompany General Ledger Reconciliation
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Compare and reconcile General Ledger entries between intercompany transactions
-          </p>
+        <div className="flex items-center justify-between">
+          <div className="text-center space-y-2 flex-1">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+              Intercompany General Ledger Reconciliation
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Compare and reconcile General Ledger entries between intercompany transactions
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Link to="/ledger">
+              <Button
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <Building2 className="h-4 w-4" />
+                <span>Ledger Summary</span>
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Company Selection */}
