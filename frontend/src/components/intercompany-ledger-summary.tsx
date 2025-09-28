@@ -53,6 +53,7 @@ export default function InterCompanyLedgerSummary() {
   const [inPartyCurrency, setInPartyCurrency] = useState<boolean>(true)
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(true)
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
+  const [statusFilter, setStatusFilter] = useState<string>("All")
 
   // Data state
   const [error, setError] = useState<string>("")
@@ -214,6 +215,18 @@ export default function InterCompanyLedgerSummary() {
     } else {
       return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
     }
+  }
+
+  // Filter entries by status
+  const filterEntriesByStatus = (entries: LedgerSummaryEntry[], glClosingAmounts: Record<string, number>) => {
+    if (statusFilter === 'All') return entries
+    return entries.filter(entry => {
+      const glClosing = glClosingAmounts[entry.party] || 0
+      const isPartyGLLoaded = glClosingAmounts.hasOwnProperty(entry.party)
+      const difference = calculateDifference(entry.closing_balance, glClosing)
+      const status = getStatus(difference, glClosing, !isPartyGLLoaded)
+      return status.text === statusFilter
+    })
   }
 
   // Calculate reconciliation analysis
@@ -677,6 +690,34 @@ export default function InterCompanyLedgerSummary() {
           </Card>
         )}
 
+        {/* Status Filter */}
+        {hasLoadedData && customerLedgerData && supplierLedgerData && (
+          <Card className="border-blue-200 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Filter by Status</label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-48 border-blue-200 focus:border-blue-400">
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-blue-200">
+                        <SelectItem value="All">All Entries</SelectItem>
+                        <SelectItem value="Match">✓ Matched</SelectItem>
+                        <SelectItem value="Unmatched">✗ Unmatched</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Showing {filterEntriesByStatus(customerLedgerData.entries, customerGLClosing).length} of {customerLedgerData.entries.length} customers, {filterEntriesByStatus(supplierLedgerData.entries, supplierGLClosing).length} of {supplierLedgerData.entries.length} suppliers
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Data Display */}
         {hasLoadedData && customerLedgerData && supplierLedgerData && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -693,14 +734,14 @@ export default function InterCompanyLedgerSummary() {
                     <TableHeader>
                       <TableRow className="bg-blue-50">
                         <TableHead className="text-blue-800">Party</TableHead>
-                        <TableHead className="text-blue-800 text-right">Closing</TableHead>
+                        <TableHead className="text-blue-800 text-right">Party Balance</TableHead>
                         <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
                         <TableHead className="text-blue-800 text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {customerLedgerData.entries.map((entry, index) => {
+                      {filterEntriesByStatus(customerLedgerData.entries, customerGLClosing).map((entry, index) => {
                         const glClosing = customerGLClosing[entry.party] || 0
                         const difference = calculateDifference(entry.closing_balance, glClosing)
                         // Check if this specific party's GL data is loaded
@@ -742,14 +783,14 @@ export default function InterCompanyLedgerSummary() {
                     <TableHeader>
                       <TableRow className="bg-blue-50">
                         <TableHead className="text-blue-800">Party</TableHead>
-                        <TableHead className="text-blue-800 text-right">Closing</TableHead>
+                        <TableHead className="text-blue-800 text-right">Party Balance</TableHead>
                         <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
                         <TableHead className="text-blue-800 text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {supplierLedgerData.entries.map((entry, index) => {
+                      {filterEntriesByStatus(supplierLedgerData.entries, supplierGLClosing).map((entry, index) => {
                         const glClosing = supplierGLClosing[entry.party] || 0
                         const difference = calculateDifference(entry.closing_balance, glClosing)
                         // Check if this specific party's GL data is loaded
