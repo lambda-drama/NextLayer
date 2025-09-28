@@ -47,7 +47,6 @@ export function useGLClosingAmounts({
         }
 
         const csrfToken = window.csrf_token || ''
-        console.log("GL Closing Amounts - Request body:", JSON.stringify({ filters }))
 
         const response = await fetch('/api/method/nextlayer.next_layer.api.ledger_summary.get_gl_closing_amounts', {
           method: 'POST',

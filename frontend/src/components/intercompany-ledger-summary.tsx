@@ -92,10 +92,10 @@ export default function InterCompanyLedgerSummary() {
   const customerParties = customerLedgerData?.entries?.map(entry => entry.party) || []
   const supplierParties = supplierLedgerData?.entries?.map(entry => entry.party) || []
 
-  // Get GL closing amounts for customers
+  // Get GL closing amounts for customers (use Supplier as party type)
   const { glClosingAmounts: customerGLClosing, isLoading: isLoadingCustomerGL } = useGLClosingAmounts({
     company: company,
-    partyType: "Customer",
+    partyType: "Supplier",
     fromDate,
     toDate,
     currency,
@@ -103,10 +103,10 @@ export default function InterCompanyLedgerSummary() {
     enabled: hasLoadedData && customerParties.length > 0
   })
 
-  // Get GL closing amounts for suppliers
+  // Get GL closing amounts for suppliers (use Customer as party type)
   const { glClosingAmounts: supplierGLClosing, isLoading: isLoadingSupplierGL } = useGLClosingAmounts({
     company: company,
-    partyType: "Supplier",
+    partyType: "Customer",
     fromDate,
     toDate,
     currency,
@@ -693,7 +693,6 @@ export default function InterCompanyLedgerSummary() {
                     <TableHeader>
                       <TableRow className="bg-blue-50">
                         <TableHead className="text-blue-800">Party</TableHead>
-                        <TableHead className="text-blue-800 text-right">Opening</TableHead>
                         <TableHead className="text-blue-800 text-right">Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
@@ -711,7 +710,6 @@ export default function InterCompanyLedgerSummary() {
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(entry.opening_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
@@ -744,7 +742,6 @@ export default function InterCompanyLedgerSummary() {
                     <TableHeader>
                       <TableRow className="bg-blue-50">
                         <TableHead className="text-blue-800">Party</TableHead>
-                        <TableHead className="text-blue-800 text-right">Opening</TableHead>
                         <TableHead className="text-blue-800 text-right">Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
@@ -762,7 +759,6 @@ export default function InterCompanyLedgerSummary() {
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(entry.opening_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>

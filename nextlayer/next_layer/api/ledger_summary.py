@@ -336,27 +336,14 @@ def get_intercompany_parties(
 
 @frappe.whitelist()
 def get_gl_closing_amounts(filters: Dict) -> Dict:
-    """
-    Get GL closing amounts for intercompany parties using general ledger report
 
-    Args:
-        filters: Dict containing company, from_date, to_date, currency, party_type, parties
-
-    Returns:
-        Dict containing GL closing amounts for each party
-    """
     try:
-        # print("GL Closing Amounts - received filters:", filters)
-
-        # Extract parameters from filters
         company = filters.get("company")
         from_date = filters.get("from_date")
         to_date = filters.get("to_date")
         currency = filters.get("currency", "all")
-        party_type = filters.get("party_type")  # "Customer" or "Supplier"
-        parties = filters.get("parties", [])  # List of party names
-
-        
+        party_type = filters.get("party_type")
+        parties = filters.get("parties", [])
 
         # Validate inputs
         if not all([company, from_date, to_date, party_type]):
@@ -377,12 +364,12 @@ def get_gl_closing_amounts(filters: Dict) -> Dict:
         # Process each party individually for better debugging and reliability
         for party in parties:
             try:
-                # Prepare filters for the general ledger report - match general_ledger.py format exactly
+                # Correct logic: line party becomes company, filter company becomes party
                 gl_filters = {
-                    "company": company,
+                    "company": party,  # The line party (customer/supplier) becomes the company in GL
                     "from_date": from_date,
                     "to_date": to_date,
-                    "party": [party],  # Single party
+                    "party": [company],  # The filter company becomes the party in GL
                     "party_type": party_type,
                     "show_remarks": 1,
                     "categorize_by": "Categorize by Voucher (Consolidated)",
