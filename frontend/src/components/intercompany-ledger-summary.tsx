@@ -610,6 +610,75 @@ export default function InterCompanyLedgerSummary() {
           </Card>
         )} */}
 
+        {/* Totals Summary */}
+        {hasLoadedData && customerLedgerData && supplierLedgerData && (
+          <Card className="border-beveren-200 shadow-lg mb-6">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Totals Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Customer Summary */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-beveren-800 border-b border-beveren-200 pb-2">
+                    Customer Summary
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
+                      <span className="font-medium text-beveren-700">Total Party Balance:</span>
+                      <span className="font-bold text-beveren-800">
+                        {formatCurrency(customerLedgerData.totals.totalClosingBalance, 'USD', company)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
+                      <span className="font-medium text-beveren-700">GL Closing:</span>
+                      <span className="font-bold text-beveren-800">
+                        {formatCurrency(Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0), 'USD', company)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <span className="font-medium text-orange-700">Difference:</span>
+                      <span className="font-bold text-orange-800">
+                        {formatCurrency(Math.abs(customerLedgerData.totals.totalClosingBalance - Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0)), 'USD', company)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Supplier Summary */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-beveren-800 border-b border-beveren-200 pb-2">
+                    Supplier Summary
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
+                      <span className="font-medium text-beveren-700">Total Party Balance:</span>
+                      <span className="font-bold text-beveren-800">
+                        {formatCurrency(supplierLedgerData.totals.totalClosingBalance, 'USD', company)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
+                      <span className="font-medium text-beveren-700">GL Closing:</span>
+                      <span className="font-bold text-beveren-800">
+                        {formatCurrency(Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0), 'USD', company)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <span className="font-medium text-orange-700">Difference:</span>
+                      <span className="font-bold text-orange-800">
+                        {formatCurrency(Math.abs(supplierLedgerData.totals.totalClosingBalance - Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0)), 'USD', company)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Summary Statistics */}
         {hasLoadedData && summaryStats && (
           <Card className="border-blue-200 shadow-lg">
