@@ -115,12 +115,7 @@ export default function InterCompanyLedgerSummary() {
     enabled: hasLoadedData && supplierParties.length > 0
   })
 
-  console.log("Customer Ledger Data:", customerLedgerData)
-  console.log("Supplier Ledger Data:", supplierLedgerData)
-  console.log("Customer GL Closing:", customerGLClosing)
-  console.log("Supplier GL Closing:", supplierGLClosing)
-  console.log("hasLoadedData:", hasLoadedData)
-  console.log("Should render tables:", hasLoadedData && customerLedgerData && supplierLedgerData)
+
   const isLoading = isLoadingCustomer || isLoadingSupplier || isLoadingCustomerGL || isLoadingSupplierGL
 
   // Handle load data

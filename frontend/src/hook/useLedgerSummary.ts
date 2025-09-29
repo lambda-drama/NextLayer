@@ -81,9 +81,7 @@ export function useLedgerSummary({
         }
 
         const csrfToken = window.csrf_token || ''
-        console.log("CSRF Token:", csrfToken)
-        console.log("Request body:", JSON.stringify({ filters }))
-        console.log("Endpoint:", endpoint)
+      
 
         const response = await fetch(endpoint, {
           method: 'POST',
@@ -101,7 +99,6 @@ export function useLedgerSummary({
         }
 
         const result = await response.json()
-        console.log("here", result)
         if (result.message && result.message.success) {
           setData(result.message)
         } else if (result.message && result.message.error) {
