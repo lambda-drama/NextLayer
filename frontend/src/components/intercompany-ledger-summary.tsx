@@ -636,13 +636,13 @@ export default function InterCompanyLedgerSummary() {
                     <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
                       <span className="font-medium text-beveren-700">GL Closing:</span>
                       <span className="font-bold text-beveren-800">
-                        {formatCurrency(customerLedgerData.totals.totalCredit - customerLedgerData.totals.totalDebit, 'USD', company)}
+                        {formatCurrency(Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0), 'USD', company)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <span className="font-medium text-orange-700">Difference:</span>
                       <span className="font-bold text-orange-800">
-                        {formatCurrency(Math.abs(customerLedgerData.totals.totalClosingBalance - (customerLedgerData.totals.totalCredit - customerLedgerData.totals.totalDebit)), 'USD', company)}
+                        {formatCurrency(Math.abs(customerLedgerData.totals.totalClosingBalance - Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0)), 'USD', company)}
                       </span>
                     </div>
                   </div>
@@ -663,13 +663,13 @@ export default function InterCompanyLedgerSummary() {
                     <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
                       <span className="font-medium text-beveren-700">GL Closing:</span>
                       <span className="font-bold text-beveren-800">
-                        {formatCurrency(supplierLedgerData.totals.totalCredit - supplierLedgerData.totals.totalDebit, 'USD', company)}
+                        {formatCurrency(Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0), 'USD', company)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <span className="font-medium text-orange-700">Difference:</span>
                       <span className="font-bold text-orange-800">
-                        {formatCurrency(Math.abs(supplierLedgerData.totals.totalClosingBalance - (supplierLedgerData.totals.totalCredit - supplierLedgerData.totals.totalDebit)), 'USD', company)}
+                        {formatCurrency(Math.abs(supplierLedgerData.totals.totalClosingBalance - Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0)), 'USD', company)}
                       </span>
                     </div>
                   </div>
