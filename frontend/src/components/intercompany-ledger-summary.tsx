@@ -99,7 +99,7 @@ export default function InterCompanyLedgerSummary() {
     partyType: "Supplier",
     fromDate,
     toDate,
-    currency,
+    currency: "all", // Always use company currency for GL closing
     parties: customerParties,
     enabled: hasLoadedData && customerParties.length > 0
   })
@@ -110,7 +110,7 @@ export default function InterCompanyLedgerSummary() {
     partyType: "Customer",
     fromDate,
     toDate,
-    currency,
+    currency: "all", // Always use company currency for GL closing
     parties: supplierParties,
     enabled: hasLoadedData && supplierParties.length > 0
   })
@@ -158,13 +158,7 @@ export default function InterCompanyLedgerSummary() {
     } else if (displayCurrency === 'CDF') {
       locale = 'en-CD'
     } else if (displayCurrency === 'CNY') {
-      locale = 'en-CN'
-    } else if (displayCurrency === 'DJF') {
-      locale = 'en-DJ'
-    } else if (displayCurrency === 'XAF') {
-      locale = 'en-CM'
-    } else if (displayCurrency === 'XOF') {
-      locale = 'en-SN'
+      locale = 'zh-CN'
     }
 
     return new Intl.NumberFormat(locale, {
@@ -625,19 +619,19 @@ export default function InterCompanyLedgerSummary() {
                     <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
                       <span className="font-medium text-beveren-700">Total Party Balance:</span>
                       <span className="font-bold text-beveren-800">
-                        {formatCurrency(customerLedgerData.totals.totalClosingBalance, 'USD', company)}
+                        {formatCurrency(customerLedgerData.totals.totalClosingBalance, customerLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
                       <span className="font-medium text-beveren-700">GL Closing:</span>
                       <span className="font-bold text-beveren-800">
-                        {formatCurrency(Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0), 'USD', company)}
+                        {formatCurrency(Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0), customerLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <span className="font-medium text-orange-700">Difference:</span>
                       <span className="font-bold text-orange-800">
-                        {formatCurrency(Math.abs(customerLedgerData.totals.totalClosingBalance - Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0)), 'USD', company)}
+                        {formatCurrency(Math.abs(customerLedgerData.totals.totalClosingBalance - Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0)), customerLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
                   </div>
@@ -652,19 +646,19 @@ export default function InterCompanyLedgerSummary() {
                     <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
                       <span className="font-medium text-beveren-700">Total Party Balance:</span>
                       <span className="font-bold text-beveren-800">
-                        {formatCurrency(supplierLedgerData.totals.totalClosingBalance, 'USD', company)}
+                        {formatCurrency(supplierLedgerData.totals.totalClosingBalance, supplierLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
                       <span className="font-medium text-beveren-700">GL Closing:</span>
                       <span className="font-bold text-beveren-800">
-                        {formatCurrency(Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0), 'USD', company)}
+                        {formatCurrency(Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0), supplierLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <span className="font-medium text-orange-700">Difference:</span>
                       <span className="font-bold text-orange-800">
-                        {formatCurrency(Math.abs(supplierLedgerData.totals.totalClosingBalance - Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0)), 'USD', company)}
+                        {formatCurrency(Math.abs(supplierLedgerData.totals.totalClosingBalance - Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0)), supplierLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
                   </div>
