@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2 } from "lucide-react"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3 } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -832,6 +832,75 @@ export default function IntercompanyReconciliation() {
       balanceB: totalsB.balance,
     }
   }, [totalsA, totalsB, bypassTotalCalculation])
+
+  // Calculate summary statistics for match/mismatch counts
+  const summaryStats = useMemo(() => {
+    if (!findMatchingEntries.glDataAWithStatus.length && !findMatchingEntries.glDataBWithStatus.length) {
+      return null
+    }
+
+    // Count Company A entries by status
+    let matchedA = 0
+    let mismatchedA = 0
+    let pendingA = 0
+
+    findMatchingEntries.glDataAWithStatus.forEach(entry => {
+      switch (entry.status) {
+        case 'Match':
+          matchedA++
+          break
+        case 'Mismatch':
+          mismatchedA++
+          break
+        case 'Pending':
+          pendingA++
+          break
+      }
+    })
+
+    // Count Company B entries by status
+    let matchedB = 0
+    let mismatchedB = 0
+    let pendingB = 0
+
+    findMatchingEntries.glDataBWithStatus.forEach(entry => {
+      switch (entry.status) {
+        case 'Match':
+          matchedB++
+          break
+        case 'Mismatch':
+          mismatchedB++
+          break
+        case 'Pending':
+          pendingB++
+          break
+      }
+    })
+
+    const totalA = findMatchingEntries.glDataAWithStatus.length
+    const totalB = findMatchingEntries.glDataBWithStatus.length
+
+    return {
+      companyA: {
+        total: totalA,
+        matched: matchedA,
+        mismatched: mismatchedA,
+        pending: pendingA
+      },
+      companyB: {
+        total: totalB,
+        matched: matchedB,
+        mismatched: mismatchedB,
+        pending: pendingB
+      },
+      overall: {
+        total: totalA + totalB,
+        matched: matchedA + matchedB,
+        mismatched: mismatchedA + mismatchedB,
+        pending: pendingA + pendingB
+      }
+    }
+  }, [findMatchingEntries])
 
   const formatCurrency = (amount: number, currencyCode: string = 'USD', partyName?: string, partyType?: string) => {
     // Use selected currency if it's not "all", otherwise use party currency or provided currencyCode
@@ -2169,6 +2238,98 @@ export default function IntercompanyReconciliation() {
                     </AlertDescription>
                   </div>
                 </Alert>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Summary Statistics */}
+        {hasLoadedData && summaryStats && (
+          <Card className="border-blue-200 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Reconciliation Summary Statistics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Company A Statistics */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    {companyA} Statistics
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <span className="text-blue-700 font-medium">Total Entries:</span>
+                      <span className="text-blue-900 font-bold text-lg">{summaryStats.companyA.total}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                      <span className="text-green-700 font-medium">Matched:</span>
+                      <span className="text-green-900 font-bold text-lg">{summaryStats.companyA.matched}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                      <span className="text-red-700 font-medium">Mismatched:</span>
+                      <span className="text-red-900 font-bold text-lg">{summaryStats.companyA.mismatched}</span>
+                    </div>
+                    {/* <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                      <span className="text-yellow-700 font-medium">Pending:</span>
+                      <span className="text-yellow-900 font-bold text-lg">{summaryStats.companyA.pending}</span>
+                    </div> */}
+                  </div>
+                </div>
+
+                {/* Company B Statistics */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    {companyB} Statistics
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <span className="text-blue-700 font-medium">Total Entries:</span>
+                      <span className="text-blue-900 font-bold text-lg">{summaryStats.companyB.total}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                      <span className="text-green-700 font-medium">Matched:</span>
+                      <span className="text-green-900 font-bold text-lg">{summaryStats.companyB.matched}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                      <span className="text-red-700 font-medium">Mismatched:</span>
+                      <span className="text-red-900 font-bold text-lg">{summaryStats.companyB.mismatched}</span>
+                    </div>
+                    {/* <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                      <span className="text-yellow-700 font-medium">Pending:</span>
+                      <span className="text-yellow-900 font-bold text-lg">{summaryStats.companyB.pending}</span>
+                    </div> */}
+                  </div>
+                </div>
+              </div>
+
+              {/* Overall Progress */}
+              <div className="mt-6 pt-6 border-t border-blue-200">
+                <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
+                    <div className="text-3xl font-bold text-green-700">
+                      {summaryStats.overall.matched}
+                    </div>
+                    <div className="text-lg text-green-600 font-medium">Total Matched</div>
+                  </div>
+                  <div className="text-center p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-lg">
+                    <div className="text-3xl font-bold text-red-700">
+                      {summaryStats.overall.mismatched}
+                    </div>
+                    <div className="text-lg text-red-600 font-medium">Total Mismatched</div>
+                  </div>
+                  {/* <div className="text-center p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
+                    <div className="text-3xl font-bold text-yellow-700">
+                      {summaryStats.overall.pending}
+                    </div>
+                    <div className="text-lg text-yellow-600 font-medium">Total Pending</div>
+                  </div> */}
+                </div>
               </div>
             </CardContent>
           </Card>
