@@ -481,9 +481,14 @@ def get_gl_closing_amounts(filters: Dict) -> Dict:
                     gl_filters["presentation_currency"] = currency
                     gl_filters["account_currency"] = currency
                 else:
-                    company_currency = frappe.get_cached_value("Company", company, "default_currency")
-                    gl_filters["company_currency"] = company_currency
-                    gl_filters["account_currency"] = company_currency
+                    # When using "all", resolve a safe company currency for the GL company (the party)
+                    # Prefer the GL company (party) currency; fallback to selected company's currency; then to USD
+                    party_company_currency = frappe.get_cached_value("Company", party, "default_currency") if party else None
+                    selected_company_currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
+                    safe_company_currency = party_company_currency or selected_company_currency or "USD"
+
+                    gl_filters["company_currency"] = safe_company_currency
+                    gl_filters["account_currency"] = safe_company_currency
 
                 gl_filters["company_fb"] = ""
 
