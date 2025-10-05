@@ -367,7 +367,7 @@ export default function InterCompanyLedgerSummary() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Currency</label>
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                  <SelectTrigger className="border-blue-200 focus:border-blue-400" disabled>
                     <SelectValue placeholder="All Currencies" />
                   </SelectTrigger>
                   <SelectContent className="bg-blue-200">
