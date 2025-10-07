@@ -13,8 +13,8 @@ import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
 import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
-import { useParties } from "../hook/useParties"
 import { usePartiesForAutofill } from "../hook/usePartiesForAutofill"
+import { usePermissionAwareParties } from "../hook/usePermissionAwareParties"
 import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
 import { usePermissionAwareGLData } from "../hook/usePermissionAwareGLData"
 import { useMatchStatus } from "../hook/useMatchStatus"
@@ -86,15 +86,9 @@ export default function IntercompanyReconciliation() {
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
   const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, error: matchError, clearError } = useMatchStatus()
 
-  const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = useParties(
-    "Customer",
-    companyA
-  )
+  const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = usePermissionAwareParties("Customer")
 
-  const { parties: partiesB, isLoading: partiesBLoading, error: partiesBError } = useParties(
-    partyTypeB,
-    companyB
-  )
+  const { parties: partiesB, isLoading: partiesBLoading, error: partiesBError } = usePermissionAwareParties(partyTypeB as "Customer" | "Supplier")
 
   // Auto-fill parties hooks - bypasses permission checks for UI auto-filling
   const { parties: autofillPartiesA } = usePartiesForAutofill("Customer", companyA)
@@ -1727,7 +1721,7 @@ export default function IntercompanyReconciliation() {
                     <Select
                       value={partyA}
                       onValueChange={setPartyA}
-                      disabled={!customerViewEnabled || !companyA || partiesALoading}
+                      disabled={!customerViewEnabled || partiesALoading}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
                         <SelectValue placeholder={
@@ -1737,12 +1731,18 @@ export default function IntercompanyReconciliation() {
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use autofill parties as fallback if regular parties fail due to permissions */}
-                        {(partiesA.length > 0 ? partiesA : autofillPartiesA).map((party) => (
+                        {/* Use permission-aware parties for dropdown display */}
+                        {partiesA.map((party) => (
                           <SelectItem key={party.name} value={party.name}>
                             {party.name}
                           </SelectItem>
                         ))}
+                        {/* Show autofilled party if it's not in permission-aware list */}
+                        {partyA && !partiesA.some(p => p.name === partyA) && (
+                          <SelectItem key={partyA} value={partyA}>
+                            {partyA}
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1817,7 +1817,7 @@ export default function IntercompanyReconciliation() {
                     <Select
                       value={partyB}
                       onValueChange={handlePartyBChange}
-                      disabled={!supplierViewEnabled || !companyB || partiesBLoading}
+                      disabled={!supplierViewEnabled || partiesBLoading}
                     >
                       <SelectTrigger className="border-blue-200 focus:border-blue-400">
                         <SelectValue placeholder={
@@ -1827,12 +1827,18 @@ export default function IntercompanyReconciliation() {
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use autofill parties as fallback if regular parties fail due to permissions */}
-                        {(partiesB.length > 0 ? partiesB : autofillPartiesB).map((party) => (
+                        {/* Use permission-aware parties for dropdown display */}
+                        {partiesB.map((party) => (
                           <SelectItem key={party.name} value={party.name}>
                             {party.name}
                           </SelectItem>
                         ))}
+                        {/* Show autofilled party if it's not in permission-aware list */}
+                        {partyB && !partiesB.some(p => p.name === partyB) && (
+                          <SelectItem key={partyB} value={partyB}>
+                            {partyB}
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

@@ -9,6 +9,79 @@ from nextlayer.next_layer.report.customer_ledger_summary_extension.customer_ledg
 from nextlayer.next_layer.report.supplier_ledger_summary_extension.supplier_ledger_summary_extension import execute as supplier_ledger_execute
 
 
+def get_representative_party_currency(company: str, party_type: str = "Customer", party_names: List[str] = None) -> str:
+    """
+    Get the currency from the first customer/supplier in the provided list.
+    If not found, fall back to company currency.
+
+    Args:
+        company: Company name
+        party_type: "Customer" or "Supplier"
+        party_names: List of party names to check (optional)
+
+    Returns:
+        Currency code (e.g., "USD", "EUR", etc.)
+    """
+    try:
+        # Get company currency as fallback
+        company_currency = frappe.get_cached_value("Company", company, "default_currency") or "USD"
+
+        # If party names are provided, check the first one
+        if party_names and len(party_names) > 0:
+            first_party_name = party_names[0]
+            try:
+                if party_type == "Customer":
+                    party_currency = frappe.get_cached_value("Customer", first_party_name, "default_currency")
+                else:  # Supplier
+                    party_currency = frappe.get_cached_value("Supplier", first_party_name, "default_currency")
+
+                if party_currency:
+                    print(f"Found {party_type} currency for {first_party_name}: {party_currency}")
+                    return party_currency
+                else:
+                    print(f"No currency found for {first_party_name}, using company currency: {company_currency}")
+                    return company_currency
+            except Exception as e:
+                print(f"Error getting currency for {first_party_name}: {str(e)}")
+                return company_currency
+
+        # Fallback: Get the first customer/supplier for this company
+        if party_type == "Customer":
+            # Get first customer
+            first_party = frappe.db.sql("""
+                SELECT name, default_currency
+                FROM `tabCustomer`
+                WHERE disabled = 0
+                ORDER BY customer_name
+                LIMIT 1
+            """, as_dict=True)
+        else:  # Supplier
+            # Get first supplier
+            first_party = frappe.db.sql("""
+                SELECT name, default_currency
+                FROM `tabSupplier`
+                WHERE disabled = 0
+                ORDER BY supplier_name
+                LIMIT 1
+            """, as_dict=True)
+
+        if first_party and first_party[0].get("default_currency"):
+            party_currency = first_party[0]["default_currency"]
+            print(f"Found {party_type} currency: {party_currency}")
+            return party_currency
+        else:
+            print(f"No {party_type} currency found, using company currency: {company_currency}")
+            return company_currency
+
+    except Exception as e:
+        print(f"Error getting representative party currency: {str(e)}")
+        # Fall back to company currency
+        try:
+            return frappe.get_cached_value("Company", company, "default_currency") or "USD"
+        except:
+            return "USD"
+
+
 @frappe.whitelist()
 def get_customer_ledger_summary(filters: Dict) -> Dict:
     """
@@ -79,6 +152,15 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
         # Execute the customer ledger summary report
         columns, data = customer_ledger_execute(filters)
         print("Customer data:", data)
+
+        # Extract party names from the data for currency determination
+        party_names = []
+        for row in data:
+            if isinstance(row, dict):
+                party_name = row.get("party") or row.get("customer")
+                if party_name and party_name not in party_names:
+                    party_names.append(party_name)
+
         # Process the report data
         entries = []
         totals = {
@@ -89,6 +171,10 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
             "totalCredit": 0,
             "totalClosingBalance": 0
         }
+
+        # Get representative party currency for display
+        representative_currency = get_representative_party_currency(company, "Customer", party_names)
+        print(f"Using representative currency for customers: {representative_currency}")
 
         for row in data:
             if isinstance(row, dict):
@@ -110,7 +196,7 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
                     "debit": flt(row.get("debit", 0)),
                     "credit": flt(row.get("credit", 0)),
                     "closing_balance": flt(row.get("closing_balance", 0)),
-                    "currency": currency if currency != "all" else "USD"
+                    "currency": representative_currency
                 }
                 entries.append(entry)
 
@@ -213,6 +299,15 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
         # Execute the supplier ledger summary report
         columns, data = supplier_ledger_execute(report_filters)
         print("Supplier data:", data)
+
+        # Extract party names from the data for currency determination
+        party_names = []
+        for row in data:
+            if isinstance(row, dict):
+                party_name = row.get("party") or row.get("supplier")
+                if party_name and party_name not in party_names:
+                    party_names.append(party_name)
+
         # Process the report data
         entries = []
         totals = {
@@ -223,6 +318,10 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
             "totalCredit": 0,
             "totalClosingBalance": 0
         }
+
+        # Get representative party currency for display
+        representative_currency = get_representative_party_currency(company, "Supplier", party_names)
+        print(f"Using representative currency for suppliers: {representative_currency}")
 
         for row in data:
             if isinstance(row, dict):
@@ -244,7 +343,7 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
                     "debit": flt(row.get("debit", 0)),
                     "credit": flt(row.get("credit", 0)),
                     "closing_balance": flt(row.get("closing_balance", 0)),
-                    "currency": currency if currency != "all" else "USD"
+                    "currency": representative_currency
                 }
                 entries.append(entry)
 
@@ -382,9 +481,14 @@ def get_gl_closing_amounts(filters: Dict) -> Dict:
                     gl_filters["presentation_currency"] = currency
                     gl_filters["account_currency"] = currency
                 else:
-                    company_currency = frappe.get_cached_value("Company", company, "default_currency")
-                    gl_filters["company_currency"] = company_currency
-                    gl_filters["account_currency"] = company_currency
+                    # When using "all", resolve a safe company currency for the GL company (the party)
+                    # Prefer the GL company (party) currency; fallback to selected company's currency; then to USD
+                    party_company_currency = frappe.get_cached_value("Company", party, "default_currency") if party else None
+                    selected_company_currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
+                    safe_company_currency = party_company_currency or selected_company_currency or "USD"
+
+                    gl_filters["company_currency"] = safe_company_currency
+                    gl_filters["account_currency"] = safe_company_currency
 
                 gl_filters["company_fb"] = ""
 
