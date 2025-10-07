@@ -279,7 +279,7 @@ def get_parties(party_type="Customer", company=None):
 	"""Get list of parties (customers/suppliers) for dropdown"""
 	try:
 		# Skip company permission check - allow access to all companies for reconciliation
-		
+
 		filters = {}
 
 		# add internal customer/supplier filter
@@ -345,6 +345,89 @@ def get_parties_for_autofill(party_type="Customer", company=None):
 			"error": str(e),
 			"message": f"Failed to fetch {party_type} parties for auto-fill"
 		}
+
+
+@frappe.whitelist()
+def get_permission_aware_parties(party_type="Customer"):
+	"""Get parties that the current user has permission to access"""
+	try:
+		# Get all parties of the specified type
+		if party_type == "Customer":
+			filters = {"is_internal_customer": 1, "disabled": 0}
+			fields = ["name", "customer_name as party_name", "default_currency"]
+		elif party_type == "Supplier":
+			filters = {"is_internal_supplier": 1, "disabled": 0}
+			fields = ["name", "supplier_name as party_name", "default_currency"]
+		else:
+			frappe.throw("Invalid party_type. Must be 'Customer' or 'Supplier'")
+
+		parties = frappe.get_all(
+			party_type,
+			fields=fields,
+			filters=filters,
+			order_by="name"
+		)
+		# Get user permitted parties
+		user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
+		print("User permitted parties:", user_permitted)
+		# Extract permitted party names from the permission data
+		permitted_party_names = []
+		if user_permitted and party_type in user_permitted:
+			print("User permitted parties:", user_permitted[party_type])
+			permitted_party_names = [perm.get("doc") for perm in user_permitted[party_type]]
+		
+		# If user has specific party permissions, filter accordingly
+		if permitted_party_names:
+			allowed_parties = []
+			for party in parties:
+				if party.name in permitted_party_names:
+					allowed_parties.append({
+						"name": party.name,
+						"party_name": party.party_name,
+						"default_currency": party.default_currency
+					})
+		else:
+			# If no specific permissions, show all parties
+			allowed_parties = []
+			for party in parties:
+				allowed_parties.append({
+					"name": party.name,
+					"party_name": party.party_name,
+					"default_currency": party.default_currency
+				})
+
+		return {
+			"success": True,
+			"parties": allowed_parties
+		}
+
+	except Exception as e:
+		frappe.log_error(f"Get Permission Aware Parties Error: {str(e)}")
+		# Fallback: return all parties if there's an error
+		try:
+			if party_type == "Customer":
+				filters = {"is_internal_customer": 1, "disabled": 0}
+				fields = ["name", "customer_name as party_name", "default_currency"]
+			elif party_type == "Supplier":
+				filters = {"is_internal_supplier": 1, "disabled": 0}
+				fields = ["name", "supplier_name as party_name", "default_currency"]
+
+			parties = frappe.get_all(
+				party_type,
+				fields=fields,
+				filters=filters,
+				order_by="name"
+			)
+			return {
+				"success": True,
+				"parties": [{"name": p.name, "party_name": p.party_name, "default_currency": p.default_currency} for p in parties]
+			}
+		except:
+			return {
+				"success": False,
+				"error": str(e),
+				"parties": []
+			}
 
 
 @frappe.whitelist()
@@ -447,13 +530,13 @@ def get_match_status(voucher_type, voucher_no, company):
 				try:
 					matched_with_parsed = frappe.parse_json(matched_with_raw)
 				except:
-					
+
 					matched_with_parsed = matched_with_raw
 
 			return {
 				"success": True,
 				"status": doc.get("intercompany_match_status", "Pending"),
-				"matched_with": matched_with_raw, 
+				"matched_with": matched_with_raw,
 				"matched_with_parsed": matched_with_parsed,
 				"matched_by": doc.get("intercompany_matched_by"),
 				"matched_on": doc.get("intercompany_matched_on")
