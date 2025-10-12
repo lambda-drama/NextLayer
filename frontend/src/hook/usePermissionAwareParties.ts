@@ -65,3 +65,4 @@ export const usePermissionAwareParties = (partyType: 'Customer' | 'Supplier') =>
     error
   }
 }
+
