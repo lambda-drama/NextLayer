@@ -375,7 +375,7 @@ def get_permission_aware_parties(party_type="Customer"):
 		if user_permitted and party_type in user_permitted:
 			print("User permitted parties:", user_permitted[party_type])
 			permitted_party_names = [perm.get("doc") for perm in user_permitted[party_type]]
-		
+
 		# If user has specific party permissions, filter accordingly
 		if permitted_party_names:
 			allowed_parties = []
