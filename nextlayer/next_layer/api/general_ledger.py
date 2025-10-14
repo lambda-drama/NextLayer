@@ -349,7 +349,7 @@ def get_parties_for_autofill(party_type="Customer", company=None):
 
 @frappe.whitelist()
 def get_permission_aware_parties(party_type="Customer"):
-	"""Get parties that the current user has permission to access"""
+	"""Get parties that the current user has permission to access using doctype-level permissions"""
 	try:
 		# Get all parties of the specified type
 		if party_type == "Customer":
@@ -367,34 +367,29 @@ def get_permission_aware_parties(party_type="Customer"):
 			filters=filters,
 			order_by="name"
 		)
-		# Get user permitted parties
-		user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
-		print("User permitted parties:", user_permitted)
-		# Extract permitted party names from the permission data
-		permitted_party_names = []
-		if user_permitted and party_type in user_permitted:
-			print("User permitted parties:", user_permitted[party_type])
-			permitted_party_names = [perm.get("doc") for perm in user_permitted[party_type]]
 
-		# If user has specific party permissions, filter accordingly
-		if permitted_party_names:
-			allowed_parties = []
-			for party in parties:
-				if party.name in permitted_party_names:
+		# Filter parties based on doctype-level permissions using frappe.has_permission()
+		allowed_parties = []
+		for party in parties:
+			try:
+				# Check if user has read permission on this specific party document
+
+				has_perm = frappe.has_permission(
+					doctype=party_type,
+					ptype="read",
+					user=frappe.session.user,
+					doc=frappe.get_doc(party_type, party.name)
+				)
+				if has_perm:
 					allowed_parties.append({
 						"name": party.name,
 						"party_name": party.party_name,
 						"default_currency": party.default_currency
 					})
-		else:
-			# If no specific permissions, show all parties
-			allowed_parties = []
-			for party in parties:
-				allowed_parties.append({
-					"name": party.name,
-					"party_name": party.party_name,
-					"default_currency": party.default_currency
-				})
+			except Exception as perm_error:
+				# If there's an error checking permission for this specific party, skip it
+				frappe.log_error(f"Permission check error for {party_type} {party.name}: {str(perm_error)}")
+				continue
 
 		return {
 			"success": True,
@@ -688,9 +683,9 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 		# Get the admin password from Global Defaults
 		global_defaults = frappe.get_single("Global Defaults")
 		stored_password = get_decrypted_password(
-    "Global Defaults",   # Doctype
-    "Global Defaults",   # Docname (same as Doctype for Single DocTypes)
-    "custom_admin_password"  # Fieldname
+	"Global Defaults",   # Doctype
+	"Global Defaults",   # Docname (same as Doctype for Single DocTypes)
+	"custom_admin_password"  # Fieldname
 )
 		print("Stored password fetched", stored_password)
 		if not stored_password:
@@ -813,3 +808,17 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 			"error": str(e),
 			"message": _("Failed to verify admin password or fetch hidden transactions")
 		}
+
+
+def can_user_read_customer():
+	"""Check if the given user has 'read' permission on the specified Customer."""
+	doctype = "Customer"
+
+	has_perm = frappe.has_permission(
+		doctype=doctype,
+		ptype="read",
+		user="amiingeesle@gmail.com",
+		doc=frappe.get_doc(doctype, "GL China Footwear")
+	)
+
+	return has_perm
