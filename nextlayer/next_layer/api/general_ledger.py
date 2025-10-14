@@ -373,7 +373,7 @@ def get_permission_aware_parties(party_type="Customer"):
 		for party in parties:
 			try:
 				# Check if user has read permission on this specific party document
-				
+
 				has_perm = frappe.has_permission(
 					doctype=party_type,
 					ptype="read",

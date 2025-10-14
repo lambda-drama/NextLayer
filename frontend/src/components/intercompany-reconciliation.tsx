@@ -845,6 +845,12 @@ export default function IntercompanyReconciliation() {
       return null
     }
 
+    // Don't calculate stats until we have backend status data to avoid race conditions
+    // This prevents showing incorrect totals on first fetch when backend status is still loading
+    if (!hasBackendStatusData && (glDataA.length > 0 || glDataB.length > 0)) {
+      return null
+    }
+
     // Count Company A entries by status
     let matchedA = 0
     let mismatchedA = 0
@@ -906,7 +912,7 @@ export default function IntercompanyReconciliation() {
         pending: pendingA + pendingB
       }
     }
-  }, [findMatchingEntries])
+  }, [findMatchingEntries, hasBackendStatusData, glDataA, glDataB])
 
   const formatCurrency = (amount: number, currencyCode: string = 'USD', partyName?: string, partyType?: string) => {
     // Use selected currency if it's not "all", otherwise use party currency or provided currencyCode
@@ -2334,26 +2340,34 @@ export default function IntercompanyReconciliation() {
               {/* Overall Progress */}
               <div className="mt-6 pt-6 border-t border-blue-200">
                 <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-                    <div className="text-3xl font-bold text-green-700">
-                      {summaryStats.overall.matched}
+                {summaryStats ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
+                      <div className="text-3xl font-bold text-green-700">
+                        {summaryStats.overall.matched}
+                      </div>
+                      <div className="text-lg text-green-600 font-medium">Total Matched</div>
                     </div>
-                    <div className="text-lg text-green-600 font-medium">Total Matched</div>
+                    <div className="text-center p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-lg">
+                      <div className="text-3xl font-bold text-red-700">
+                        {summaryStats.overall.mismatched}
+                      </div>
+                      <div className="text-lg text-red-600 font-medium">Total Mismatched</div>
+                    </div>
+                    {/* <div className="text-center p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
+                      <div className="text-3xl font-bold text-yellow-700">
+                        {summaryStats.overall.pending}
+                      </div>
+                      <div className="text-lg text-yellow-600 font-medium">Total Pending</div>
+                    </div> */}
                   </div>
-                  <div className="text-center p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-lg">
-                    <div className="text-3xl font-bold text-red-700">
-                      {summaryStats.overall.mismatched}
+                ) : (
+                  <div className="text-center p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg">
+                    <div className="text-lg text-gray-600 font-medium">
+                      {isFetchingBackendStatus ? "Calculating reconciliation totals..." : "Loading reconciliation data..."}
                     </div>
-                    <div className="text-lg text-red-600 font-medium">Total Mismatched</div>
                   </div>
-                  {/* <div className="text-center p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
-                    <div className="text-3xl font-bold text-yellow-700">
-                      {summaryStats.overall.pending}
-                    </div>
-                    <div className="text-lg text-yellow-600 font-medium">Total Pending</div>
-                  </div> */}
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
