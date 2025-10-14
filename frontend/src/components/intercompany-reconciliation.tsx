@@ -94,6 +94,18 @@ export default function IntercompanyReconciliation() {
   const { parties: autofillPartiesA } = usePartiesForAutofill("Customer", companyA)
   const { parties: autofillPartiesB } = usePartiesForAutofill(partyTypeB, companyB)
 
+  // Conditional party selection based on checkbox state
+  // When checkbox is ticked: use permission-aware parties (restricted)
+  // When checkbox is unchecked: use all parties for autofill functionality
+  const displayPartiesA = customerViewEnabled ? partiesA : autofillPartiesA
+  const displayPartiesB = supplierViewEnabled ? partiesB : autofillPartiesB
+
+  // Conditional company selection based on checkbox state
+  // When checkbox is ticked: use permission-aware companies (restricted)
+  // When checkbox is unchecked: use all companies for autofill functionality
+  const displayCompaniesA = customerViewEnabled ? permissionAwareCompanies : allCompanies
+  const displayCompaniesB = supplierViewEnabled ? permissionAwareCompanies : allCompanies
+
   // GL Data hooks - get all data for transaction tables
   const {
     data: glDataA,
@@ -177,26 +189,26 @@ export default function IntercompanyReconciliation() {
   // Auto-fill Company B when Company A and Party A are selected
   useEffect(() => {
     if (companyA && partyA && !companyB && !partyB) {
-      const selectedParty = partiesA.find(p => p.name === partyA)
+      const selectedParty = displayPartiesA.find(p => p.name === partyA)
       if (selectedParty) {
         setCompanyB(selectedParty.name)
         setPartyB(companyA)
         setIsAutoFilled(true)
       }
     }
-  }, [companyA, partyA, partiesA, companyB, partyB])
+  }, [companyA, partyA, displayPartiesA, companyB, partyB])
 
   // Auto-fill Company A when Company B and Party B are selected (reverse)
   useEffect(() => {
     if (companyB && partyB && !companyA && !partyA) {
-      const selectedParty = partiesB.find(p => p.name === partyB)
+      const selectedParty = displayPartiesB.find(p => p.name === partyB)
       if (selectedParty) {
         setCompanyA(selectedParty.name)
         setPartyA(companyB)
         setIsAutoFilled(true)
       }
     }
-  }, [companyB, partyB, partiesB, companyA, partyA])
+  }, [companyB, partyB, displayPartiesB, companyA, partyA])
 
   // Helper function to find corresponding company for intercompany transactions
   const findCorrespondingCompany = (selectedCompany: string): string | null => {
@@ -929,11 +941,11 @@ export default function IntercompanyReconciliation() {
     }
 
     if (partyType === 'Customer') {
-      const party = partiesA.find(p => p.name === partyName || p.party_name === partyName)
+      const party = displayPartiesA.find(p => p.name === partyName || p.party_name === partyName)
       return party?.default_currency || 'USD'
     } else if (partyType === 'Supplier') {
       // Right side: Supplier from Company B
-      const party = partiesB.find(p => p.name === partyName || p.party_name === partyName)
+      const party = displayPartiesB.find(p => p.name === partyName || p.party_name === partyName)
       return party?.default_currency || 'USD'
     }
 
@@ -1695,12 +1707,18 @@ export default function IntercompanyReconciliation() {
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use permission-aware companies for dropdown display */}
-                        {permissionAwareCompanies.map((company) => (
+                        {/* Use conditional companies based on checkbox state */}
+                        {displayCompaniesA.map((company) => (
                           <SelectItem key={company.name} value={company.name}>
                             {company.name}
                           </SelectItem>
                         ))}
+                        {/* Show autofilled company if it's not in current list */}
+                        {companyA && !displayCompaniesA.some(c => c.name === companyA) && (
+                          <SelectItem key={companyA} value={companyA}>
+                            {companyA}
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1731,14 +1749,14 @@ export default function IntercompanyReconciliation() {
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use permission-aware parties for dropdown display */}
-                        {partiesA.map((party) => (
+                        {/* Use conditional parties based on checkbox state */}
+                        {displayPartiesA.map((party) => (
                           <SelectItem key={party.name} value={party.name}>
                             {party.name}
                           </SelectItem>
                         ))}
-                        {/* Show autofilled party if it's not in permission-aware list */}
-                        {partyA && !partiesA.some(p => p.name === partyA) && (
+                        {/* Show autofilled party if it's not in current list */}
+                        {partyA && !displayPartiesA.some(p => p.name === partyA) && (
                           <SelectItem key={partyA} value={partyA}>
                             {partyA}
                           </SelectItem>
@@ -1785,14 +1803,14 @@ export default function IntercompanyReconciliation() {
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use permission-aware companies for dropdown display */}
-                        {permissionAwareCompanies.map((company) => (
+                        {/* Use conditional companies based on checkbox state */}
+                        {displayCompaniesB.map((company) => (
                           <SelectItem key={company.name} value={company.name}>
                             {company.name}
                           </SelectItem>
                         ))}
-                        {/* Show autofilled company if it's not in permission-aware list */}
-                        {companyB && !permissionAwareCompanies.some(c => c.name === companyB) && (
+                        {/* Show autofilled company if it's not in current list */}
+                        {companyB && !displayCompaniesB.some(c => c.name === companyB) && (
                           <SelectItem key={companyB} value={companyB}>
                             {companyB}
                           </SelectItem>
@@ -1827,14 +1845,14 @@ export default function IntercompanyReconciliation() {
                         } />
                       </SelectTrigger>
                       <SelectContent className="bg-blue-200">
-                        {/* Use permission-aware parties for dropdown display */}
-                        {partiesB.map((party) => (
+                        {/* Use conditional parties based on checkbox state */}
+                        {displayPartiesB.map((party) => (
                           <SelectItem key={party.name} value={party.name}>
                             {party.name}
                           </SelectItem>
                         ))}
-                        {/* Show autofilled party if it's not in permission-aware list */}
-                        {partyB && !partiesB.some(p => p.name === partyB) && (
+                        {/* Show autofilled party if it's not in current list */}
+                        {partyB && !displayPartiesB.some(p => p.name === partyB) && (
                           <SelectItem key={partyB} value={partyB}>
                             {partyB}
                           </SelectItem>
@@ -2720,6 +2738,40 @@ export default function IntercompanyReconciliation() {
                         )
                       })
                       )}
+
+                      {/* Customer Table Totals Row */}
+                      {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length > 0 && (
+                        <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
+                          <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
+                            TOTAL
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-beveren-700">
+                            {formatCurrency(
+                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).reduce((sum, entry) => sum + entry.debit, 0),
+                              getPartyCurrency(partyA, 'Customer'),
+                              partyA,
+                              'Customer'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-beveren-700">
+                            {formatCurrency(
+                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).reduce((sum, entry) => sum + entry.credit, 0),
+                              getPartyCurrency(partyA, 'Customer'),
+                              partyA,
+                              'Customer'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-beveren-800">
+                            {formatCurrency(
+                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).reduce((sum, entry) => sum + entry.balance, 0),
+                              getPartyCurrency(partyA, 'Customer'),
+                              partyA,
+                              'Customer'
+                            )}
+                          </TableCell>
+                          <TableCell colSpan={3}></TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -2942,6 +2994,40 @@ export default function IntercompanyReconciliation() {
                           </TableRow>
                         )
                       })
+                      )}
+
+                      {/* Supplier Table Totals Row */}
+                      {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).length > 0 && (
+                        <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
+                          <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
+                            TOTAL
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-beveren-700">
+                            {formatCurrency(
+                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).reduce((sum, entry) => sum + entry.debit, 0),
+                              getPartyCurrency(partyB, partyTypeB),
+                              partyB,
+                              partyTypeB
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-beveren-700">
+                            {formatCurrency(
+                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).reduce((sum, entry) => sum + entry.credit, 0),
+                              getPartyCurrency(partyB, partyTypeB),
+                              partyB,
+                              partyTypeB
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-beveren-800">
+                            {formatCurrency(
+                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).reduce((sum, entry) => sum + entry.balance, 0),
+                              getPartyCurrency(partyB, partyTypeB),
+                              partyB,
+                              partyTypeB
+                            )}
+                          </TableCell>
+                          <TableCell colSpan={3}></TableCell>
+                        </TableRow>
                       )}
                     </TableBody>
                   </Table>
