@@ -235,3 +235,4 @@ def get_whatsapp_template(template_name):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get WhatsApp Template Failed")
 		frappe.throw(f"Failed to get WhatsApp template: {e!s}")
+
