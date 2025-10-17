@@ -43,6 +43,18 @@ doc_events = {
         "on_submit": "nextlayer.next_layer.controllers.sales_shipment.on_submit",
         "on_cancel": "nextlayer.next_layer.controllers.sales_shipment.on_cancel",
     },
+    "Sales Invoice": {
+        "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+    },
+    "Purchase Invoice": {
+        "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+    },
+    "Journal Entry": {
+        "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+    },
+    "Payment Entry": {
+        "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+    },
 }
 
 # Includes in <head>
@@ -271,7 +283,7 @@ doctype_js = {
 # }
 
 website_route_rules = [
-    {'from_route': '/frontend/<path:app_path>', 'to_route': 'frontend'}, 
+    {'from_route': '/frontend/<path:app_path>', 'to_route': 'frontend'},
     {'from_route': '/frontend', 'to_route': 'frontend'},
     {'from_route': '/reconciliation', 'to_route': 'frontend'},
     {'from_route': '/ledger', 'to_route': 'frontend'}

@@ -822,3 +822,433 @@ def can_user_read_customer():
 	)
 
 	return has_perm
+
+
+def cleanup_intercompany_matches_on_cancel(doc, method=None):
+	"""
+	Clean up intercompany matches when a document is cancelled.
+	This function checks if the document has intercompany matches and removes
+	the corresponding matches from the matched documents.
+
+	Args:
+		doc: The document being cancelled
+		method: The method name (for hook compatibility)
+	"""
+	try:
+		if not hasattr(doc, 'intercompany_match_status') or not hasattr(doc, 'intercompany_matched_with'):
+			return
+
+		# Only proceed if the document was matched
+		if doc.intercompany_match_status != 'Match' or not doc.intercompany_matched_with:
+			return
+
+		try:
+			matched_data = frappe.parse_json(doc.intercompany_matched_with)
+		except:
+			matched_data = doc.intercompany_matched_with
+
+		# Handle both single match and multiple matches
+		matches_to_clean = []
+		if isinstance(matched_data, dict):
+			matches_to_clean = [matched_data]
+		elif isinstance(matched_data, list):
+			# Multiple matches
+			matches_to_clean = matched_data
+
+		# Clean up each matched document
+		for match in matches_to_clean:
+			if not isinstance(match, dict):
+				continue
+
+			voucher_type = match.get('voucher_type')
+			voucher_no = match.get('voucher_no')
+
+			if not voucher_type or not voucher_no:
+				continue
+
+			# Check if the matched document still exists
+			if not frappe.db.exists(voucher_type, voucher_no):
+				frappe.logger().info(f"Matched document {voucher_type} {voucher_no} no longer exists, skipping cleanup")
+				continue
+
+			try:
+				# Get the matched document
+				matched_doc = frappe.get_doc(voucher_type, voucher_no)
+				# frappe.throw(str(matched_doc))
+				# Check if this document also has matches
+				if (hasattr(matched_doc, 'intercompany_match_status') and
+					hasattr(matched_doc, 'intercompany_matched_with') and
+					matched_doc.intercompany_match_status == 'Match' and
+					matched_doc.intercompany_matched_with):
+
+						# No more matches, reset to pending
+					frappe.db.set_value(
+						voucher_type,
+						voucher_no,
+						{
+							'intercompany_match_status': 'Mismatch',
+							'intercompany_matched_with': None,
+							'intercompany_matched_by': None,
+							'intercompany_matched_on': None
+						}
+					)
+
+			except Exception as e:
+				frappe.logger().error(f"Error cleaning up match for {voucher_type} {voucher_no}: {str(e)}")
+				continue
+	except Exception as e:
+		frappe.logger().error(f"Error in cleanup_intercompany_matches_on_cancel for {doc.doctype} {doc.name}: {str(e)}")
+		# Don't raise the exception to prevent cancellation failure
+
+
+@frappe.whitelist()
+def bulk_cleanup_cancelled_sales_invoices():
+	"""
+	Bulk cleanup function for cancelled Sales Invoices.
+	Finds all cancelled Sales Invoices that have intercompany matches and cleans them up.
+	"""
+	try:
+		# Find all cancelled Sales Invoices with intercompany matches
+		cancelled_invoices = frappe.get_all(
+			"Sales Invoice",
+			filters={
+				"docstatus": 2,  # Cancelled
+				"intercompany_match_status": "Match",
+				"intercompany_matched_with": ["!=", ""]
+			},
+			fields=["name", "intercompany_matched_with"]
+		)
+
+		processed_count = 0
+		error_count = 0
+
+		for invoice in cancelled_invoices:
+			try:
+				# Parse the matched_with data
+				try:
+					matched_data = frappe.parse_json(invoice.intercompany_matched_with)
+				except:
+					matched_data = invoice.intercompany_matched_with
+
+				# Handle both single match and multiple matches
+				matches_to_clean = []
+				if isinstance(matched_data, dict):
+					matches_to_clean = [matched_data]
+				elif isinstance(matched_data, list):
+					matches_to_clean = matched_data
+
+				# Clean up each matched document
+				for match in matches_to_clean:
+					if not isinstance(match, dict):
+						continue
+
+					voucher_type = match.get('voucher_type')
+					voucher_no = match.get('voucher_no')
+
+					if not voucher_type or not voucher_no:
+						continue
+
+					# Check if the matched document still exists
+					if frappe.db.exists(voucher_type, voucher_no):
+						# Update the matched document to Mismatch status
+						frappe.db.set_value(
+							voucher_type,
+							voucher_no,
+							{
+								'intercompany_match_status': 'Mismatch',
+								'intercompany_matched_with': None,
+								'intercompany_matched_by': None,
+								'intercompany_matched_on': None
+							}
+						)
+
+				processed_count += 1
+				frappe.logger().info(f"Processed cancelled Sales Invoice: {invoice.name}")
+
+			except Exception as e:
+				error_count += 1
+				frappe.logger().error(f"Error processing Sales Invoice {invoice.name}: {str(e)}")
+				continue
+
+		frappe.db.commit()
+
+		return {
+			"success": True,
+			"message": f"Bulk cleanup completed for Sales Invoices",
+			"total_found": len(cancelled_invoices),
+			"processed": processed_count,
+			"errors": error_count
+		}
+
+	except Exception as e:
+		frappe.logger().error(f"Bulk cleanup Sales Invoices error: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"message": "Failed to perform bulk cleanup for Sales Invoices"
+		}
+
+
+@frappe.whitelist()
+def bulk_cleanup_cancelled_purchase_invoices():
+	"""
+	Bulk cleanup function for cancelled Purchase Invoices.
+	Finds all cancelled Purchase Invoices that have intercompany matches and cleans them up.
+	"""
+	try:
+		# Find all cancelled Purchase Invoices with intercompany matches
+		cancelled_invoices = frappe.get_all(
+			"Purchase Invoice",
+			filters={
+				"docstatus": 2,  # Cancelled
+				"intercompany_match_status": "Match",
+				"intercompany_matched_with": ["!=", ""]
+			},
+			fields=["name", "intercompany_matched_with"]
+		)
+
+		processed_count = 0
+		error_count = 0
+
+		for invoice in cancelled_invoices:
+			try:
+				# Parse the matched_with data
+				try:
+					matched_data = frappe.parse_json(invoice.intercompany_matched_with)
+				except:
+					matched_data = invoice.intercompany_matched_with
+
+				# Handle both single match and multiple matches
+				matches_to_clean = []
+				if isinstance(matched_data, dict):
+					matches_to_clean = [matched_data]
+				elif isinstance(matched_data, list):
+					matches_to_clean = matched_data
+
+				# Clean up each matched document
+				for match in matches_to_clean:
+					if not isinstance(match, dict):
+						continue
+
+					voucher_type = match.get('voucher_type')
+					voucher_no = match.get('voucher_no')
+
+					if not voucher_type or not voucher_no:
+						continue
+
+					# Check if the matched document still exists
+					if frappe.db.exists(voucher_type, voucher_no):
+						# Update the matched document to Mismatch status
+						frappe.db.set_value(
+							voucher_type,
+							voucher_no,
+							{
+								'intercompany_match_status': 'Mismatch',
+								'intercompany_matched_with': None,
+								'intercompany_matched_by': None,
+								'intercompany_matched_on': None
+							}
+						)
+
+				processed_count += 1
+				frappe.logger().info(f"Processed cancelled Purchase Invoice: {invoice.name}")
+
+			except Exception as e:
+				error_count += 1
+				frappe.logger().error(f"Error processing Purchase Invoice {invoice.name}: {str(e)}")
+				continue
+
+		frappe.db.commit()
+
+		return {
+			"success": True,
+			"message": f"Bulk cleanup completed for Purchase Invoices",
+			"total_found": len(cancelled_invoices),
+			"processed": processed_count,
+			"errors": error_count
+		}
+
+	except Exception as e:
+		frappe.logger().error(f"Bulk cleanup Purchase Invoices error: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"message": "Failed to perform bulk cleanup for Purchase Invoices"
+		}
+
+
+@frappe.whitelist()
+def bulk_cleanup_cancelled_journal_entries():
+	"""
+	Bulk cleanup function for cancelled Journal Entries.
+	Finds all cancelled Journal Entries that have intercompany matches and cleans them up.
+	"""
+	try:
+		# Find all cancelled Journal Entries with intercompany matches
+		cancelled_entries = frappe.get_all(
+			"Journal Entry",
+			filters={
+				"docstatus": 2,  # Cancelled
+				"intercompany_match_status": "Match",
+				"intercompany_matched_with": ["!=", ""]
+			},
+			fields=["name", "intercompany_matched_with"]
+		)
+
+		processed_count = 0
+		error_count = 0
+
+		for entry in cancelled_entries:
+			try:
+				# Parse the matched_with data
+				try:
+					matched_data = frappe.parse_json(entry.intercompany_matched_with)
+				except:
+					matched_data = entry.intercompany_matched_with
+
+				# Handle both single match and multiple matches
+				matches_to_clean = []
+				if isinstance(matched_data, dict):
+					matches_to_clean = [matched_data]
+				elif isinstance(matched_data, list):
+					matches_to_clean = matched_data
+
+				# Clean up each matched document
+				for match in matches_to_clean:
+					if not isinstance(match, dict):
+						continue
+
+					voucher_type = match.get('voucher_type')
+					voucher_no = match.get('voucher_no')
+
+					if not voucher_type or not voucher_no:
+						continue
+
+					# Check if the matched document still exists
+					if frappe.db.exists(voucher_type, voucher_no):
+						# Update the matched document to Mismatch status
+						frappe.db.set_value(
+							voucher_type,
+							voucher_no,
+							{
+								'intercompany_match_status': 'Mismatch',
+								'intercompany_matched_with': None,
+								'intercompany_matched_by': None,
+								'intercompany_matched_on': None
+							}
+						)
+
+				processed_count += 1
+				frappe.logger().info(f"Processed cancelled Journal Entry: {entry.name}")
+
+			except Exception as e:
+				error_count += 1
+				frappe.logger().error(f"Error processing Journal Entry {entry.name}: {str(e)}")
+				continue
+
+		frappe.db.commit()
+
+		return {
+			"success": True,
+			"message": f"Bulk cleanup completed for Journal Entries",
+			"total_found": len(cancelled_entries),
+			"processed": processed_count,
+			"errors": error_count
+		}
+
+	except Exception as e:
+		frappe.logger().error(f"Bulk cleanup Journal Entries error: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"message": "Failed to perform bulk cleanup for Journal Entries"
+		}
+
+
+@frappe.whitelist()
+def bulk_cleanup_cancelled_payment_entries():
+	"""
+	Bulk cleanup function for cancelled Payment Entries.
+	Finds all cancelled Payment Entries that have intercompany matches and cleans them up.
+	"""
+	try:
+		# Find all cancelled Payment Entries with intercompany matches
+		cancelled_entries = frappe.get_all(
+			"Payment Entry",
+			filters={
+				"docstatus": 2,  # Cancelled
+				"intercompany_match_status": "Match",
+				"intercompany_matched_with": ["!=", ""]
+			},
+			fields=["name", "intercompany_matched_with"]
+		)
+
+		processed_count = 0
+		error_count = 0
+
+		for entry in cancelled_entries:
+			try:
+				# Parse the matched_with data
+				try:
+					matched_data = frappe.parse_json(entry.intercompany_matched_with)
+				except:
+					matched_data = entry.intercompany_matched_with
+
+				# Handle both single match and multiple matches
+				matches_to_clean = []
+				if isinstance(matched_data, dict):
+					matches_to_clean = [matched_data]
+				elif isinstance(matched_data, list):
+					matches_to_clean = matched_data
+
+				# Clean up each matched document
+				for match in matches_to_clean:
+					if not isinstance(match, dict):
+						continue
+
+					voucher_type = match.get('voucher_type')
+					voucher_no = match.get('voucher_no')
+
+					if not voucher_type or not voucher_no:
+						continue
+
+					# Check if the matched document still exists
+					if frappe.db.exists(voucher_type, voucher_no):
+						# Update the matched document to Mismatch status
+						frappe.db.set_value(
+							voucher_type,
+							voucher_no,
+							{
+								'intercompany_match_status': 'Mismatch',
+								'intercompany_matched_with': None,
+								'intercompany_matched_by': None,
+								'intercompany_matched_on': None
+							}
+						)
+
+				processed_count += 1
+				frappe.logger().info(f"Processed cancelled Payment Entry: {entry.name}")
+
+			except Exception as e:
+				error_count += 1
+				frappe.logger().error(f"Error processing Payment Entry {entry.name}: {str(e)}")
+				continue
+
+		frappe.db.commit()
+
+		return {
+			"success": True,
+			"message": f"Bulk cleanup completed for Payment Entries",
+			"total_found": len(cancelled_entries),
+			"processed": processed_count,
+			"errors": error_count
+		}
+
+	except Exception as e:
+		frappe.logger().error(f"Bulk cleanup Payment Entries error: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"message": "Failed to perform bulk cleanup for Payment Entries"
+		}
+
