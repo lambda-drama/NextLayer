@@ -15,6 +15,18 @@ frappe.ui.form.on("Scanning Operation", {
 
 		// Setup automatic barcode detection
 		setup_automatic_barcode_detection(frm);
+
+		// Setup warehouse filters based on company
+		setup_warehouse_filters(frm);
+	},
+
+	company(frm) {
+		// Clear warehouse fields when company changes
+		frm.set_value("ds_warehouse", "");
+		frm.set_value("dt_warehouse", "");
+
+		// Update warehouse filters
+		setup_warehouse_filters(frm);
 	},
 
 	scan_barcode(frm) {
@@ -24,9 +36,11 @@ frappe.ui.form.on("Scanning Operation", {
 	},
 
 	operation(frm) {
-		// Clear warehouse fields when operation changes
+		// Clear warehouse fields and party fields when operation changes
 		frm.set_value("ds_warehouse", "");
 		frm.set_value("dt_warehouse", "");
+		frm.set_value("customer", "");
+		frm.set_value("supplier", "");
 	},
 
 	before_save(frm) {
@@ -95,9 +109,20 @@ function create_purchase_receipt(frm) {
 		return;
 	}
 
+	// Prepare items data for the new document
+	let items_data = [];
+	frm.doc.items.forEach(function(item) {
+		items_data.push({
+			item_code: item.item_code,
+			qty: item.quantity,
+			warehouse: item.warehouse,
+			description: item.description
+		});
+	});
+
 	// Navigate to new Purchase Receipt with pre-filled data
 	let args = {
-		supplier: frm.doc.customer,
+		supplier: frm.doc.supplier,
 		posting_date: frm.doc.date,
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
@@ -108,9 +133,23 @@ function create_purchase_receipt(frm) {
 	frappe.route_options = args;
 	frappe.new_doc("Purchase Receipt");
 
-	// Set up items loading after navigation
+	// Wait for the document to load and then add items
 	setTimeout(function() {
-		load_items_to_current_form("Purchase Receipt");
+		if (cur_frm && cur_frm.doctype === "Purchase Receipt") {
+			// Clear any existing items first
+			cur_frm.clear_table("items");
+
+			items_data.forEach(function(item_data) {
+				let new_row = cur_frm.add_child("items");
+				new_row.item_code = item_data.item_code;
+				new_row.qty = item_data.qty;
+				new_row.warehouse = item_data.warehouse;
+				if (item_data.description) {
+					new_row.description = item_data.description;
+				}
+			});
+			cur_frm.refresh_field("items");
+		}
 	}, 1000);
 }
 
@@ -121,9 +160,20 @@ function create_purchase_invoice(frm) {
 		return;
 	}
 
+	// Prepare items data for the new document
+	let items_data = [];
+	frm.doc.items.forEach(function(item) {
+		items_data.push({
+			item_code: item.item_code,
+			qty: item.quantity,
+			warehouse: item.warehouse,
+			description: item.description
+		});
+	});
+
 	// Navigate to new Purchase Invoice with pre-filled data
 	let args = {
-		supplier: frm.doc.customer,
+		supplier: frm.doc.supplier,
 		posting_date: frm.doc.date,
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
@@ -134,9 +184,23 @@ function create_purchase_invoice(frm) {
 	frappe.route_options = args;
 	frappe.new_doc("Purchase Invoice");
 
-	// Set up items loading after navigation
+	// Wait for the document to load and then add items
 	setTimeout(function() {
-		load_items_to_current_form("Purchase Invoice");
+		if (cur_frm && cur_frm.doctype === "Purchase Invoice") {
+			// Clear any existing items first
+			cur_frm.clear_table("items");
+
+			items_data.forEach(function(item_data) {
+				let new_row = cur_frm.add_child("items");
+				new_row.item_code = item_data.item_code;
+				new_row.qty = item_data.qty;
+				new_row.warehouse = item_data.warehouse;
+				if (item_data.description) {
+					new_row.description = item_data.description;
+				}
+			});
+			cur_frm.refresh_field("items");
+		}
 	}, 1000);
 }
 
@@ -146,6 +210,17 @@ function create_delivery_note(frm) {
 		frappe.msgprint(__("No items found to create Delivery Note"));
 		return;
 	}
+
+	// Prepare items data for the new document
+	let items_data = [];
+	frm.doc.items.forEach(function(item) {
+		items_data.push({
+			item_code: item.item_code,
+			qty: item.quantity,
+			warehouse: item.warehouse,
+			description: item.description
+		});
+	});
 
 	// Navigate to new Delivery Note with pre-filled data
 	let args = {
@@ -160,9 +235,23 @@ function create_delivery_note(frm) {
 	frappe.route_options = args;
 	frappe.new_doc("Delivery Note");
 
-	// Set up items loading after navigation
+	// Wait for the document to load and then add items
 	setTimeout(function() {
-		load_items_to_current_form("Delivery Note");
+		if (cur_frm && cur_frm.doctype === "Delivery Note") {
+			// Clear any existing items first
+			cur_frm.clear_table("items");
+
+			items_data.forEach(function(item_data) {
+				let new_row = cur_frm.add_child("items");
+				new_row.item_code = item_data.item_code;
+				new_row.qty = item_data.qty;
+				new_row.warehouse = item_data.warehouse;
+				if (item_data.description) {
+					new_row.description = item_data.description;
+				}
+			});
+			cur_frm.refresh_field("items");
+		}
 	}, 1000);
 }
 
@@ -172,6 +261,17 @@ function create_sales_invoice(frm) {
 		frappe.msgprint(__("No items found to create Sales Invoice"));
 		return;
 	}
+
+	// Prepare items data for the new document
+	let items_data = [];
+	frm.doc.items.forEach(function(item) {
+		items_data.push({
+			item_code: item.item_code,
+			qty: item.quantity,
+			warehouse: item.warehouse,
+			description: item.description
+		});
+	});
 
 	// Navigate to new Sales Invoice with pre-filled data
 	let args = {
@@ -186,9 +286,23 @@ function create_sales_invoice(frm) {
 	frappe.route_options = args;
 	frappe.new_doc("Sales Invoice");
 
-	// Set up items loading after navigation
+	// Wait for the document to load and then add items
 	setTimeout(function() {
-		load_items_to_current_form("Sales Invoice");
+		if (cur_frm && cur_frm.doctype === "Sales Invoice") {
+			// Clear any existing items first
+			cur_frm.clear_table("items");
+
+			items_data.forEach(function(item_data) {
+				let new_row = cur_frm.add_child("items");
+				new_row.item_code = item_data.item_code;
+				new_row.qty = item_data.qty;
+				new_row.warehouse = item_data.warehouse;
+				if (item_data.description) {
+					new_row.description = item_data.description;
+				}
+			});
+			cur_frm.refresh_field("items");
+		}
 	}, 1000);
 }
 
@@ -328,39 +442,33 @@ function auto_fill_missing_warehouses(frm) {
 	}
 }
 
-// Function to load items to current form after navigation
-function load_items_to_current_form(doctype) {
-	// Get the scanning operation name from route options
-	let scanning_operation = frappe.route_options ? frappe.route_options.scanning_operation : null;
-
-	if (!scanning_operation) return;
-
-	// Call server to get items
-	frappe.call({
-		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_items_from_scanning_operation",
-		args: {
-			scanning_operation: scanning_operation
-		},
-		callback: function(r) {
-			if (r.message && r.message.items && cur_frm && cur_frm.doctype === doctype) {
-				// Clear existing items
-				cur_frm.clear_table("items");
-
-				// Add items from scanning operation
-				r.message.items.forEach(function(item) {
-					let new_row = cur_frm.add_child("items");
-					new_row.item_code = item.item_code;
-					new_row.qty = item.quantity;
-					new_row.warehouse = item.warehouse;
-					if (item.description) {
-						new_row.description = item.description;
-					}
-				});
-
-				cur_frm.refresh_field("items");
-				frappe.show_alert(__("Items loaded from Scanning Operation"));
+// Function to setup warehouse filters based on company
+function setup_warehouse_filters(frm) {
+	// Set up filter for Default Source Warehouse
+	frm.set_query("ds_warehouse", function() {
+		return {
+			filters: {
+				company: frm.doc.company || ""
 			}
-		}
+		};
+	});
+
+	// Set up filter for Default Target Warehouse
+	frm.set_query("dt_warehouse", function() {
+		return {
+			filters: {
+				company: frm.doc.company || ""
+			}
+		};
+	});
+
+	// Set up filter for warehouse field in items table
+	frm.set_query("warehouse", "items", function() {
+		return {
+			filters: {
+				company: frm.doc.company || ""
+			}
+		};
 	});
 }
 

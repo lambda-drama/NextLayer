@@ -83,6 +83,7 @@ doc_events = {
 
 doctype_js = {
 	"Sales Shipment Cost":"public/js/sales_shipment.js",
+	"Company":"public/js/company.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
