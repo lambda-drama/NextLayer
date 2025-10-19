@@ -8,15 +8,12 @@ frappe.ui.form.on("Scanning Operation", {
 			frm.fields_dict.scan_barcode.set_focus();
 		}
 
-		// Add Create buttons group only after document is submitted
 		if (frm.doc.docstatus === 1) {
 			add_create_buttons(frm);
 		}
 
-		// Setup automatic barcode detection
 		setup_automatic_barcode_detection(frm);
 
-		// Setup warehouse filters based on company
 		setup_warehouse_filters(frm);
 	},
 
@@ -27,6 +24,9 @@ frappe.ui.form.on("Scanning Operation", {
 
 		// Update warehouse filters
 		setup_warehouse_filters(frm);
+
+		// Setup customer/supplier filters based on company
+		setup_party_filters(frm);
 	},
 
 	scan_barcode(frm) {
@@ -41,6 +41,52 @@ frappe.ui.form.on("Scanning Operation", {
 		frm.set_value("dt_warehouse", "");
 		frm.set_value("customer", "");
 		frm.set_value("supplier", "");
+	},
+
+	customer(frm) {
+		if (!frm.doc.customer || !frm.doc.company) return;
+
+		frappe.call({
+			method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+			args: {
+				company: frm.doc.company,
+				parenttype: "Customer",
+			},
+			callback: function(r) {
+				if (!r.message) return;
+
+				const { allowed_parties, restrict_selling_settings } = r.message;
+
+				if (restrict_selling_settings) {
+					if (!allowed_parties.includes(frm.doc.customer)) {
+						frappe.throw('Customer not authorized to transact!')
+					}
+				}
+			}
+		});
+	},
+
+	supplier(frm) {
+		if (!frm.doc.supplier || !frm.doc.company) return;
+
+		frappe.call({
+			method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+			args: {
+				company: frm.doc.company,
+				parenttype: "Supplier",
+			},
+			callback: function(r) {
+				if (!r.message) return;
+
+				const { allowed_parties, restrict_buying_settings } = r.message;
+
+				if (restrict_buying_settings) {
+					if (!allowed_parties.includes(frm.doc.supplier)) {
+						frappe.throw('Supplier not authorized to transact!')
+					}
+				}
+			}
+		});
 	},
 
 	before_save(frm) {
@@ -114,8 +160,12 @@ function create_purchase_receipt(frm) {
 	frm.doc.items.forEach(function(item) {
 		items_data.push({
 			item_code: item.item_code,
+			item_name: item.item_name,
 			qty: item.quantity,
+			uom: item.uom,
+			stock_uom: item.uom,
 			warehouse: item.warehouse,
+			barcode: item.barcode,
 			description: item.description
 		});
 	});
@@ -142,8 +192,14 @@ function create_purchase_receipt(frm) {
 			items_data.forEach(function(item_data) {
 				let new_row = cur_frm.add_child("items");
 				new_row.item_code = item_data.item_code;
+				new_row.item_name = item_data.item_name;
 				new_row.qty = item_data.qty;
+				new_row.uom = item_data.uom;
+				new_row.stock_uom = item_data.uom;
 				new_row.warehouse = item_data.warehouse;
+				if (item_data.barcode) {
+					new_row.barcode = item_data.barcode;
+				}
 				if (item_data.description) {
 					new_row.description = item_data.description;
 				}
@@ -165,8 +221,12 @@ function create_purchase_invoice(frm) {
 	frm.doc.items.forEach(function(item) {
 		items_data.push({
 			item_code: item.item_code,
+			item_name: item.item_name,
 			qty: item.quantity,
+			uom: item.uom,
+			stock_uom: item.uom,
 			warehouse: item.warehouse,
+			barcode: item.barcode,
 			description: item.description
 		});
 	});
@@ -193,8 +253,14 @@ function create_purchase_invoice(frm) {
 			items_data.forEach(function(item_data) {
 				let new_row = cur_frm.add_child("items");
 				new_row.item_code = item_data.item_code;
+				new_row.item_name = item_data.item_name;
 				new_row.qty = item_data.qty;
+				new_row.uom = item_data.uom;
+				new_row.stock_uom = item_data.uom;
 				new_row.warehouse = item_data.warehouse;
+				if (item_data.barcode) {
+					new_row.barcode = item_data.barcode;
+				}
 				if (item_data.description) {
 					new_row.description = item_data.description;
 				}
@@ -216,8 +282,12 @@ function create_delivery_note(frm) {
 	frm.doc.items.forEach(function(item) {
 		items_data.push({
 			item_code: item.item_code,
+			item_name: item.item_name,
 			qty: item.quantity,
+			uom: item.uom,
+			stock_uom: item.uom,
 			warehouse: item.warehouse,
+			barcode: item.barcode,
 			description: item.description
 		});
 	});
@@ -244,8 +314,14 @@ function create_delivery_note(frm) {
 			items_data.forEach(function(item_data) {
 				let new_row = cur_frm.add_child("items");
 				new_row.item_code = item_data.item_code;
+				new_row.item_name = item_data.item_name;
 				new_row.qty = item_data.qty;
+				new_row.uom = item_data.uom;
+				new_row.stock_uom = item_data.uom;
 				new_row.warehouse = item_data.warehouse;
+				if (item_data.barcode) {
+					new_row.barcode = item_data.barcode;
+				}
 				if (item_data.description) {
 					new_row.description = item_data.description;
 				}
@@ -267,8 +343,12 @@ function create_sales_invoice(frm) {
 	frm.doc.items.forEach(function(item) {
 		items_data.push({
 			item_code: item.item_code,
+			item_name: item.item_name,
 			qty: item.quantity,
+			uom: item.uom,
+			stock_uom: item.uom,
 			warehouse: item.warehouse,
+			barcode: item.barcode,
 			description: item.description
 		});
 	});
@@ -295,8 +375,14 @@ function create_sales_invoice(frm) {
 			items_data.forEach(function(item_data) {
 				let new_row = cur_frm.add_child("items");
 				new_row.item_code = item_data.item_code;
+				new_row.item_name = item_data.item_name;
 				new_row.qty = item_data.qty;
+				new_row.uom = item_data.uom;
+				new_row.stock_uom = item_data.uom;
 				new_row.warehouse = item_data.warehouse;
+				if (item_data.barcode) {
+					new_row.barcode = item_data.barcode;
+				}
 				if (item_data.description) {
 					new_row.description = item_data.description;
 				}
@@ -442,6 +528,80 @@ function auto_fill_missing_warehouses(frm) {
 	}
 }
 
+// Function to setup party filters based on company
+function setup_party_filters(frm) {
+	if (!frm.doc.company) return;
+
+	// Setup customer filter for Loading operations
+	frm.set_query("customer", function() {
+		return {
+			filters: [
+				["Customer", "disabled", "!=", 1]
+			]
+		};
+	});
+
+	// Setup supplier filter for Offloading operations
+	frm.set_query("supplier", function() {
+		return {
+			filters: [
+				["Supplier", "disabled", "!=", 1]
+			]
+		};
+	});
+
+	// Apply company-based restrictions
+	frappe.call({
+		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+		args: {
+			company: frm.doc.company,
+			parenttype: "Customer",
+		},
+		callback: function(r) {
+			if (!r.message) return;
+
+			const { allowed_parties, restrict_selling_settings } = r.message;
+
+			if (restrict_selling_settings) {
+				// Restrict Customer field
+				frm.set_query("customer", function() {
+					return {
+						filters: [
+							["Customer", "name", "in", allowed_parties],
+							["Customer", "disabled", "!=", 1]
+						]
+					};
+				});
+			}
+		}
+	});
+
+	frappe.call({
+		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+		args: {
+			company: frm.doc.company,
+			parenttype: "Supplier",
+		},
+		callback: function(r) {
+			if (!r.message) return;
+
+			const { allowed_parties, restrict_buying_settings } = r.message;
+
+			if (restrict_buying_settings) {
+				// Restrict Supplier field
+				frm.set_query("supplier", function() {
+					return {
+						filters: [
+							["Supplier", "name", "in", allowed_parties],
+							["Supplier", "disabled", "!=", 1]
+						]
+					};
+				});
+			}
+		}
+	});
+}
+
 // Function to setup warehouse filters based on company
 function setup_warehouse_filters(frm) {
 	// Set up filter for Default Source Warehouse
@@ -471,4 +631,5 @@ function setup_warehouse_filters(frm) {
 		};
 	});
 }
+
 

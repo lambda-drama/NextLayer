@@ -92,3 +92,4 @@ def calculate_ean13_check_digit(number):
 
 	check_digit = (10 - (total % 10)) % 10
 	return check_digit
+
