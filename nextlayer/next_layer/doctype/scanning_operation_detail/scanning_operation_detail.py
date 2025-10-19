@@ -8,6 +8,7 @@ from frappe.model.document import Document
 class ScanningOperationDetail(Document):
 	def validate(self):
 		self.validate_required_fields()
+		self.auto_fill_uom()
 
 	def validate_required_fields(self):
 		"""Validate required fields"""
@@ -17,3 +18,10 @@ class ScanningOperationDetail(Document):
 			frappe.throw("Quantity must be greater than 0")
 		if not self.warehouse:
 			frappe.throw("Warehouse is required")
+
+	def auto_fill_uom(self):
+		"""Auto-fill UOM from item's default UOM if not set"""
+		if self.item_code and not self.uom:
+			stock_uom = frappe.get_value("Item", self.item_code, "stock_uom")
+			if stock_uom:
+				self.uom = stock_uom

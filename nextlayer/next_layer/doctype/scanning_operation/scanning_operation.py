@@ -64,6 +64,70 @@ class ScanningOperation(Document):
 
 
 @frappe.whitelist()
+def get_customers_or_suppliers_by_company(company, parenttype):
+	"""Get allowed customers or suppliers for a company based on Party Account settings"""
+
+	restrict_selling_settings = frappe.db.get_single_value("Selling Settings", "custom_restrict_allowed_customers_by_companies")
+	restrict_buying_settings = frappe.db.get_single_value("Buying Settings", "custom_restrict_allowed_suppliers_by_companies")
+
+	if not company:
+		frappe.throw("Company is required")
+
+	def get_allowed_parties_by_company(company: str, direct_type: str, group_type: str, group_link_field: str) -> list:
+		"""
+		Fetches allowed parties (customers or suppliers) for a company based on:
+		- Direct Party Accounts (e.g., Customer or Supplier)
+		- Group Party Accounts (e.g., Customer Group or Supplier Group)
+
+		:param company: Selected Company
+		:param direct_type: "Customer" or "Supplier"
+		:param group_type: "Customer Group" or "Supplier Group"
+		:param group_link_field: Field in direct doctype pointing to group (e.g., "customer_group")
+		:return: List of party names
+		"""
+
+		# Direct parties with a Party Account for the company
+		direct_parties = frappe.db.get_all(
+			"Party Account",
+			filters={"company": company, "parenttype": direct_type},
+			pluck="parent"
+		)
+
+		# Groups that have Party Account for the company
+		allowed_groups = frappe.db.get_all(
+			"Party Account",
+			filters={"company": company, "parenttype": group_type},
+			pluck="parent"
+		)
+
+		group_parties = []
+		if allowed_groups:
+			group_parties = frappe.db.get_all(
+				direct_type,
+				filters={group_link_field: ["in", allowed_groups]},
+				pluck="name"
+			)
+
+		return list(set(direct_parties + group_parties))
+
+	allowed_parties = []
+	if parenttype == "Customer":
+		allowed_parties = get_allowed_parties_by_company(
+			company, direct_type="Customer", group_type="Customer Group", group_link_field="customer_group"
+		)
+	elif parenttype == "Supplier":
+		allowed_parties = get_allowed_parties_by_company(
+			company, direct_type="Supplier", group_type="Supplier Group", group_link_field="supplier_group"
+		)
+
+	return {
+		"allowed_parties": allowed_parties,
+		"restrict_selling_settings": restrict_selling_settings,
+		"restrict_buying_settings": restrict_buying_settings
+	}
+
+
+@frappe.whitelist()
 def get_item_by_barcode(barcode):
 	"""Get item details by barcode"""
 	try:
@@ -82,6 +146,7 @@ def get_item_by_barcode(barcode):
 				"item_code": item_code,
 				"item_name": item_doc.item_name,
 				"description": item_doc.description,
+				"stock_uom": item_doc.stock_uom,
 				"barcode": barcode
 			}
 		else:

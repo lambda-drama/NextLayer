@@ -10,13 +10,16 @@ frappe.ui.form.on("Scanning Operation Detail", {
 				args: {
 					doctype: "Item",
 					filters: { name: row.item_code },
-					fieldname: ["item_name", "description"]
+					fieldname: ["item_name", "description", "stock_uom"]
 				},
 				callback: function(r) {
 					if (r.message) {
 						frm.set_value(cdt, cdn, "item_name", r.message.item_name);
 						if (r.message.description) {
 							frm.set_value(cdt, cdn, "description", r.message.description);
+						}
+						if (r.message.stock_uom) {
+							frm.set_value(cdt, cdn, "uom", r.message.stock_uom);
 						}
 					}
 				}
@@ -41,6 +44,10 @@ frappe.ui.form.on("Scanning Operation Detail", {
 
 						if (r.message.description) {
 							frm.set_value(cdt, cdn, "description", r.message.description);
+						}
+
+						if (r.message.stock_uom) {
+							frm.set_value(cdt, cdn, "uom", r.message.stock_uom);
 						}
 
 						frappe.show_alert(__("Item details populated from barcode"));
