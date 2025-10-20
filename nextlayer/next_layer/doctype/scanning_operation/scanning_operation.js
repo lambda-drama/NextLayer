@@ -184,29 +184,7 @@ function create_purchase_receipt(frm) {
 	frappe.new_doc("Purchase Receipt");
 
 	// Wait for the document to load and then add items
-	setTimeout(function() {
-		if (cur_frm && cur_frm.doctype === "Purchase Receipt") {
-			// Clear any existing items first
-			cur_frm.clear_table("items");
-
-			items_data.forEach(function(item_data) {
-				let new_row = cur_frm.add_child("items");
-				new_row.item_code = item_data.item_code;
-				new_row.item_name = item_data.item_name;
-				new_row.qty = item_data.qty;
-				new_row.uom = item_data.uom;
-				new_row.stock_uom = item_data.uom;
-				new_row.warehouse = item_data.warehouse;
-				if (item_data.barcode) {
-					new_row.barcode = item_data.barcode;
-				}
-				if (item_data.description) {
-					new_row.description = item_data.description;
-				}
-			});
-			cur_frm.refresh_field("items");
-		}
-	}, 1000);
+	wait_for_document_and_add_items("Purchase Receipt", items_data);
 }
 
 // Function to create Purchase Invoice
@@ -245,29 +223,7 @@ function create_purchase_invoice(frm) {
 	frappe.new_doc("Purchase Invoice");
 
 	// Wait for the document to load and then add items
-	setTimeout(function() {
-		if (cur_frm && cur_frm.doctype === "Purchase Invoice") {
-			// Clear any existing items first
-			cur_frm.clear_table("items");
-
-			items_data.forEach(function(item_data) {
-				let new_row = cur_frm.add_child("items");
-				new_row.item_code = item_data.item_code;
-				new_row.item_name = item_data.item_name;
-				new_row.qty = item_data.qty;
-				new_row.uom = item_data.uom;
-				new_row.stock_uom = item_data.uom;
-				new_row.warehouse = item_data.warehouse;
-				if (item_data.barcode) {
-					new_row.barcode = item_data.barcode;
-				}
-				if (item_data.description) {
-					new_row.description = item_data.description;
-				}
-			});
-			cur_frm.refresh_field("items");
-		}
-	}, 1000);
+	wait_for_document_and_add_items("Purchase Invoice", items_data);
 }
 
 // Function to create Delivery Note
@@ -306,29 +262,7 @@ function create_delivery_note(frm) {
 	frappe.new_doc("Delivery Note");
 
 	// Wait for the document to load and then add items
-	setTimeout(function() {
-		if (cur_frm && cur_frm.doctype === "Delivery Note") {
-			// Clear any existing items first
-			cur_frm.clear_table("items");
-
-			items_data.forEach(function(item_data) {
-				let new_row = cur_frm.add_child("items");
-				new_row.item_code = item_data.item_code;
-				new_row.item_name = item_data.item_name;
-				new_row.qty = item_data.qty;
-				new_row.uom = item_data.uom;
-				new_row.stock_uom = item_data.uom;
-				new_row.warehouse = item_data.warehouse;
-				if (item_data.barcode) {
-					new_row.barcode = item_data.barcode;
-				}
-				if (item_data.description) {
-					new_row.description = item_data.description;
-				}
-			});
-			cur_frm.refresh_field("items");
-		}
-	}, 1000);
+	wait_for_document_and_add_items("Delivery Note", items_data);
 }
 
 // Function to create Sales Invoice
@@ -367,29 +301,7 @@ function create_sales_invoice(frm) {
 	frappe.new_doc("Sales Invoice");
 
 	// Wait for the document to load and then add items
-	setTimeout(function() {
-		if (cur_frm && cur_frm.doctype === "Sales Invoice") {
-			// Clear any existing items first
-			cur_frm.clear_table("items");
-
-			items_data.forEach(function(item_data) {
-				let new_row = cur_frm.add_child("items");
-				new_row.item_code = item_data.item_code;
-				new_row.item_name = item_data.item_name;
-				new_row.qty = item_data.qty;
-				new_row.uom = item_data.uom;
-				new_row.stock_uom = item_data.uom;
-				new_row.warehouse = item_data.warehouse;
-				if (item_data.barcode) {
-					new_row.barcode = item_data.barcode;
-				}
-				if (item_data.description) {
-					new_row.description = item_data.description;
-				}
-			});
-			cur_frm.refresh_field("items");
-		}
-	}, 1000);
+	wait_for_document_and_add_items("Sales Invoice", items_data);
 }
 
 // Function to process barcode scan
@@ -630,6 +542,73 @@ function setup_warehouse_filters(frm) {
 			}
 		};
 	});
+}
+
+// Robust function to wait for document to load and add items
+function wait_for_document_and_add_items(doctype, items_data) {
+	let attempts = 0;
+	const max_attempts = 20; // Maximum 10 seconds (20 * 500ms)
+
+	function try_add_items() {
+		attempts++;
+
+		// Check if the current form is the target doctype
+		if (cur_frm && cur_frm.doctype === doctype) {
+			console.log(`Document ${doctype} loaded successfully after ${attempts} attempts`);
+
+			try {
+				// Clear any existing items first
+				cur_frm.clear_table("items");
+
+				// Add items one by one with error handling
+				items_data.forEach(function(item_data, index) {
+					try {
+						let new_row = cur_frm.add_child("items");
+						new_row.item_code = item_data.item_code;
+						new_row.item_name = item_data.item_name;
+						new_row.qty = item_data.qty;
+						new_row.uom = item_data.uom;
+						new_row.stock_uom = item_data.uom;
+						new_row.warehouse = item_data.warehouse;
+
+						if (item_data.barcode) {
+							new_row.barcode = item_data.barcode;
+						}
+						if (item_data.description) {
+							new_row.description = item_data.description;
+						}
+
+						console.log(`Added item ${index + 1}/${items_data.length}: ${item_data.item_code}`);
+					} catch (item_error) {
+						console.error(`Error adding item ${index + 1}:`, item_error);
+						frappe.msgprint(__("Error adding item {0}: {1}", [item_data.item_code, item_error.message]));
+					}
+				});
+
+				// Refresh the field to show the items
+				cur_frm.refresh_field("items");
+
+				// Show success message
+				frappe.show_alert(__("Successfully added {0} items to {1}", [items_data.length, doctype]));
+
+			} catch (error) {
+				console.error(`Error adding items to ${doctype}:`, error);
+				frappe.msgprint(__("Error adding items to {0}: {1}", [doctype, error.message]));
+			}
+
+		} else if (attempts < max_attempts) {
+			// Document not ready yet, try again
+			console.log(`Waiting for ${doctype} to load... attempt ${attempts}/${max_attempts}`);
+			setTimeout(try_add_items, 500); // Wait 500ms before next attempt
+		} else {
+			// Max attempts reached
+			console.error(`Failed to load ${doctype} after ${max_attempts} attempts`);
+			frappe.msgprint(__("Failed to load {0} document. Please try creating the document manually.", [doctype]));
+		}
+	}
+
+	// Start the first attempt after a short delay
+	setTimeout(try_add_items, 500);
 }
 
 
