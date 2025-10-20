@@ -28,7 +28,8 @@ fixtures = [
                 "name",
                 "in",
                 (
-                    "Global Defaults-custom_admin_password"
+                    "Global Defaults-custom_admin_password",
+                    "Item Barcode-custom_image"
                 ),
             ]
         ],
@@ -54,6 +55,9 @@ doc_events = {
     },
     "Payment Entry": {
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+    },
+    "Item": {
+        "before_save": "nextlayer.next_layer.controllers.generate_barcode.auto_generate_barcode_for_item",
     },
 }
 
@@ -84,6 +88,7 @@ doc_events = {
 doctype_js = {
 	"Sales Shipment Cost":"public/js/sales_shipment.js",
 	"Company":"public/js/company.js",
+	"Item":"public/js/item.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}

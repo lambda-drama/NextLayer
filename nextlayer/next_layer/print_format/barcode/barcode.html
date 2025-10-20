@@ -1,0 +1,78 @@
+<style>
+    .print-format {
+        width: 8cm;
+        height: 10cm;
+        padding: 5px;
+    }
+
+    @page {
+        size: 8cm 10cm;
+        margin: 0;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+    }
+
+    .container {
+        width: 100%;
+        text-align: center;
+        padding: 5px;
+    }
+
+    .title {
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .uom {
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+
+    .barcode img {
+        width: 100%;
+        margin-top: 5px;
+    }
+</style>
+
+<div class="container">
+    <div class="title">{{ doc.item_name }}</div>
+    <div class="uom">UOM: {{ doc.stock_uom }}</div>
+
+    {% if frappe.form_dict.barcode %}
+        <!-- Use barcode from route options (selected from modal) -->
+        {% set selected_barcode = frappe.form_dict.barcode %}
+        {% set barcode_image = frappe.form_dict.custom_image %}
+
+        {% if barcode_image %}
+            <div class="barcode">
+                <img src="{{ barcode_image }}">
+            </div>
+        {% else %}
+            <div class="barcode">
+                <p>{{ selected_barcode }}</p>
+            </div>
+        {% endif %}
+    {% else %}
+        <!-- Fallback: get first barcode if no specific barcode selected -->
+        {% set barcode = frappe.db.get_all(
+            "Item Barcode",
+            filters={"parent": doc.name},
+            fields=["custom_image"],
+            limit=1
+        ) %}
+
+        {% if barcode and barcode[0].custom_image %}
+            <div class="barcode">
+                <img src="{{ barcode[0].custom_image }}">
+            </div>
+        {% else %}
+            <div class="barcode">
+                <p>No barcode available</p>
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
