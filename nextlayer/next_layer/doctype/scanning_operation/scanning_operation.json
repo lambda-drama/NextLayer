@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:SO-{MM}-{######}",
  "creation": "2025-10-18 18:39:24.035741",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -196,10 +197,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-19 01:28:41.608225",
+ "modified": "2025-10-20 23:05:47.378996",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
