@@ -3,12 +3,17 @@
 
 import frappe
 from frappe.model.document import Document
+from erpnext.stock.utils import get_stock_balance
 
 
 class ScanningOperation(Document):
 	def validate(self):
 		self.validate_items()
 		self.auto_fill_missing_warehouses()
+
+	def on_submit(self):
+		"""Validate stock availability only on submit"""
+		self.validate_stock_availability()
 
 	def validate_items(self):
 		"""Validate that all items have required fields"""
@@ -61,6 +66,32 @@ class ScanningOperation(Document):
 		for item in self.items:
 			if not item.warehouse:
 				frappe.throw(f"Warehouse is required for row {item.idx}. Please set default warehouse or specify warehouse for this item.")
+
+	def validate_stock_availability(self):
+		"""Validate that sufficient stock is available for each item in the warehouse
+		Only validate for Loading operations (items being taken out of warehouse)"""
+		if not self.items or self.operation != "Loading":
+			return
+
+		for item in self.items:
+			if not item.item_code or not item.warehouse:
+				continue
+
+			# Get current stock balance for the item in the warehouse
+			stock_balance = get_stock_balance(
+				item_code=item.item_code,
+				warehouse=item.warehouse,
+				posting_date=self.date or frappe.utils.today(),
+				posting_time=self.posting_time or frappe.utils.nowtime()
+			)
+
+			# Check if sufficient stock is available
+			if stock_balance < item.quantity:
+				frappe.throw(
+					f"Insufficient stock for {item.item_name} ({item.item_code}) in warehouse {item.warehouse}. "
+					f"Available: {stock_balance}, Required: {item.quantity}",
+					title="Stock Validation Error"
+				)
 
 
 @frappe.whitelist()
@@ -166,6 +197,41 @@ def get_items_by_barcode_list(barcode_list):
 		if item:
 			items.append(item)
 	return items
+
+
+@frappe.whitelist()
+def check_stock_availability(item_code, warehouse, quantity, posting_date=None, posting_time=None):
+	"""Check if sufficient stock is available for an item in a warehouse"""
+	try:
+		if not item_code or not warehouse or not quantity:
+			return {"available": False, "message": "Item code, warehouse, and quantity are required"}
+
+		# Get current stock balance
+		stock_balance = get_stock_balance(
+			item_code=item_code,
+			warehouse=warehouse,
+			posting_date=posting_date or frappe.utils.today(),
+			posting_time=posting_time or frappe.utils.nowtime()
+		)
+
+		if stock_balance >= quantity:
+			return {
+				"available": True,
+				"stock_balance": stock_balance,
+				"required": quantity,
+				"message": f"Stock available: {stock_balance}"
+			}
+		else:
+			return {
+				"available": False,
+				"stock_balance": stock_balance,
+				"required": quantity,
+				"message": f"Insufficient stock. Available: {stock_balance}, Required: {quantity}"
+			}
+
+	except Exception as e:
+		frappe.log_error(f"Error checking stock availability for {item_code}: {str(e)}")
+		return {"available": False, "message": f"Error checking stock: {str(e)}"}
 
 
 @frappe.whitelist()

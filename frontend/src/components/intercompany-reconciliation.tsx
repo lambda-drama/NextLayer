@@ -18,6 +18,7 @@ import { usePermissionAwareParties } from "../hook/usePermissionAwareParties"
 import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
 import { usePermissionAwareGLData } from "../hook/usePermissionAwareGLData"
 import { useMatchStatus } from "../hook/useMatchStatus"
+import { useUserRoles } from "../hook/useUserRoles"
 import HiddenDocumentsSummary from "./hidden-documents-summary"
 import AdminPasswordDialog from "./admin-password-dialog"
 import HiddenTransactionsModal from "./hidden-transactions-modal"
@@ -85,6 +86,7 @@ export default function IntercompanyReconciliation() {
   const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
   const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, error: matchError, clearError } = useMatchStatus()
+  const { isSystemManagerOrAdmin } = useUserRoles()
 
   const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = usePermissionAwareParties("Customer")
 
@@ -2438,25 +2440,27 @@ export default function IntercompanyReconciliation() {
                     )}
                   </div>
 
-                   {/* Bypass Total Calculation Checkbox */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="bypass-total-calculation"
-                        checked={bypassTotalCalculation}
-                        onCheckedChange={handleBypassTotalCalculationChange}
-                      />
-                      <label htmlFor="bypass-total-calculation" className="text-sm text-gray-700">
-                        Match Net Amounts
-                      </label>
+                   {/* Bypass Total Calculation Checkbox - Only visible to System Manager or Administrator */}
+                  {isSystemManagerOrAdmin() && (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="bypass-total-calculation"
+                          checked={bypassTotalCalculation}
+                          onCheckedChange={handleBypassTotalCalculationChange}
+                        />
+                        <label htmlFor="bypass-total-calculation" className="text-sm text-gray-700">
+                          Match Net Amounts
+                        </label>
+                      </div>
+                      {/* <div className="text-xs text-gray-500">
+                        {bypassTotalCalculation
+                          ? "Match based on net total (credit - debit)"
+                          : "Match based on individual debit/credit amounts"
+                        }
+                      </div> */}
                     </div>
-                    {/* <div className="text-xs text-gray-500">
-                      {bypassTotalCalculation
-                        ? "Match based on net total (credit - debit)"
-                        : "Match based on individual debit/credit amounts"
-                      }
-                    </div> */}
-                  </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button

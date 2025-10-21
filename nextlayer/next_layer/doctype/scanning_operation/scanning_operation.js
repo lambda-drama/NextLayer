@@ -92,8 +92,10 @@ frappe.ui.form.on("Scanning Operation", {
 	before_save(frm) {
 		// Auto-fill missing warehouses before submit
 		auto_fill_missing_warehouses(frm);
-	}
+	},
+
 });
+
 
 // Function to setup automatic barcode detection
 function setup_automatic_barcode_detection(frm) {
@@ -612,3 +614,14 @@ function wait_for_document_and_add_items(doctype, items_data) {
 }
 
 
+frappe.ui.form.on("Scanning Operation Detail", {
+	items_add: function(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		
+		// Set default quantity to 1 for new rows
+		if (!row.quantity) {
+			frappe.model.set_value(cdt, cdn, "quantity", 1);
+		}
+	},
+
+}); 
