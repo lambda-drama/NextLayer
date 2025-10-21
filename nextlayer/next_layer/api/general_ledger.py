@@ -675,6 +675,24 @@ def get_permission_aware_companies():
 
 
 @frappe.whitelist()
+def get_user_roles():
+	"""Get current user's roles"""
+	try:
+		user_roles = frappe.get_roles()
+		return {
+			"success": True,
+			"roles": user_roles
+		}
+	except Exception as e:
+		frappe.log_error(f"Error fetching user roles: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"roles": []
+		}
+
+
+@frappe.whitelist()
 def verify_admin_password_and_get_hidden_transactions(admin_password, company_a, company_b, party_a, party_b, party_type_b, from_date, to_date, currency="all", ignore_exchange_rate_revaluation=True, ignore_system_generated_notes=True, show_opening_entries=False):
 	"""
 	Verify admin password from Global Defaults and return hidden transactions for both companies
