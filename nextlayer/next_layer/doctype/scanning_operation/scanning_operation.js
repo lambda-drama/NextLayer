@@ -92,7 +92,8 @@ frappe.ui.form.on("Scanning Operation", {
 	before_save(frm) {
 		// Auto-fill missing warehouses before submit
 		auto_fill_missing_warehouses(frm);
-	}
+	},
+
 });
 
 // Function to setup automatic barcode detection
