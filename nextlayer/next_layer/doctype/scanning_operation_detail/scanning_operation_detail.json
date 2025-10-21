@@ -33,7 +33,6 @@
    "read_only": 1
   },
   {
-   "default": "1",
    "fieldname": "quantity",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -81,7 +80,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-19 23:36:09.751697",
+ "modified": "2025-10-22 00:05:25.489329",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation Detail",

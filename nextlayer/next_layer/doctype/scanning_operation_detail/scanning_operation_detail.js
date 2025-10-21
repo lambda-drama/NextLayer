@@ -2,31 +2,6 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Scanning Operation Detail", {
-	item_code(frm, cdt, cdn) {
-		let row = locals[cdt][cdn];
-		if (row.item_code) {
-			frappe.call({
-				method: "frappe.client.get_value",
-				args: {
-					doctype: "Item",
-					filters: { name: row.item_code },
-					fieldname: ["item_name", "description", "stock_uom"]
-				},
-				callback: function(r) {
-					if (r.message) {
-						frm.set_value(cdt, cdn, "item_name", r.message.item_name);
-						if (r.message.description) {
-							frm.set_value(cdt, cdn, "description", r.message.description);
-						}
-						if (r.message.stock_uom) {
-							frm.set_value(cdt, cdn, "uom", r.message.stock_uom);
-						}
-					}
-				}
-			});
-		}
-	},
-
 	barcode(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
 		if (row.barcode) {
@@ -65,5 +40,41 @@ frappe.ui.form.on("Scanning Operation Detail", {
 			frm.set_value(cdt, cdn, "quantity", 0);
 			frappe.msgprint(__("Quantity cannot be negative"));
 		}
+	},
+	item_code(frm, cdt, cdn) {
+		// Set default quantity to 1 when item code is manually selected
+		let row = locals[cdt][cdn];
+		console.log("Item code selected:", row.item_code, "Current quantity:", row.quantity);
+
+		if (row.item_code) {
+			// Set quantity to 1 immediately if it's 0 or empty
+			if (!row.quantity || row.quantity === 0) {
+				console.log("Setting quantity to 1 for item:", row.item_code);
+				frm.set_value(cdt, cdn, "quantity", 1);
+				frm.refresh_field("quantity");
+			}
+
+			// Fetch item details
+			frappe.call({
+				method: "frappe.client.get_value",
+				args: {
+					doctype: "Item",
+					filters: { name: row.item_code },
+					fieldname: ["item_name", "description", "stock_uom"]
+				},
+				callback: function(r) {
+					if (r.message) {
+						frm.set_value(cdt, cdn, "item_name", r.message.item_name);
+						if (r.message.description) {
+							frm.set_value(cdt, cdn, "description", r.message.description);
+						}
+						if (r.message.stock_uom) {
+							frm.set_value(cdt, cdn, "uom", r.message.stock_uom);
+						}
+					}
+				}
+			});
+		}
 	}
 });
+

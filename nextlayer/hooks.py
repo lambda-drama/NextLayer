@@ -29,7 +29,11 @@ fixtures = [
                 "in",
                 (
                     "Global Defaults-custom_admin_password",
-                    "Item Barcode-custom_image"
+                    "Item Barcode-custom_image",
+                    "Purchase Invoice-custom_scanning_operation",
+                    "Purchase Receipt-custom_scanning_operation",
+                    "Sales Invoice-custom_scanning_operation",
+                    "Delivery Note-custom_scanning_operation",
                 ),
             ]
         ],
