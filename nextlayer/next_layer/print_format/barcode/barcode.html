@@ -27,11 +27,6 @@
         margin-bottom: 5px;
     }
 
-    .uom {
-        font-size: 12px;
-        margin-bottom: 10px;
-    }
-
     .barcode img {
         width: 100%;
         margin-top: 5px;
@@ -40,7 +35,6 @@
 
 <div class="container">
     <div class="title">{{ doc.item_name }}</div>
-    <div class="uom">UOM: {{ doc.stock_uom }}</div>
 
     {% if frappe.form_dict.barcode %}
         <!-- Use barcode from route options (selected from modal) -->
