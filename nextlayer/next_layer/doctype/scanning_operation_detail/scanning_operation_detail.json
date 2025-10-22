@@ -36,8 +36,7 @@
    "fieldname": "quantity",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Quantity",
-   "reqd": 1
+   "label": "Quantity"
   },
   {
    "fieldname": "column_break_vggm",
@@ -80,7 +79,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-22 00:05:25.489329",
+ "modified": "2025-10-23 02:07:27.844447",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation Detail",
