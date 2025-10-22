@@ -347,24 +347,25 @@ function add_item_to_table(frm, item_data) {
 	let existing_row = null;
 	if (frm.doc.items) {
 		frm.doc.items.forEach(function(row, index) {
-			console.log("Checking row", index, ":", row.item_code, "vs", item_data.item_code, "|", row.warehouse, "vs", warehouse);
 			if (row.item_code === item_data.item_code && row.warehouse === warehouse) {
 				existing_row = index;
-				console.log("Found existing row at index:", index);
 			}
 		});
 	}
 
-	console.log("Existing row found:", existing_row);
 
 	if (existing_row !== null) {
 		// Update quantity of existing item (like POS behavior)
 		let current_qty = frm.doc.items[existing_row].quantity || 0;
 		let new_qty = current_qty + 1;
-		console.log("Updating quantity:", current_qty, "->", new_qty, "for row", existing_row);
 
-		frm.set_value("items", existing_row, "quantity", new_qty);
-		frm.refresh_field("items"); // Refresh the table to show updated quantity
+		// Directly modify the row data to avoid triggering form events
+		frm.doc.items[existing_row].quantity = new_qty;
+
+		// Trigger form calculations and refresh with a small delay
+			frm.refresh_field("items");
+		
+
 		frappe.show_alert(__("Quantity increased to {0} for {1}", [new_qty, item_data.item_name]));
 	} else {
 		// Add new item to table
@@ -556,7 +557,6 @@ function wait_for_document_and_add_items(doctype, items_data) {
 
 		// Check if the current form is the target doctype
 		if (cur_frm && cur_frm.doctype === doctype) {
-			console.log(`Document ${doctype} loaded successfully after ${attempts} attempts`);
 
 			try {
 				// Clear any existing items first
@@ -580,7 +580,6 @@ function wait_for_document_and_add_items(doctype, items_data) {
 							new_row.description = item_data.description;
 						}
 
-						console.log(`Added item ${index + 1}/${items_data.length}: ${item_data.item_code}`);
 					} catch (item_error) {
 						console.error(`Error adding item ${index + 1}:`, item_error);
 						frappe.msgprint(__("Error adding item {0}: {1}", [item_data.item_code, item_error.message]));
@@ -600,8 +599,7 @@ function wait_for_document_and_add_items(doctype, items_data) {
 
 		} else if (attempts < max_attempts) {
 			// Document not ready yet, try again
-			console.log(`Waiting for ${doctype} to load... attempt ${attempts}/${max_attempts}`);
-			setTimeout(try_add_items, 500); // Wait 500ms before next attempt
+			setTimeout(try_add_items, 500);
 		} else {
 			// Max attempts reached
 			console.error(`Failed to load ${doctype} after ${max_attempts} attempts`);
@@ -618,7 +616,6 @@ frappe.ui.form.on("Scanning Operation Detail", {
 	items_add: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
 
-		// Set default quantity to 1 for new rows
 		if (!row.quantity) {
 			frappe.model.set_value(cdt, cdn, "quantity", 1);
 		}
