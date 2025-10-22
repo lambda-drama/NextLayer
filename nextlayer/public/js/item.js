@@ -116,12 +116,12 @@ function get_barcode_list_html(frm, barcodes) {
 				}
 				.barcode-text {
 					font-weight: bold;
-					font-size: 16px;
+					font-size: 10px;
 					color: #333;
 				}
 				.barcode-type {
 					color: #666;
-					font-size: 12px;
+					font-size: 10px;
 				}
 				.barcode-image {
 					max-width: 150px;
@@ -311,7 +311,7 @@ function create_print_html(item_data, barcode_data) {
 					height: 10cm;
 					padding: 5px;
 					font-family: Arial, sans-serif;
-					font-size: 14px;
+					font-size: 10px;
 				}
 
 				.container {
@@ -321,14 +321,9 @@ function create_print_html(item_data, barcode_data) {
 				}
 
 				.title {
-					font-size: 14px;
+					font-size: 10px;
 					font-weight: bold;
 					margin-bottom: 5px;
-				}
-
-				.uom {
-					font-size: 12px;
-					margin-bottom: 10px;
 				}
 
 				.barcode {
@@ -339,8 +334,7 @@ function create_print_html(item_data, barcode_data) {
 		<body>
 			<div class="print-format">
 				<div class="container">
-					<div class="title">${item_data.item_name}</div>
-					<div class="uom">UOM: ${item_data.stock_uom}</div>
+				<div class="title">${item_data.item_name}</div>
 					<div class="barcode">
 						${image_html}
 					</div>

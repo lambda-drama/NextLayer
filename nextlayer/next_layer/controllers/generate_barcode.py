@@ -172,7 +172,6 @@ def generate_ean_barcodes_for_items_background(company):
 					"parentfield": "barcodes",
 					"barcode": ean_barcode,
 					"barcode_type": "EAN"
-					# custom_image will be generated on-demand when printing
 				})
 
 				barcode_doc.insert(ignore_permissions=True)
