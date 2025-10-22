@@ -23,7 +23,11 @@ function show_barcode_selection_modal(frm) {
 			if (r.message && r.message.length > 0) {
 				if (r.message.length === 1) {
 					// Only one barcode, print directly
-					print_barcode(frm.doc.name, r.message[0]);
+					print_barcode(frm.doc.name, {
+						barcode: r.message[0].barcode,
+						custom_image: r.message[0].custom_image,
+						barcode_id: r.message[0].name
+					});
 				} else {
 					// Multiple barcodes, show selection modal
 					show_barcode_modal(frm, r.message);
@@ -70,13 +74,8 @@ function show_barcode_modal(frm, barcodes) {
 			let item_code = $item.data('item');
 			let barcode = $item.data('barcode');
 			let custom_image = $item.data('image');
+			let barcode_id = $item.data('barcode-id');
 
-			console.log('Print button clicked:');
-			console.log('- Item code from data:', item_code);
-			console.log('- Barcode from data:', barcode);
-			console.log('- Image from data:', custom_image);
-			console.log('- Current form item:', cur_frm ? cur_frm.doc.name : 'No current form');
-			console.log('- Current form item name:', cur_frm ? cur_frm.doc.item_name : 'No current form');
 
 			// Close modal first
 			modal.hide();
@@ -84,7 +83,8 @@ function show_barcode_modal(frm, barcodes) {
 			// Then print
 			print_barcode(item_code, {
 				barcode: barcode,
-				custom_image: custom_image
+				custom_image: custom_image,
+				barcode_id: barcode_id
 			});
 		});
 	}, 100);
@@ -145,14 +145,14 @@ function get_barcode_list_html(frm, barcodes) {
 
 	barcodes.forEach(function(barcode, index) {
 		let image_html = '';
-		if (barcode.custom_image) {
-			image_html = `<img src="${barcode.custom_image}" class="barcode-image" alt="Barcode">`;
+		if (barcode.custom_image && barcode.custom_image !== '') {
+			image_html = `<img src="${barcode.custom_image}" class="barcode-image" alt="Barcode ${barcode.barcode}">`;
 		} else {
-			image_html = '<div style="color: #999; font-size: 12px;">No image available</div>';
+			image_html = '<div style="color: #999; font-size: 12px; padding: 10px; border: 1px dashed #ccc;">Image will be generated when printing</div>';
 		}
 
 		html += `
-			<div class="barcode-item" data-barcode="${barcode.barcode}" data-image="${barcode.custom_image || ''}" data-item="${frm.doc.name}">
+			<div class="barcode-item" data-barcode="${barcode.barcode}" data-image="${barcode.custom_image || ''}" data-item="${frm.doc.name}" data-barcode-id="${barcode.name || ''}">
 				<div class="barcode-info">
 					<div>
 						<div class="barcode-text">${barcode.barcode}</div>
@@ -177,7 +177,6 @@ function get_barcode_list_html(frm, barcodes) {
 }
 
 function printSelectedBarcode(item_code, barcode, custom_image) {
-	console.log('Printing barcode:', barcode, 'for item:', item_code);
 	print_barcode(item_code, {
 		barcode: barcode,
 		custom_image: custom_image
@@ -185,14 +184,55 @@ function printSelectedBarcode(item_code, barcode, custom_image) {
 }
 
 function print_barcode(item_code, barcode_data) {
-	// Generate print content and trigger browser print
-	generate_print_content(item_code, barcode_data);
+	// Check if custom_image exists and is valid
+	if (!barcode_data.custom_image || barcode_data.custom_image === '') {
+		console.log('No custom_image found, generating barcode image first...');
+
+		// Show loading message
+		frappe.show_alert({
+			message: __('Generating barcode image...'),
+			indicator: 'blue'
+		});
+
+		// Generate barcode image on-demand for this specific barcode
+		frappe.call({
+			method: "nextlayer.next_layer.controllers.generate_barcode.generate_and_save_barcode_image",
+			args: {
+				barcode_id: barcode_data.barcode_id || barcode_data.name
+			},
+			callback: function(r) {
+				if (r.message && r.message.status === 'success') {
+					console.log('Barcode image generated successfully, proceeding to print...');
+
+					// Update barcode_data with the new image
+					barcode_data.custom_image = r.message.image_url;
+
+					// Show success message
+					frappe.show_alert({
+						message: __('Barcode image ready! Proceeding to print...'),
+						indicator: 'green'
+					});
+
+					// Now proceed to print with the generated image
+					generate_print_content(item_code, barcode_data);
+				} else {
+					console.error('Error generating barcode image:', r.message);
+					frappe.msgprint(__('Failed to generate barcode image: ') + (r.message?.message || 'Unknown error'));
+				}
+			},
+			error: function(err) {
+				console.error('Error calling image generation API:', err);
+				frappe.msgprint(__('Failed to generate barcode image. Please try again.'));
+			}
+		});
+	} else {
+		console.log('Custom image exists, proceeding to print directly...');
+		// Image exists, proceed to print directly
+		generate_print_content(item_code, barcode_data);
+	}
 }
 
 function generate_print_content(item_code, barcode_data) {
-	console.log('Generating print content for:', item_code, barcode_data);
-	console.log('Current form item:', cur_frm ? cur_frm.doc.name : 'No current form');
-	console.log('Current form item name:', cur_frm ? cur_frm.doc.item_name : 'No current form');
 
 	// Use current form data if available, otherwise fetch from API
 	let item_data;
@@ -235,10 +275,18 @@ function generate_print_content(item_code, barcode_data) {
 
 function create_print_html(item_data, barcode_data) {
 	let image_html = '';
-	if (barcode_data.custom_image) {
-		image_html = `<img src="${barcode_data.custom_image}" style="width: 100%; margin-top: 5px;">`;
+	if (barcode_data.custom_image && barcode_data.custom_image !== '') {
+		image_html = `<img src="${barcode_data.custom_image}" style="width: 100%; margin-top: 5px;" alt="Barcode ${barcode_data.barcode}">`;
 	} else {
-		image_html = `<p style="text-align: center; margin-top: 10px;">${barcode_data.barcode}</p>`;
+		// Fallback: show barcode number as text if image is not available
+		image_html = `
+			<div style="text-align: center; margin-top: 10px; font-family: monospace; font-size: 16px; font-weight: bold;">
+				${barcode_data.barcode}
+			</div>
+			<div style="text-align: center; margin-top: 5px; font-size: 12px; color: #666;">
+				(Barcode Image Not Available)
+			</div>
+		`;
 	}
 
 	return `
@@ -304,8 +352,6 @@ function create_print_html(item_data, barcode_data) {
 }
 
 function open_print_dialog(html_content) {
-	console.log('Opening print dialog with content length:', html_content.length);
-
 	// Create a new window with the print content
 	let printWindow = window.open('', '_blank', 'width=600,height=400');
 
@@ -319,11 +365,8 @@ function open_print_dialog(html_content) {
 	printWindow.document.write(html_content);
 	printWindow.document.close();
 
-	console.log('Print window opened, waiting for load...');
-
 	// Wait for images to load, then trigger print
 	printWindow.onload = function() {
-		console.log('Print window loaded, triggering print...');
 		setTimeout(function() {
 			printWindow.print();
 			printWindow.close();

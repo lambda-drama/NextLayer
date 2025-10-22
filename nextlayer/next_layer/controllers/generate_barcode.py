@@ -46,7 +46,7 @@ def generate_ean_barcodes_for_items(company):
 	try:
 		# Get all items
 		items = frappe.get_all("Item",
-			filters={"disabled": 0},
+			filters={"disabled": 0, "is_stock_item": 1},
 			fields=["name", "item_code", "item_name"]
 		)
 
@@ -67,9 +67,6 @@ def generate_ean_barcodes_for_items(company):
 			# Generate EAN-13 barcode
 			ean_barcode = generate_ean13_barcode()
 
-			# Generate barcode image
-			barcode_image = generate_image_for_barcode(ean_barcode)
-
 			# Create Item Barcode record
 			barcode_doc = frappe.get_doc({
 				"doctype": "Item Barcode",
@@ -77,8 +74,8 @@ def generate_ean_barcodes_for_items(company):
 				"parenttype": "Item",
 				"parentfield": "barcodes",
 				"barcode": ean_barcode,
-				"barcode_type": "EAN",
-				"custom_image": barcode_image
+				"barcode_type": "EAN"
+				# custom_image will be generated on-demand when printing
 			})
 
 			barcode_doc.insert(ignore_permissions=True)
@@ -95,6 +92,117 @@ def generate_ean_barcodes_for_items(company):
 
 	except Exception as e:
 		frappe.log_error(f"Error generating EAN barcodes: {str(e)}")
+		frappe.db.rollback()
+		raise e
+
+
+@frappe.whitelist()
+def enqueue_generate_ean_barcodes_for_items(company):
+	"""Enqueue the generation of EAN barcodes for all items to run in background"""
+	try:
+		# Get total count of items for progress tracking
+		total_items = frappe.db.count("Item", filters={"disabled": 0, "is_stock_item": 1})
+
+		if total_items == 0:
+			return {
+				"status": "info",
+				"message": "No items found to generate barcodes for"
+			}
+
+		# Enqueue the background job
+		job = frappe.enqueue(
+			method="nextlayer.next_layer.controllers.generate_barcode.generate_ean_barcodes_for_items_background",
+			queue="long",
+			timeout=300,  # 1 hour timeout
+			company=company,
+			job_name=f"Generate EAN Barcodes for {company}",
+			enqueue_after_commit=True
+		)
+
+		return {
+			"status": "success",
+			"message": f"Barcode generation job queued successfully. Processing {total_items} items.",
+			"job_id": job.id if job else None,
+			"total_items": total_items
+		}
+
+	except Exception as e:
+		frappe.log_error(f"Error enqueueing EAN barcode generation: {str(e)}")
+		return {
+			"status": "error",
+			"message": f"Failed to queue barcode generation: {str(e)}"
+		}
+
+
+def generate_ean_barcodes_for_items_background(company):
+	"""Background function to generate EAN barcodes for all items"""
+	try:
+		# Get all items
+		items = frappe.get_all("Item",
+			filters={"disabled": 0, "is_stock_item": 1},
+			fields=["name", "item_code", "item_name"]
+		)
+
+		generated_count = 0
+		skipped_count = 0
+		error_count = 0
+
+		frappe.log_error(f"Starting background barcode generation for {len(items)} items")
+
+		for i, item in enumerate(items):
+			try:
+				# Check if item already has an EAN barcode
+				existing_barcode = frappe.get_value("Item Barcode",
+					{"parent": item.name, "barcode_type": "EAN"},
+					"barcode"
+				)
+
+				if existing_barcode:
+					skipped_count += 1
+					continue
+
+				# Generate EAN-13 barcode
+				ean_barcode = generate_ean13_barcode()
+
+				# Create Item Barcode record (image will be generated on-demand)
+				barcode_doc = frappe.get_doc({
+					"doctype": "Item Barcode",
+					"parent": item.name,
+					"parenttype": "Item",
+					"parentfield": "barcodes",
+					"barcode": ean_barcode,
+					"barcode_type": "EAN"
+					# custom_image will be generated on-demand when printing
+				})
+
+				barcode_doc.insert(ignore_permissions=True)
+				generated_count += 1
+
+				# Commit every 10 items to avoid long transactions
+				if (i + 1) % 10 == 0:
+					frappe.db.commit()
+					frappe.log_error(f"Processed {i + 1}/{len(items)} items. Generated: {generated_count}, Skipped: {skipped_count}")
+
+			except Exception as item_error:
+				error_count += 1
+				frappe.log_error(f"Error processing item {item.name}: {str(item_error)}")
+				continue
+
+		# Final commit
+		frappe.db.commit()
+
+		# Log final results
+		frappe.log_error(f"Barcode generation completed. Generated: {generated_count}, Skipped: {skipped_count}, Errors: {error_count}")
+
+		return {
+			"generated_count": generated_count,
+			"skipped_count": skipped_count,
+			"error_count": error_count,
+			"total_items": len(items)
+		}
+
+	except Exception as e:
+		frappe.log_error(f"Error in background barcode generation: {str(e)}")
 		frappe.db.rollback()
 		raise e
 
@@ -237,7 +345,7 @@ def get_item_barcodes(item_code):
 	try:
 		barcodes = frappe.get_all("Item Barcode",
 			filters={"parent": item_code},
-			fields=["barcode", "barcode_type", "custom_image"],
+			fields=["name", "barcode", "barcode_type", "custom_image"],
 			order_by="creation desc"
 		)
 
@@ -246,4 +354,148 @@ def get_item_barcodes(item_code):
 	except Exception as e:
 		frappe.log_error(f"Error getting barcodes for item {item_code}: {str(e)}")
 		return []
+
+
+@frappe.whitelist()
+def generate_and_save_barcode_image(barcode_id):
+	"""Generate and save barcode image for a specific Item Barcode record"""
+	try:
+		# Get the barcode record
+		barcode_doc = frappe.get_doc("Item Barcode", barcode_id)
+
+		if not barcode_doc.barcode:
+			frappe.throw("No barcode found for this record")
+
+		# Check if image already exists
+		if barcode_doc.custom_image:
+			return {
+				"status": "success",
+				"message": "Barcode image already exists",
+				"image_url": barcode_doc.custom_image
+			}
+
+		# Generate barcode image
+		barcode_image = generate_image_for_barcode(barcode_doc.barcode)
+		print("Ites here",str(barcode_image))
+		if barcode_image:
+			# Update the record with the image
+			barcode_doc.custom_image = barcode_image
+			barcode_doc.save(ignore_permissions=True)
+
+			return {
+				"status": "success",
+				"message": "Barcode image generated and saved",
+				"image_url": barcode_image
+			}
+		else:
+			return {
+				"status": "error",
+				"message": "Failed to generate barcode image"
+			}
+
+	except Exception as e:
+		frappe.log_error(f"Error generating barcode image for {barcode_id}: {str(e)}")
+		return {
+			"status": "error",
+			"message": f"Failed to generate barcode image: {str(e)}"
+		}
+
+
+@frappe.whitelist()
+def print_barcodes_for_items(item_codes=None, company=None):
+	"""Print barcodes for specified items, generating images on-demand if needed"""
+	try:
+		if not item_codes:
+			# If no specific items, get all items with barcodes
+			items_with_barcodes = frappe.get_all("Item Barcode",
+				filters={"parenttype": "Item"},
+				fields=["parent", "name", "barcode", "custom_image"],
+				group_by="parent"
+			)
+		else:
+			# Get barcodes for specific items
+			items_with_barcodes = frappe.get_all("Item Barcode",
+				filters={"parent": ["in", item_codes]},
+				fields=["parent", "name", "barcode", "custom_image"]
+			)
+
+		if not items_with_barcodes:
+			return {
+				"status": "info",
+				"message": "No items with barcodes found"
+			}
+
+		generated_images = 0
+		existing_images = 0
+		errors = 0
+
+		for item_barcode in items_with_barcodes:
+			try:
+				if not item_barcode.custom_image:
+					# Generate image on-demand
+					result = generate_and_save_barcode_image(item_barcode.name)
+					if result.get("status") == "success":
+						generated_images += 1
+					else:
+						errors += 1
+				else:
+					existing_images += 1
+
+			except Exception as e:
+				errors += 1
+				frappe.log_error(f"Error processing barcode for item {item_barcode.parent}: {str(e)}")
+
+		# Get updated barcodes with images for printing
+		updated_barcodes = frappe.get_all("Item Barcode",
+			filters={"parent": ["in", [item["parent"] for item in items_with_barcodes]]},
+			fields=["parent", "barcode", "custom_image", "barcode_type"],
+			order_by="parent"
+		)
+
+		return {
+			"status": "success",
+			"message": f"Ready for printing. Generated: {generated_images}, Existing: {existing_images}, Errors: {errors}",
+			"barcodes": updated_barcodes,
+			"generated_images": generated_images,
+			"existing_images": existing_images,
+			"errors": errors
+		}
+
+	except Exception as e:
+		frappe.log_error(f"Error in print_barcodes_for_items: {str(e)}")
+		return {
+			"status": "error",
+			"message": f"Failed to prepare barcodes for printing: {str(e)}"
+		}
+
+
+@frappe.whitelist()
+def get_printable_barcodes(item_code=None):
+	"""Get barcodes ready for printing (with images)"""
+	try:
+		filters = {"parenttype": "Item"}
+		if item_code:
+			filters["parent"] = item_code
+
+		barcodes = frappe.get_all("Item Barcode",
+			filters=filters,
+			fields=["parent", "barcode", "custom_image", "barcode_type"],
+			order_by="parent"
+		)
+
+		# Filter only barcodes that have images
+		printable_barcodes = [barcode for barcode in barcodes if barcode.custom_image]
+
+		return {
+			"status": "success",
+			"barcodes": printable_barcodes,
+			"count": len(printable_barcodes)
+		}
+
+	except Exception as e:
+		frappe.log_error(f"Error getting printable barcodes: {str(e)}")
+		return {
+			"status": "error",
+			"message": f"Failed to get printable barcodes: {str(e)}"
+		}
 

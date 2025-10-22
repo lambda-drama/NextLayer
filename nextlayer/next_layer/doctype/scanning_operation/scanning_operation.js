@@ -617,11 +617,11 @@ function wait_for_document_and_add_items(doctype, items_data) {
 frappe.ui.form.on("Scanning Operation Detail", {
 	items_add: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
-		
+
 		// Set default quantity to 1 for new rows
 		if (!row.quantity) {
 			frappe.model.set_value(cdt, cdn, "quantity", 1);
 		}
 	},
 
-}); 
+});
