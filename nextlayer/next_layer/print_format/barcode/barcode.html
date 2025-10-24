@@ -1,57 +1,72 @@
 <style>
+    
     .print-format {
-        width: 8cm;
-        height: 10cm;
-        padding: 5px;
+        width: 3cm;
+        height: 5cm;
+        padding: 3px;
+        border: 0.5px dashed #888;
+        box-sizing: border-box;
     }
-
+    
     @page {
-        size: 8cm 10cm;
+        size: 3cm 5cm;
         margin: 0;
     }
 
     body {
         font-family: Arial, sans-serif;
-        font-size: 14px;
+        font-size: 9px;
+        margin: 0;
+        padding: 0;
     }
 
     .container {
         width: 100%;
         text-align: center;
-        padding: 5px;
+        padding: 2px;
+        box-sizing: border-box;
     }
 
     .title {
-        font-size: 14px;
+        font-size: 9px;
         font-weight: bold;
-        margin-bottom: 5px;
+        margin-bottom: 3px;
+        text-transform: uppercase;
+    }
+
+    .info {
+        text-align: center;
+        margin: 2px 0;
+        line-height: 1.1;
+        font-size: 8.5px;
     }
 
     .barcode img {
         width: 100%;
-        margin-top: 5px;
+        max-height: 3cm;
+        object-fit: contain;
+        margin: 1px 0;
+    }
+
+    .footer {
+        text-align: center;
+        font-weight: bold;
+        font-size: 8.5px;
+        text-transform: uppercase;
     }
 </style>
 
-<div class="container">
-    <div class="title">{{ doc.item_name }}</div>
+<div class="print-format">
+    <div class="container">
 
-    {% if frappe.form_dict.barcode %}
-        <!-- Use barcode from route options (selected from modal) -->
-        {% set selected_barcode = frappe.form_dict.barcode %}
-        {% set barcode_image = frappe.form_dict.custom_image %}
+        <div class="info">
+            <div> MRK - R.M.D</div>
+            <div> M/C-3</div>
+            <div> ART-RYL-AIR</div>
+            <div class="title">{{ doc.item_name }}</div>
 
-        {% if barcode_image %}
-            <div class="barcode">
-                <img src="{{ barcode_image }}">
-            </div>
-        {% else %}
-            <div class="barcode">
-                <p>{{ selected_barcode }}</p>
-            </div>
-        {% endif %}
-    {% else %}
-        <!-- Fallback: get first barcode if no specific barcode selected -->
+        </div>
+
         {% set barcode = frappe.db.get_all(
             "Item Barcode",
             filters={"parent": doc.name},
@@ -68,5 +83,7 @@
                 <p>No barcode available</p>
             </div>
         {% endif %}
-    {% endif %}
+
+        <div class="footer">Made in India</div>
+    </div>
 </div>
