@@ -295,49 +295,78 @@ function create_print_html(item_data, barcode_data) {
 		<head>
 			<title>Barcode Print</title>
 			<style>
-				@media print {
-					@page {
-						size: 8cm 10cm;
-						margin: 0;
-					}
-					body {
-						margin: 0;
-						padding: 0;
-					}
+				.print-format {
+					width: 5cm;
+					height: 10cm;
+					padding: 4px;
+					border: 0.5px dashed #888;
+					box-sizing: border-box;
 				}
 
-				.print-format {
-					width: 8cm;
-					height: 10cm;
-					padding: 5px;
+				@page {
+					size: 5cm 10cm;
+					margin: 0;
+				}
+
+				body {
 					font-family: Arial, sans-serif;
 					font-size: 10px;
+					margin: 0;
+					padding: 0;
 				}
 
 				.container {
 					width: 100%;
 					text-align: center;
-					padding: 5px;
+					padding: 3px;
+					box-sizing: border-box;
 				}
 
 				.title {
 					font-size: 10px;
-					font-weight: bold;
-					margin-bottom: 5px;
+					margin: 4px 0;
+					text-transform: uppercase;
+					word-wrap: break-word;
 				}
 
-				.barcode {
-					margin-top: 5px;
+				.info {
+					text-align: center;
+					margin: 2px 0;
+					line-height: 1.2;
+					font-size: 9px;
+				}
+
+				.barcode img {
+					width: 100%;
+					max-height: 5cm;
+					object-fit: contain;
+					margin: 3px 0;
+				}
+
+				.footer {
+					text-align: center;
+					font-weight: bold;
+					font-size: 9px;
+					text-transform: uppercase;
+					margin-top: 4px;
 				}
 			</style>
 		</head>
 		<body>
 			<div class="print-format">
 				<div class="container">
-				<div class="title">${item_data.item_name}</div>
+					<div class="info">
+						<div>MRK - R.M.D</div>
+						<div>M/C-3</div>
+						<div>ART-RYL-AIR</div>
+						<div class="title">${item_data.item_name}</div>
+					</div>
+
 					<div class="barcode">
 						${image_html}
 					</div>
+
+					<div class="footer">Made in India</div>
 				</div>
 			</div>
 		</body>
