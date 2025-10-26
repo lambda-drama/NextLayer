@@ -270,7 +270,7 @@ function show_print_info_modal(item_code, barcode_data) {
 
 			// Close dialog and proceed with printing
 			dialog.hide();
-			
+
 			// Generate and print
 			generate_print_content(item_code, barcode_data);
 		}
@@ -397,28 +397,34 @@ function create_print_html(item_data, barcode_data) {
 				}
 
 				.barcode {
-					margin-top:30px;
-					
+					margin-top:20px;
+
 					}
-					
-				.footer {
-					text-align: center;
-					font-weight: bold;
-					font-size: 9px;
-					text-transform: uppercase;
-					margin-top: 10px;
-				}
-			</style>
-		</head>
+
+			.footer {
+				text-align: center;
+				font-weight: bold;
+				font-size: 9px;
+				text-transform: uppercase;
+				margin-top: 5px;
+			}
+
+			.info-section {
+				border-bottom: 0.1px solid #ccc;
+				padding-bottom: 1px;
+				margin-bottom: 1px;
+			}
+		</style>
+	</head>
 		<body>
 			<div class="print-format">
 				<div class="container">
-					<div class="info">
-						<div>MARKA-${barcode_data.marka || 'MRK - R.M.D'}</div>
-						<div>M/C-${barcode_data.machine_no || 'M/C-3'}</div>
-						<div>${barcode_data.unique_code || 'ART-RYL-AIR'}</div>
-						<div class="title">${item_data.item_name}</div>
-					</div>
+				<div class="info">
+					<div class="info-section">MARKA-${barcode_data.marka || 'MRK - R.M.D'}</div>
+					<div class="info-section">M/C-${barcode_data.machine_no || 'M/C-3'}</div>
+					<div class="info-section">${barcode_data.unique_code || 'ART-RYL-AIR'}</div>
+					<div class="title info-section">${item_data.item_name}</div>
+				</div>
 
 					<div class="barcode">
 						${image_html}
