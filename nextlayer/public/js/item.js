@@ -263,14 +263,10 @@ function show_print_info_modal(item_code, barcode_data) {
 		],
 		primary_action_label: __('Print'),
 		primary_action: function(values) {
-			console.log('Modal primary action called with values:', values);
 
-			// Add the additional info to barcode_data
 			barcode_data.marka = values.marka;
 			barcode_data.machine_no = values.machine_no;
 			barcode_data.unique_code = values.unique_code;
-
-			console.log('Updated barcode_data:', barcode_data);
 
 			// Close dialog and proceed with printing
 			dialog.hide();
@@ -281,21 +277,17 @@ function show_print_info_modal(item_code, barcode_data) {
 	});
 
 	dialog.show();
-	console.log('Dialog show() called');
 }
 
 function generate_print_content(item_code, barcode_data) {
-	console.log('Generating print content for:', {item_code, barcode_data});
 
 	// Use current form data if available, otherwise fetch from API
 	if (cur_frm && cur_frm.doc && cur_frm.doc.name === item_code) {
-		console.log('Using current form data');
 		let item_data = {
 			item_name: cur_frm.doc.item_name,
 			stock_uom: cur_frm.doc.stock_uom
 		};
 		let print_html = create_print_html(item_data, barcode_data);
-		console.log('Print HTML created, opening print window...');
 		open_print_dialog(print_html);
 	} else {
 		console.log('Fetching item data from API');
@@ -377,7 +369,7 @@ function create_print_html(item_data, barcode_data) {
 				}
 
 				.title {
-					font-size: 10px;
+					font-size: 14px;
 					margin: 4px 0;
 					text-transform: uppercase;
 					word-wrap: break-word;
@@ -393,22 +385,28 @@ function create_print_html(item_data, barcode_data) {
 					text-align: center;
 					margin-top: 10px;
 					line-height: 1.2;
-					font-size: 12px;
+					font-size: 16px;
 				}
 
 				.barcode img {
 					width: 100%;
 					max-height: 5cm;
 					object-fit: contain;
-					margin: 3px 0;
+					margin-left: 3px;
+					margin-right: 3px;
 				}
 
+				.barcode {
+					margin-top:30px;
+					
+					}
+					
 				.footer {
 					text-align: center;
 					font-weight: bold;
 					font-size: 9px;
 					text-transform: uppercase;
-					margin-top: 4px;
+					margin-top: 10px;
 				}
 			</style>
 		</head>
@@ -416,8 +414,8 @@ function create_print_html(item_data, barcode_data) {
 			<div class="print-format">
 				<div class="container">
 					<div class="info">
-						<div>${barcode_data.marka || 'MRK - R.M.D'}</div>
-						<div>${barcode_data.machine_no || 'M/C-3'}</div>
+						<div>MARKA-${barcode_data.marka || 'MRK - R.M.D'}</div>
+						<div>M/C-${barcode_data.machine_no || 'M/C-3'}</div>
 						<div>${barcode_data.unique_code || 'ART-RYL-AIR'}</div>
 						<div class="title">${item_data.item_name}</div>
 					</div>
@@ -459,7 +457,6 @@ function open_print_dialog(html_content) {
 	// Fallback if onload doesn't fire
 	setTimeout(function() {
 		if (printWindow && !printWindow.closed) {
-			console.log('Fallback: triggering print after timeout...');
 			printWindow.print();
 			printWindow.close();
 		}
