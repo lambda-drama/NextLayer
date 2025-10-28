@@ -1,21 +1,20 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:SO-{MM}-{######}",
+ "autoname": "field:scanning_name",
  "creation": "2025-10-18 18:39:24.035741",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "section_break_v8yd",
   "amended_from",
+  "scanning_name",
   "operation",
   "company",
   "column_break_gtsy",
   "date",
   "posting_time",
   "column_break_rnyw",
-  "customer",
-  "supplier",
   "accounting_dimensions_section",
   "company_group",
   "cost_center",
@@ -24,6 +23,23 @@
   "column_break_fcol",
   "marka",
   "branch",
+  "shipping_details_section",
+  "container_no",
+  "port_of_loading",
+  "data_ncab",
+  "bil",
+  "bill_of_exit",
+  "column_break_chmk",
+  "estimated_date_of_departure",
+  "destination",
+  "port_of_discharge",
+  "container_quantity",
+  "shipping_line",
+  "column_break_wyxl",
+  "estimated_date_of_arrival",
+  "remaining_days",
+  "actual_arrival_date",
+  "shipping_status",
   "section_break_xpeq",
   "scan_barcode",
   "column_break_pfcx",
@@ -46,16 +62,6 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
-  },
-  {
-   "depends_on": "eval:doc.operation === \"Loading\"",
-   "fieldname": "customer",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Customer",
-   "mandatory_depends_on": "eval:doc.operation === \"Loading\"",
-   "options": "Customer"
   },
   {
    "fieldname": "column_break_gtsy",
@@ -185,23 +191,110 @@
    "options": "Warehouse"
   },
   {
-   "depends_on": "eval:doc.operation === \"Offloading\"",
-   "fieldname": "supplier",
+   "fieldname": "scanning_name",
+   "fieldtype": "Data",
+   "label": "Scanning Name",
+   "unique": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "shipping_details_section",
+   "fieldtype": "Section Break",
+   "label": "Shipping Details"
+  },
+  {
+   "fieldname": "container_no",
+   "fieldtype": "Data",
+   "label": "Container No"
+  },
+  {
+   "fieldname": "port_of_loading",
    "fieldtype": "Link",
-   "label": "Supplier",
-   "mandatory_depends_on": "eval:doc.operation === \"Offloading\"",
-   "options": "Supplier"
+   "label": "Port of Loading",
+   "options": "Location"
+  },
+  {
+   "fieldname": "data_ncab",
+   "fieldtype": "Data",
+   "label": "Bill of Lading"
+  },
+  {
+   "fieldname": "bil",
+   "fieldtype": "Attach",
+   "label": "BIL"
+  },
+  {
+   "fieldname": "bill_of_exit",
+   "fieldtype": "Data",
+   "label": "Bill of Exit"
+  },
+  {
+   "fieldname": "column_break_chmk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estimated_date_of_departure",
+   "fieldtype": "Date",
+   "label": "Estimated Date of Departure"
+  },
+  {
+   "fieldname": "destination",
+   "fieldtype": "Link",
+   "label": "Destination",
+   "options": "Location"
+  },
+  {
+   "fieldname": "port_of_discharge",
+   "fieldtype": "Link",
+   "label": "Port of Discharge",
+   "options": "Location"
+  },
+  {
+   "fieldname": "container_quantity",
+   "fieldtype": "Float",
+   "label": "Container Quantity"
+  },
+  {
+   "fieldname": "shipping_line",
+   "fieldtype": "Link",
+   "label": "Shipping Line",
+   "options": "Location"
+  },
+  {
+   "fieldname": "column_break_wyxl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estimated_date_of_arrival",
+   "fieldtype": "Date",
+   "label": "Estimated Date of Arrival"
+  },
+  {
+   "fieldname": "remaining_days",
+   "fieldtype": "Data",
+   "label": "Remaining Days"
+  },
+  {
+   "fieldname": "actual_arrival_date",
+   "fieldtype": "Date",
+   "label": "Actual Arrival Date"
+  },
+  {
+   "fieldname": "shipping_status",
+   "fieldtype": "Select",
+   "label": "Shipping Status",
+   "options": "\nIn Transit\nCompleted"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-23 02:07:53.298568",
+ "modified": "2025-10-28 23:04:29.093190",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",
- "naming_rule": "Expression",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
