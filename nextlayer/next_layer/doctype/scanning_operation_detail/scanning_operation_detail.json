@@ -68,7 +68,8 @@
    "label": "Description"
   },
   {
-   "fetch_from": "item_code.stock_uom",
+   "fetch_from": "item_code.sales_uom",
+   "fetch_if_empty": 1,
    "fieldname": "uom",
    "fieldtype": "Link",
    "label": "Uom",
@@ -79,7 +80,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-23 02:07:27.844447",
+ "modified": "2025-10-28 23:39:36.821373",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation Detail",

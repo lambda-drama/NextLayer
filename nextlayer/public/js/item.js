@@ -342,21 +342,21 @@ function create_print_html(item_data, barcode_data) {
 			<title>Barcode Print</title>
 			<style>
 				.print-format {
-					width: 5cm;
-					height: 10cm;
+					width: 10cm;
+					height: 15cm;
 					padding: 4px;
 					border: 0.5px dashed #888;
 					box-sizing: border-box;
 				}
 
 				@page {
-					size: 5cm 10cm;
+					size: 10cm 15cm;
 					margin: 0;
 				}
 
 				body {
 					font-family: Arial, sans-serif;
-					font-size: 10px;
+					font-size: 16px;
 					margin: 0;
 					padding: 0;
 				}
@@ -369,7 +369,7 @@ function create_print_html(item_data, barcode_data) {
 				}
 
 				.title {
-					font-size: 14px;
+					font-size: 16px;
 					margin: 4px 0;
 					text-transform: uppercase;
 					word-wrap: break-word;
@@ -377,13 +377,13 @@ function create_print_html(item_data, barcode_data) {
 
 				.info {
 					text-align: center;
-					margin: 2px 0;
 					line-height: 1.2;
 					font-size: 12px;
 				}
 				.info div {
 					text-align: center;
-					margin-top: 10px;
+					margin-top: 25px;
+					
 					line-height: 1.2;
 					font-size: 16px;
 				}
@@ -394,19 +394,22 @@ function create_print_html(item_data, barcode_data) {
 					object-fit: contain;
 					margin-left: 3px;
 					margin-right: 3px;
+					margin-top:50px;
+					margin-bottom:20px;
 				}
 
 				.barcode {
-					margin-top:20px;
+					margin-top:10px;
+					background:red;
 
 					}
 
 			.footer {
-				text-align: center;
+					text-align: center;
 				font-weight: bold;
-				font-size: 9px;
+				font-size: 12px;
 				text-transform: uppercase;
-				margin-top: 5px;
+				margin-top: 10px;
 			}
 
 			.info-section {
