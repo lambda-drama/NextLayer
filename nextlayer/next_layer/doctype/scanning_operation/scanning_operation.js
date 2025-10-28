@@ -26,7 +26,7 @@ frappe.ui.form.on("Scanning Operation", {
 		setup_warehouse_filters(frm);
 
 		// Setup customer/supplier filters based on company
-		setup_party_filters(frm);
+		// setup_party_filters(frm);
 	},
 
 	scan_barcode(frm) {
@@ -39,55 +39,55 @@ frappe.ui.form.on("Scanning Operation", {
 		// Clear warehouse fields and party fields when operation changes
 		frm.set_value("ds_warehouse", "");
 		frm.set_value("dt_warehouse", "");
-		frm.set_value("customer", "");
-		frm.set_value("supplier", "");
+		// frm.set_value("customer", "");
+		// frm.set_value("supplier", "");
 	},
 
-	customer(frm) {
-		if (!frm.doc.customer || !frm.doc.company) return;
+	// customer(frm) {
+	// 	if (!frm.doc.customer || !frm.doc.company) return;
 
-		frappe.call({
-			method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
-			args: {
-				company: frm.doc.company,
-				parenttype: "Customer",
-			},
-			callback: function(r) {
-				if (!r.message) return;
+	// 	frappe.call({
+	// 		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+	// 		args: {
+	// 			company: frm.doc.company,
+	// 			parenttype: "Customer",
+	// 		},
+	// 		callback: function(r) {
+	// 			if (!r.message) return;
 
-				const { allowed_parties, restrict_selling_settings } = r.message;
+	// 			const { allowed_parties, restrict_selling_settings } = r.message;
 
-				if (restrict_selling_settings) {
-					if (!allowed_parties.includes(frm.doc.customer)) {
-						frappe.throw('Customer not authorized to transact!')
-					}
-				}
-			}
-		});
-	},
+	// 			if (restrict_selling_settings) {
+	// 				if (!allowed_parties.includes(frm.doc.customer)) {
+	// 					frappe.throw('Customer not authorized to transact!')
+	// 				}
+	// 			}
+	// 		}
+	// 	});
+	// },
 
-	supplier(frm) {
-		if (!frm.doc.supplier || !frm.doc.company) return;
+	// supplier(frm) {
+	// 	if (!frm.doc.supplier || !frm.doc.company) return;
 
-		frappe.call({
-			method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
-			args: {
-				company: frm.doc.company,
-				parenttype: "Supplier",
-			},
-			callback: function(r) {
-				if (!r.message) return;
+	// 	frappe.call({
+	// 		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+	// 		args: {
+	// 			company: frm.doc.company,
+	// 			parenttype: "Supplier",
+	// 		},
+	// 		callback: function(r) {
+	// 			if (!r.message) return;
 
-				const { allowed_parties, restrict_buying_settings } = r.message;
+	// 			const { allowed_parties, restrict_buying_settings } = r.message;
 
-				if (restrict_buying_settings) {
-					if (!allowed_parties.includes(frm.doc.supplier)) {
-						frappe.throw('Supplier not authorized to transact!')
-					}
-				}
-			}
-		});
-	},
+	// 			if (restrict_buying_settings) {
+	// 				if (!allowed_parties.includes(frm.doc.supplier)) {
+	// 					frappe.throw('Supplier not authorized to transact!')
+	// 				}
+	// 			}
+	// 		}
+	// 	});
+	// },
 
 	before_save(frm) {
 		// Auto-fill missing warehouses before submit
@@ -252,7 +252,7 @@ function create_delivery_note(frm) {
 
 	// Navigate to new Delivery Note with pre-filled data
 	let args = {
-		customer: frm.doc.customer,
+		// customer: frm.doc.customer,
 		posting_date: frm.doc.date,
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
@@ -291,7 +291,7 @@ function create_sales_invoice(frm) {
 
 	// Navigate to new Sales Invoice with pre-filled data
 	let args = {
-		customer: frm.doc.customer,
+		// customer: frm.doc.customer,
 		posting_date: frm.doc.date,
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
@@ -444,78 +444,78 @@ function auto_fill_missing_warehouses(frm) {
 }
 
 // Function to setup party filters based on company
-function setup_party_filters(frm) {
-	if (!frm.doc.company) return;
+// function setup_party_filters(frm) {
+// 	if (!frm.doc.company) return;
 
-	// Setup customer filter for Loading operations
-	frm.set_query("customer", function() {
-		return {
-			filters: [
-				["Customer", "disabled", "!=", 1]
-			]
-		};
-	});
+// 	// Setup customer filter for Loading operations
+// 	frm.set_query("customer", function() {
+// 		return {
+// 			filters: [
+// 				["Customer", "disabled", "!=", 1]
+// 			]
+// 		};
+// 	});
 
-	// Setup supplier filter for Offloading operations
-	frm.set_query("supplier", function() {
-		return {
-			filters: [
-				["Supplier", "disabled", "!=", 1]
-			]
-		};
-	});
+// 	// Setup supplier filter for Offloading operations
+// 	frm.set_query("supplier", function() {
+// 		return {
+// 			filters: [
+// 				["Supplier", "disabled", "!=", 1]
+// 			]
+// 		};
+// 	});
 
-	// Apply company-based restrictions
-	frappe.call({
-		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
-		args: {
-			company: frm.doc.company,
-			parenttype: "Customer",
-		},
-		callback: function(r) {
-			if (!r.message) return;
+// 	// Apply company-based restrictions
+// 	frappe.call({
+// 		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+// 		args: {
+// 			company: frm.doc.company,
+// 			parenttype: "Customer",
+// 		},
+// 		callback: function(r) {
+// 			if (!r.message) return;
 
-			const { allowed_parties, restrict_selling_settings } = r.message;
+// 			const { allowed_parties, restrict_selling_settings } = r.message;
 
-			if (restrict_selling_settings) {
-				// Restrict Customer field
-				frm.set_query("customer", function() {
-					return {
-						filters: [
-							["Customer", "name", "in", allowed_parties],
-							["Customer", "disabled", "!=", 1]
-						]
-					};
-				});
-			}
-		}
-	});
+// 			if (restrict_selling_settings) {
+// 				// Restrict Customer field
+// 				frm.set_query("customer", function() {
+// 					return {
+// 						filters: [
+// 							["Customer", "name", "in", allowed_parties],
+// 							["Customer", "disabled", "!=", 1]
+// 						]
+// 					};
+// 				});
+// 			}
+// 		}
+// 	});
 
-	frappe.call({
-		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
-		args: {
-			company: frm.doc.company,
-			parenttype: "Supplier",
-		},
-		callback: function(r) {
-			if (!r.message) return;
+// 	frappe.call({
+// 		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
+// 		args: {
+// 			company: frm.doc.company,
+// 			parenttype: "Supplier",
+// 		},
+// 		callback: function(r) {
+// 			if (!r.message) return;
 
-			const { allowed_parties, restrict_buying_settings } = r.message;
+// 			const { allowed_parties, restrict_buying_settings } = r.message;
 
-			if (restrict_buying_settings) {
-				// Restrict Supplier field
-				frm.set_query("supplier", function() {
-					return {
-						filters: [
-							["Supplier", "name", "in", allowed_parties],
-							["Supplier", "disabled", "!=", 1]
-						]
-					};
-				});
-			}
-		}
-	});
-}
+// 			if (restrict_buying_settings) {
+// 				// Restrict Supplier field
+// 				frm.set_query("supplier", function() {
+// 					return {
+// 						filters: [
+// 							["Supplier", "name", "in", allowed_parties],
+// 							["Supplier", "disabled", "!=", 1]
+// 						]
+// 					};
+// 				});
+// 			}
+// 		}
+// 	});
+// }
 
 // Function to setup warehouse filters based on company
 function setup_warehouse_filters(frm) {
