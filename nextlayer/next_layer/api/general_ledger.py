@@ -842,6 +842,48 @@ def can_user_read_customer():
 	return has_perm
 
 
+def clear_intercompany_fields_before_submit(doc, method=None):
+	"""
+	Clear intercompany matching fields before submission.
+	This prevents old intercompany match data from being carried over when cancelling and amending documents.
+
+	Args:
+		doc: The document being submitted
+		method: The method name (for hook compatibility)
+	"""
+	try:
+		# Check if the document has intercompany fields
+		if not hasattr(doc, 'intercompany_match_status'):
+			return
+
+		# List of fields to clear if they have values
+		fields_to_clear = [
+			'intercompany_matched_by',
+			'intercompany_matched_on',
+			'intercompany_match_status',
+			'intercompany_matched_with'
+		]
+
+		# Check each field and clear if it has a value
+		fields_cleared = []
+		for field in fields_to_clear:
+			if hasattr(doc, field) and doc.get(field):
+				# Set all fields to None
+				doc.set(field, None)
+				fields_cleared.append(field)
+
+		if fields_cleared:
+			frappe.logger().info(
+				f"Cleared intercompany fields before submission for {doc.doctype} {doc.name}: {fields_cleared}"
+			)
+
+	except Exception as e:
+		frappe.logger().error(
+			f"Error clearing intercompany fields before submission for {doc.doctype} {doc.name}: {str(e)}"
+		)
+		# Don't raise the exception to prevent submission failure
+
+
 def cleanup_intercompany_matches_on_cancel(doc, method=None):
 	"""
 	Clean up intercompany matches when a document is cancelled.

@@ -49,15 +49,19 @@ doc_events = {
         "on_cancel": "nextlayer.next_layer.controllers.sales_shipment.on_cancel",
     },
     "Sales Invoice": {
+        "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
     },
     "Purchase Invoice": {
+        "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
     },
     "Journal Entry": {
+        "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
     },
     "Payment Entry": {
+        "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
     },
     "Item": {
