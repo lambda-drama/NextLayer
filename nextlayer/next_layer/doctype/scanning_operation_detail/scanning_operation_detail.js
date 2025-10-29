@@ -21,8 +21,10 @@ frappe.ui.form.on("Scanning Operation Detail", {
 							frm.set_value(cdt, cdn, "description", r.message.description);
 						}
 
-						if (r.message.stock_uom) {
-							frm.set_value(cdt, cdn, "uom", r.message.stock_uom);
+						// Prefer sales_uom; fallback to parent Scanning Operation.uom
+						let uom_to_set = r.message.sales_uom || (frm.doc && frm.doc.uom) || null;
+						if (uom_to_set) {
+							frm.set_value(cdt, cdn, "uom", uom_to_set);
 						}
 
 						frappe.show_alert(__("Item details populated from barcode"));
@@ -60,7 +62,7 @@ frappe.ui.form.on("Scanning Operation Detail", {
 				args: {
 					doctype: "Item",
 					filters: { name: row.item_code },
-					fieldname: ["item_name", "description", "stock_uom"]
+				fieldname: ["item_name", "description", "stock_uom", "sales_uom"]
 				},
 				callback: function(r) {
 					if (r.message) {
@@ -68,8 +70,10 @@ frappe.ui.form.on("Scanning Operation Detail", {
 						if (r.message.description) {
 							frm.set_value(cdt, cdn, "description", r.message.description);
 						}
-						if (r.message.stock_uom) {
-							frm.set_value(cdt, cdn, "uom", r.message.stock_uom);
+						// Prefer sales_uom; fallback to parent Scanning Operation.uom
+						let uom_to_set = r.message.sales_uom || (frm.doc && frm.doc.uom) || null;
+						if (uom_to_set) {
+							frm.set_value(cdt, cdn, "uom", uom_to_set);
 						}
 					}
 				}

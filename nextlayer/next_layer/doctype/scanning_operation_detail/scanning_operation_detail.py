@@ -20,8 +20,14 @@ class ScanningOperationDetail(Document):
 			frappe.throw("Warehouse is required")
 
 	def auto_fill_uom(self):
-		"""Auto-fill UOM from item's default UOM if not set"""
+		"""Auto-fill UOM: prefer item's sales_uom; if empty, fallback to parent Scanning Operation.uom"""
 		if self.item_code and not self.uom:
-			stock_uom = frappe.get_value("Item", self.item_code, "stock_uom")
-			if stock_uom:
-				self.uom = stock_uom
+			sales_uom = frappe.get_value("Item", self.item_code, "sales_uom")
+			if sales_uom:
+				self.uom = sales_uom
+				return
+			# fallback to parent doc.uom
+			if self.parenttype and self.parent:
+				parent_uom = frappe.db.get_value(self.parenttype, self.parent, "uom")
+				if parent_uom:
+					self.uom = parent_uom

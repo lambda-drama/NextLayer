@@ -44,6 +44,7 @@
   "shipping_status",
   "section_break_xpeq",
   "scan_barcode",
+  "uom",
   "column_break_pfcx",
   "ds_warehouse",
   "dt_warehouse",
@@ -331,13 +332,21 @@
    "fieldname": "total_containers",
    "fieldtype": "Float",
    "label": "Total Containers"
+  },
+  {
+   "default": "Carton",
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-29 11:58:02.714218",
+ "modified": "2025-10-30 00:14:41.709113",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",

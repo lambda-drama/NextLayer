@@ -132,10 +132,10 @@ class ScanningOperation(Document):
 				stock_uom = get_item_field(d.item_code, "stock_uom")
 				d.stock_uom = stock_uom
 
-			# Selected UOM: default to sales_uom if missing, else stock_uom
+			# Selected UOM: default to sales_uom if missing; if still missing, fallback to parent doc.uom (do NOT fallback to stock_uom)
 			selected_uom = d.uom
 			if not selected_uom:
-				selected_uom = get_item_field(d.item_code, "sales_uom") or d.stock_uom
+				selected_uom = get_item_field(d.item_code, "sales_uom") or getattr(self, "uom", None)
 				d.uom = selected_uom
 
 			# Conversion factor for selected UOM to stock UOM
@@ -264,6 +264,7 @@ def get_item_by_barcode(barcode):
 				"item_name": item_doc.item_name,
 				"description": item_doc.description,
 				"stock_uom": item_doc.stock_uom,
+				"sales_uom": getattr(item_doc, "sales_uom", None),
 				"barcode": barcode
 			}
 		else:

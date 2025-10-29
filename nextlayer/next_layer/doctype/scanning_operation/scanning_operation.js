@@ -380,6 +380,13 @@ function add_item_to_table(frm, item_data) {
 		new_row.barcode = item_data.barcode;
 		new_row.warehouse = warehouse;
 
+		// Prefer sales_uom; fallback to parent Scanning Operation.uom
+		if (item_data.sales_uom) {
+			new_row.uom = item_data.sales_uom;
+		} else if (frm.doc && frm.doc.uom) {
+			new_row.uom = frm.doc.uom;
+		}
+
 		if (item_data.description) {
 			new_row.description = item_data.description;
 		}
