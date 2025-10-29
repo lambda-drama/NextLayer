@@ -362,9 +362,11 @@ function add_item_to_table(frm, item_data) {
 		// Directly modify the row data to avoid triggering form events
 		frm.doc.items[existing_row].quantity = new_qty;
 
-		// Trigger form calculations and refresh with a small delay
+		// Trigger form refresh and auto-save
 			frm.refresh_field("items");
-		
+			// Auto-save after each scan increment
+			frm.save();
+
 
 		frappe.show_alert(__("Quantity increased to {0} for {1}", [new_qty, item_data.item_name]));
 	} else {
@@ -383,6 +385,9 @@ function add_item_to_table(frm, item_data) {
 		}
 
 		frappe.show_alert(__("Item {0} added successfully", [item_data.item_name]));
+
+		// Auto-save after adding a new row so server computes conversions and totals
+		frm.save();
 	}
 
 	frm.refresh_field("items");

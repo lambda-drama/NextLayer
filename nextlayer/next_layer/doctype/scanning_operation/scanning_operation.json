@@ -48,7 +48,13 @@
   "ds_warehouse",
   "dt_warehouse",
   "scanned_items_section",
-  "items"
+  "items",
+  "section_break_xcjd",
+  "total_pairs",
+  "column_break_pyqn",
+  "total_cartons",
+  "column_break_sybu",
+  "total_containers"
  ],
  "fields": [
   {
@@ -298,13 +304,40 @@
    "fieldtype": "Link",
    "label": "Verified By",
    "options": "User"
+  },
+  {
+   "fieldname": "section_break_xcjd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_pairs",
+   "fieldtype": "Float",
+   "label": "Total Pairs"
+  },
+  {
+   "fieldname": "column_break_pyqn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_cartons",
+   "fieldtype": "Float",
+   "label": "Total Cartons"
+  },
+  {
+   "fieldname": "column_break_sybu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_containers",
+   "fieldtype": "Float",
+   "label": "Total Containers"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-29 02:40:42.724041",
+ "modified": "2025-10-29 11:58:02.714218",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",
