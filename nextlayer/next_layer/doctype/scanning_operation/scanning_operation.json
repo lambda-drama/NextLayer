@@ -202,7 +202,9 @@
   {
    "fieldname": "scanning_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Scanning Name",
+   "reqd": 1,
    "unique": 1
   },
   {
@@ -313,7 +315,8 @@
   {
    "fieldname": "total_pairs",
    "fieldtype": "Float",
-   "label": "Total Pairs"
+   "label": "Total Pairs",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_pyqn",
@@ -322,7 +325,8 @@
   {
    "fieldname": "total_cartons",
    "fieldtype": "Float",
-   "label": "Total Cartons"
+   "label": "Total Cartons",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_sybu",
@@ -331,7 +335,8 @@
   {
    "fieldname": "total_containers",
    "fieldtype": "Float",
-   "label": "Total Containers"
+   "label": "Total Containers",
+   "read_only": 1
   },
   {
    "default": "Carton",
@@ -346,7 +351,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-30 00:14:41.709113",
+ "modified": "2025-10-30 01:56:52.043247",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",
