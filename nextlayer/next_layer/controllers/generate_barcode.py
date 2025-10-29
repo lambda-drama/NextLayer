@@ -240,6 +240,125 @@ def calculate_ean13_check_digit(number):
 	return check_digit
 
 
+# ----------------------------
+# Short numeric Code128 barcodes
+# ----------------------------
+
+def _generate_unique_numeric_code(length: int, max_attempts: int = 50) -> str:
+	"""Generate a unique numeric string of given length not used in Item Barcode."""
+	for _ in range(max_attempts):
+		candidate = ''.join([str(random.randint(0, 9)) for _ in range(length)])
+		# Ensure not already used as a barcode anywhere
+		exists = frappe.db.exists("Item Barcode", {"barcode": candidate})
+		if not exists:
+			return candidate
+	# Fallback: include a random suffix if collisions keep happening
+	return ''.join([str(random.randint(0, 9)) for _ in range(length)])
+
+
+@frappe.whitelist()
+def generate_short_barcodes_for_items(company: str, length: int = 6):
+	"""Generate short numeric barcodes (Code128) of 6 or 8 digits for items.
+
+	Skips items that already have a Code128 short barcode. Ensures barcode uniqueness across all items.
+	"""
+	if length not in (6, 8):
+		frappe.throw("Length must be 6 or 8")
+	try:
+		items = frappe.get_all("Item",
+			filters={"disabled": 0, "is_stock_item": 1},
+			fields=["name", "item_code", "item_name"]
+		)
+
+		generated_count = 0
+		skipped_count = 0
+
+		for item in items:
+			# Skip only if item already has a short numeric barcode with the same requested length
+			existing_barcodes = frappe.get_all(
+				"Item Barcode",
+				filters={"parent": item.name},
+				fields=["barcode", "barcode_type"],
+			)
+			already_has_same_length_short = any(
+				((b.get("barcode_type") in (None, "")) and isinstance(b.get("barcode"), str) and len(b.get("barcode")) == length)
+				for b in existing_barcodes
+			)
+			if already_has_same_length_short:
+				skipped_count += 1
+				continue
+
+			code = _generate_unique_numeric_code(length)
+
+			barcode_doc = frappe.get_doc({
+				"doctype": "Item Barcode",
+				"parent": item.name,
+				"parenttype": "Item",
+				"parentfield": "barcodes",
+				"barcode": code,
+				"barcode_type": "",
+			})
+			barcode_doc.insert(ignore_permissions=True)
+			generated_count += 1
+
+		frappe.db.commit()
+
+		return {
+			"generated_count": generated_count,
+			"skipped_count": skipped_count,
+			"total_items": len(items),
+			"length": length,
+		}
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(f"Error generating short barcodes: {str(e)}")
+		raise e
+
+
+@frappe.whitelist()
+def generate_short_barcode_for_item(item_code: str, length: int = 6):
+	"""Generate a short numeric Code128 barcode for a single item."""
+	if length not in (6, 8):
+		frappe.throw("Length must be 6 or 8")
+	if not frappe.db.exists("Item", item_code):
+		frappe.throw(f"Item {item_code} does not exist")
+
+	# Skip only if already has a short numeric barcode of the same requested length (empty type)
+	existing_barcodes = frappe.get_all(
+		"Item Barcode",
+		filters={"parent": item_code},
+		fields=["barcode", "barcode_type"],
+	)
+	already_has_short = any(
+		((b.get("barcode_type") in (None, "")) and isinstance(b.get("barcode"), str) and len(b.get("barcode")) == length)
+		for b in existing_barcodes
+	)
+	if already_has_short:
+		return {
+			"status": "skipped",
+			"message": f"Item {item_code} already has a short barcode",
+		}
+
+	code = _generate_unique_numeric_code(length)
+
+	barcode_doc = frappe.get_doc({
+		"doctype": "Item Barcode",
+		"parent": item_code,
+		"parenttype": "Item",
+		"parentfield": "barcodes",
+		"barcode": code,
+		"barcode_type": "",
+	})
+	barcode_doc.insert(ignore_permissions=True)
+
+	return {
+		"status": "success",
+		"barcode": code,
+		"barcode_type": "CODE128",
+		"length": length,
+	}
+
+
 @frappe.whitelist()
 def generate_barcode_for_item(item_code):
 	"""Generate EAN barcode with image for a specific item"""

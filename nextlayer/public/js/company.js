@@ -3,9 +3,14 @@
 
 frappe.ui.form.on("Company", {
 	refresh(frm) {
-		// Add Generate EAN Barcodes button
-		frm.add_custom_button(__("Generate EAN Barcodes"), function() {
+		// Add Generate EAN-13 Barcodes button
+		frm.add_custom_button(__("Generate EAN-13 Barcodes"), function() {
 			generate_ean_barcodes(frm);
+		}, __("Actions"));
+
+		// Add Generate Short Barcodes (6/8) button
+		frm.add_custom_button(__("Generate Short Barcodes (6/8)"), function() {
+			open_short_barcode_dialog(frm);
 		}, __("Actions"));
 	}
 });
@@ -106,4 +111,44 @@ function generate_ean_barcodes(frm) {
 			});
 		}
 	);
+}
+
+// Dialog to choose 6 or 8 digit short barcode generation
+function open_short_barcode_dialog(frm) {
+	let d = new frappe.ui.Dialog({
+		title: __("Generate Short Barcodes"),
+		fields: [
+			{ fieldtype: "HTML", fieldname: "help", options: __("Choose the length for numeric Code128 barcodes.") },
+			{ fieldtype: "Select", fieldname: "length", label: __("Length"), options: "6\n8", default: "6" },
+		],
+		primary_action_label: __("Generate"),
+		primary_action: function() {
+			let values = d.get_values();
+			let length = cint(values.length);
+			d.hide();
+
+			frappe.call({
+				method: "nextlayer.next_layer.controllers.generate_barcode.generate_short_barcodes_for_items",
+				args: { company: frm.doc.name, length },
+				callback: function(r) {
+					if (r.message) {
+						const res = r.message;
+						frappe.msgprint({
+							title: __("Short Barcodes Generated"),
+							message: __("Generated {0}, Skipped {1}, Length {2}", [res.generated_count, res.skipped_count, res.length]),
+							indicator: 'green'
+						});
+					} else {
+						frappe.msgprint({
+							title: __("Error"),
+							message: __("Failed to generate short barcodes."),
+							indicator: 'red'
+						});
+					}
+				}
+			});
+		}
+	});
+
+	d.show();
 }
