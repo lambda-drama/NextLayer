@@ -10,6 +10,7 @@ class ScanningOperation(Document):
 	def validate(self):
 		self.validate_items()
 		self.auto_fill_missing_warehouses()
+		self.compute_uom_conversions_and_totals()
 
 	def on_submit(self):
 		"""Validate stock availability only on submit"""
@@ -92,6 +93,91 @@ class ScanningOperation(Document):
 					f"Available: {stock_balance}, Required: {item.quantity}",
 					title="Stock Validation Error"
 				)
+
+	def compute_uom_conversions_and_totals(self):
+		"""Compute per-row UOM conversions and aggregate totals on the document."""
+		if not getattr(self, "items", None):
+			self.total_pairs = 0
+			self.total_cartons = 0
+			self.total_containers = 0
+			return
+
+		def get_item_field(item_code: str, fieldname: str):
+			return frappe.db.get_value("Item", item_code, fieldname)
+
+		def get_conversion_factor(item_code: str, uom_name: str) -> float:
+			if not item_code or not uom_name:
+				return 0.0
+			try:
+				row = frappe.db.get_value(
+					"UOM Conversion Detail",
+					{"parent": item_code, "uom": uom_name},
+					["conversion_factor"],
+					as_dict=True,
+				)
+				return float(row.conversion_factor) if row and row.conversion_factor else 0.0
+			except Exception:
+				return 0.0
+
+		total_pairs = 0.0
+		total_cartons = 0.0
+		total_containers = 0.0
+
+		for d in self.items:
+			if not d.item_code:
+				continue
+
+			# Ensure stock_uom present
+			if not d.stock_uom:
+				stock_uom = get_item_field(d.item_code, "stock_uom")
+				d.stock_uom = stock_uom
+
+			# Selected UOM: default to sales_uom if missing, else stock_uom
+			selected_uom = d.uom
+			if not selected_uom:
+				selected_uom = get_item_field(d.item_code, "sales_uom") or d.stock_uom
+				d.uom = selected_uom
+
+			# Conversion factor for selected UOM to stock UOM
+			uom_cf = 1.0 if (selected_uom and d.stock_uom and selected_uom == d.stock_uom) else get_conversion_factor(d.item_code, selected_uom)
+			if not uom_cf:
+				uom_cf = 1.0
+			d.uom_conversion_factor = uom_cf
+
+			qty = float(d.quantity or 0)
+			qty_stock = qty * uom_cf
+			d.qty_as_per_stock_uom = qty_stock
+
+			# Carton and Container conversion factors
+			carton_cf = get_conversion_factor(d.item_code, "Carton")
+			container_cf = get_conversion_factor(d.item_code, "Container")
+			d.carton_conversion_factor = carton_cf or 0.0
+			d.container_conversion_factor = container_cf or 0.0
+
+			# Derive carton/container quantities
+			if selected_uom == "Carton":
+				d.uomcartons = qty
+			elif carton_cf:
+				d.uomcartons = qty_stock / carton_cf
+			else:
+				d.uomcartons = 0.0
+
+			if selected_uom == "Container":
+				d.uomcontainers = qty
+			elif container_cf:
+				d.uomcontainers = qty_stock / container_cf
+			else:
+				d.uomcontainers = 0.0
+
+			# Accumulate totals
+			total_pairs += qty_stock
+			total_cartons += float(d.uomcartons or 0)
+			total_containers += float(d.uomcontainers or 0)
+
+		# Set document totals
+		self.total_pairs = total_pairs
+		self.total_cartons = total_cartons
+		self.total_containers = total_containers
 
 
 @frappe.whitelist()
