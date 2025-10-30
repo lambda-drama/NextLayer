@@ -383,7 +383,7 @@ function create_print_html(item_data, barcode_data) {
 				.info div {
 					text-align: center;
 					margin-top: 25px;
-					
+
 					line-height: 1.2;
 					font-size: 16px;
 				}
@@ -394,8 +394,8 @@ function create_print_html(item_data, barcode_data) {
 					object-fit: contain;
 					margin-left: 3px;
 					margin-right: 3px;
-					margin-top:50px;
-					margin-bottom:20px;
+					padding-top:60px;
+					margin-bottom:30px;
 				}
 
 				.barcode {

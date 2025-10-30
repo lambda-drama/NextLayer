@@ -7,6 +7,7 @@ import re
 from barcode import Code128
 from barcode.writer import ImageWriter
 from frappe.utils.file_manager import save_file
+import os
 
 
 def sanitize_filename(filename):
@@ -27,16 +28,33 @@ def generate_image_for_barcode(barcode):
 		sanitized_filename = sanitize_filename(barcode)
 
 		file_path = frappe.get_site_path(f"private/files/{sanitized_filename}.png")
+		# Ensure directory exists
+		dirname = os.path.dirname(file_path)
+		os.makedirs(dirname, exist_ok=True)
 
+		# Generate barcode image with default settings
 		code = Code128(barcode, writer=ImageWriter())
-
-		code.save(file_path.replace(".png", ""))
+		# Expand visual width only for short codes (6 or 8 digits); keep 13-digit default
+		try:
+			code_str = str(barcode)
+			if len(code_str) in (6, 8):
+				writer_options = {
+					"module_width": 0.6,
+					"quiet_zone": 6.0,
+					"text_distance": 5.0,
+				}
+				code.save(file_path.replace(".png", ""), options=writer_options)
+			else:
+				code.save(file_path.replace(".png", ""))
+		except Exception:
+			# Fallback to default save if options are not supported
+			code.save(file_path.replace(".png", ""))
 
 		with open(file_path, "rb") as f:
 			file_doc = save_file(f"{sanitized_filename}.png", f.read(), "Item Barcode", barcode, is_private=1)
 		return file_doc.file_url
 	except Exception as e:
-		frappe.log_error(f"Error generating barcode image: {str(e)}")
+		frappe.log_error(f"Error generating barcode image for {barcode}: {str(e)}")
 		return None
 
 
@@ -485,6 +503,7 @@ def generate_and_save_barcode_image(barcode_id):
 			frappe.throw("No barcode found for this record")
 
 		# Check if image already exists
+		# Check if image already exists; if so, reuse it
 		if barcode_doc.custom_image:
 			return {
 				"status": "success",
