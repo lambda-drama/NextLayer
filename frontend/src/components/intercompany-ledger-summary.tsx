@@ -14,6 +14,7 @@ import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
 
 import { useLedgerSummary } from "../hook/useLedgerSummary"
 import { useGLClosingAmounts } from "../hook/useGLClosingAmounts"
+import { useIntransitInvoiceTotals } from "../hook/useIntransitInvoiceTotals"
 
 // Types
 interface LedgerSummaryEntry {
@@ -115,8 +116,67 @@ export default function InterCompanyLedgerSummary() {
     enabled: hasLoadedData && supplierParties.length > 0
   })
 
+  // Calculate difference between ledger closing and GL closing
+  const calculateDifference = (ledgerClosing: number, glClosing: number) => {
+    // Handle negative values by taking absolute values for comparison
+    // This ensures we compare the magnitude, not the sign
+    const absLedgerClosing = Math.abs(ledgerClosing)
+    const absGlClosing = Math.abs(glClosing)
 
-  const isLoading = isLoadingCustomer || isLoadingSupplier || isLoadingCustomerGL || isLoadingSupplierGL
+    // Return the difference in absolute terms
+    return absLedgerClosing - absGlClosing
+  }
+
+  // Get unmatched parties for in-transit check (only for unmatched entries)
+  const unmatchedCustomerParties = useMemo(() => {
+    if (!customerLedgerData || !customerGLClosing) return []
+    return customerLedgerData.entries
+      .filter(entry => {
+        const glClosing = customerGLClosing[entry.party] || 0
+        const isPartyGLLoaded = customerGLClosing.hasOwnProperty(entry.party)
+        if (!isPartyGLLoaded) return false
+        const difference = calculateDifference(entry.closing_balance, glClosing)
+        const tolerance = 0.01
+        return Math.abs(difference) >= tolerance // Unmatched
+      })
+      .map(entry => entry.party)
+  }, [customerLedgerData, customerGLClosing])
+
+  const unmatchedSupplierParties = useMemo(() => {
+    if (!supplierLedgerData || !supplierGLClosing) return []
+    return supplierLedgerData.entries
+      .filter(entry => {
+        const glClosing = supplierGLClosing[entry.party] || 0
+        const isPartyGLLoaded = supplierGLClosing.hasOwnProperty(entry.party)
+        if (!isPartyGLLoaded) return false
+        const difference = calculateDifference(entry.closing_balance, glClosing)
+        const tolerance = 0.01
+        return Math.abs(difference) >= tolerance // Unmatched
+      })
+      .map(entry => entry.party)
+  }, [supplierLedgerData, supplierGLClosing])
+
+  // Get in-transit invoice totals for unmatched customers (check Sales Invoices)
+  const { intransitTotals: customerIntransitTotals, isLoading: isLoadingCustomerIntransit } = useIntransitInvoiceTotals({
+    company: company,
+    partyType: "Customer",
+    fromDate,
+    toDate,
+    parties: unmatchedCustomerParties,
+    enabled: hasLoadedData && unmatchedCustomerParties.length > 0
+  })
+
+  // Get in-transit invoice totals for unmatched suppliers (check Purchase Invoices)
+  const { intransitTotals: supplierIntransitTotals, isLoading: isLoadingSupplierIntransit } = useIntransitInvoiceTotals({
+    company: company,
+    partyType: "Supplier",
+    fromDate,
+    toDate,
+    parties: unmatchedSupplierParties,
+    enabled: hasLoadedData && unmatchedSupplierParties.length > 0
+  })
+
+  const isLoading = isLoadingCustomer || isLoadingSupplier || isLoadingCustomerGL || isLoadingSupplierGL || isLoadingCustomerIntransit || isLoadingSupplierIntransit
 
   // Handle load data
   const handleLoadData = () => {
@@ -178,19 +238,8 @@ export default function InterCompanyLedgerSummary() {
     return company?.default_currency || 'USD'
   }
 
-  // Calculate difference between ledger closing and GL closing
-  const calculateDifference = (ledgerClosing: number, glClosing: number) => {
-    // Handle negative values by taking absolute values for comparison
-    // This ensures we compare the magnitude, not the sign
-    const absLedgerClosing = Math.abs(ledgerClosing)
-    const absGlClosing = Math.abs(glClosing)
-
-    // Return the difference in absolute terms
-    return absLedgerClosing - absGlClosing
-  }
-
-  // Get status based on difference and loading state
-  const getStatus = (difference: number, glClosing: number, isLoading: boolean) => {
+  // Get status based on difference, loading state, and in-transit totals
+  const getStatus = (difference: number, glClosing: number, isLoading: boolean, party: string, intransitTotal?: number) => {
     // If GL data is still loading for this specific party, show pending
     if (isLoading) {
       return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
@@ -199,21 +248,35 @@ export default function InterCompanyLedgerSummary() {
     // If GL data is loaded for this party, check for match/unmatched
     // Note: glClosing can be 0 legitimately, so we don't check for zero here
     const tolerance = 0.01 // Small tolerance for floating point comparison
-    if (Math.abs(difference) < tolerance) {
+    const absDifference = Math.abs(difference)
+    
+    if (absDifference < tolerance) {
       return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
     } else {
+      // Check if difference matches in-transit total
+      if (intransitTotal !== undefined && intransitTotal !== null) {
+        const absIntransitTotal = Math.abs(intransitTotal)
+        if (Math.abs(absDifference - absIntransitTotal) < tolerance) {
+          return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
+        }
+      }
       return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
     }
   }
 
   // Filter entries by status
-  const filterEntriesByStatus = (entries: LedgerSummaryEntry[], glClosingAmounts: Record<string, number>) => {
+  const filterEntriesByStatus = (entries: LedgerSummaryEntry[], glClosingAmounts: Record<string, number>, intransitTotals?: Record<string, number>) => {
     if (statusFilter === 'All') return entries
     return entries.filter(entry => {
       const glClosing = glClosingAmounts[entry.party] || 0
       const isPartyGLLoaded = glClosingAmounts.hasOwnProperty(entry.party)
       const difference = calculateDifference(entry.closing_balance, glClosing)
-      const status = getStatus(difference, glClosing, !isPartyGLLoaded)
+      const intransitTotal = intransitTotals?.[entry.party]
+      const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
+      // Handle "Match with In-Transit" status in filter
+      if (statusFilter === 'Match') {
+        return status.text === 'Match' || status.text === 'Match with In-Transit'
+      }
       return status.text === statusFilter
     })
   }
@@ -769,7 +832,7 @@ export default function InterCompanyLedgerSummary() {
                   </div>
                 </div>
                 <div className="text-sm text-gray-600">
-                  Showing {filterEntriesByStatus(customerLedgerData.entries, customerGLClosing).length} of {customerLedgerData.entries.length} customers, {filterEntriesByStatus(supplierLedgerData.entries, supplierGLClosing).length} of {supplierLedgerData.entries.length} suppliers
+                  Showing {filterEntriesByStatus(customerLedgerData.entries, customerGLClosing, customerIntransitTotals).length} of {customerLedgerData.entries.length} customers, {filterEntriesByStatus(supplierLedgerData.entries, supplierGLClosing, supplierIntransitTotals).length} of {supplierLedgerData.entries.length} suppliers
                 </div>
               </div>
             </CardContent>
@@ -795,16 +858,21 @@ export default function InterCompanyLedgerSummary() {
                         <TableHead className="text-blue-800 text-right">Party Balance</TableHead>
                         <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
+                        <TableHead className="text-gray-500 text-right">In-Transit Total</TableHead>
                         <TableHead className="text-blue-800 text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filterEntriesByStatus(customerLedgerData.entries, customerGLClosing).map((entry, index) => {
+                      {filterEntriesByStatus(customerLedgerData.entries, customerGLClosing, customerIntransitTotals).map((entry, index) => {
                         const glClosing = customerGLClosing[entry.party] || 0
                         const difference = calculateDifference(entry.closing_balance, glClosing)
-                        // Check if this specific party's GL data is loaded
                         const isPartyGLLoaded = customerGLClosing.hasOwnProperty(entry.party)
-                        const status = getStatus(difference, glClosing, !isPartyGLLoaded)
+                        const intransitTotal = customerIntransitTotals[entry.party]
+                        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
+                        
+                        // Show "-" for matched entries, show value for unmatched
+                        const showIntransitTotal = status.text === 'Match' ? '-' : 
+                          (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
@@ -812,6 +880,7 @@ export default function InterCompanyLedgerSummary() {
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
                                 {status.text}
@@ -844,16 +913,21 @@ export default function InterCompanyLedgerSummary() {
                         <TableHead className="text-blue-800 text-right">Party Balance</TableHead>
                         <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
+                        <TableHead className="text-gray-500 text-right">In-Transit Total</TableHead>
                         <TableHead className="text-blue-800 text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filterEntriesByStatus(supplierLedgerData.entries, supplierGLClosing).map((entry, index) => {
+                      {filterEntriesByStatus(supplierLedgerData.entries, supplierGLClosing, supplierIntransitTotals).map((entry, index) => {
                         const glClosing = supplierGLClosing[entry.party] || 0
                         const difference = calculateDifference(entry.closing_balance, glClosing)
-                        // Check if this specific party's GL data is loaded
                         const isPartyGLLoaded = supplierGLClosing.hasOwnProperty(entry.party)
-                        const status = getStatus(difference, glClosing, !isPartyGLLoaded)
+                        const intransitTotal = supplierIntransitTotals[entry.party]
+                        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
+                        
+                        // Show "-" for matched entries, show value for unmatched
+                        const showIntransitTotal = status.text === 'Match' ? '-' : 
+                          (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
@@ -861,6 +935,7 @@ export default function InterCompanyLedgerSummary() {
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
                                 {status.text}
