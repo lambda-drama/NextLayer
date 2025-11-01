@@ -450,16 +450,72 @@ def update_match_status():
 		if not frappe.db.exists(voucher_type, voucher_no):
 			frappe.throw(f"Document {voucher_type} {voucher_no} not found")
 
+		# Get the current document to check if it has a matched_with
+		current_doc = frappe.get_doc(voucher_type, voucher_no)
+		current_matched_with = current_doc.get("intercompany_matched_with")
+		
+		# If unmatching (status is Mismatch and matched_with is None), also unmatch the paired transaction
+		if match_status == "Mismatch" and (matched_with is None or matched_with == ""):
+			# Parse the current matched_with to find the paired transaction
+			if current_matched_with:
+				try:
+					# Try to parse as JSON
+					try:
+						matched_data = frappe.parse_json(current_matched_with)
+					except:
+						matched_data = current_matched_with
+					
+					# Handle both single match (dict) and multiple matches (list)
+					matches_to_unmatch = []
+					if isinstance(matched_data, dict):
+						matches_to_unmatch = [matched_data]
+					elif isinstance(matched_data, list):
+						matches_to_unmatch = matched_data
+					
+					# Unmatch each paired transaction
+					for match in matches_to_unmatch:
+						if not isinstance(match, dict):
+							continue
+						
+						paired_voucher_type = match.get('voucher_type')
+						paired_voucher_no = match.get('voucher_no')
+						
+						if paired_voucher_type and paired_voucher_no:
+							# Check if the paired document exists
+							if frappe.db.exists(paired_voucher_type, paired_voucher_no):
+								# Update the paired document to Mismatch and clear all matching fields
+								try:
+									frappe.db.set_value(
+										paired_voucher_type,
+										paired_voucher_no,
+										{
+											'intercompany_match_status': 'Mismatch',
+											'intercompany_matched_with': None,
+											'intercompany_matched_by': None,
+											'intercompany_matched_on': None
+										}
+									)
+									frappe.logger().info(f"Also unmatched paired transaction {paired_voucher_type} {paired_voucher_no}")
+								except Exception as e:
+									frappe.logger().error(f"Error unmatching paired transaction {paired_voucher_type} {paired_voucher_no}: {str(e)}")
+									# Continue even if paired unmatch fails
+				except Exception as e:
+					frappe.logger().error(f"Error parsing matched_with for unmatch: {str(e)}")
+					# Continue with the main unmatch even if parsing fails
+
 		matched_with_value = matched_with
 		if isinstance(matched_with, dict):
 			matched_with_value = frappe.as_json(matched_with)
 
+		# Set matched_by and matched_on to None when unmatching
+		matched_by_value = frappe.session.user if match_status == "Match" else None
+		matched_on_value = frappe.utils.now() if match_status == "Match" else None
 
 		update_data = {
 			"intercompany_match_status": match_status,
 			"intercompany_matched_with": matched_with_value,
-			"intercompany_matched_by": frappe.session.user,
-			"intercompany_matched_on": frappe.utils.now()
+			"intercompany_matched_by": matched_by_value,
+			"intercompany_matched_on": matched_on_value
 		}
 
 		# Add retry logic for concurrency issues

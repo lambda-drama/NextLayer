@@ -1030,15 +1030,60 @@ export default function IntercompanyReconciliation() {
 
       // OPTIMISTIC UPDATE: Immediately update UI
       const optimisticStatusMap = { ...backendMatchStatus }
+      const pairedEntriesSet = new Set<string>()
+      
       selectedEntriesArray.forEach(entryKey => {
         optimisticStatusMap[entryKey] = {
           status: 'Mismatch',
           matched_with: null,
           matched_with_parsed: null, // Clear the parsed match data
-          matched_by: 'Manual',
-          matched_on: new Date().toISOString()
+          matched_by: null,
+          matched_on: null
+        }
+        
+        // Find the entry to check for paired transactions
+        const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
+          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        )
+        const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
+          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        )
+        
+        const entry = entryA || entryB
+        if (entry) {
+          // Check for backend matched_with data
+          if (entry.backendMatchData?.matched_with_parsed) {
+            const matchedData = entry.backendMatchData.matched_with_parsed
+            // Handle both single match (object) and multiple matches (array)
+            const matches = Array.isArray(matchedData) ? matchedData : [matchedData]
+            
+            matches.forEach((match: any) => {
+              if (match && match.voucher_type && match.voucher_no) {
+                const pairedKey = `${match.voucher_type}-${match.voucher_no}`
+                pairedEntriesSet.add(pairedKey)
+              }
+            })
+          }
+          
+          // Also check for frontend matchedEntry
+          if (entry.matchedEntry) {
+            const pairedKey = `${entry.matchedEntry.voucher_type}-${entry.matchedEntry.voucher_no}`
+            pairedEntriesSet.add(pairedKey)
+          }
         }
       })
+      
+      // Also update paired entries optimistically
+      pairedEntriesSet.forEach(pairedKey => {
+        optimisticStatusMap[pairedKey] = {
+          status: 'Mismatch',
+          matched_with: null,
+          matched_with_parsed: null, // Clear the parsed match data
+          matched_by: null,
+          matched_on: null
+        }
+      })
+      
       setBackendMatchStatus(optimisticStatusMap)
       setHasBackendStatusData(true) // Mark that we have fresh backend data
 
@@ -1563,25 +1608,31 @@ export default function IntercompanyReconciliation() {
 
   // Execute individual unmatch after confirmation
   const handleConfirmIndividualUnmatch = async () => {
-    if (!selectedEntryForAction || !selectedEntryForAction.matchedEntry) return
+    if (!selectedEntryForAction) return
+
+    // Check if entry has a match (either frontend matchedEntry or backend matched_with)
+    const hasFrontendMatch = selectedEntryForAction.matchedEntry
+    const hasBackendMatch = selectedEntryForAction.backendMatchData?.matched_with_parsed
+
+    if (!hasFrontendMatch && !hasBackendMatch) {
+      alert('This entry is not matched with any other transaction.')
+      return
+    }
 
     setIsIndividualProcessing(true)
     try {
       const entry = selectedEntryForAction
+      
+      // Determine which company this entry belongs to
+      const entryCompany = findMatchingEntries.glDataAWithStatus.some(e => 
+        e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no
+      ) ? companyA : companyB
 
-      // Update both entries to Mismatch status
+      // Update the entry - backend will automatically unmatch the paired transaction
       await updateMatchStatus({
         voucher_type: entry.voucher_type,
         voucher_no: entry.voucher_no,
-        company: companyA,
-        status: 'Mismatch',
-        matched_with: null
-      })
-
-      await updateMatchStatus({
-        voucher_type: entry.matchedEntry!.voucher_type,
-        voucher_no: entry.matchedEntry!.voucher_no,
-        company: companyB,
+        company: entryCompany,
         status: 'Mismatch',
         matched_with: null
       })
@@ -1589,26 +1640,41 @@ export default function IntercompanyReconciliation() {
       // OPTIMISTIC UPDATE: Update backend match status immediately
       const statusMap = { ...backendMatchStatus }
 
-      // Update the status map with new data
+      // Update the status map for the current entry
       const keyA = `${entry.voucher_type}-${entry.voucher_no}`
-      const keyB = `${entry.matchedEntry!.voucher_type}-${entry.matchedEntry!.voucher_no}`
-
       statusMap[keyA] = {
         success: true,
         status: 'Mismatch',
         matched_with: null,
         matched_with_parsed: null, // Clear the parsed match data
-        matched_by: 'current_user',
-        matched_on: new Date().toISOString()
+        matched_by: null,
+        matched_on: null
       }
 
-      statusMap[keyB] = {
-        success: true,
-        status: 'Mismatch',
-        matched_with: null,
-        matched_with_parsed: null, // Clear the parsed match data
-        matched_by: 'current_user',
-        matched_on: new Date().toISOString()
+      // Also update the paired entry if we know about it
+      let pairedEntry: GLEntry | null = null
+      if (hasFrontendMatch && entry.matchedEntry) {
+        pairedEntry = entry.matchedEntry
+      } else if (hasBackendMatch && selectedEntryForAction.backendMatchData?.matched_with_parsed) {
+        const matchedData = selectedEntryForAction.backendMatchData.matched_with_parsed
+        // Find the paired entry in our data
+        pairedEntry = findMatchingEntries.glDataAWithStatus.find(e =>
+          e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
+        ) || findMatchingEntries.glDataBWithStatus.find(e =>
+          e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
+        ) || null
+      }
+
+      if (pairedEntry) {
+        const keyB = `${pairedEntry.voucher_type}-${pairedEntry.voucher_no}`
+        statusMap[keyB] = {
+          success: true,
+          status: 'Mismatch',
+          matched_with: null,
+          matched_with_parsed: null, // Clear the parsed match data
+          matched_by: null,
+          matched_on: null
+        }
       }
 
       setBackendMatchStatus(statusMap)
@@ -2759,46 +2825,62 @@ export default function IntercompanyReconciliation() {
                               })()}
                             </TableCell>
                             <TableCell className="text-center">
-                              {entry.status === 'Mismatch' && entry.matchedEntry && (
-                                <Button
-                                  onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-green-200 text-green-700 hover:bg-green-50"
-                                >
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Match
-                                </Button>
-                              )}
-                              {entry.status === 'Match' && entry.matchedEntry && (
-                                <Button
-                                  onClick={() => handleShowUnmatchConfirmation(entry)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-red-200 text-red-700 hover:bg-red-50"
-                                >
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  Unmatch
-                                </Button>
-                              )}
-                              {!entry.matchedEntry && (
-                                <Button
-                                  onClick={() => handleManualMatchSelection(entry)}
-                                  size="sm"
-                                  variant="outline"
-                                  className={`${
-                                    manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
-                                      ? "border-blue-200 text-blue-700 bg-blue-50"
-                                      : "border-orange-200 text-orange-700 hover:bg-orange-50"
-                                  }`}
-                                >
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  {manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
-                                    ? "Selected"
-                                    : "Manual Match"
-                                  }
-                                </Button>
-                              )}
+                              {(() => {
+                                // Check if entry has a match (frontend or backend)
+                                const hasFrontendMatch = entry.matchedEntry
+                                const hasBackendMatch = entry.backendMatchData?.matched_with_parsed
+                                const isMatched = entry.status === 'Match' || (hasFrontendMatch || hasBackendMatch)
+                                
+                                // If matched, show Unmatch button
+                                if (isMatched && (hasFrontendMatch || hasBackendMatch)) {
+                                  return (
+                                    <Button
+                                      onClick={() => handleShowUnmatchConfirmation(entry)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-200 text-red-700 hover:bg-red-50"
+                                    >
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      Unmatch
+                                    </Button>
+                                  )
+                                }
+                                
+                                // If status is Mismatch but has a frontend match (auto-detected), show Match to confirm
+                                if (entry.status === 'Mismatch' && hasFrontendMatch) {
+                                  return (
+                                    <Button
+                                      onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-green-200 text-green-700 hover:bg-green-50"
+                                    >
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Match
+                                    </Button>
+                                  )
+                                }
+                                
+                                // Otherwise, show Manual Match button
+                                return (
+                                  <Button
+                                    onClick={() => handleManualMatchSelection(entry)}
+                                    size="sm"
+                                    variant="outline"
+                                    className={`${
+                                      manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                        ? "border-blue-200 text-blue-700 bg-blue-50"
+                                        : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                                    }`}
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    {manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                      ? "Selected"
+                                      : "Manual Match"
+                                    }
+                                  </Button>
+                                )
+                              })()}
                             </TableCell>
                           </TableRow>
                         )
@@ -3028,46 +3110,62 @@ export default function IntercompanyReconciliation() {
                               })()}
                             </TableCell>
                             <TableCell className="text-center">
-                              {entry.status === 'Mismatch' && entry.matchedEntry && (
-                                <Button
-                                  onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-green-200 text-green-700 hover:bg-green-50"
-                                >
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Match
-                                </Button>
-                              )}
-                              {entry.status === 'Match' && entry.matchedEntry && (
-                                <Button
-                                  onClick={() => handleShowUnmatchConfirmation(entry)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-red-200 text-red-700 hover:bg-red-50"
-                                >
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  Unmatch
-                                </Button>
-                              )}
-                              {!entry.matchedEntry && (
-                                <Button
-                                  onClick={() => handleManualMatchSelection(entry)}
-                                  size="sm"
-                                  variant="outline"
-                                  className={`${
-                                    manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
-                                      ? "border-blue-200 text-blue-700 bg-blue-50"
-                                      : "border-orange-200 text-orange-700 hover:bg-orange-50"
-                                  }`}
-                                >
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  {manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
-                                    ? "Selected"
-                                    : "Manual Match"
-                                  }
-                                </Button>
-                              )}
+                              {(() => {
+                                // Check if entry has a match (frontend or backend)
+                                const hasFrontendMatch = entry.matchedEntry
+                                const hasBackendMatch = entry.backendMatchData?.matched_with_parsed
+                                const isMatched = entry.status === 'Match' || (hasFrontendMatch || hasBackendMatch)
+                                
+                                // If matched, show Unmatch button
+                                if (isMatched && (hasFrontendMatch || hasBackendMatch)) {
+                                  return (
+                                    <Button
+                                      onClick={() => handleShowUnmatchConfirmation(entry)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-200 text-red-700 hover:bg-red-50"
+                                    >
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      Unmatch
+                                    </Button>
+                                  )
+                                }
+                                
+                                // If status is Mismatch but has a frontend match (auto-detected), show Match to confirm
+                                if (entry.status === 'Mismatch' && hasFrontendMatch) {
+                                  return (
+                                    <Button
+                                      onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-green-200 text-green-700 hover:bg-green-50"
+                                    >
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Match
+                                    </Button>
+                                  )
+                                }
+                                
+                                // Otherwise, show Manual Match button
+                                return (
+                                  <Button
+                                    onClick={() => handleManualMatchSelection(entry)}
+                                    size="sm"
+                                    variant="outline"
+                                    className={`${
+                                      manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                        ? "border-blue-200 text-blue-700 bg-blue-50"
+                                        : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                                    }`}
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    {manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
+                                      ? "Selected"
+                                      : "Manual Match"
+                                    }
+                                  </Button>
+                                )
+                              })()}
                             </TableCell>
                           </TableRow>
                         )
@@ -3417,7 +3515,7 @@ export default function IntercompanyReconciliation() {
       )}
 
       {/* Individual Unmatch Confirmation Modal */}
-      {showIndividualUnmatchModal && selectedEntryForAction && selectedEntryForAction.matchedEntry && (
+      {showIndividualUnmatchModal && selectedEntryForAction && (selectedEntryForAction.matchedEntry || selectedEntryForAction.backendMatchData?.matched_with_parsed) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
             <h3 className="text-lg font-semibold mb-4 text-red-700">
@@ -3445,18 +3543,57 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="text-2xl text-gray-400">↔</div>
                   <div>
-                    <div className="font-medium text-blue-600">
-                      {selectedEntryForAction.matchedEntry.voucher_type} {selectedEntryForAction.matchedEntry.voucher_no}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {companyB} - {selectedEntryForAction.matchedEntry.posting_date}
-                    </div>
-                    <div className="text-sm font-medium">
-                      {selectedEntryForAction.matchedEntry.debit > 0 ?
-                        `Debit: ${formatCurrency(selectedEntryForAction.matchedEntry.debit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}` :
-                        `Credit: ${formatCurrency(selectedEntryForAction.matchedEntry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}`
+                    {(() => {
+                      // Get matched entry data - either from frontend or backend
+                      let matchedData: any = null
+                      if (selectedEntryForAction.matchedEntry) {
+                        matchedData = selectedEntryForAction.matchedEntry
+                      } else if (selectedEntryForAction.backendMatchData?.matched_with_parsed) {
+                        matchedData = selectedEntryForAction.backendMatchData.matched_with_parsed
+                        // Handle array case (take first match)
+                        if (Array.isArray(matchedData)) {
+                          matchedData = matchedData[0]
+                        }
                       }
-                    </div>
+                      
+                      if (!matchedData) return <div className="text-gray-500">Match data</div>
+                      
+                      const matchedEntry = findMatchingEntries.glDataAWithStatus.find(e =>
+                        e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
+                      ) || findMatchingEntries.glDataBWithStatus.find(e =>
+                        e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
+                      )
+                      
+                      const matchedCompany = findMatchingEntries.glDataAWithStatus.some(e => 
+                        e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
+                      ) ? companyA : companyB
+                      
+                      return (
+                        <>
+                          <div className="font-medium text-blue-600">
+                            {matchedData.voucher_type} {matchedData.voucher_no}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {matchedCompany} - {matchedEntry?.posting_date || 'N/A'}
+                          </div>
+                          <div className="text-sm font-medium">
+                            {matchedEntry ? (
+                              matchedEntry.debit > 0 ?
+                                `Debit: ${formatCurrency(matchedEntry.debit, 
+                                  matchedCompany === companyA ? getPartyCurrency(partyA, 'Customer') : getPartyCurrency(partyB, partyTypeB),
+                                  matchedCompany === companyA ? partyA : partyB,
+                                  matchedCompany === companyA ? 'Customer' : partyTypeB
+                                )}` :
+                                `Credit: ${formatCurrency(matchedEntry.credit,
+                                  matchedCompany === companyA ? getPartyCurrency(partyA, 'Customer') : getPartyCurrency(partyB, partyTypeB),
+                                  matchedCompany === companyA ? partyA : partyB,
+                                  matchedCompany === companyA ? 'Customer' : partyTypeB
+                                )}`
+                            ) : 'N/A'}
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
