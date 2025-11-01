@@ -49,6 +49,7 @@ export default function IntercompanyReconciliation() {
 
   // Status filtering and matching
   const [statusFilter, setStatusFilter] = useState<string>("Mismatch")
+  const [debitCreditFilter, setDebitCreditFilter] = useState<string>("All")
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set())
   const [showMatchModal, setShowMatchModal] = useState(false)
   const [showValidationError, setShowValidationError] = useState(false)
@@ -1623,9 +1624,35 @@ export default function IntercompanyReconciliation() {
   }
 
   // Filter entries by status
-  const filterEntriesByStatus = (entries: GLEntry[]) => {
-    if (statusFilter === 'All') return entries
-    return entries.filter(entry => entry.status === statusFilter)
+  const filterEntriesByStatus = (entries: GLEntry[], isSideA: boolean = true) => {
+    let filtered = entries
+    
+    // Apply status filter
+    if (statusFilter !== 'All') {
+      filtered = filtered.filter(entry => entry.status === statusFilter)
+    }
+    
+    // Apply debit/credit filter
+    if (debitCreditFilter === 'Debit => Credit') {
+      if (isSideA) {
+        // Left side (Company A): show only entries with debit != 0
+        filtered = filtered.filter(entry => entry.debit !== 0)
+      } else {
+        // Right side (Company B): show only entries with credit != 0
+        filtered = filtered.filter(entry => entry.credit !== 0)
+      }
+    } else if (debitCreditFilter === 'Credit => Debit') {
+      if (isSideA) {
+        // Left side (Company A): show only entries with credit != 0
+        filtered = filtered.filter(entry => entry.credit !== 0)
+      } else {
+        // Right side (Company B): show only entries with debit != 0
+        filtered = filtered.filter(entry => entry.debit !== 0)
+      }
+    }
+    // If debitCreditFilter is 'All', no additional filtering needed
+    
+    return filtered
   }
 
   // Determine loading and error states
@@ -2424,9 +2451,22 @@ export default function IntercompanyReconciliation() {
                     </Select>
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Filter by Debit/Credit</label>
+                    <Select value={debitCreditFilter} onValueChange={setDebitCreditFilter}>
+                      <SelectTrigger className="w-48 border-blue-200 focus:border-blue-400">
+                        <SelectValue placeholder="Select Filter" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-blue-200">
+                        <SelectItem value="All">All (Default)</SelectItem>
+                        <SelectItem value="Debit => Credit">Debit → Credit</SelectItem>
+                        <SelectItem value="Credit => Debit">Credit → Debit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div className="text-sm text-gray-600">
-                    Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length} of {findMatchingEntries.glDataAWithStatus.length} entries
+                    Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length} of {findMatchingEntries.glDataAWithStatus.length} entries
                     {isBackendStatusLoading && (
                       <span className="ml-2 inline-flex items-center px-2 py-1 bg-blue-50 border border-blue-200 rounded-full">
                         <RefreshCw className="h-3 w-3 animate-spin text-blue-600 mr-1" />
@@ -2559,7 +2599,7 @@ export default function IntercompanyReconciliation() {
                             type="checkbox"
                             onChange={(e) => {
                               const isChecked = e.target.checked
-                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
+                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
                               if (isChecked) {
                                 setSelectedEntries(new Set([...selectedEntries, ...entryKeys]))
                               } else {
@@ -2573,8 +2613,12 @@ export default function IntercompanyReconciliation() {
                         </TableHead>
                         <TableHead className="text-blue-800">Date</TableHead>
                         <TableHead className="text-blue-800">Voucher</TableHead>
-                        <TableHead className="text-blue-800 text-right">Debit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
-                        <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                        {debitCreditFilter !== 'Credit => Debit' && (
+                          <TableHead className="text-blue-800 text-right">Debit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                        )}
+                        {debitCreditFilter !== 'Debit => Credit' && (
+                          <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                        )}
                         <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
                         <TableHead className="text-blue-800 text-center">Matched With</TableHead>
@@ -2584,7 +2628,7 @@ export default function IntercompanyReconciliation() {
                     <TableBody>
                       {isTableLoading ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
                               <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                               <span className="text-gray-600">
@@ -2593,14 +2637,14 @@ export default function IntercompanyReconciliation() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ) : filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length === 0 ? (
+                      ) : filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).map((entry, index) => {
+                        filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).map((entry, index) => {
                         const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
                         return (
                           <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
@@ -2630,12 +2674,16 @@ export default function IntercompanyReconciliation() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-medium text-blue-600">
-                              {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
-                              {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
-                            </TableCell>
+                            {debitCreditFilter !== 'Credit => Debit' && (
+                              <TableCell className="text-right font-medium text-blue-600">
+                                {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
+                              </TableCell>
+                            )}
+                            {debitCreditFilter !== 'Debit => Credit' && (
+                              <TableCell className="text-right font-medium text-green-600">
+                                {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
+                              </TableCell>
+                            )}
                             <TableCell className="text-right font-medium">
                               {formatCurrency(entry.balance, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                             </TableCell>
@@ -2758,30 +2806,34 @@ export default function IntercompanyReconciliation() {
                       )}
 
                       {/* Customer Table Totals Row */}
-                      {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).length > 0 && (
+                      {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length > 0 && (
                         <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
                           <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
                             TOTAL
                           </TableCell>
-                          <TableCell className="text-right font-bold text-beveren-700">
-                            {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).reduce((sum, entry) => sum + entry.debit, 0),
-                              getPartyCurrency(partyA, 'Customer'),
-                              partyA,
-                              'Customer'
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-beveren-700">
-                            {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).reduce((sum, entry) => sum + entry.credit, 0),
-                              getPartyCurrency(partyA, 'Customer'),
-                              partyA,
-                              'Customer'
-                            )}
-                          </TableCell>
+                          {debitCreditFilter !== 'Credit => Debit' && (
+                            <TableCell className="text-right font-bold text-beveren-700">
+                              {formatCurrency(
+                                filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => sum + entry.debit, 0),
+                                getPartyCurrency(partyA, 'Customer'),
+                                partyA,
+                                'Customer'
+                              )}
+                            </TableCell>
+                          )}
+                          {debitCreditFilter !== 'Debit => Credit' && (
+                            <TableCell className="text-right font-bold text-beveren-700">
+                              {formatCurrency(
+                                filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => sum + entry.credit, 0),
+                                getPartyCurrency(partyA, 'Customer'),
+                                partyA,
+                                'Customer'
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell className="text-right font-bold text-beveren-800">
                             {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus).reduce((sum, entry) => sum + entry.balance, 0),
+                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => sum + entry.balance, 0),
                               getPartyCurrency(partyA, 'Customer'),
                               partyA,
                               'Customer'
@@ -2816,7 +2868,7 @@ export default function IntercompanyReconciliation() {
                             type="checkbox"
                             onChange={(e) => {
                               const isChecked = e.target.checked
-                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
+                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
                               if (isChecked) {
                                 setSelectedEntries(new Set([...selectedEntries, ...entryKeys]))
                               } else {
@@ -2830,8 +2882,12 @@ export default function IntercompanyReconciliation() {
                         </TableHead>
                         <TableHead className="text-blue-800">Date</TableHead>
                         <TableHead className="text-blue-800">Voucher</TableHead>
-                        <TableHead className="text-blue-800 text-right">Debit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
-                        <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                        {debitCreditFilter !== 'Debit => Credit' && (
+                          <TableHead className="text-blue-800 text-right">Debit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                        )}
+                        {debitCreditFilter !== 'Credit => Debit' && (
+                          <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                        )}
                         <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
                         <TableHead className="text-blue-800 text-center">Matched With</TableHead>
@@ -2841,7 +2897,7 @@ export default function IntercompanyReconciliation() {
                     <TableBody>
                       {isTableLoading ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
                               <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                               <span className="text-gray-600">
@@ -2850,14 +2906,14 @@ export default function IntercompanyReconciliation() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ) : filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).length === 0 ? (
+                      ) : filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).map((entry, index) => {
+                        filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).map((entry, index) => {
                         const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
                         return (
                           <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
@@ -2887,12 +2943,16 @@ export default function IntercompanyReconciliation() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-medium text-blue-600">
-                              {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
-                              {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
-                            </TableCell>
+                            {debitCreditFilter !== 'Debit => Credit' && (
+                              <TableCell className="text-right font-medium text-blue-600">
+                                {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
+                              </TableCell>
+                            )}
+                            {debitCreditFilter !== 'Credit => Debit' && (
+                              <TableCell className="text-right font-medium text-green-600">
+                                {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
+                              </TableCell>
+                            )}
                             <TableCell className="text-right font-medium">
                               {formatCurrency(entry.balance, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                             </TableCell>
@@ -3015,30 +3075,34 @@ export default function IntercompanyReconciliation() {
                       )}
 
                       {/* Supplier Table Totals Row */}
-                      {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).length > 0 && (
+                      {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).length > 0 && (
                         <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
                           <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
                             TOTAL
                           </TableCell>
-                          <TableCell className="text-right font-bold text-beveren-700">
-                            {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).reduce((sum, entry) => sum + entry.debit, 0),
-                              getPartyCurrency(partyB, partyTypeB),
-                              partyB,
-                              partyTypeB
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-beveren-700">
-                            {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).reduce((sum, entry) => sum + entry.credit, 0),
-                              getPartyCurrency(partyB, partyTypeB),
-                              partyB,
-                              partyTypeB
-                            )}
-                          </TableCell>
+                          {debitCreditFilter !== 'Debit => Credit' && (
+                            <TableCell className="text-right font-bold text-beveren-700">
+                              {formatCurrency(
+                                filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => sum + entry.debit, 0),
+                                getPartyCurrency(partyB, partyTypeB),
+                                partyB,
+                                partyTypeB
+                              )}
+                            </TableCell>
+                          )}
+                          {debitCreditFilter !== 'Credit => Debit' && (
+                            <TableCell className="text-right font-bold text-beveren-700">
+                              {formatCurrency(
+                                filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => sum + entry.credit, 0),
+                                getPartyCurrency(partyB, partyTypeB),
+                                partyB,
+                                partyTypeB
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell className="text-right font-bold text-beveren-800">
                             {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus).reduce((sum, entry) => sum + entry.balance, 0),
+                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => sum + entry.balance, 0),
                               getPartyCurrency(partyB, partyTypeB),
                               partyB,
                               partyTypeB
