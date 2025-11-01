@@ -552,3 +552,124 @@ def get_gl_closing_amounts(filters: Dict) -> Dict:
             "error": str(e),
             "message": _("Failed to fetch GL closing amounts")
         }
+
+
+@frappe.whitelist()
+def get_intransit_invoice_totals(filters: Dict) -> Dict:
+    """
+    Get total of in-transit invoices (invoices where custom_actual_arrival_date is None)
+    for given parties and company.
+
+    Args:
+        filters: Dict containing:
+            - company: Company name
+            - party_type: "Customer" or "Supplier"
+            - parties: List of party names
+            - from_date: Start date (optional)
+            - to_date: End date (optional)
+
+    Returns:
+        Dict with party names as keys and in-transit totals as values
+    """
+    try:
+        company = filters.get("company")
+        party_type = filters.get("party_type")
+        parties = filters.get("parties", [])
+        from_date = filters.get("from_date")
+        to_date = filters.get("to_date")
+
+        if not all([company, party_type]):
+            frappe.throw(_("Company and party_type are required"))
+
+        if not parties:
+            return {
+                "success": True,
+                "intransit_totals": {},
+                "message": "No parties provided"
+            }
+
+        # Determine which doctype and fields to use
+        if party_type == "Supplier":
+            # For Supplier side: Check Purchase Invoices
+            # Company is the buying company, party is the supplier
+            invoice_type = "Purchase Invoice"
+            supplier_field = "supplier"
+            company_field = "company"
+        else:  # Customer
+            # For Customer side: Check Sales Invoices
+            # Company is the selling company, party is the customer
+            invoice_type = "Sales Invoice"
+            supplier_field = "customer"
+            company_field = "company"
+
+        intransit_totals = {}
+
+        for party in parties:
+            try:
+                # Build filters for invoices
+                invoice_filters = {
+                    company_field: company,
+                    supplier_field: party,
+                    "docstatus": 1,  # Only submitted invoices
+                    "custom_actual_arrival_date": ["in", [None, ""]]  # In-transit (date is None/empty)
+                }
+                # Add date filters if provided
+                if from_date:
+                    invoice_filters["posting_date"] = [">=", from_date]
+                if to_date:
+                    if "posting_date" in invoice_filters:
+                        invoice_filters["posting_date"] = [invoice_filters["posting_date"], "<=", to_date]
+                    else:
+                        invoice_filters["posting_date"] = ["<=", to_date]
+
+                # Get all invoices first, then filter for None custom_actual_arrival_date
+                # Frappe filters don't handle None well, so we get all and filter in Python
+                base_filters = {
+                    company_field: company,
+                    supplier_field: party,
+                    "docstatus": 1
+                }
+                
+                # Properly construct date filters for Frappe
+                if from_date and to_date:
+                    base_filters["posting_date"] = ["between", [from_date, to_date]]
+                elif from_date:
+                    base_filters["posting_date"] = [">=", from_date]
+                elif to_date:
+                    base_filters["posting_date"] = ["<=", to_date]
+                
+                # Get invoices matching the base filters
+                all_invoices = frappe.get_all(
+                    invoice_type,
+                    filters=base_filters,
+                    fields=["name", "grand_total", "currency", "base_grand_total", "custom_actual_arrival_date"]
+                )
+                
+                # Filter for in-transit invoices (custom_actual_arrival_date is None or empty)
+                invoices = [
+                    inv for inv in all_invoices 
+                    if not inv.get("custom_actual_arrival_date") or inv.get("custom_actual_arrival_date") == ""
+                ]
+
+                # Calculate total in company currency (base_grand_total)
+                total_intransit = sum(flt(inv.get("grand_total", 0)) for inv in invoices)
+
+                intransit_totals[party] = total_intransit
+                print("In-transit total for party", party, ":", total_intransit, "invoices found:", invoices)
+            except Exception as e:
+                print(f"Error processing party {party} for in-transit invoices: {str(e)}")
+                intransit_totals[party] = 0
+
+        return {
+            "success": True,
+            "intransit_totals": intransit_totals
+        }
+
+    except Exception as e:
+        frappe.log_error(f"In-Transit Invoice Totals Error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": _("Failed to fetch in-transit invoice totals"),
+            "intransit_totals": {}
+        }
