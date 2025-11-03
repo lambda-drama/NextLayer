@@ -177,8 +177,7 @@
    "fieldname": "items",
    "fieldtype": "Table",
    "label": "Items",
-   "options": "Scanning Operation Detail",
-   "reqd": 1
+   "options": "Scanning Operation Detail"
   },
   {
    "fieldname": "scan_barcode",
@@ -301,13 +300,16 @@
    "fieldname": "scanned_by",
    "fieldtype": "Link",
    "label": "Scanned By",
-   "options": "User"
+   "options": "User",
+   "permlevel": 1,
+   "reqd": 1
   },
   {
    "fieldname": "verified_by",
    "fieldtype": "Link",
    "label": "Verified By",
-   "options": "User"
+   "options": "User",
+   "permlevel": 1
   },
   {
    "fieldname": "section_break_xcjd",
@@ -360,7 +362,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-11-03 22:24:54.717876",
+ "modified": "2025-11-04 02:32:35.908472",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",

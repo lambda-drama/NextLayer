@@ -16,25 +16,50 @@ class ScanningOperation(Document):
 
 	def on_submit(self):
 		"""Validate before submission"""
+		self.validate_items_exist()
 		self.validate_verification_complete()
 		self.validate_stock_availability()
+		# Update verification status to "Skipped Verification" if no verifier is assigned
+		if not self.verified_by:
+			self.verification_status = "Skipped Verification"
+
+	def validate_items_exist(self):
+		"""Validate that items table is not empty before submission"""
+		if not self.items or len(self.items) == 0:
+			frappe.throw(
+				"Cannot submit document with empty items table. Please add at least one item before submitting.",
+				title="Items Required"
+			)
+
+		# Check if there are any valid items (with item_code)
+		valid_items = [item for item in self.items if item.item_code]
+		if not valid_items:
+			frappe.throw(
+				"Cannot submit document. No valid items found in the items table. Please add at least one item before submitting.",
+				title="Items Required"
+			)
 
 	def validate_verification_complete(self):
 		"""Validate that verification is complete before allowing submission"""
-		if self.verified_by and self.verification_status != "Verified":
-			frappe.throw(
-				"Only submit if fully verified. Current verification status: {0}".format(self.verification_status),
-				title="Verification Required"
-			)
+		# If both scanned_by and verified_by are set, verification must be complete
+		if self.scanned_by and self.verified_by:
+			if self.verification_status != "Verified":
+				frappe.throw(
+					"Only submit if fully verified. Current verification status: {0}".format(self.verification_status),
+					title="Verification Required"
+				)
+			# Check if current user is the verifier (only verifier can submit when both users exist)
+			current_user = frappe.session.user
+			if current_user != self.verified_by:
+				frappe.throw(
+					"Only the verifier can submit this document when both scanner and verifier are assigned.",
+					title="Submission Restricted"
+				)
+		# If only scanned_by is set, scanner can submit regardless of verification status
 
 	def validate_verification_user(self):
-		"""Validate that verified_by is different from scanned_by"""
-		if self.verified_by and self.scanned_by:
-			if self.verified_by == self.scanned_by:
-				frappe.throw(
-					"Verified By must be different from Scanned By. The scanner cannot verify their own scan.",
-					title="Validation Error"
-				)
+		"""Validate verification user (no restrictions - same user can scan and verify if needed)"""
+		pass
 
 	def validate_items(self):
 		"""Validate that all items have required fields"""
