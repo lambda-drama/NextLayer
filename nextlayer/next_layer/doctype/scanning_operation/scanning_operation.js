@@ -39,19 +39,6 @@ frappe.ui.form.on("Scanning Operation", {
 	},
 
 	verified_by(frm) {
-		// Validate that verified_by is different from scanned_by
-		if (frm.doc.verified_by && frm.doc.scanned_by) {
-			if (frm.doc.verified_by === frm.doc.scanned_by) {
-				frappe.msgprint({
-					title: __("Validation Error"),
-					message: __("Verified By must be different from Scanned By. The scanner cannot verify their own scan."),
-					indicator: "red"
-				});
-				frm.set_value("verified_by", "");
-				return;
-			}
-		}
-		
 		// When verified_by is set, enforce verification mode restrictions
 		setup_verification_mode(frm);
 	},
@@ -350,7 +337,14 @@ function create_sales_invoice(frm) {
 // Function to check if we're in verification mode
 function is_verification_mode(frm) {
 	const current_user = frappe.session.user;
+	const scanned_by = frm.doc.scanned_by;
 	const verified_by = frm.doc.verified_by;
+	
+	// Verification mode: current user is the verifier AND not the scanner
+	// If user is both scanner and verifier, default to scanner mode (add to quantity)
+	if (scanned_by === current_user && verified_by === current_user) {
+		return false; // Scanner mode takes priority
+	}
 	
 	// Verification mode: verified_by is set AND current user is the verified_by person
 	return verified_by && verified_by === current_user;
@@ -358,16 +352,7 @@ function is_verification_mode(frm) {
 
 // Function to check if scanning should be blocked
 function should_block_scanning(frm) {
-	const current_user = frappe.session.user;
-	const scanned_by = frm.doc.scanned_by;
-	const verified_by = frm.doc.verified_by;
-	
-	// Block scanning if verified_by is set but current user is not the verified_by person
-	// AND current user is the scanner (scanned_by)
-	if (verified_by && verified_by !== current_user && scanned_by === current_user) {
-		return true;
-	}
-	
+	// Scanner and verifier can work simultaneously - no blocking
 	return false;
 }
 
@@ -377,20 +362,35 @@ function process_barcode_scan(frm) {
 
 	if (!barcode) return;
 
-	// Check if scanning should be blocked
-	if (should_block_scanning(frm)) {
-		frappe.msgprint({
-			title: __("Scanning Restricted"),
-			message: __("Verification has started. Only the verified by person can scan now."),
-			indicator: "orange"
-		});
-		frm.set_value("scan_barcode", "");
-		return;
-	}
+	const current_user = frappe.session.user;
+	const scanned_by = frm.doc.scanned_by;
+	const verified_by = frm.doc.verified_by;
 
-	// Auto-set scanned_by on first scan if not set
-	if (!frm.doc.scanned_by) {
-		frm.set_value("scanned_by", frappe.session.user);
+	// Check if we're in verification mode
+	const is_verifier = verified_by && verified_by === current_user;
+	const is_scanner = scanned_by && scanned_by === current_user;
+
+	// If not in verification mode, only scanned_by user can scan (add to quantity)
+	if (!is_verifier) {
+		if (!scanned_by) {
+			frappe.msgprint({
+				title: __("Scanner Not Selected"),
+				message: __("Please select 'Scanned By' user before scanning items."),
+				indicator: "orange"
+			});
+			frm.set_value("scan_barcode", "");
+			return;
+		}
+
+		if (scanned_by !== current_user) {
+			frappe.msgprint({
+				title: __("Scanning Restricted"),
+				message: __("Only the selected scanner ({0}) can scan items. Please log in as the scanner to scan items.", [scanned_by]),
+				indicator: "red"
+			});
+			frm.set_value("scan_barcode", "");
+			return;
+		}
 	}
 
 	// Clear the barcode field immediately for next scan
@@ -514,11 +514,23 @@ function add_item_to_table_for_verification(frm, item_data) {
 	}
 
 	if (existing_row !== null) {
-		// Update verified_qty of existing item
+		// Check if verified_qty is going beyond scanned quantity
+		let scanned_qty = frm.doc.items[existing_row].quantity || 0;
 		let current_verified_qty = frm.doc.items[existing_row].verified_qty || 0;
 		let new_verified_qty = current_verified_qty + 1;
 
-		// Directly modify the row data
+		// Validate: verifier cannot verify beyond what was scanned
+		if (new_verified_qty > scanned_qty) {
+			frappe.msgprint({
+				title: __("Verification Error"),
+				message: __("Cannot verify beyond scanned quantity. Scanned: {0}, Verified: {1}. Please ask the scanner to scan again and correct the quantities.", [scanned_qty, current_verified_qty]),
+				indicator: "red"
+			});
+			frm.set_value("scan_barcode", "");
+			return;
+		}
+
+		// Update verified_qty of existing item
 		frm.doc.items[existing_row].verified_qty = new_verified_qty;
 
 		// Trigger form refresh and auto-save
@@ -530,12 +542,14 @@ function add_item_to_table_for_verification(frm, item_data) {
 			indicator: "blue"
 		});
 	} else {
-		// Item not found in original scan - show warning
+		// Item not found in original scan - show error
 		frappe.msgprint({
-			title: __("Item Not Found"),
-			message: __("Item {0} with barcode {1} was not found in the original scan. Please verify items that were originally scanned.", [item_data.item_name, item_data.barcode]),
-			indicator: "orange"
+			title: __("Item Not Found in Original Scan"),
+			message: __("Item {0} with barcode {1} was not found in the original scan. Verifier can only verify items that were originally scanned. Please ask the scanner to scan this item first.", [item_data.item_name, item_data.barcode]),
+			indicator: "red"
 		});
+		frm.set_value("scan_barcode", "");
+		return;
 	}
 
 	frm.refresh_field("items");
@@ -706,47 +720,39 @@ function setup_verification_mode(frm) {
 	const scanned_by = frm.doc.scanned_by;
 	const verified_by = frm.doc.verified_by;
 
-	// If verified_by is set
-	if (verified_by) {
-		// If current user is the scanner (scanned_by) but not the verifier, disable scanning
-		if (scanned_by === current_user && verified_by !== current_user) {
-			// Disable barcode field
-			if (frm.fields_dict.scan_barcode) {
-				frm.fields_dict.scan_barcode.set_read_only(true);
-				frm.fields_dict.scan_barcode.df.description = __("Verification in progress. Only the verified by person can scan.");
-			}
-		} 
-		// If current user is the verifier, enable verification mode
-		else if (verified_by === current_user) {
-			// Enable barcode field for verification
-			if (frm.fields_dict.scan_barcode) {
-				frm.fields_dict.scan_barcode.set_read_only(false);
-				frm.fields_dict.scan_barcode.df.description = __("Verification mode: Scanning will add to verified quantity.");
-			}
+	// Enable barcode field for scanner or verifier
+	if (scanned_by === current_user || verified_by === current_user) {
+		if (frm.fields_dict.scan_barcode) {
+			frm.fields_dict.scan_barcode.set_read_only(false);
 			
-			// Show verification mode indicator
-			if (!frm.doc.__verification_mode_indicator_shown) {
-				frappe.show_alert({
-					message: __("Verification mode active. Scanning will verify items."),
-					indicator: "blue"
-				}, 3);
-				frm.doc.__verification_mode_indicator_shown = true;
-			}
-		}
-		// If current user is neither scanner nor verifier, disable scanning
-		else {
-			if (frm.fields_dict.scan_barcode) {
-				frm.fields_dict.scan_barcode.set_read_only(true);
-				frm.fields_dict.scan_barcode.df.description = __("Only the scanner or verifier can scan items.");
+			// Set description based on user role
+			if (scanned_by === current_user && verified_by === current_user) {
+				frm.fields_dict.scan_barcode.df.description = __("You are both scanner and verifier. Scanning will add to quantity.");
+			} else if (scanned_by === current_user) {
+				frm.fields_dict.scan_barcode.df.description = __("Scanner mode: Scanning will add to quantity.");
+			} else if (verified_by === current_user) {
+				frm.fields_dict.scan_barcode.df.description = __("Verification mode: Scanning will add to verified quantity.");
+				
+				// Show verification mode indicator
+				if (!frm.doc.__verification_mode_indicator_shown) {
+					frappe.show_alert({
+						message: __("Verification mode active. Scanning will verify items."),
+						indicator: "blue"
+					}, 3);
+					frm.doc.__verification_mode_indicator_shown = true;
+				}
 			}
 		}
 	} else {
-		// No verification yet - enable normal scanning
+		// If current user is neither scanner nor verifier, disable scanning
 		if (frm.fields_dict.scan_barcode) {
-			frm.fields_dict.scan_barcode.set_read_only(false);
-			frm.fields_dict.scan_barcode.df.description = "";
+			frm.fields_dict.scan_barcode.set_read_only(true);
+			if (!scanned_by && !verified_by) {
+				frm.fields_dict.scan_barcode.df.description = __("Please select 'Scanned By' or 'Verified By' user before scanning.");
+			} else {
+				frm.fields_dict.scan_barcode.df.description = __("Only the scanner or verifier can scan items.");
+			}
 		}
-		frm.doc.__verification_mode_indicator_shown = false;
 	}
 
 	// Refresh the field to apply changes
