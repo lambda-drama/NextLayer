@@ -15,6 +15,9 @@ frappe.ui.form.on("Scanning Operation", {
 		setup_automatic_barcode_detection(frm);
 
 		setup_warehouse_filters(frm);
+		
+		// Setup verification mode restrictions
+		setup_verification_mode(frm);
 	},
 
 	company(frm) {
@@ -35,12 +38,50 @@ frappe.ui.form.on("Scanning Operation", {
 		}
 	},
 
+	verified_by(frm) {
+		// Validate that verified_by is different from scanned_by
+		if (frm.doc.verified_by && frm.doc.scanned_by) {
+			if (frm.doc.verified_by === frm.doc.scanned_by) {
+				frappe.msgprint({
+					title: __("Validation Error"),
+					message: __("Verified By must be different from Scanned By. The scanner cannot verify their own scan."),
+					indicator: "red"
+				});
+				frm.set_value("verified_by", "");
+				return;
+			}
+		}
+		
+		// When verified_by is set, enforce verification mode restrictions
+		setup_verification_mode(frm);
+	},
+
 	operation(frm) {
 		// Clear warehouse fields and party fields when operation changes
 		frm.set_value("ds_warehouse", "");
 		frm.set_value("dt_warehouse", "");
 		// frm.set_value("customer", "");
 		// frm.set_value("supplier", "");
+	},
+
+	ds_warehouse(frm) {
+		// When default source warehouse changes, update all child table warehouses on save
+		if (frm.doc.operation === "Loading" && frm.doc.ds_warehouse && frm.doc.items && frm.doc.items.length > 0) {
+			frappe.show_alert({
+				message: __("Warehouses in items table will be updated to '{0}' on save", [frm.doc.ds_warehouse]),
+				indicator: "blue"
+			}, 3);
+		}
+	},
+
+	dt_warehouse(frm) {
+		// When default target warehouse changes, update all child table warehouses on save
+		if (frm.doc.operation === "Offloading" && frm.doc.dt_warehouse && frm.doc.items && frm.doc.items.length > 0) {
+			frappe.show_alert({
+				message: __("Warehouses in items table will be updated to '{0}' on save", [frm.doc.dt_warehouse]),
+				indicator: "blue"
+			}, 3);
+		}
 	},
 
 	// customer(frm) {
@@ -306,11 +347,51 @@ function create_sales_invoice(frm) {
 	wait_for_document_and_add_items("Sales Invoice", items_data);
 }
 
+// Function to check if we're in verification mode
+function is_verification_mode(frm) {
+	const current_user = frappe.session.user;
+	const verified_by = frm.doc.verified_by;
+	
+	// Verification mode: verified_by is set AND current user is the verified_by person
+	return verified_by && verified_by === current_user;
+}
+
+// Function to check if scanning should be blocked
+function should_block_scanning(frm) {
+	const current_user = frappe.session.user;
+	const scanned_by = frm.doc.scanned_by;
+	const verified_by = frm.doc.verified_by;
+	
+	// Block scanning if verified_by is set but current user is not the verified_by person
+	// AND current user is the scanner (scanned_by)
+	if (verified_by && verified_by !== current_user && scanned_by === current_user) {
+		return true;
+	}
+	
+	return false;
+}
+
 // Function to process barcode scan
 function process_barcode_scan(frm) {
 	let barcode = frm.doc.scan_barcode;
 
 	if (!barcode) return;
+
+	// Check if scanning should be blocked
+	if (should_block_scanning(frm)) {
+		frappe.msgprint({
+			title: __("Scanning Restricted"),
+			message: __("Verification has started. Only the verified by person can scan now."),
+			indicator: "orange"
+		});
+		frm.set_value("scan_barcode", "");
+		return;
+	}
+
+	// Auto-set scanned_by on first scan if not set
+	if (!frm.doc.scanned_by) {
+		frm.set_value("scanned_by", frappe.session.user);
+	}
 
 	// Clear the barcode field immediately for next scan
 	frm.set_value("scan_barcode", "");
@@ -324,7 +405,11 @@ function process_barcode_scan(frm) {
 		callback: function(r) {
 			if (r.message) {
 				console.log("Our data",r.message);
-				add_item_to_table(frm, r.message);
+				if (is_verification_mode(frm)) {
+					add_item_to_table_for_verification(frm, r.message);
+				} else {
+					add_item_to_table(frm, r.message);
+				}
 			} else {
 				frappe.msgprint(__("Item not found for barcode: {0}", [barcode]));
 			}
@@ -395,6 +480,62 @@ function add_item_to_table(frm, item_data) {
 
 		// Auto-save after adding a new row so server computes conversions and totals
 		frm.save();
+	}
+
+	frm.refresh_field("items");
+
+	// Set focus back to barcode field for next scan
+	setTimeout(function() {
+		if (frm.fields_dict.scan_barcode) {
+			frm.fields_dict.scan_barcode.set_focus();
+		}
+	}, 100);
+}
+
+// Function to add item to table for verification (adds to verified_qty instead of quantity)
+function add_item_to_table_for_verification(frm, item_data) {
+	let warehouse = "";
+
+	// Set default warehouse based on operation
+	if (frm.doc.operation === "Loading" && frm.doc.ds_warehouse) {
+		warehouse = frm.doc.ds_warehouse;
+	} else if (frm.doc.operation === "Offloading" && frm.doc.dt_warehouse) {
+		warehouse = frm.doc.dt_warehouse;
+	}
+
+	// Find existing item row (same item + warehouse combination)
+	let existing_row = null;
+	if (frm.doc.items) {
+		frm.doc.items.forEach(function(row, index) {
+			if (row.item_code === item_data.item_code && row.warehouse === warehouse) {
+				existing_row = index;
+			}
+		});
+	}
+
+	if (existing_row !== null) {
+		// Update verified_qty of existing item
+		let current_verified_qty = frm.doc.items[existing_row].verified_qty || 0;
+		let new_verified_qty = current_verified_qty + 1;
+
+		// Directly modify the row data
+		frm.doc.items[existing_row].verified_qty = new_verified_qty;
+
+		// Trigger form refresh and auto-save
+		frm.refresh_field("items");
+		frm.save();
+
+		frappe.show_alert({
+			message: __("Verified quantity increased to {0} for {1}", [new_verified_qty, item_data.item_name]),
+			indicator: "blue"
+		});
+	} else {
+		// Item not found in original scan - show warning
+		frappe.msgprint({
+			title: __("Item Not Found"),
+			message: __("Item {0} with barcode {1} was not found in the original scan. Please verify items that were originally scanned.", [item_data.item_name, item_data.barcode]),
+			indicator: "orange"
+		});
 	}
 
 	frm.refresh_field("items");
@@ -557,6 +698,61 @@ function setup_warehouse_filters(frm) {
 			}
 		};
 	});
+}
+
+// Function to setup verification mode restrictions
+function setup_verification_mode(frm) {
+	const current_user = frappe.session.user;
+	const scanned_by = frm.doc.scanned_by;
+	const verified_by = frm.doc.verified_by;
+
+	// If verified_by is set
+	if (verified_by) {
+		// If current user is the scanner (scanned_by) but not the verifier, disable scanning
+		if (scanned_by === current_user && verified_by !== current_user) {
+			// Disable barcode field
+			if (frm.fields_dict.scan_barcode) {
+				frm.fields_dict.scan_barcode.set_read_only(true);
+				frm.fields_dict.scan_barcode.df.description = __("Verification in progress. Only the verified by person can scan.");
+			}
+		} 
+		// If current user is the verifier, enable verification mode
+		else if (verified_by === current_user) {
+			// Enable barcode field for verification
+			if (frm.fields_dict.scan_barcode) {
+				frm.fields_dict.scan_barcode.set_read_only(false);
+				frm.fields_dict.scan_barcode.df.description = __("Verification mode: Scanning will add to verified quantity.");
+			}
+			
+			// Show verification mode indicator
+			if (!frm.doc.__verification_mode_indicator_shown) {
+				frappe.show_alert({
+					message: __("Verification mode active. Scanning will verify items."),
+					indicator: "blue"
+				}, 3);
+				frm.doc.__verification_mode_indicator_shown = true;
+			}
+		}
+		// If current user is neither scanner nor verifier, disable scanning
+		else {
+			if (frm.fields_dict.scan_barcode) {
+				frm.fields_dict.scan_barcode.set_read_only(true);
+				frm.fields_dict.scan_barcode.df.description = __("Only the scanner or verifier can scan items.");
+			}
+		}
+	} else {
+		// No verification yet - enable normal scanning
+		if (frm.fields_dict.scan_barcode) {
+			frm.fields_dict.scan_barcode.set_read_only(false);
+			frm.fields_dict.scan_barcode.df.description = "";
+		}
+		frm.doc.__verification_mode_indicator_shown = false;
+	}
+
+	// Refresh the field to apply changes
+	if (frm.fields_dict.scan_barcode) {
+		frm.refresh_field("scan_barcode");
+	}
 }
 
 // Robust function to wait for document to load and add items

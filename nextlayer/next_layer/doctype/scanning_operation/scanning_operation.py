@@ -8,13 +8,33 @@ from erpnext.stock.utils import get_stock_balance
 
 class ScanningOperation(Document):
 	def validate(self):
+		self.validate_verification_user()
 		self.validate_items()
 		self.auto_fill_missing_warehouses()
 		self.compute_uom_conversions_and_totals()
+		self.compute_verification_status()
 
 	def on_submit(self):
-		"""Validate stock availability only on submit"""
+		"""Validate before submission"""
+		self.validate_verification_complete()
 		self.validate_stock_availability()
+
+	def validate_verification_complete(self):
+		"""Validate that verification is complete before allowing submission"""
+		if self.verified_by and self.verification_status != "Verified":
+			frappe.throw(
+				"Only submit if fully verified. Current verification status: {0}".format(self.verification_status),
+				title="Verification Required"
+			)
+
+	def validate_verification_user(self):
+		"""Validate that verified_by is different from scanned_by"""
+		if self.verified_by and self.scanned_by:
+			if self.verified_by == self.scanned_by:
+				frappe.throw(
+					"Verified By must be different from Scanned By. The scanner cannot verify their own scan.",
+					title="Validation Error"
+				)
 
 	def validate_items(self):
 		"""Validate that all items have required fields"""
@@ -26,7 +46,7 @@ class ScanningOperation(Document):
 			# Warehouse validation moved to auto_fill_missing_warehouses
 
 	def auto_fill_missing_warehouses(self):
-		"""Auto-fill missing warehouses before validation"""
+		"""Auto-fill missing warehouses and update warehouses when default warehouse changes"""
 		if not self.items:
 			return
 
@@ -40,6 +60,14 @@ class ScanningOperation(Document):
 		elif self.operation == "Offloading" and self.dt_warehouse:
 			default_warehouse = self.dt_warehouse
 
+		# If default warehouse is set, update all items to use it
+		if default_warehouse:
+			for item in self.items:
+				if item.item_code:  # Only update items that have item_code
+					item.warehouse = default_warehouse
+			return
+
+		# If no default warehouse, use existing logic for auto-fill
 		# Categorize items
 		for item in self.items:
 			if item.warehouse:
@@ -65,7 +93,7 @@ class ScanningOperation(Document):
 
 		# Final validation - ensure all items have warehouse
 		for item in self.items:
-			if not item.warehouse:
+			if item.item_code and not item.warehouse:
 				frappe.throw(f"Warehouse is required for row {item.idx}. Please set default warehouse or specify warehouse for this item.")
 
 	def validate_stock_availability(self):
@@ -178,6 +206,53 @@ class ScanningOperation(Document):
 		self.total_pairs = total_pairs
 		self.total_cartons = total_cartons
 		self.total_containers = total_containers
+
+	def compute_verification_status(self):
+		"""Compute verification status based on quantity vs verified_qty comparison"""
+		if not getattr(self, "items", None) or not self.items:
+			# No items - set to Pending
+			self.verification_status = "Pending"
+			return
+
+		# If verified_by is not set, status should be Pending
+		if not self.verified_by:
+			self.verification_status = "Pending"
+			return
+
+		# Filter valid items (with item_code)
+		valid_items = [item for item in self.items if item.item_code]
+
+		if not valid_items:
+			self.verification_status = "Pending"
+			return
+
+		# Check if all items have matching quantities
+		has_discrepancy = False
+		all_verified = True
+
+		for item in valid_items:
+			quantity = float(item.quantity or 0)
+			verified_qty = float(item.verified_qty or 0)
+
+			# If verified_qty doesn't match quantity, we have a discrepancy
+			if quantity != verified_qty:
+				has_discrepancy = True
+				all_verified = False
+				break
+
+			# If verified_qty is 0 for an item with quantity > 0, not fully verified yet
+			if verified_qty == 0 and quantity > 0:
+				all_verified = False
+
+		# Set verification status
+		if has_discrepancy:
+			self.verification_status = "Discrepancy"
+		elif all_verified:
+			# All items have matching verified_qty
+			self.verification_status = "Verified"
+		else:
+			# Still pending verification (some items not verified yet)
+			self.verification_status = "Pending"
 
 
 @frappe.whitelist()

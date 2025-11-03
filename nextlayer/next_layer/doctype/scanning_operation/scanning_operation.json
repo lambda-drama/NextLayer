@@ -17,6 +17,7 @@
   "column_break_rnyw",
   "scanned_by",
   "verified_by",
+  "verification_status",
   "accounting_dimensions_section",
   "company_group",
   "cost_center",
@@ -345,13 +346,21 @@
    "label": "UOM",
    "options": "UOM",
    "reqd": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "verification_status",
+   "fieldtype": "Select",
+   "label": "Verification Status",
+   "options": "\nPending\nVerified\nDiscrepancy",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-30 01:56:52.043247",
+ "modified": "2025-11-03 22:24:54.717876",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",
