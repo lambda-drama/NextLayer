@@ -15,6 +15,7 @@ frappe.ui.form.on("Scanning Operation", {
 		setup_automatic_barcode_detection(frm);
 
 		setup_warehouse_filters(frm);
+		setup_accounting_dimension_filters(frm);
 		
 		// Setup verification mode restrictions
 		setup_verification_mode(frm);
@@ -25,8 +26,14 @@ frappe.ui.form.on("Scanning Operation", {
 		frm.set_value("ds_warehouse", "");
 		frm.set_value("dt_warehouse", "");
 
+		// Clear accounting dimension fields when company changes
+		frm.set_value("cost_center", "");
+		frm.set_value("project", "");
+		frm.set_value("branch", "");
+
 		// Update warehouse filters
 		setup_warehouse_filters(frm);
+		setup_accounting_dimension_filters(frm);
 
 		// Setup customer/supplier filters based on company
 		// setup_party_filters(frm);
@@ -70,52 +77,7 @@ frappe.ui.form.on("Scanning Operation", {
 			}, 3);
 		}
 	},
-
-	// customer(frm) {
-	// 	if (!frm.doc.customer || !frm.doc.company) return;
-
-	// 	frappe.call({
-	// 		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
-	// 		args: {
-	// 			company: frm.doc.company,
-	// 			parenttype: "Customer",
-	// 		},
-	// 		callback: function(r) {
-	// 			if (!r.message) return;
-
-	// 			const { allowed_parties, restrict_selling_settings } = r.message;
-
-	// 			if (restrict_selling_settings) {
-	// 				if (!allowed_parties.includes(frm.doc.customer)) {
-	// 					frappe.throw('Customer not authorized to transact!')
-	// 				}
-	// 			}
-	// 		}
-	// 	});
-	// },
-
-	// supplier(frm) {
-	// 	if (!frm.doc.supplier || !frm.doc.company) return;
-
-	// 	frappe.call({
-	// 		method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_customers_or_suppliers_by_company",
-	// 		args: {
-	// 			company: frm.doc.company,
-	// 			parenttype: "Supplier",
-	// 		},
-	// 		callback: function(r) {
-	// 			if (!r.message) return;
-
-	// 			const { allowed_parties, restrict_buying_settings } = r.message;
-
-	// 			if (restrict_buying_settings) {
-	// 				if (!allowed_parties.includes(frm.doc.supplier)) {
-	// 					frappe.throw('Supplier not authorized to transact!')
-	// 				}
-	// 			}
-	// 		}
-	// 	});
-	// },
+	
 
 	before_save(frm) {
 		// Auto-fill missing warehouses before submit
@@ -197,14 +159,13 @@ function create_purchase_receipt(frm) {
 			warehouse: item.warehouse,
 			barcode: item.barcode,
 			description: item.description,
-			uomcontainers: item.uomcontainers,
-			uomcartons: item.uomcartons
+			custom_containers: item.uomcontainers,
+			custom_cartons: item.uomcartons
 		});
 	});
 
 	// Navigate to new Purchase Receipt with pre-filled data
 	let args = {
-		supplier: frm.doc.supplier,
 		posting_date: frm.doc.date,
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
@@ -218,20 +179,20 @@ function create_purchase_receipt(frm) {
 		branch: frm.doc.branch,
 		custom_container_no: frm.doc.container_no,
 		custom_port_of_loading: frm.doc.port_of_loading,
-		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bill_of_landing: frm.doc.data_ncab,
 		custom_bil: frm.doc.bil,
 		custom_bill_of_exit: frm.doc.bill_of_exit,
 		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
 		custom_destination: frm.doc.destination,
 		custom_port_of_discharge: frm.doc.port_of_discharge,
 		custom_container_quantity: frm.doc.container_quantity,
-		custom_shipping_line: frm.doc.shipping_line,
+		custom_shippin_line: frm.doc.shipping_line,
 		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
 		custom_remaining_days: frm.doc.remaining_days,
 		custom_actual_arrival_date: frm.doc.actual_arrival_date,
 		custom_shipping_status: frm.doc.shipping_status,
 		custom_total_cartons: frm.doc.total_cartons,
-		custom_total_container: frm.doc.total_containers
+		custom_total_containers: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -260,8 +221,8 @@ function create_purchase_invoice(frm) {
 			warehouse: item.warehouse,
 			barcode: item.barcode,
 			description: item.description,
-			uomcontainers: item.uomcontainers,
-			uomcartons: item.uomcartons
+			custom_containers: item.uomcontainers,
+			custom_cartons: item.uomcartons
 		});
 	});
 
@@ -281,20 +242,20 @@ function create_purchase_invoice(frm) {
 		branch: frm.doc.branch,
 		custom_container_no: frm.doc.container_no,
 		custom_port_of_loading: frm.doc.port_of_loading,
-		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bill_of_landing: frm.doc.data_ncab,
 		custom_bil: frm.doc.bil,
 		custom_bill_of_exit: frm.doc.bill_of_exit,
 		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
 		custom_destination: frm.doc.destination,
 		custom_port_of_discharge: frm.doc.port_of_discharge,
 		custom_container_quantity: frm.doc.container_quantity,
-		custom_shipping_line: frm.doc.shipping_line,
+		custom_shippin_line: frm.doc.shipping_line,
 		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
 		custom_remaining_days: frm.doc.remaining_days,
 		custom_actual_arrival_date: frm.doc.actual_arrival_date,
 		custom_shipping_status: frm.doc.shipping_status,
 		custom_total_cartons: frm.doc.total_cartons,
-		custom_total_container: frm.doc.total_containers
+		custom_total_containers: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -320,11 +281,12 @@ function create_delivery_note(frm) {
 			qty: item.quantity,
 			uom: item.uom,
 			stock_uom: item.stock_uom || item.uom,
+			conversion_factor: item.uom_conversion_factor,
 			warehouse: item.warehouse,
 			barcode: item.barcode,
 			description: item.description,
-			uomcontainers: item.uomcontainers,
-			uomcartons: item.uomcartons
+			custom_containers:  item.uomcontainers,
+			custom_cartons: item.uomcartons,
 		});
 	});
 
@@ -342,22 +304,23 @@ function create_delivery_note(frm) {
 		project: frm.doc.project,
 		marka: frm.doc.marka,
 		branch: frm.doc.branch,
+		
 		custom_container_no: frm.doc.container_no,
 		custom_port_of_loading: frm.doc.port_of_loading,
-		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bill_of_landing: frm.doc.data_ncab,
 		custom_bil: frm.doc.bil,
 		custom_bill_of_exit: frm.doc.bill_of_exit,
 		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
 		custom_destination: frm.doc.destination,
 		custom_port_of_discharge: frm.doc.port_of_discharge,
 		custom_container_quantity: frm.doc.container_quantity,
-		custom_shipping_line: frm.doc.shipping_line,
+		custom_shippin_line: frm.doc.shipping_line,
 		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
 		custom_remaining_days: frm.doc.remaining_days,
 		custom_actual_arrival_date: frm.doc.actual_arrival_date,
 		custom_shipping_status: frm.doc.shipping_status,
 		custom_total_cartons: frm.doc.total_cartons,
-		custom_total_container: frm.doc.total_containers
+		custom_total_containers: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -376,6 +339,8 @@ function create_sales_invoice(frm) {
 
 	// Prepare items data for the new document
 	let items_data = [];
+	
+	// First, prepare items data structure
 	frm.doc.items.forEach(function(item) {
 		items_data.push({
 			item_code: item.item_code,
@@ -386,11 +351,45 @@ function create_sales_invoice(frm) {
 			warehouse: item.warehouse,
 			barcode: item.barcode,
 			description: item.description,
-			uomcontainers: item.uomcontainers,
-			uomcartons: item.uomcartons
+			custom_containers: item.uomcontainers,
+			custom_cartons: item.uomcartons
 		});
 	});
 
+	// Fetch income accounts for all items before forwarding
+	let pending_requests = items_data.length;
+	let all_income_accounts_fetched = false;
+	
+	if (items_data.length > 0 && frm.doc.company) {
+		items_data.forEach(function(item_data, index) {
+			frappe.call({
+				method: "nextlayer.next_layer.doctype.scanning_operation.scanning_operation.get_accounts",
+				args: {
+					item_code: item_data.item_code,
+					company: frm.doc.company
+				},
+				callback: function(r) {
+					pending_requests--;
+					if (r.message) {
+						item_data.income_account = r.message;
+					}
+					
+					// When all requests are done, proceed with creating the document
+					if (pending_requests === 0 && !all_income_accounts_fetched) {
+						all_income_accounts_fetched = true;
+						proceed_with_sales_invoice_creation(frm, items_data);
+					}
+				}
+			});
+		});
+	} else {
+		// No items or no company, proceed without fetching income accounts
+		proceed_with_sales_invoice_creation(frm, items_data);
+	}
+}
+
+// Function to proceed with Sales Invoice creation after income accounts are fetched
+function proceed_with_sales_invoice_creation(frm, items_data) {
 	// Navigate to new Sales Invoice with pre-filled data
 	let args = {
 		// customer: frm.doc.customer,
@@ -407,20 +406,20 @@ function create_sales_invoice(frm) {
 		branch: frm.doc.branch,
 		custom_container_no: frm.doc.container_no,
 		custom_port_of_loading: frm.doc.port_of_loading,
-		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bill_of_landing: frm.doc.data_ncab,
 		custom_bil: frm.doc.bil,
 		custom_bill_of_exit: frm.doc.bill_of_exit,
 		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
 		custom_destination: frm.doc.destination,
 		custom_port_of_discharge: frm.doc.port_of_discharge,
 		custom_container_quantity: frm.doc.container_quantity,
-		custom_shipping_line: frm.doc.shipping_line,
+		custom_shippin_line: frm.doc.shipping_line,
 		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
 		custom_remaining_days: frm.doc.remaining_days,
 		custom_actual_arrival_date: frm.doc.actual_arrival_date,
 		custom_shipping_status: frm.doc.shipping_status,
 		custom_total_cartons: frm.doc.total_cartons,
-		custom_total_container: frm.doc.total_containers
+		custom_total_containers: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -810,6 +809,36 @@ function setup_warehouse_filters(frm) {
 	});
 }
 
+// Function to setup accounting dimension filters based on company
+function setup_accounting_dimension_filters(frm) {
+	// Set up filter for Cost Center - filter by company field
+	frm.set_query("cost_center", function() {
+		return {
+			filters: {
+				company: frm.doc.company || ""
+			}
+		};
+	});
+
+	// Set up filter for Project - filter by company field
+	frm.set_query("project", function() {
+		return {
+			filters: {
+				company: frm.doc.company || ""
+			}
+		};
+	});
+
+	// Set up filter for Branch - filter by custom_company field
+	frm.set_query("branch", function() {
+		return {
+			filters: {
+				custom_company: frm.doc.company || ""
+			}
+		};
+	});
+}
+
 // Function to setup verification mode restrictions
 function setup_verification_mode(frm) {
 	const current_user = frappe.session.user;
@@ -898,6 +927,11 @@ function wait_for_document_and_add_items(doctype, items_data) {
 							if (item_data.uomcartons !== undefined && item_data.uomcartons !== null) {
 								new_row.custom_uom_cartons = item_data.uomcartons;
 							}
+						}
+
+						// For Sales Invoice, set income account if available
+						if (doctype === "Sales Invoice" && item_data.income_account) {
+							new_row.income_account = item_data.income_account;
 						}
 
 					} catch (item_error) {

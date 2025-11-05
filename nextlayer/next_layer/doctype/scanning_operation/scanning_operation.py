@@ -222,6 +222,9 @@ class ScanningOperation(Document):
 			else:
 				d.uomcontainers = 0.0
 
+			# Income account will be fetched dynamically when forwarding to Sales Invoice
+			# No need to store it here
+
 			# Accumulate totals
 			total_pairs += qty_stock
 			total_cartons += float(d.uomcartons or 0)
@@ -278,6 +281,27 @@ class ScanningOperation(Document):
 		else:
 			# Still pending verification (some items not verified yet)
 			self.verification_status = "Pending"
+
+
+@frappe.whitelist()
+def get_accounts(item_code, company):
+	"""Get income account for item from item defaults or company defaults"""
+	try:
+		item_doc = frappe.get_doc("Item", item_code)
+		item_defaults = item_doc.get("item_defaults")
+
+		if item_defaults:
+			for default in item_defaults:
+				if default.get("company") == company:
+					this_company = frappe.get_doc("Company", company)
+					income_account = this_company.default_income_account
+					return income_account
+
+		return None
+
+	except Exception as e:
+		frappe.log_error(f"Error fetching income account for {item_code} and {company}: {str(e)[:140]}", "Income Account Fetch Error")
+		return None
 
 
 @frappe.whitelist()
