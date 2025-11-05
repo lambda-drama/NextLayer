@@ -51,10 +51,25 @@ doc_events = {
     "Sales Invoice": {
         "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+        "onload": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+        "validate": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+        "before_save": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_delivery_note",
     },
     "Purchase Invoice": {
         "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+        "onload": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+        "validate": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+        "before_save": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_delivery_note",
+    },
+    "Delivery Note": {
+        "onload": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+        "validate": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+    },
+    "Purchase Receipt": {
+        "onload": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+        "validate": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_scanning_operation",
+        "before_save": "nextlayer.next_layer.controllers.scanning_operation_hooks.populate_fields_from_delivery_note",
     },
     "Journal Entry": {
         "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",

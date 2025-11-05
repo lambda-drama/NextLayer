@@ -193,10 +193,12 @@ function create_purchase_receipt(frm) {
 			item_name: item.item_name,
 			qty: item.quantity,
 			uom: item.uom,
-			stock_uom: item.uom,
+			stock_uom: item.stock_uom || item.uom,
 			warehouse: item.warehouse,
 			barcode: item.barcode,
-			description: item.description
+			description: item.description,
+			uomcontainers: item.uomcontainers,
+			uomcartons: item.uomcartons
 		});
 	});
 
@@ -207,7 +209,29 @@ function create_purchase_receipt(frm) {
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
 		set_warehouse: frm.doc.dt_warehouse,
-		scanning_operation: frm.doc.name
+		custom_scanning_operation: frm.doc.name,
+		custom_invoice_no: frm.doc.scanning_name,
+		company_group: frm.doc.company_group,
+		cost_center: frm.doc.cost_center,
+		project: frm.doc.project,
+		marka: frm.doc.marka,
+		branch: frm.doc.branch,
+		custom_container_no: frm.doc.container_no,
+		custom_port_of_loading: frm.doc.port_of_loading,
+		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bil: frm.doc.bil,
+		custom_bill_of_exit: frm.doc.bill_of_exit,
+		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
+		custom_destination: frm.doc.destination,
+		custom_port_of_discharge: frm.doc.port_of_discharge,
+		custom_container_quantity: frm.doc.container_quantity,
+		custom_shipping_line: frm.doc.shipping_line,
+		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
+		custom_remaining_days: frm.doc.remaining_days,
+		custom_actual_arrival_date: frm.doc.actual_arrival_date,
+		custom_shipping_status: frm.doc.shipping_status,
+		custom_total_cartons: frm.doc.total_cartons,
+		custom_total_container: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -232,10 +256,12 @@ function create_purchase_invoice(frm) {
 			item_name: item.item_name,
 			qty: item.quantity,
 			uom: item.uom,
-			stock_uom: item.uom,
+			stock_uom: item.stock_uom || item.uom,
 			warehouse: item.warehouse,
 			barcode: item.barcode,
-			description: item.description
+			description: item.description,
+			uomcontainers: item.uomcontainers,
+			uomcartons: item.uomcartons
 		});
 	});
 
@@ -246,7 +272,29 @@ function create_purchase_invoice(frm) {
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
 		set_warehouse: frm.doc.dt_warehouse,
-		scanning_operation: frm.doc.name
+		custom_scanning_operation: frm.doc.name,
+		custom_invoice_no: frm.doc.scanning_name,
+		company_group: frm.doc.company_group,
+		cost_center: frm.doc.cost_center,
+		project: frm.doc.project,
+		marka: frm.doc.marka,
+		branch: frm.doc.branch,
+		custom_container_no: frm.doc.container_no,
+		custom_port_of_loading: frm.doc.port_of_loading,
+		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bil: frm.doc.bil,
+		custom_bill_of_exit: frm.doc.bill_of_exit,
+		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
+		custom_destination: frm.doc.destination,
+		custom_port_of_discharge: frm.doc.port_of_discharge,
+		custom_container_quantity: frm.doc.container_quantity,
+		custom_shipping_line: frm.doc.shipping_line,
+		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
+		custom_remaining_days: frm.doc.remaining_days,
+		custom_actual_arrival_date: frm.doc.actual_arrival_date,
+		custom_shipping_status: frm.doc.shipping_status,
+		custom_total_cartons: frm.doc.total_cartons,
+		custom_total_container: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -271,10 +319,12 @@ function create_delivery_note(frm) {
 			item_name: item.item_name,
 			qty: item.quantity,
 			uom: item.uom,
-			stock_uom: item.uom,
+			stock_uom: item.stock_uom || item.uom,
 			warehouse: item.warehouse,
 			barcode: item.barcode,
-			description: item.description
+			description: item.description,
+			uomcontainers: item.uomcontainers,
+			uomcartons: item.uomcartons
 		});
 	});
 
@@ -285,7 +335,29 @@ function create_delivery_note(frm) {
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
 		set_warehouse: frm.doc.ds_warehouse,
-		scanning_operation: frm.doc.name
+		custom_scanning_operation: frm.doc.name,
+		custom_invoice_no: frm.doc.scanning_name,
+		company_group: frm.doc.company_group,
+		cost_center: frm.doc.cost_center,
+		project: frm.doc.project,
+		marka: frm.doc.marka,
+		branch: frm.doc.branch,
+		custom_container_no: frm.doc.container_no,
+		custom_port_of_loading: frm.doc.port_of_loading,
+		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bil: frm.doc.bil,
+		custom_bill_of_exit: frm.doc.bill_of_exit,
+		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
+		custom_destination: frm.doc.destination,
+		custom_port_of_discharge: frm.doc.port_of_discharge,
+		custom_container_quantity: frm.doc.container_quantity,
+		custom_shipping_line: frm.doc.shipping_line,
+		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
+		custom_remaining_days: frm.doc.remaining_days,
+		custom_actual_arrival_date: frm.doc.actual_arrival_date,
+		custom_shipping_status: frm.doc.shipping_status,
+		custom_total_cartons: frm.doc.total_cartons,
+		custom_total_container: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -310,10 +382,12 @@ function create_sales_invoice(frm) {
 			item_name: item.item_name,
 			qty: item.quantity,
 			uom: item.uom,
-			stock_uom: item.uom,
+			stock_uom: item.stock_uom || item.uom,
 			warehouse: item.warehouse,
 			barcode: item.barcode,
-			description: item.description
+			description: item.description,
+			uomcontainers: item.uomcontainers,
+			uomcartons: item.uomcartons
 		});
 	});
 
@@ -324,7 +398,29 @@ function create_sales_invoice(frm) {
 		posting_time: frm.doc.posting_time,
 		company: frm.doc.company,
 		set_warehouse: frm.doc.ds_warehouse,
-		scanning_operation: frm.doc.name
+		custom_scanning_operation: frm.doc.name,
+		custom_invoice_no: frm.doc.scanning_name,
+		company_group: frm.doc.company_group,
+		cost_center: frm.doc.cost_center,
+		project: frm.doc.project,
+		marka: frm.doc.marka,
+		branch: frm.doc.branch,
+		custom_container_no: frm.doc.container_no,
+		custom_port_of_loading: frm.doc.port_of_loading,
+		custom_bill_of_lading: frm.doc.data_ncab,
+		custom_bil: frm.doc.bil,
+		custom_bill_of_exit: frm.doc.bill_of_exit,
+		custom_estimated_date_of_departure: frm.doc.estimated_date_of_departure,
+		custom_destination: frm.doc.destination,
+		custom_port_of_discharge: frm.doc.port_of_discharge,
+		custom_container_quantity: frm.doc.container_quantity,
+		custom_shipping_line: frm.doc.shipping_line,
+		custom_estimated_date_of_arrival: frm.doc.estimated_date_of_arrival,
+		custom_remaining_days: frm.doc.remaining_days,
+		custom_actual_arrival_date: frm.doc.actual_arrival_date,
+		custom_shipping_status: frm.doc.shipping_status,
+		custom_total_cartons: frm.doc.total_cartons,
+		custom_total_container: frm.doc.total_containers
 	};
 
 	frappe.route_options = args;
@@ -784,7 +880,7 @@ function wait_for_document_and_add_items(doctype, items_data) {
 						new_row.item_name = item_data.item_name;
 						new_row.qty = item_data.qty;
 						new_row.uom = item_data.uom;
-						new_row.stock_uom = item_data.uom;
+						new_row.stock_uom = item_data.stock_uom || item_data.uom;
 						new_row.warehouse = item_data.warehouse;
 
 						if (item_data.barcode) {
@@ -792,6 +888,16 @@ function wait_for_document_and_add_items(doctype, items_data) {
 						}
 						if (item_data.description) {
 							new_row.description = item_data.description;
+						}
+
+						// For Delivery Note, forward custom UOM fields
+						if (doctype === "Delivery Note") {
+							if (item_data.uomcontainers !== undefined && item_data.uomcontainers !== null) {
+								new_row.custom_uom_container = item_data.uomcontainers;
+							}
+							if (item_data.uomcartons !== undefined && item_data.uomcartons !== null) {
+								new_row.custom_uom_cartons = item_data.uomcartons;
+							}
 						}
 
 					} catch (item_error) {
