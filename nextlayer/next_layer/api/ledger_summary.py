@@ -590,26 +590,30 @@ def get_intransit_invoice_totals(filters: Dict) -> Dict:
 
         # Determine which doctype and fields to use
         if party_type == "Supplier":
-            # For Supplier side: Check Purchase Invoices
-            # Company is the buying company, party is the supplier
-            invoice_type = "Purchase Invoice"
-            supplier_field = "supplier"
-            company_field = "company"
-        else:  # Customer
-            # For Customer side: Check Sales Invoices
-            # Company is the selling company, party is the customer
+            # For Supplier side: Check Sales Invoices
+            # The party (supplier company) is the company on the invoice
+            # The company selected at top is the customer on the invoice
             invoice_type = "Sales Invoice"
-            supplier_field = "customer"
-            company_field = "company"
+            party_field = "company"  # The party becomes the company on the invoice
+            company_field = "customer"  # The top company becomes the customer
+        else:  # Customer
+            # For Customer side: Check Purchase Invoices
+            # The party (customer company) is the company on the invoice
+            # The company selected at top is the supplier on the invoice
+            invoice_type = "Purchase Invoice"
+            party_field = "company"  # The party becomes the company on the invoice
+            company_field = "supplier"  # The top company becomes the supplier
 
         intransit_totals = {}
 
         for party in parties:
             try:
                 # Build filters for invoices
+                # The party becomes the company on the invoice
+                # The top company becomes the customer/supplier on the invoice
                 invoice_filters = {
-                    company_field: company,
-                    supplier_field: party,
+                    party_field: party,  # Party is the company on the invoice
+                    company_field: company,  # Top company is customer/supplier on the invoice
                     "docstatus": 1,  # Only submitted invoices
                     "custom_actual_arrival_date": ["in", [None, ""]]  # In-transit (date is None/empty)
                 }
@@ -625,8 +629,8 @@ def get_intransit_invoice_totals(filters: Dict) -> Dict:
                 # Get all invoices first, then filter for None custom_actual_arrival_date
                 # Frappe filters don't handle None well, so we get all and filter in Python
                 base_filters = {
-                    company_field: company,
-                    supplier_field: party,
+                    party_field: party,  # Party is the company on the invoice
+                    company_field: company,  # Top company is customer/supplier on the invoice
                     "docstatus": 1
                 }
                 

@@ -156,7 +156,8 @@ export default function InterCompanyLedgerSummary() {
       .map(entry => entry.party)
   }, [supplierLedgerData, supplierGLClosing])
 
-  // Get in-transit invoice totals for unmatched customers (check Sales Invoices)
+  // Get in-transit invoice totals for unmatched customers (check Purchase Invoices)
+  // The party (customer company) is the company on the invoice, the top company is the supplier
   const { intransitTotals: customerIntransitTotals, isLoading: isLoadingCustomerIntransit } = useIntransitInvoiceTotals({
     company: company,
     partyType: "Customer",
@@ -166,7 +167,8 @@ export default function InterCompanyLedgerSummary() {
     enabled: hasLoadedData && unmatchedCustomerParties.length > 0
   })
 
-  // Get in-transit invoice totals for unmatched suppliers (check Purchase Invoices)
+  // Get in-transit invoice totals for unmatched suppliers (check Sales Invoices)
+  // The party (supplier company) is the company on the invoice, the top company is the customer
   const { intransitTotals: supplierIntransitTotals, isLoading: isLoadingSupplierIntransit } = useIntransitInvoiceTotals({
     company: company,
     partyType: "Supplier",
