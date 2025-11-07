@@ -252,18 +252,26 @@ export default function InterCompanyLedgerSummary() {
     const tolerance = 0.01 // Small tolerance for floating point comparison
     const absDifference = Math.abs(difference)
     
+    // First check if difference matches in-transit total (this takes priority over exact match)
+    // This ensures that when intransit explains the difference, it's "Match with Intransit" not "Match"
+    // Even if difference is zero, if intransit total exists and matches, it should be "Match with Intransit"
+    if (intransitTotal !== undefined && intransitTotal !== null) {
+      const absIntransitTotal = Math.abs(intransitTotal)
+      // Check if the difference equals the intransit total (within tolerance)
+      // This takes priority so entries with intransit match are not counted as regular "Match"
+      if (Math.abs(absDifference - absIntransitTotal) < tolerance) {
+        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
+      }
+    }
+    
+    // Then check for exact match (difference is zero or very close to zero)
+    // This only applies when there's no intransit match
     if (absDifference < tolerance) {
       return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
-    } else {
-      // Check if difference matches in-transit total
-      if (intransitTotal !== undefined && intransitTotal !== null) {
-        const absIntransitTotal = Math.abs(intransitTotal)
-        if (Math.abs(absDifference - absIntransitTotal) < tolerance) {
-          return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
-        }
-      }
-      return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
     }
+    
+    // Otherwise it's unmatched
+    return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
   }
 
   // Filter entries by status
@@ -309,6 +317,7 @@ export default function InterCompanyLedgerSummary() {
     const totalCustomers = customerLedgerData.entries.length
     let matchedCustomers = 0
     let unmatchedCustomers = 0
+    let matchWithIntransitCustomers = 0
 
     customerLedgerData.entries.forEach(entry => {
       const glClosing = customerGLClosing[entry.party] || 0
@@ -316,8 +325,13 @@ export default function InterCompanyLedgerSummary() {
 
       if (isPartyGLLoaded) {
         const difference = calculateDifference(entry.closing_balance, glClosing)
-        if (Math.abs(difference) < 0.01) {
+        const intransitTotal = customerIntransitTotals[entry.party]
+        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
+        
+        if (status.text === 'Match') {
           matchedCustomers++
+        } else if (status.text === 'Match with In-Transit') {
+          matchWithIntransitCustomers++
         } else {
           unmatchedCustomers++
         }
@@ -328,6 +342,7 @@ export default function InterCompanyLedgerSummary() {
     const totalSuppliers = supplierLedgerData.entries.length
     let matchedSuppliers = 0
     let unmatchedSuppliers = 0
+    let matchWithIntransitSuppliers = 0
 
     supplierLedgerData.entries.forEach(entry => {
       const glClosing = supplierGLClosing[entry.party] || 0
@@ -335,8 +350,13 @@ export default function InterCompanyLedgerSummary() {
 
       if (isPartyGLLoaded) {
         const difference = calculateDifference(entry.closing_balance, glClosing)
-        if (Math.abs(difference) < 0.01) {
+        const intransitTotal = supplierIntransitTotals[entry.party]
+        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
+        
+        if (status.text === 'Match') {
           matchedSuppliers++
+        } else if (status.text === 'Match with In-Transit') {
+          matchWithIntransitSuppliers++
         } else {
           unmatchedSuppliers++
         }
@@ -348,16 +368,23 @@ export default function InterCompanyLedgerSummary() {
         total: totalCustomers,
         matched: matchedCustomers,
         unmatched: unmatchedCustomers,
-        pending: totalCustomers - matchedCustomers - unmatchedCustomers
+        matchWithIntransit: matchWithIntransitCustomers,
+        pending: totalCustomers - matchedCustomers - unmatchedCustomers - matchWithIntransitCustomers
       },
       suppliers: {
         total: totalSuppliers,
         matched: matchedSuppliers,
         unmatched: unmatchedSuppliers,
-        pending: totalSuppliers - matchedSuppliers - unmatchedSuppliers
+        matchWithIntransit: matchWithIntransitSuppliers,
+        pending: totalSuppliers - matchedSuppliers - unmatchedSuppliers - matchWithIntransitSuppliers
+      },
+      overall: {
+        matched: matchedCustomers + matchedSuppliers,
+        unmatched: unmatchedCustomers + unmatchedSuppliers,
+        matchWithIntransit: matchWithIntransitCustomers + matchWithIntransitSuppliers
       }
     }
-  }, [customerLedgerData, supplierLedgerData, customerGLClosing, supplierGLClosing])
+  }, [customerLedgerData, supplierLedgerData, customerGLClosing, supplierGLClosing, customerIntransitTotals, supplierIntransitTotals])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
@@ -794,18 +821,24 @@ export default function InterCompanyLedgerSummary() {
               {/* Overall Progress */}
               <div className="mt-6 pt-6 border-t border-blue-200">
                 <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
                     <div className="text-3xl font-bold text-green-700">
-                      {summaryStats.customers.matched + summaryStats.suppliers.matched}
+                      {summaryStats.overall.matched}
                     </div>
                     <div className="text-lg text-green-600 font-medium">Total Matched</div>
                   </div>
                   <div className="text-center p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-lg">
                     <div className="text-3xl font-bold text-red-700">
-                      {summaryStats.customers.unmatched + summaryStats.suppliers.unmatched}
+                      {summaryStats.overall.unmatched}
                     </div>
                     <div className="text-lg text-red-600 font-medium">Total Unmatched</div>
+                  </div>
+                  <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
+                    <div className="text-3xl font-bold text-blue-700">
+                      {summaryStats.overall.matchWithIntransit}
+                    </div>
+                    <div className="text-lg text-blue-600 font-medium">Match with Intransit</div>
                   </div>
                 </div>
               </div>
@@ -828,6 +861,7 @@ export default function InterCompanyLedgerSummary() {
                       <SelectContent className="bg-blue-200">
                         <SelectItem value="All">All Entries</SelectItem>
                         <SelectItem value="Match">✓ Matched</SelectItem>
+                        <SelectItem value="Match with In-Transit">✓ Match with Intransit</SelectItem>
                         <SelectItem value="Unmatched">✗ Unmatched</SelectItem>
                       </SelectContent>
                     </Select>
