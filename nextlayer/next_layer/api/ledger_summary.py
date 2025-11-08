@@ -67,14 +67,11 @@ def get_representative_party_currency(company: str, party_type: str = "Customer"
 
         if first_party and first_party[0].get("default_currency"):
             party_currency = first_party[0]["default_currency"]
-            print(f"Found {party_type} currency: {party_currency}")
             return party_currency
         else:
-            print(f"No {party_type} currency found, using company currency: {company_currency}")
             return company_currency
 
     except Exception as e:
-        print(f"Error getting representative party currency: {str(e)}")
         # Fall back to company currency
         try:
             return frappe.get_cached_value("Company", company, "default_currency") or "USD"
@@ -101,10 +98,7 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
         to_date = filters.get("to_date")
         currency = filters.get("currency", "all")
         show_intercompany_only = filters.get("show_intercompany_only", True)
-        print("Customer ledger summary - extracted params:", {
-            "company": company, "from_date": from_date, "to_date": to_date,
-            "currency": currency, "show_intercompany_only": show_intercompany_only
-        })
+       
 
         # Validate inputs
         if not all([company, from_date, to_date]):
@@ -151,7 +145,6 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
 
         # Execute the customer ledger summary report
         columns, data = customer_ledger_execute(filters)
-        print("Customer data:", data)
 
         # Extract party names from the data for currency determination
         party_names = []
@@ -250,11 +243,7 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
         to_date = filters.get("to_date")
         currency = filters.get("currency", "all")
         show_intercompany_only = filters.get("show_intercompany_only", True)
-        print("Supplier ledger summary - extracted params:", {
-            "company": company, "from_date": from_date, "to_date": to_date,
-            "currency": currency, "show_intercompany_only": show_intercompany_only
-        })
-
+       
         # Validate inputs
         if not all([company, from_date, to_date]):
             frappe.throw(_("Company, from_date, and to_date are required"))
@@ -298,7 +287,6 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
 
         # Execute the supplier ledger summary report
         columns, data = supplier_ledger_execute(report_filters)
-        print("Supplier data:", data)
 
         # Extract party names from the data for currency determination
         party_names = []
@@ -321,7 +309,6 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
 
         # Get representative party currency for display
         representative_currency = get_representative_party_currency(company, "Supplier", party_names)
-        print(f"Using representative currency for suppliers: {representative_currency}")
 
         for row in data:
             if isinstance(row, dict):
@@ -531,9 +518,7 @@ def get_gl_closing_amounts(filters: Dict) -> Dict:
                 gl_closing_amounts[party] = closing_balance
 
             except Exception as e:
-                print(f"Error processing party {party}: {str(e)}")
                 import traceback
-                print(f"Traceback: {traceback.format_exc()}")
                 gl_closing_amounts[party] = 0
 
 
