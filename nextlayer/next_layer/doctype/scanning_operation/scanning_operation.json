@@ -14,6 +14,7 @@
   "column_break_gtsy",
   "date",
   "posting_time",
+  "letter_head",
   "column_break_rnyw",
   "scanned_by",
   "verified_by",
@@ -356,13 +357,22 @@
    "label": "Verification Status",
    "options": "\nPending\nVerified\nDiscrepancy",
    "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fetch_from": "company.default_letter_head",
+   "fieldname": "letter_head",
+   "fieldtype": "Link",
+   "label": "Letter Head",
+   "options": "Letter Head",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-11-05 23:40:07.370416",
+ "modified": "2025-11-08 11:50:52.520814",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",
