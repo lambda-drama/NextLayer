@@ -18,7 +18,7 @@ class ScanningOperation(Document):
 		"""Validate before submission"""
 		self.validate_items_exist()
 		self.validate_verification_complete()
-		self.validate_stock_availability()
+		# self.validate_stock_availability()
 		# Update verification status to "Skipped Verification" if no verifier is assigned
 		if not self.verified_by:
 			self.verification_status = "Skipped Verification"
