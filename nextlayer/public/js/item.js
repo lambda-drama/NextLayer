@@ -409,7 +409,7 @@ function create_print_html(item_data, barcode_data) {
 				font-weight: bold;
 				font-size: 12px;
 				text-transform: uppercase;
-				margin-top: 10px;
+				margin-top: 5px;
 			}
 
 			.info-section {
@@ -424,17 +424,17 @@ function create_print_html(item_data, barcode_data) {
 			<div class="print-format">
 				<div class="container">
 				<div class="info">
-					<div class="info-section" style="font-size:24px">MARKA-${barcode_data.marka || 'MRK - R.M.D'}</div>
-					<div class="info-section" style="font-size:24px">M/C-${barcode_data.machine_no || 'M/C-3'}</div>
-					<div class="info-section" style="font-size:24px">${barcode_data.unique_code || 'ART-RYL-AIR'}</div>
-					<div class="title info-section" style="font-size:24px">${item_data.item_name}</div>
+					<div class="info-section" style="font-size:22px">MARKA-${barcode_data.marka || 'MRK - R.M.D'}</div>
+					<div class="info-section" style="font-size:22px">M/C-${barcode_data.machine_no || 'M/C-3'}</div>
+					<div class="info-section" style="font-size:22px">${barcode_data.unique_code || 'ART-RYL-AIR'}</div>
+					<div class="title info-section" style="font-size:22px">${item_data.item_name}</div>
 				</div>
 
 					<div class="barcode">
 						${image_html}
 					</div>
 
-					<div class="footer" style="font-size:20px">Made in India</div>
+					<div class="footer" style="font-size:17px">Made in India</div>
 				</div>
 			</div>
 		</body>
