@@ -382,7 +382,7 @@ function create_print_html(item_data, barcode_data) {
 				}
 				.info div {
 					text-align: center;
-					margin-top: 25px;
+					margin-top: 10px;
 
 					line-height: 1.2;
 					font-size: 16px;
@@ -424,10 +424,10 @@ function create_print_html(item_data, barcode_data) {
 			<div class="print-format">
 				<div class="container">
 				<div class="info">
-					<div class="info-section" style="font-size:22px">MARKA-${barcode_data.marka || 'MRK - R.M.D'}</div>
-					<div class="info-section" style="font-size:22px">M/C-${barcode_data.machine_no || 'M/C-3'}</div>
-					<div class="info-section" style="font-size:22px">${barcode_data.unique_code || 'ART-RYL-AIR'}</div>
-					<div class="title info-section" style="font-size:22px">${item_data.item_name}</div>
+					<div class="info-section" style="font-size:24px; font-weight:bold">MARKA-${barcode_data.marka || 'MRK - R.M.D'}</div>
+					<div class="info-section" style="font-size:24px;font-weight:bold">M/C-${barcode_data.machine_no || 'M/C-3'}</div>
+					<div class="info-section" style="font-size:24px;font-weight:bold">${barcode_data.unique_code || 'ART-RYL-AIR'}</div>
+					<div class="title info-section" style="font-size:22px;font-weight:bold">${item_data.item_name}</div>
 				</div>
 
 					<div class="barcode">

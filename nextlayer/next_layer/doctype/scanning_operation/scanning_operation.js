@@ -918,53 +918,57 @@ function handle_decrease_quantity(frm, cdt, cdn, row) {
 	if (current_qty > 0) {
 		let new_qty = current_qty - 1;
 		
-		// If verified_qty is greater than new quantity, reduce it to match
-		let new_verified_qty = current_verified_qty;
-		if (current_verified_qty > new_qty) {
-			new_verified_qty = new_qty;
-		}
+		// Decrease verified_qty by 1 as well, but ensure it doesn't go below 0
+		// and doesn't exceed the new quantity
+		let new_verified_qty = Math.max(0, Math.min(current_verified_qty - 1, new_qty));
 		
-		// Update quantity first
+		// Update quantity using frappe.model.set_value
 		frappe.model.set_value(cdt, cdn, "quantity", new_qty, function() {
-			// Update verified_qty if needed
-			if (current_verified_qty > new_qty) {
-				frappe.model.set_value(cdt, cdn, "verified_qty", new_verified_qty, function() {
-					// Trigger quantity field change to recalculate UOM conversions
-					// This will ensure all calculations are updated
-					trigger_quantity_recalculation(frm, cdt, cdn);
-				});
-			} else {
-				// Trigger quantity field change to recalculate UOM conversions
-				trigger_quantity_recalculation(frm, cdt, cdn);
-			}
+			// Always update verified_qty to decrease it as well
+			frappe.model.set_value(cdt, cdn, "verified_qty", new_verified_qty, function() {
+				// Both values updated, now save to trigger calculations
+				save_and_recalculate(frm, cdt, cdn);
+			});
 		});
 	} else {
 		frappe.msgprint(__("Quantity cannot be reduced below 0"));
 	}
 }
 
-// Function to trigger recalculation after quantity change
-function trigger_quantity_recalculation(frm, cdt, cdn) {
-	// Refresh the items table to update UI
+// Function to save form and trigger recalculation
+function save_and_recalculate(frm, cdt, cdn) {
+	console.log("Saving form to trigger recalculation...");
+	
+	// Refresh the items table to show updated quantity
 	frm.refresh_field("items");
 	
-	// Auto-save after decreasing quantity - this will trigger validate() 
-	// which calls compute_uom_conversions_and_totals() to recalculate everything
-	// The validate() method will:
-	// 1. Recalculate all UOM conversions (uom_cartons, uom_containers, qty_as_per_stock_uom)
-	// 2. Recalculate totals (total_pairs, total_cartons, total_containers)
-	// 3. Recalculate verification status
-	frm.save(function() {
-		// After save completes, refresh all fields to show updated calculations
-		frm.refresh_field("items");
-		frm.refresh_field("total_pairs");
-		frm.refresh_field("total_cartons");
-		frm.refresh_field("total_containers");
-		frm.refresh_field("verification_status");
+	// Save the form - this will trigger validate() which calls compute_uom_conversions_and_totals()
+	// The validate() method will recalculate:
+	// 1. All UOM conversions (uom_cartons, uom_containers, qty_as_per_stock_uom)
+	// 2. All totals (total_pairs, total_cartons, total_containers)
+	// 3. Verification status
+	frm.save(function(r) {
+		console.log("Save completed, response:", r);
 		
-		let row = locals[cdt][cdn];
-		if (row) {
-			frappe.show_alert(__("Quantity decreased to {0} for {1}", [row.quantity, row.item_name || row.item_code]));
+		if (r && !r.exc) {
+			// Reload the form to get updated values from server
+			frm.reload_doc().then(function() {
+				// After reload, refresh all fields to show updated calculations
+				frm.refresh_field("items");
+				frm.refresh_field("total_pairs");
+				frm.refresh_field("total_cartons");
+				frm.refresh_field("total_containers");
+				frm.refresh_field("verification_status");
+				
+				let updated_row = locals[cdt][cdn];
+				if (updated_row) {
+					console.log("Updated row after reload:", updated_row);
+					frappe.show_alert(__("Quantity decreased to {0} for {1}", [updated_row.quantity, updated_row.item_name || updated_row.item_code]));
+				}
+			});
+		} else {
+			console.error("Error saving form:", r);
+			frappe.show_alert(__("Error updating quantity. Please try again."), 5);
 		}
 	});
 }
