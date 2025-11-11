@@ -9,10 +9,12 @@
   "item_code",
   "quantity",
   "item_name",
+  "decrease",
   "column_break_vggm",
   "warehouse",
   "barcode",
   "verified_qty",
+  "marka",
   "section_break_rsiq",
   "uom",
   "stock_uom",
@@ -44,6 +46,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "quantity",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -105,6 +108,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "qty_as_per_stock_uom",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -113,6 +117,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "uomcontainers",
    "fieldtype": "Float",
    "label": "UOM(Containers)",
@@ -133,6 +138,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "uomcartons",
    "fieldtype": "Float",
    "label": "UOM(Cartons)",
@@ -145,17 +151,29 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "verified_qty",
    "fieldtype": "Float",
    "label": "Verified Qty",
    "read_only": 1
+  },
+  {
+   "fieldname": "decrease",
+   "fieldtype": "Button",
+   "label": "Decrease"
+  },
+  {
+   "fieldname": "marka",
+   "fieldtype": "Link",
+   "label": "Marka",
+   "options": "Marka"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-11-04 02:41:36.237472",
+ "modified": "2025-11-12 01:28:51.675145",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation Detail",

@@ -34,6 +34,8 @@ fixtures = [
                     "Purchase Receipt-custom_scanning_operation",
                     "Sales Invoice-custom_scanning_operation",
                     "Delivery Note-custom_scanning_operation",
+                    "Item-custom_parent_item",
+                    "Item-custom_is_parent",
                 ),
             ]
         ],

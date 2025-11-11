@@ -19,6 +19,19 @@ frappe.ui.form.on("Scanning Operation", {
 		
 		// Setup verification mode restrictions
 		setup_verification_mode(frm);
+		
+		// Setup decrease button handlers
+		setup_decrease_buttons(frm);
+	},
+	
+	items_add(frm, cdt, cdn) {
+		// Attach decrease button handler when new row is added
+		setup_decrease_button_for_row(frm, cdt, cdn);
+	},
+	
+	items_refresh(frm) {
+		// Re-setup decrease button handlers when items table is refreshed
+		setup_decrease_buttons(frm);
 	},
 
 	company(frm) {
@@ -839,6 +852,127 @@ function setup_accounting_dimension_filters(frm) {
 	});
 }
 
+// Function to setup decrease button handlers for all rows
+function setup_decrease_buttons(frm) {
+	if (!frm.fields_dict.items || !frm.fields_dict.items.grid || !frm.fields_dict.items.grid.wrapper) {
+		// Grid not ready yet, try again after a short delay
+		setTimeout(function() {
+			setup_decrease_buttons(frm);
+		}, 200);
+		return;
+	}
+	
+	let grid_wrapper = frm.fields_dict.items.grid.wrapper;
+	
+	// Remove existing handlers to avoid duplicates
+	$(grid_wrapper).off('click', '.grid-row [data-fieldname="decrease"]');
+	
+	// Attach click handler using event delegation
+	$(grid_wrapper).on('click', '.grid-row [data-fieldname="decrease"]', function(e) {
+		e.stopPropagation();
+		e.preventDefault();
+		
+		let $row = $(this).closest('.grid-row');
+		let row_name = $row.attr('data-name');
+		
+		if (row_name) {
+			let row = locals['Scanning Operation Detail'][row_name];
+			if (row) {
+				handle_decrease_quantity(frm, 'Scanning Operation Detail', row_name, row);
+			}
+		}
+	});
+}
+
+// Function to setup decrease button handler for a specific row
+function setup_decrease_button_for_row(frm, cdt, cdn) {
+	if (!frm.fields_dict.items || !frm.fields_dict.items.grid || !frm.fields_dict.items.grid.wrapper) {
+		return;
+	}
+	
+	setTimeout(function() {
+		let grid_wrapper = frm.fields_dict.items.grid.wrapper;
+		let $row = $(grid_wrapper).find(`.grid-row[data-name="${cdn}"]`);
+		let $button = $row.find('[data-fieldname="decrease"]');
+		
+		if ($button.length > 0) {
+			$button.off('click.decrease').on('click.decrease', function(e) {
+				e.stopPropagation();
+				e.preventDefault();
+				let row = locals[cdt][cdn];
+				if (row) {
+					handle_decrease_quantity(frm, cdt, cdn, row);
+				}
+			});
+		}
+	}, 100);
+}
+
+// Function to handle decrease quantity
+function handle_decrease_quantity(frm, cdt, cdn, row) {
+	console.log("Decrease button clicked for row:", cdn, row);
+	
+	let current_qty = row.quantity || 0;
+	let current_verified_qty = row.verified_qty || 0;
+	
+	if (current_qty > 0) {
+		let new_qty = current_qty - 1;
+		
+		// Decrease verified_qty by 1 as well, but ensure it doesn't go below 0
+		// and doesn't exceed the new quantity
+		let new_verified_qty = Math.max(0, Math.min(current_verified_qty - 1, new_qty));
+		
+		// Update quantity using frappe.model.set_value
+		frappe.model.set_value(cdt, cdn, "quantity", new_qty, function() {
+			// Always update verified_qty to decrease it as well
+			frappe.model.set_value(cdt, cdn, "verified_qty", new_verified_qty, function() {
+				// Both values updated, now save to trigger calculations
+				save_and_recalculate(frm, cdt, cdn);
+			});
+		});
+	} else {
+		frappe.msgprint(__("Quantity cannot be reduced below 0"));
+	}
+}
+
+// Function to save form and trigger recalculation
+function save_and_recalculate(frm, cdt, cdn) {
+	console.log("Saving form to trigger recalculation...");
+	
+	// Refresh the items table to show updated quantity
+	frm.refresh_field("items");
+	
+	// Save the form - this will trigger validate() which calls compute_uom_conversions_and_totals()
+	// The validate() method will recalculate:
+	// 1. All UOM conversions (uom_cartons, uom_containers, qty_as_per_stock_uom)
+	// 2. All totals (total_pairs, total_cartons, total_containers)
+	// 3. Verification status
+	frm.save(function(r) {
+		console.log("Save completed, response:", r);
+		
+		if (r && !r.exc) {
+			// Reload the form to get updated values from server
+			frm.reload_doc().then(function() {
+				// After reload, refresh all fields to show updated calculations
+				frm.refresh_field("items");
+				frm.refresh_field("total_pairs");
+				frm.refresh_field("total_cartons");
+				frm.refresh_field("total_containers");
+				frm.refresh_field("verification_status");
+				
+				let updated_row = locals[cdt][cdn];
+				if (updated_row) {
+					console.log("Updated row after reload:", updated_row);
+					frappe.show_alert(__("Quantity decreased to {0} for {1}", [updated_row.quantity, updated_row.item_name || updated_row.item_code]));
+				}
+			});
+		} else {
+			console.error("Error saving form:", r);
+			frappe.show_alert(__("Error updating quantity. Please try again."), 5);
+		}
+	});
+}
+
 // Function to setup verification mode restrictions
 function setup_verification_mode(frm) {
 	const current_user = frappe.session.user;
@@ -848,15 +982,15 @@ function setup_verification_mode(frm) {
 	// Enable barcode field for scanner or verifier
 	if (scanned_by === current_user || verified_by === current_user) {
 		if (frm.fields_dict.scan_barcode) {
-			frm.fields_dict.scan_barcode.set_read_only(false);
+			frm.set_df_property("scan_barcode", "read_only", false);
 			
 			// Set description based on user role
 			if (scanned_by === current_user && verified_by === current_user) {
-				frm.fields_dict.scan_barcode.df.description = __("You are both scanner and verifier. Scanning will add to quantity.");
+				frm.set_df_property("scan_barcode", "description", __("You are both scanner and verifier. Scanning will add to quantity."));
 			} else if (scanned_by === current_user) {
-				frm.fields_dict.scan_barcode.df.description = __("Scanner mode: Scanning will add to quantity.");
+				frm.set_df_property("scan_barcode", "description", __("Scanner mode: Scanning will add to quantity."));
 			} else if (verified_by === current_user) {
-				frm.fields_dict.scan_barcode.df.description = __("Verification mode: Scanning will add to verified quantity.");
+				frm.set_df_property("scan_barcode", "description", __("Verification mode: Scanning will add to verified quantity."));
 				
 				// Show verification mode indicator
 				if (!frm.doc.__verification_mode_indicator_shown) {
@@ -871,11 +1005,11 @@ function setup_verification_mode(frm) {
 	} else {
 		// If current user is neither scanner nor verifier, disable scanning
 		if (frm.fields_dict.scan_barcode) {
-			frm.fields_dict.scan_barcode.set_read_only(true);
+			frm.set_df_property("scan_barcode", "read_only", true);
 			if (!scanned_by && !verified_by) {
-				frm.fields_dict.scan_barcode.df.description = __("Please select 'Scanned By' or 'Verified By' user before scanning.");
+				frm.set_df_property("scan_barcode", "description", __("Please select 'Scanned By' or 'Verified By' user before scanning."));
 			} else {
-				frm.fields_dict.scan_barcode.df.description = __("Only the scanner or verifier can scan items.");
+				frm.set_df_property("scan_barcode", "description", __("Only the scanner or verifier can scan items."));
 			}
 		}
 	}
