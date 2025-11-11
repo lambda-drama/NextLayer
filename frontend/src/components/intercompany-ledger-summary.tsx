@@ -251,7 +251,7 @@ export default function InterCompanyLedgerSummary() {
     // Note: glClosing can be 0 legitimately, so we don't check for zero here
     const tolerance = 0.01 // Small tolerance for floating point comparison
     const absDifference = Math.abs(difference)
-    
+
     // First check if difference matches in-transit total (this takes priority over exact match)
     // This ensures that when intransit explains the difference, it's "Match with Intransit" not "Match"
     // Even if difference is zero, if intransit total exists and matches, it should be "Match with Intransit"
@@ -263,13 +263,13 @@ export default function InterCompanyLedgerSummary() {
         return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
       }
     }
-    
+
     // Then check for exact match (difference is zero or very close to zero)
     // This only applies when there's no intransit match
     if (absDifference < tolerance) {
       return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
     }
-    
+
     // Otherwise it's unmatched
     return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
   }
@@ -327,7 +327,7 @@ export default function InterCompanyLedgerSummary() {
         const difference = calculateDifference(entry.closing_balance, glClosing)
         const intransitTotal = customerIntransitTotals[entry.party]
         const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
-        
+
         if (status.text === 'Match') {
           matchedCustomers++
         } else if (status.text === 'Match with In-Transit') {
@@ -352,7 +352,7 @@ export default function InterCompanyLedgerSummary() {
         const difference = calculateDifference(entry.closing_balance, glClosing)
         const intransitTotal = supplierIntransitTotals[entry.party]
         const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
-        
+
         if (status.text === 'Match') {
           matchedSuppliers++
         } else if (status.text === 'Match with In-Transit') {
@@ -905,9 +905,9 @@ export default function InterCompanyLedgerSummary() {
                         const isPartyGLLoaded = customerGLClosing.hasOwnProperty(entry.party)
                         const intransitTotal = customerIntransitTotals[entry.party]
                         const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
-                        
+
                         // Show "-" for matched entries, show value for unmatched
-                        const showIntransitTotal = status.text === 'Match' ? '-' : 
+                        const showIntransitTotal = status.text === 'Match' ? '-' :
                           (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
                         return (
@@ -960,9 +960,9 @@ export default function InterCompanyLedgerSummary() {
                         const isPartyGLLoaded = supplierGLClosing.hasOwnProperty(entry.party)
                         const intransitTotal = supplierIntransitTotals[entry.party]
                         const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
-                        
+
                         // Show "-" for matched entries, show value for unmatched
-                        const showIntransitTotal = status.text === 'Match' ? '-' : 
+                        const showIntransitTotal = status.text === 'Match' ? '-' :
                           (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
                         return (

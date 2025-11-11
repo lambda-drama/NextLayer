@@ -79,6 +79,7 @@ frappe.ui.form.on("Scanning Operation Detail", {
 				}
 			});
 		}
-	}
+	},
+
 });
 

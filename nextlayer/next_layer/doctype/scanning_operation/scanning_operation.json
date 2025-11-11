@@ -317,6 +317,7 @@
    "fieldtype": "Section Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_pairs",
    "fieldtype": "Float",
    "label": "Total Pairs",
@@ -327,6 +328,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_cartons",
    "fieldtype": "Float",
    "label": "Total Cartons",
@@ -337,6 +339,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_containers",
    "fieldtype": "Float",
    "label": "Total Containers",
@@ -372,7 +375,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-11-08 11:50:52.520814",
+ "modified": "2025-11-12 01:33:34.612137",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Scanning Operation",
