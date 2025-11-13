@@ -7,8 +7,22 @@ frappe.ui.form.on("Item", {
 				show_barcode_selection_modal(frm);
 			}, __("Actions"));
 		}
+		
+		// Setup filter for custom_parent_item field - only show items where custom_is_parent is checked
+		setup_parent_item_filter(frm);
 	}
 });
+
+// Function to setup filter for custom_parent_item field
+function setup_parent_item_filter(frm) {
+	frm.set_query("custom_parent_item", function() {
+		return {
+			filters: {
+				custom_is_parent: 1
+			}
+		};
+	});
+}
 
 function show_barcode_selection_modal(frm) {
 	// Get all barcodes for this item
@@ -472,3 +486,4 @@ function open_print_dialog(html_content) {
 		}
 	}, 2000);
 }
+

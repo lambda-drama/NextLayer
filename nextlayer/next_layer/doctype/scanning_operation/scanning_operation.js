@@ -16,19 +16,19 @@ frappe.ui.form.on("Scanning Operation", {
 
 		setup_warehouse_filters(frm);
 		setup_accounting_dimension_filters(frm);
-		
+
 		// Setup verification mode restrictions
 		setup_verification_mode(frm);
-		
+
 		// Setup decrease button handlers
 		setup_decrease_buttons(frm);
 	},
-	
+
 	items_add(frm, cdt, cdn) {
 		// Attach decrease button handler when new row is added
 		setup_decrease_button_for_row(frm, cdt, cdn);
 	},
-	
+
 	items_refresh(frm) {
 		// Re-setup decrease button handlers when items table is refreshed
 		setup_decrease_buttons(frm);
@@ -90,7 +90,7 @@ frappe.ui.form.on("Scanning Operation", {
 			}, 3);
 		}
 	},
-	
+
 
 	before_save(frm) {
 		// Auto-fill missing warehouses before submit
@@ -317,7 +317,7 @@ function create_delivery_note(frm) {
 		project: frm.doc.project,
 		marka: frm.doc.marka,
 		branch: frm.doc.branch,
-		
+
 		custom_container_no: frm.doc.container_no,
 		custom_port_of_loading: frm.doc.port_of_loading,
 		custom_bill_of_landing: frm.doc.data_ncab,
@@ -352,7 +352,7 @@ function create_sales_invoice(frm) {
 
 	// Prepare items data for the new document
 	let items_data = [];
-	
+
 	// First, prepare items data structure
 	frm.doc.items.forEach(function(item) {
 		items_data.push({
@@ -372,7 +372,7 @@ function create_sales_invoice(frm) {
 	// Fetch income accounts for all items before forwarding
 	let pending_requests = items_data.length;
 	let all_income_accounts_fetched = false;
-	
+
 	if (items_data.length > 0 && frm.doc.company) {
 		items_data.forEach(function(item_data, index) {
 			frappe.call({
@@ -386,7 +386,7 @@ function create_sales_invoice(frm) {
 					if (r.message) {
 						item_data.income_account = r.message;
 					}
-					
+
 					// When all requests are done, proceed with creating the document
 					if (pending_requests === 0 && !all_income_accounts_fetched) {
 						all_income_accounts_fetched = true;
@@ -447,13 +447,13 @@ function is_verification_mode(frm) {
 	const current_user = frappe.session.user;
 	const scanned_by = frm.doc.scanned_by;
 	const verified_by = frm.doc.verified_by;
-	
+
 	// Verification mode: current user is the verifier AND not the scanner
 	// If user is both scanner and verifier, default to scanner mode (add to quantity)
 	if (scanned_by === current_user && verified_by === current_user) {
 		return false; // Scanner mode takes priority
 	}
-	
+
 	// Verification mode: verified_by is set AND current user is the verified_by person
 	return verified_by && verified_by === current_user;
 }
@@ -861,20 +861,20 @@ function setup_decrease_buttons(frm) {
 		}, 200);
 		return;
 	}
-	
+
 	let grid_wrapper = frm.fields_dict.items.grid.wrapper;
-	
+
 	// Remove existing handlers to avoid duplicates
 	$(grid_wrapper).off('click', '.grid-row [data-fieldname="decrease"]');
-	
+
 	// Attach click handler using event delegation
 	$(grid_wrapper).on('click', '.grid-row [data-fieldname="decrease"]', function(e) {
 		e.stopPropagation();
 		e.preventDefault();
-		
+
 		let $row = $(this).closest('.grid-row');
 		let row_name = $row.attr('data-name');
-		
+
 		if (row_name) {
 			let row = locals['Scanning Operation Detail'][row_name];
 			if (row) {
@@ -889,12 +889,12 @@ function setup_decrease_button_for_row(frm, cdt, cdn) {
 	if (!frm.fields_dict.items || !frm.fields_dict.items.grid || !frm.fields_dict.items.grid.wrapper) {
 		return;
 	}
-	
+
 	setTimeout(function() {
 		let grid_wrapper = frm.fields_dict.items.grid.wrapper;
 		let $row = $(grid_wrapper).find(`.grid-row[data-name="${cdn}"]`);
 		let $button = $row.find('[data-fieldname="decrease"]');
-		
+
 		if ($button.length > 0) {
 			$button.off('click.decrease').on('click.decrease', function(e) {
 				e.stopPropagation();
@@ -911,17 +911,17 @@ function setup_decrease_button_for_row(frm, cdt, cdn) {
 // Function to handle decrease quantity
 function handle_decrease_quantity(frm, cdt, cdn, row) {
 	console.log("Decrease button clicked for row:", cdn, row);
-	
+
 	let current_qty = row.quantity || 0;
 	let current_verified_qty = row.verified_qty || 0;
-	
+
 	if (current_qty > 0) {
 		let new_qty = current_qty - 1;
-		
+
 		// Decrease verified_qty by 1 as well, but ensure it doesn't go below 0
 		// and doesn't exceed the new quantity
 		let new_verified_qty = Math.max(0, Math.min(current_verified_qty - 1, new_qty));
-		
+
 		// Update quantity using frappe.model.set_value
 		frappe.model.set_value(cdt, cdn, "quantity", new_qty, function() {
 			// Always update verified_qty to decrease it as well
@@ -938,10 +938,10 @@ function handle_decrease_quantity(frm, cdt, cdn, row) {
 // Function to save form and trigger recalculation
 function save_and_recalculate(frm, cdt, cdn) {
 	console.log("Saving form to trigger recalculation...");
-	
+
 	// Refresh the items table to show updated quantity
 	frm.refresh_field("items");
-	
+
 	// Save the form - this will trigger validate() which calls compute_uom_conversions_and_totals()
 	// The validate() method will recalculate:
 	// 1. All UOM conversions (uom_cartons, uom_containers, qty_as_per_stock_uom)
@@ -949,7 +949,7 @@ function save_and_recalculate(frm, cdt, cdn) {
 	// 3. Verification status
 	frm.save(function(r) {
 		console.log("Save completed, response:", r);
-		
+
 		if (r && !r.exc) {
 			// Reload the form to get updated values from server
 			frm.reload_doc().then(function() {
@@ -959,7 +959,7 @@ function save_and_recalculate(frm, cdt, cdn) {
 				frm.refresh_field("total_cartons");
 				frm.refresh_field("total_containers");
 				frm.refresh_field("verification_status");
-				
+
 				let updated_row = locals[cdt][cdn];
 				if (updated_row) {
 					console.log("Updated row after reload:", updated_row);
@@ -983,7 +983,7 @@ function setup_verification_mode(frm) {
 	if (scanned_by === current_user || verified_by === current_user) {
 		if (frm.fields_dict.scan_barcode) {
 			frm.set_df_property("scan_barcode", "read_only", false);
-			
+
 			// Set description based on user role
 			if (scanned_by === current_user && verified_by === current_user) {
 				frm.set_df_property("scan_barcode", "description", __("You are both scanner and verifier. Scanning will add to quantity."));
@@ -991,7 +991,7 @@ function setup_verification_mode(frm) {
 				frm.set_df_property("scan_barcode", "description", __("Scanner mode: Scanning will add to quantity."));
 			} else if (verified_by === current_user) {
 				frm.set_df_property("scan_barcode", "description", __("Verification mode: Scanning will add to verified quantity."));
-				
+
 				// Show verification mode indicator
 				if (!frm.doc.__verification_mode_indicator_shown) {
 					frappe.show_alert({
