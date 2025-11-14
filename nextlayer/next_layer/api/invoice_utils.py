@@ -75,7 +75,8 @@ def group_items_by_parent(items, parent_only=False):
 			'stock_qty': 0,
 			'income_account': None,
 			'expense_account': None,
-			'custom_item_identifier': None
+			'custom_item_identifier': None,
+			'rates': []  # Track all rates to check if they're the same
 		})
 	
 	for item in items:
@@ -103,12 +104,14 @@ def group_items_by_parent(items, parent_only=False):
 					parent_groups[parent_item]['stock_uom'] = item.get('stock_uom')
 					parent_groups[parent_item]['uom'] = item.get('uom')
 			
+			# Get item rate and track it
+			item_rate = item.get('rate', 0) or 0
+			if item_rate > 0:
+				parent_groups[parent_item]['rates'].append(item_rate)
+			
 			# Accumulate quantities and amounts
 			parent_groups[parent_item]['qty'] += item.get('qty', 0) or 0
 			parent_groups[parent_item]['amount'] += item.get('amount', 0) or 0
-			# Use weighted average for rate
-			if parent_groups[parent_item]['qty'] > 0:
-				parent_groups[parent_item]['rate'] = parent_groups[parent_item]['amount'] / parent_groups[parent_item]['qty']
 			parent_groups[parent_item]['custom_containers'] += item.get('custom_containers', 0) or 0
 			parent_groups[parent_item]['custom_cartons'] += item.get('custom_cartons', 0) or 0
 			parent_groups[parent_item]['stock_qty'] += item.get('stock_qty', 0) or 0
@@ -118,8 +121,28 @@ def group_items_by_parent(items, parent_only=False):
 			# This is already a parent item, add as is
 			processed_items.append(item)
 	
-	# Add grouped parent items
-	processed_items.extend(list(parent_groups.values()))
+	# Process parent groups and calculate rates
+	for parent_item, group_data in parent_groups.items():
+		# Calculate rate based on whether all child rates are the same
+		if group_data['qty'] > 0:
+			rates = group_data['rates']
+			if rates:
+				# Check if all rates are the same (with tolerance for floating point precision)
+				# Round to 2 decimal places for comparison
+				rounded_rates = [round(rate, 2) for rate in rates]
+				if len(set(rounded_rates)) == 1:
+					# All rates are the same, use that rate
+					group_data['rate'] = rates[0]
+				else:
+					# Different rates, calculate weighted average: total amount / total quantity
+					group_data['rate'] = group_data['amount'] / group_data['qty']
+			else:
+				# No rates found, calculate from amount and quantity
+				group_data['rate'] = group_data['amount'] / group_data['qty'] if group_data['qty'] > 0 else 0
+		
+		# Remove the 'rates' key before adding to processed items
+		group_data.pop('rates', None)
+		processed_items.append(group_data)
 	
 	return processed_items
 
