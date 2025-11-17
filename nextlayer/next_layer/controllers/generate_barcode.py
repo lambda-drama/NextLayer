@@ -434,41 +434,69 @@ def generate_barcode_for_item(item_code):
 
 
 def auto_generate_barcode_for_item(doc, method):
-	"""Automatically generate barcode for new items that maintain stock"""
+	"""Automatically generate 6-digit barcode for items that maintain stock if they don't have one"""
 	try:
 		# Only generate barcode for items that maintain stock
 		if not doc.is_stock_item:
 			return
 
-		# Check if item already has any barcode
-		existing_barcodes = frappe.get_all("Item Barcode",
-			filters={"parent": doc.name},
-			fields=["barcode"]
-		)
+		# Check if item already has a 6-digit barcode in the document's child table
+		has_6_digit_barcode_in_doc = False
+		if hasattr(doc, 'barcodes') and doc.barcodes:
+			has_6_digit_barcode_in_doc = any(
+				((row.get("barcode_type") in (None, "")) and isinstance(row.get("barcode"), str) and len(str(row.get("barcode"))) == 6)
+				for row in doc.barcodes
+			)
 
-		if existing_barcodes:
-			# Item already has barcodes, skip
+		# Also check if item already has a 6-digit barcode in the database (for existing items)
+		has_6_digit_barcode_in_db = False
+		if doc.name and frappe.db.exists("Item", doc.name):
+			existing_barcodes = frappe.get_all("Item Barcode",
+				filters={"parent": doc.name},
+				fields=["barcode", "barcode_type"]
+			)
+			has_6_digit_barcode_in_db = any(
+				((b.get("barcode_type") in (None, "")) and isinstance(b.get("barcode"), str) and len(str(b.get("barcode"))) == 6)
+				for b in existing_barcodes
+			)
+
+		if has_6_digit_barcode_in_doc or has_6_digit_barcode_in_db:
+			# Item already has a 6-digit barcode, skip
 			return
 
-		# Generate EAN-13 barcode
-		ean_barcode = generate_ean13_barcode()
+		# Generate unique 6-digit barcode (function already checks for uniqueness in database)
+		barcode_code = _generate_unique_numeric_code(6)
 
-		# Generate barcode image
-		barcode_image = generate_image_for_barcode(ean_barcode)
+		# Double-check uniqueness against document's existing barcodes
+		max_attempts = 50
+		attempts = 0
+		while attempts < max_attempts:
+			# Check if this barcode already exists in the document's child table
+			barcode_exists_in_doc = False
+			if hasattr(doc, 'barcodes') and doc.barcodes:
+				barcode_exists_in_doc = any(
+					str(row.get("barcode")) == barcode_code
+					for row in doc.barcodes
+				)
 
-		# Create Item Barcode record
-		barcode_doc = frappe.get_doc({
-			"doctype": "Item Barcode",
-			"parent": doc.name,
-			"parenttype": "Item",
-			"parentfield": "barcodes",
-			"barcode": ean_barcode,
-			"barcode_type": "EAN",
-			"custom_image": barcode_image
+			# Check if this barcode exists in the database
+			barcode_exists_in_db = frappe.db.exists("Item Barcode", {"barcode": barcode_code})
+
+			if not barcode_exists_in_doc and not barcode_exists_in_db:
+				break
+
+			# Regenerate if duplicate found
+			barcode_code = _generate_unique_numeric_code(6)
+			attempts += 1
+
+		# Add barcode directly to the document's child table so it appears immediately
+		if not hasattr(doc, 'barcodes'):
+			doc.barcodes = []
+
+		doc.append("barcodes", {
+			"barcode": barcode_code,
+			"barcode_type": "",  # Empty for short numeric barcodes
 		})
-
-		barcode_doc.insert(ignore_permissions=True)
-		# frappe.db.commit()
 
 	except Exception as e:
 		frappe.log_error(f"Error auto-generating barcode for item {doc.name}: {str(e)}")
