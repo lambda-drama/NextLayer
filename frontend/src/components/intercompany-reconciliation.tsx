@@ -611,11 +611,8 @@ export default function IntercompanyReconciliation() {
 
   // Function to find matching entries between Company A and Company B (on FULL data first)
   const findMatchingEntries = useMemo(() => {
-    // console.log("Starting matching process with FULL data...")
-    // console.log("glDataA:", glDataA.length, "glDataB:", glDataB.length)
-
-    if (!glDataA.length || !glDataB.length) {
-      // console.log("Returning empty arrays - no data for matching")
+    // Allow processing if at least one company has data (don't require both)
+    if (!glDataA.length && !glDataB.length) {
       return { glDataAWithStatus: [], glDataBWithStatus: [] }
     }
 
@@ -624,7 +621,6 @@ export default function IntercompanyReconciliation() {
     const matchedEntriesA = new Set<string>()
 
     // First pass: Process Company A entries and find their matches
-    // console.log("Processing Company A entries...")
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
       // Find matching entry in Company B based on automatch setting
       // But ensure we don't match with an entry that's already been matched
@@ -763,13 +759,7 @@ export default function IntercompanyReconciliation() {
       }
     })
 
-    // console.log("Matching completed - glDataAWithStatus:", glDataAWithStatus.length)
-    // console.log("Matching completed - glDataBWithStatus:", glDataBWithStatus.length)
-
     // Now apply permission filtering to only show visible entries
-    // console.log("Applying permission filtering...")
-    // console.log("permissionAwareDataA:", permissionAwareDataA.length, "permissionAwareDataB:", permissionAwareDataB.length)
-
     // Create sets of visible voucher keys for quick lookup
     const visibleKeysA = new Set(permissionAwareDataA.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
     const visibleKeysB = new Set(permissionAwareDataB.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
@@ -777,24 +767,13 @@ export default function IntercompanyReconciliation() {
     // Filter the matched entries to only show visible ones
     const filteredGlDataAWithStatus = glDataAWithStatus.filter(entry => {
       const key = `${entry.voucher_type}-${entry.voucher_no}`
-      const isVisible = visibleKeysA.has(key)
-      if (!isVisible) {
-        // console.log(`HIDING Company A matched entry: ${key}`)
-      }
-      return isVisible
+      return visibleKeysA.has(key)
     })
 
     const filteredGlDataBWithStatus = glDataBWithStatus.filter(entry => {
       const key = `${entry.voucher_type}-${entry.voucher_no}`
-      const isVisible = visibleKeysB.has(key)
-      if (!isVisible) {
-        console.log(`HIDING Company B matched entry: ${key}`)
-      }
-      return isVisible
+      return visibleKeysB.has(key)
     })
-
-    // console.log("Final filtered results - glDataAWithStatus:", filteredGlDataAWithStatus.length)
-    // console.log("Final filtered results - glDataBWithStatus:", filteredGlDataBWithStatus.length)
 
     return { glDataAWithStatus: filteredGlDataAWithStatus, glDataBWithStatus: filteredGlDataBWithStatus }
   }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled, bypassTotalCalculation])
@@ -1727,6 +1706,7 @@ export default function IntercompanyReconciliation() {
   const isBackendStatusLoading = isFetchingBackendStatus
   const isTableLoading = isLoading || isDataProcessing
   const _error = companiesError || allCompaniesError || partiesAError || partiesBError || glErrorA || glErrorB
+
 
   // Get status badge component
   const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending') => {

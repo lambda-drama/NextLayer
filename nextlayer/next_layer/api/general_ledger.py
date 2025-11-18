@@ -130,6 +130,7 @@ def get_permission_aware_gl_data(filters):
 		finally:
 			frappe.set_user(original_user)
 		frappe.set_user(original_user)
+		
 		# Filter based on document sharing permissions for display
 		# Run permission checks as the original user to respect sharing permissions
 		visible_entries = []
