@@ -90,19 +90,30 @@ def group_items_by_parent(items, parent_only=False):
 		
 		if parent_item:
 			# This is a child item, group by parent
-			if not parent_groups[parent_item]['item_code']:
+			parent_group = parent_groups[parent_item]
+			if not parent_group['item_code']:
 				# First time seeing this parent, initialize with parent item details
-				parent_groups[parent_item]['item_code'] = parent_item
+				parent_group['item_code'] = parent_item
 				try:
 					parent_doc = frappe.get_cached_doc("Item", parent_item)
-					parent_groups[parent_item]['item_name'] = parent_doc.item_name
-					parent_groups[parent_item]['stock_uom'] = parent_doc.stock_uom
-					parent_groups[parent_item]['uom'] = getattr(parent_doc, 'sales_uom', None) or parent_doc.stock_uom
+					parent_group['item_name'] = parent_doc.item_name
+					parent_group['stock_uom'] = parent_doc.stock_uom
 				except Exception:
 					# If parent item doesn't exist, use child item details
-					parent_groups[parent_item]['item_name'] = item.get('item_name', '')
-					parent_groups[parent_item]['stock_uom'] = item.get('stock_uom')
-					parent_groups[parent_item]['uom'] = item.get('uom')
+					parent_group['item_name'] = item.get('item_name', '')
+					parent_group['stock_uom'] = item.get('stock_uom')
+
+			# Always prefer the transaction's UOM.
+			transaction_uom = item.get('uom')
+			if transaction_uom:
+				parent_group['uom'] = transaction_uom
+			elif not parent_group['uom']:
+				# Fall back to the parent's sales UOM or stock UOM only if transaction UOM is missing
+				try:
+					parent_doc = parent_doc if 'parent_doc' in locals() and parent_doc.name == parent_item else frappe.get_cached_doc("Item", parent_item)
+					parent_group['uom'] = getattr(parent_doc, 'sales_uom', None) or parent_doc.stock_uom
+				except Exception:
+					parent_group['uom'] = item.get('uom') or item.get('stock_uom')
 			
 			# Get item rate and track it
 			item_rate = item.get('rate', 0) or 0
@@ -110,13 +121,13 @@ def group_items_by_parent(items, parent_only=False):
 				parent_groups[parent_item]['rates'].append(item_rate)
 			
 			# Accumulate quantities and amounts
-			parent_groups[parent_item]['qty'] += item.get('qty', 0) or 0
-			parent_groups[parent_item]['amount'] += item.get('amount', 0) or 0
-			parent_groups[parent_item]['custom_containers'] += item.get('custom_containers', 0) or 0
-			parent_groups[parent_item]['custom_cartons'] += item.get('custom_cartons', 0) or 0
-			parent_groups[parent_item]['stock_qty'] += item.get('stock_qty', 0) or 0
-			parent_groups[parent_item]['income_account'] = parent_groups[parent_item]['income_account'] or item.get('income_account')
-			parent_groups[parent_item]['expense_account'] = parent_groups[parent_item]['expense_account'] or item.get('expense_account')
+			parent_group['qty'] += item.get('qty', 0) or 0
+			parent_group['amount'] += item.get('amount', 0) or 0
+			parent_group['custom_containers'] += item.get('custom_containers', 0) or 0
+			parent_group['custom_cartons'] += item.get('custom_cartons', 0) or 0
+			parent_group['stock_qty'] += item.get('stock_qty', 0) or 0
+			parent_group['income_account'] = parent_group['income_account'] or item.get('income_account')
+			parent_group['expense_account'] = parent_group['expense_account'] or item.get('expense_account')
 		else:
 			# This is already a parent item, add as is
 			processed_items.append(item)
