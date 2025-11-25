@@ -43,7 +43,7 @@ class ScanningOperation(Document):
 		"""Validate that verification is complete before allowing submission"""
 		# If both scanned_by and verified_by are set, verification must be complete
 		if self.scanned_by and self.verified_by:
-			if self.verification_status != "Verified":
+			if self.verification_status != "Verified" and self.operation != "Offloading":
 				frappe.throw(
 					"Only submit if fully verified. Current verification status: {0}".format(self.verification_status),
 					title="Verification Required"
@@ -445,33 +445,5 @@ def check_stock_availability(item_code, warehouse, quantity, posting_date=None, 
 		return {"available": False, "message": f"Error checking stock: {str(e)}"}
 
 
-@frappe.whitelist()
-def get_items_from_scanning_operation(scanning_operation):
-	"""Get items from Scanning Operation for creating other documents"""
-	try:
-		so_doc = frappe.get_doc("Scanning Operation", scanning_operation)
-
-		items = []
-		for item in so_doc.items:
-			items.append({
-				"item_code": item.item_code,
-				"item_name": item.item_name,
-				"quantity": item.quantity,
-				"warehouse": item.warehouse,
-				"description": item.description,
-				"barcode": item.barcode
-			})
-
-		return {
-			"items": items,
-			"customer": so_doc.customer,
-			"company": so_doc.company,
-			"date": so_doc.date,
-			"posting_time": so_doc.posting_time
-		}
-
-	except Exception as e:
-		frappe.log_error(f"Error getting items from scanning operation {scanning_operation}: {str(e)}")
-		return None
 
 
