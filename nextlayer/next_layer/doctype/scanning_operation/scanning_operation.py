@@ -11,6 +11,7 @@ class ScanningOperation(Document):
 		self.validate_verification_user()
 		self.validate_items()
 		self.auto_fill_missing_warehouses()
+		self.auto_set_verified_by_for_offloading()
 		self.compute_uom_conversions_and_totals()
 		self.compute_verification_status()
 
@@ -42,8 +43,8 @@ class ScanningOperation(Document):
 	def validate_verification_complete(self):
 		"""Validate that verification is complete before allowing submission"""
 		# If both scanned_by and verified_by are set, verification must be complete
-		if self.scanned_by and self.verified_by:
-			if self.verification_status != "Verified" and self.operation != "Offloading":
+		if self.scanned_by and self.verified_by and self.operation != "Offloading":
+			if self.verification_status != "Verified":
 				frappe.throw(
 					"Only submit if fully verified. Current verification status: {0}".format(self.verification_status),
 					title="Verification Required"
@@ -55,11 +56,23 @@ class ScanningOperation(Document):
 					"Only the verifier can submit this document when both scanner and verifier are assigned.",
 					title="Submission Restricted"
 				)
+		if self.operation == "Offloading" and self.verification_status != "Verified":
+			frappe.throw(
+				"Offloading operations must be fully verified before submission. Current verification status: {0}".format(self.verification_status),
+				title="Verification Required"
+			)
+      
 		# If only scanned_by is set, scanner can submit regardless of verification status
 
 	def validate_verification_user(self):
 		"""Validate verification user (no restrictions - same user can scan and verify if needed)"""
 		pass
+
+	def auto_set_verified_by_for_offloading(self):
+		"""For Offloading operations, automatically set verified_by to document owner if not set"""
+		if self.operation == "Offloading" and not self.verified_by:
+			# Set verified_by to the document owner (creator)
+			self.verified_by = self.owner
 
 	def validate_items(self):
 		"""Validate that all items have required fields"""

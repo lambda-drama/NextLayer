@@ -6,6 +6,33 @@ from collections import defaultdict
 
 
 @frappe.whitelist()
+def get_referenced_loading_operations():
+	"""Get list of Loading Scanning Operations that have already been referenced by SUBMITTED Offloading operations
+	Only Loading operations referenced by submitted (docstatus=1) Offloading operations are considered as referenced"""
+	try:
+		# Query all SUBMITTED Offloading Scanning Operations that have a scanning_operation field set
+		# Only submitted documents (docstatus=1) count as "referenced"
+		offloading_docs = frappe.get_all(
+			"Scanning Operation",
+			filters={
+				"operation": "Offloading",
+				"scanning_operation": ["is", "set"],
+				"docstatus": 1  # Only submitted documents
+			},
+			fields=["scanning_operation"],
+			pluck="scanning_operation"
+		)
+		
+		# Remove duplicates and None values
+		referenced_operations = list(set([op for op in offloading_docs if op]))
+		
+		return referenced_operations
+	except Exception as e:
+		frappe.log_error(f"Error getting referenced loading operations: {str(e)}")
+		return []
+
+
+@frappe.whitelist()
 def get_items_from_scanning_operation(scanning_operation, parent_only=False):
 	"""Get items from Scanning Operation for creating other documents or copying to another Scanning Operation
 	Supports parent/child item grouping"""
@@ -146,4 +173,6 @@ def group_scanning_items_by_parent(items):
 		processed_items.append(group_data)
 	
 	return processed_items
+
+
 
