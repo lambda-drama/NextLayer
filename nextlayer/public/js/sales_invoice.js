@@ -45,6 +45,11 @@ frappe.ui.form.on("Sales Invoice", {
 									// Clear the items table before adding new items
 									frappe.model.clear_table(frm.doc, "items");
 									frm.doc.group_same_items = 0;
+									
+									// Track completed requests
+									let completed_requests = 0;
+									let total_requests = selections.length;
+									
 									// Iterate over each selected Purchase Invoice
 									selections.forEach(function(purchase_invoice) {
 										// Call server-side method to fetch items from the selected Purchase Invoice
@@ -56,6 +61,8 @@ frappe.ui.form.on("Sales Invoice", {
 												parent_only: parent_only
 											},
 											callback: function(response) {
+												completed_requests++;
+												
 												if (response && response.message) {
 													console.log(response.message)
 													// Items fetched successfully, iterate over the items
@@ -103,9 +110,14 @@ frappe.ui.form.on("Sales Invoice", {
 													frm.set_value('marka', shipping_details.marka);
 													frm.set_value('custom_estimated_date_of_arrival', shipping_details.estimated_date_of_arrival);
 													frm.set_value('custom_estimated_date_of_departure', shipping_details.estimated_date_of_departure);
-													frm.refresh();
 												} else {
 													frappe.msgprint("Failed to fetch items from " + purchase_invoice);
+												}
+												
+												// When all requests are complete, refresh and save
+												if (completed_requests === total_requests) {
+													frm.refresh();
+													frm.save();
 												}
 											}
 										});

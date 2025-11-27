@@ -112,6 +112,8 @@ frappe.ui.form.on("Purchase Invoice", {
 													frm.set_value('custom_estimated_date_of_departure', shipping_details.estimated_date_of_departure);
 													
 													frm.refresh();
+													// Auto-save the document after items are added
+													frm.save();
 												} else {
 													frappe.msgprint("No items found in the selected Sales Invoice");
 												}
