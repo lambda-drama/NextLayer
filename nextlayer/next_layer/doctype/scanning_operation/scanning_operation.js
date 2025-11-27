@@ -778,11 +778,18 @@ function add_item_to_table_for_verification(frm, item_data) {
 	}
 
 	// Find existing item row (same item + warehouse combination)
+	// For Offloading, also check by item_code only since items come from "Get Items"
 	let existing_row = null;
 	if (frm.doc.items) {
 		frm.doc.items.forEach(function(row, index) {
-			if (row.item_code === item_data.item_code && row.warehouse === warehouse) {
-				existing_row = index;
+			if (row.item_code === item_data.item_code) {
+				// For Offloading, match by item_code only (warehouse may vary)
+				if (frm.doc.operation === "Offloading") {
+					existing_row = index;
+				} else if (row.warehouse === warehouse) {
+					// For Loading, match by both item_code and warehouse
+					existing_row = index;
+				}
 			}
 		});
 	}
@@ -816,14 +823,45 @@ function add_item_to_table_for_verification(frm, item_data) {
 			indicator: "blue"
 		});
 	} else {
-		// Item not found in original scan - show error
-		frappe.msgprint({
-			title: __("Item Not Found in Original Scan"),
-			message: __("Item {0} with barcode {1} was not found in the original scan. Verifier can only verify items that were originally scanned. Please ask the scanner to scan this item first.", [item_data.item_name, item_data.barcode]),
-			indicator: "red"
-		});
-		frm.set_value("scan_barcode", "");
-		return;
+		// For Offloading operations, if item not found, allow adding it (items come from Get Items, not scanning)
+		if (frm.doc.operation === "Offloading") {
+			// In Offloading, items are added via "Get Items", so we can add new items during verification
+			let new_row = frm.add_child("items");
+			new_row.item_code = item_data.item_code;
+			new_row.item_name = item_data.item_name;
+			new_row.quantity = 0; // Start with 0 quantity since it wasn't scanned
+			new_row.verified_qty = 1; // Set verified quantity to 1
+			new_row.barcode = item_data.barcode;
+			new_row.warehouse = warehouse;
+
+			// Prefer sales_uom; fallback to parent Scanning Operation.uom
+			if (item_data.sales_uom) {
+				new_row.uom = item_data.sales_uom;
+			} else if (frm.doc && frm.doc.uom) {
+				new_row.uom = frm.doc.uom;
+			}
+
+			if (item_data.description) {
+				new_row.description = item_data.description;
+			}
+
+			frappe.show_alert({
+				message: __("Item {0} added and verified (Offloading mode)", [item_data.item_name]),
+				indicator: "blue"
+			});
+
+			frm.refresh_field("items");
+			frm.save();
+		} else {
+			// For Loading operations, item must be scanned first
+			frappe.msgprint({
+				title: __("Item Not Found in Original Scan"),
+				message: __("Item {0} with barcode {1} was not found in the original scan. Verifier can only verify items that were originally scanned. Please ask the scanner to scan this item first.", [item_data.item_name, item_data.barcode]),
+				indicator: "red"
+			});
+			frm.set_value("scan_barcode", "");
+			return;
+		}
 	}
 
 	frm.refresh_field("items");
