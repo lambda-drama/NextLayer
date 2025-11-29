@@ -12,6 +12,24 @@ function show_invoice_settings_modal(frm, doctype) {
 				default: frm.doc.custom_invoice_no || ''
 			},
 			{
+				fieldtype: 'Column Break'
+			},
+			{
+				label: __('Posting Date'),
+				fieldname: 'posting_date',
+				fieldtype: 'Date',
+				default: frm.doc.posting_date || frappe.datetime.get_today()
+			},
+			{
+				fieldtype: 'Column Break'
+			},
+			{
+				label: __('Due Date'),
+				fieldname: 'due_date',
+				fieldtype: 'Date',
+				default: frm.doc.due_date || ''
+			},
+			{
 				fieldtype: 'Section Break',
 				label: __('Accounting Dimensions')
 			},
@@ -30,8 +48,7 @@ function show_invoice_settings_modal(frm, doctype) {
 				fieldname: 'company_group',
 				fieldtype: 'Link',
 				options: 'Company Group',
-				default: frm.doc.company_group || '',
-				reqd: 1
+				default: frm.doc.company_group || ''
 			},
 			{
 				fieldtype: 'Column Break'
@@ -103,6 +120,12 @@ function show_invoice_settings_modal(frm, doctype) {
 			}
 			if (values.price_list !== undefined) {
 				frm.set_value(price_list_field, values.price_list);
+			}
+			if (values.posting_date !== undefined) {
+				frm.set_value('posting_date', values.posting_date);
+			}
+			if (values.due_date !== undefined) {
+				frm.set_value('due_date', values.due_date);
 			}
 			
 			// Close dialog

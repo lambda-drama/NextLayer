@@ -12,6 +12,15 @@ function show_invoice_settings_modal(frm, doctype) {
 				default: frm.doc.custom_invoice_no || ''
 			},
 			{
+				fieldtype: 'Column Break'
+			},
+			{
+				label: __('Posting Date'),
+				fieldname: 'posting_date',
+				fieldtype: 'Date',
+				default: frm.doc.posting_date || frappe.datetime.get_today()
+			},
+			{
 				fieldtype: 'Section Break',
 				label: __('Accounting Dimensions')
 			},
@@ -40,8 +49,7 @@ function show_invoice_settings_modal(frm, doctype) {
 				fieldname: 'branch',
 				fieldtype: 'Link',
 				options: 'Branch',
-				default: frm.doc.branch || '',
-				reqd: 1
+				default: frm.doc.branch || ''
 			},
 			{
 				fieldtype: 'Section Break',
@@ -103,6 +111,9 @@ function show_invoice_settings_modal(frm, doctype) {
 			}
 			if (values.price_list !== undefined) {
 				frm.set_value(price_list_field, values.price_list);
+			}
+			if (values.posting_date !== undefined) {
+				frm.set_value('posting_date', values.posting_date);
 			}
 			
 			// Close dialog
