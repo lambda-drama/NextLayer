@@ -1,3 +1,122 @@
+// Function to show invoice settings modal
+function show_invoice_settings_modal(frm, doctype) {
+	let price_list_field = doctype === 'Sales Invoice' ? 'selling_price_list' : 'buying_price_list';
+	
+	let settings_dialog = new frappe.ui.Dialog({
+		title: __('Invoice Settings'),
+		fields: [
+			{
+				label: __('Invoice Number'),
+				fieldname: 'custom_invoice_no',
+				fieldtype: 'Data',
+				default: frm.doc.custom_invoice_no || ''
+			},
+			{
+				fieldtype: 'Section Break',
+				label: __('Accounting Dimensions')
+			},
+			{
+				label: __('Marka'),
+				fieldname: 'marka',
+				fieldtype: 'Link',
+				options: 'Marka',
+				default: frm.doc.marka || ''
+			},
+			{
+				fieldtype: 'Column Break'
+			},
+			{
+				label: __('Company Group'),
+				fieldname: 'company_group',
+				fieldtype: 'Link',
+				options: 'Company Group',
+				default: frm.doc.company_group || ''
+			},
+			{
+				fieldtype: 'Column Break'
+			},
+			{
+				label: __('Branch'),
+				fieldname: 'branch',
+				fieldtype: 'Link',
+				options: 'Branch',
+				default: frm.doc.branch || '',
+				reqd: 1
+			},
+			{
+				fieldtype: 'Section Break',
+				label: __('Warehouse & Pricing')
+			},
+			{
+				label: __('Set Accepted Warehouse'),
+				fieldname: 'set_warehouse',
+				fieldtype: 'Link',
+				options: 'Warehouse',
+				default: frm.doc.set_warehouse || '',
+				get_query: function() {
+					return {
+						filters: {
+							company: frm.doc.company
+						}
+					};
+				}
+			},
+			{
+				fieldtype: 'Column Break'
+			},
+			{
+				label: __('Price List'),
+				fieldname: 'price_list',
+				fieldtype: 'Link',
+				options: 'Price List',
+				default: frm.doc[price_list_field] || '',
+				get_query: function() {
+					return {
+						filters: {
+							buying: doctype === 'Purchase Invoice' ? 1 : 0,
+							selling: doctype === 'Sales Invoice' ? 1 : 0
+						}
+					};
+				}
+			}
+		],
+		primary_action_label: __('Save'),
+		primary_action: function() {
+			// Get values from dialog
+			let values = settings_dialog.get_values();
+			
+			// Update form fields
+			if (values.custom_invoice_no !== undefined) {
+				frm.set_value('custom_invoice_no', values.custom_invoice_no);
+			}
+			if (values.marka !== undefined) {
+				frm.set_value('marka', values.marka);
+			}
+			if (values.company_group !== undefined) {
+				frm.set_value('company_group', values.company_group);
+			}
+			if (values.branch !== undefined) {
+				frm.set_value('branch', values.branch);
+			}
+			if (values.set_warehouse !== undefined) {
+				frm.set_value('set_warehouse', values.set_warehouse);
+			}
+			if (values.price_list !== undefined) {
+				frm.set_value(price_list_field, values.price_list);
+			}
+			
+			// Close dialog
+			settings_dialog.hide();
+			
+			// Refresh and save
+			frm.refresh();
+			frm.save();
+		}
+	});
+	
+	settings_dialog.show();
+}
+
 frappe.ui.form.on("Purchase Invoice", {
 	refresh: function(frm) {
 		if (frm.doc.docstatus == 0) {
@@ -69,6 +188,12 @@ frappe.ui.form.on("Purchase Invoice", {
 												var purchase_invoice_items = response.message.purchase_invoice_items || [];
 												var shipping_details = response.message.shipping_details || {};
 
+												// If parent_only is True, autofill company and supplier
+												if (parent_only && response.message.company && response.message.supplier) {
+													frm.set_value('company', response.message.company);
+													frm.set_value('supplier', response.message.supplier);
+												}
+
 												if (purchase_invoice_items.length > 0) {
 													// Items fetched successfully, iterate over the items
 													purchase_invoice_items.forEach(function(item) {
@@ -111,9 +236,8 @@ frappe.ui.form.on("Purchase Invoice", {
 													frm.set_value('custom_estimated_date_of_arrival', shipping_details.estimated_date_of_arrival);
 													frm.set_value('custom_estimated_date_of_departure', shipping_details.estimated_date_of_departure);
 													
-													frm.refresh();
-													// Auto-save the document after items are added
-													frm.save();
+													// Show modal for additional settings
+													show_invoice_settings_modal(frm, 'Purchase Invoice');
 												} else {
 													frappe.msgprint("No items found in the selected Sales Invoice");
 												}

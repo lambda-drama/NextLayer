@@ -159,13 +159,12 @@ def group_items_by_parent(items, parent_only=False):
 
 
 @frappe.whitelist()
-def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=False):
+def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only=False):
 	"""
 	Get items from Sales Invoice for Purchase Invoice
 	Supports parent/child item grouping
 	"""
 	selected_sales_invoice = sales_invoice
-	company = company
 	# Properly convert checkbox value to boolean
 	parent_only = parent_only in (True, 1, "1", "true", "True")
 
@@ -177,14 +176,18 @@ def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=Fals
 	if not selected_sales_invoice:
 		frappe.throw("Sales invoice is not provided or is invalid.")
 
-	if not company:
-		frappe.throw("Company is not provided or is invalid.")
-
 	purchase_invoice_items = []
 	transit_numbers = []
 
 	try:
 		sales_invoice_doc = frappe.get_doc("Sales Invoice", selected_sales_invoice)
+		
+		# If parent_only is True and company is not provided, use customer from Sales Invoice as company
+		if parent_only and not company:
+			company = sales_invoice_doc.customer
+		
+		if not company:
+			frappe.throw("Company is not provided or is invalid.")
 		
 		# Ensure the sales invoice is submitted before proceeding
 		if sales_invoice_doc.docstatus != 1:
@@ -265,6 +268,11 @@ def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=Fals
 			'shipping_details': shipping_details,
 			'transit_numbers': transit_numbers
 		}
+		
+		# If parent_only is True, include company and supplier info for autofill
+		if parent_only:
+			response_data['company'] = sales_invoice_doc.customer  # Company = customer from Sales Invoice
+			response_data['supplier'] = sales_invoice_doc.company  # Supplier = company from Sales Invoice
 
 		frappe.response['message'] = response_data
 
@@ -274,13 +282,12 @@ def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=Fals
 
 
 @frappe.whitelist()
-def get_items_from_selected_purchase_invoice(purchase_invoice, company, parent_only=False):
+def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, parent_only=False):
 	"""
 	Get items from Purchase Invoice for Sales Invoice
 	Supports parent/child item grouping
 	"""
 	selected_purchase_invoice = purchase_invoice
-	company = company
 	# Properly convert checkbox value to boolean
 	parent_only = parent_only in (True, 1, "1", "true", "True")
 
@@ -290,6 +297,13 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company, parent_o
 	try:
 		# Retrieve the selected Purchase Invoice document
 		purchase_invoice_doc = frappe.get_doc("Purchase Invoice", selected_purchase_invoice)
+		
+		# If parent_only is True and company is not provided, use supplier from Purchase Invoice as company
+		if parent_only and not company:
+			company = purchase_invoice_doc.supplier
+		
+		if not company:
+			frappe.throw("Company is not provided or is invalid.")
 		
 		# Iterate over items in the Purchase Invoice and add them to the Sales Invoice items list
 		for item in purchase_invoice_doc.items:
@@ -373,6 +387,11 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company, parent_o
 			'shipping_details': shipping_details,
 			'transit_numbers': transit_numbers
 		}
+		
+		# If parent_only is True, include company and customer info for autofill
+		if parent_only:
+			response_data['company'] = purchase_invoice_doc.supplier  # Company = supplier from Purchase Invoice
+			response_data['customer'] = purchase_invoice_doc.company  # Customer = company from Purchase Invoice
 		
 		# Set the response message to the list of item dictionaries
 		frappe.response['message'] = response_data
