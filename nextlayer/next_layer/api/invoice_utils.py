@@ -90,19 +90,30 @@ def group_items_by_parent(items, parent_only=False):
 		
 		if parent_item:
 			# This is a child item, group by parent
-			if not parent_groups[parent_item]['item_code']:
+			parent_group = parent_groups[parent_item]
+			if not parent_group['item_code']:
 				# First time seeing this parent, initialize with parent item details
-				parent_groups[parent_item]['item_code'] = parent_item
+				parent_group['item_code'] = parent_item
 				try:
 					parent_doc = frappe.get_cached_doc("Item", parent_item)
-					parent_groups[parent_item]['item_name'] = parent_doc.item_name
-					parent_groups[parent_item]['stock_uom'] = parent_doc.stock_uom
-					parent_groups[parent_item]['uom'] = getattr(parent_doc, 'sales_uom', None) or parent_doc.stock_uom
+					parent_group['item_name'] = parent_doc.item_name
+					parent_group['stock_uom'] = parent_doc.stock_uom
 				except Exception:
 					# If parent item doesn't exist, use child item details
-					parent_groups[parent_item]['item_name'] = item.get('item_name', '')
-					parent_groups[parent_item]['stock_uom'] = item.get('stock_uom')
-					parent_groups[parent_item]['uom'] = item.get('uom')
+					parent_group['item_name'] = item.get('item_name', '')
+					parent_group['stock_uom'] = item.get('stock_uom')
+
+			# Always prefer the transaction's UOM.
+			transaction_uom = item.get('uom')
+			if transaction_uom:
+				parent_group['uom'] = transaction_uom
+			elif not parent_group['uom']:
+				# Fall back to the parent's sales UOM or stock UOM only if transaction UOM is missing
+				try:
+					parent_doc = parent_doc if 'parent_doc' in locals() and parent_doc.name == parent_item else frappe.get_cached_doc("Item", parent_item)
+					parent_group['uom'] = getattr(parent_doc, 'sales_uom', None) or parent_doc.stock_uom
+				except Exception:
+					parent_group['uom'] = item.get('uom') or item.get('stock_uom')
 			
 			# Get item rate and track it
 			item_rate = item.get('rate', 0) or 0
@@ -110,13 +121,13 @@ def group_items_by_parent(items, parent_only=False):
 				parent_groups[parent_item]['rates'].append(item_rate)
 			
 			# Accumulate quantities and amounts
-			parent_groups[parent_item]['qty'] += item.get('qty', 0) or 0
-			parent_groups[parent_item]['amount'] += item.get('amount', 0) or 0
-			parent_groups[parent_item]['custom_containers'] += item.get('custom_containers', 0) or 0
-			parent_groups[parent_item]['custom_cartons'] += item.get('custom_cartons', 0) or 0
-			parent_groups[parent_item]['stock_qty'] += item.get('stock_qty', 0) or 0
-			parent_groups[parent_item]['income_account'] = parent_groups[parent_item]['income_account'] or item.get('income_account')
-			parent_groups[parent_item]['expense_account'] = parent_groups[parent_item]['expense_account'] or item.get('expense_account')
+			parent_group['qty'] += item.get('qty', 0) or 0
+			parent_group['amount'] += item.get('amount', 0) or 0
+			parent_group['custom_containers'] += item.get('custom_containers', 0) or 0
+			parent_group['custom_cartons'] += item.get('custom_cartons', 0) or 0
+			parent_group['stock_qty'] += item.get('stock_qty', 0) or 0
+			parent_group['income_account'] = parent_group['income_account'] or item.get('income_account')
+			parent_group['expense_account'] = parent_group['expense_account'] or item.get('expense_account')
 		else:
 			# This is already a parent item, add as is
 			processed_items.append(item)
@@ -148,13 +159,12 @@ def group_items_by_parent(items, parent_only=False):
 
 
 @frappe.whitelist()
-def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=False):
+def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only=False):
 	"""
 	Get items from Sales Invoice for Purchase Invoice
 	Supports parent/child item grouping
 	"""
 	selected_sales_invoice = sales_invoice
-	company = company
 	# Properly convert checkbox value to boolean
 	parent_only = parent_only in (True, 1, "1", "true", "True")
 
@@ -166,14 +176,18 @@ def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=Fals
 	if not selected_sales_invoice:
 		frappe.throw("Sales invoice is not provided or is invalid.")
 
-	if not company:
-		frappe.throw("Company is not provided or is invalid.")
-
 	purchase_invoice_items = []
 	transit_numbers = []
 
 	try:
 		sales_invoice_doc = frappe.get_doc("Sales Invoice", selected_sales_invoice)
+		
+		# If parent_only is True and company is not provided, use customer from Sales Invoice as company
+		if parent_only and not company:
+			company = sales_invoice_doc.customer
+		
+		if not company:
+			frappe.throw("Company is not provided or is invalid.")
 		
 		# Ensure the sales invoice is submitted before proceeding
 		if sales_invoice_doc.docstatus != 1:
@@ -254,6 +268,11 @@ def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=Fals
 			'shipping_details': shipping_details,
 			'transit_numbers': transit_numbers
 		}
+		
+		# If parent_only is True, include company and supplier info for autofill
+		if parent_only:
+			response_data['company'] = sales_invoice_doc.customer  # Company = customer from Sales Invoice
+			response_data['supplier'] = sales_invoice_doc.company  # Supplier = company from Sales Invoice
 
 		frappe.response['message'] = response_data
 
@@ -263,13 +282,12 @@ def get_items_from_selected_sal_invoice(sales_invoice, company, parent_only=Fals
 
 
 @frappe.whitelist()
-def get_items_from_selected_purchase_invoice(purchase_invoice, company, parent_only=False):
+def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, parent_only=False):
 	"""
 	Get items from Purchase Invoice for Sales Invoice
 	Supports parent/child item grouping
 	"""
 	selected_purchase_invoice = purchase_invoice
-	company = company
 	# Properly convert checkbox value to boolean
 	parent_only = parent_only in (True, 1, "1", "true", "True")
 
@@ -279,6 +297,13 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company, parent_o
 	try:
 		# Retrieve the selected Purchase Invoice document
 		purchase_invoice_doc = frappe.get_doc("Purchase Invoice", selected_purchase_invoice)
+		
+		# If parent_only is True and company is not provided, use supplier from Purchase Invoice as company
+		if parent_only and not company:
+			company = purchase_invoice_doc.supplier
+		
+		if not company:
+			frappe.throw("Company is not provided or is invalid.")
 		
 		# Iterate over items in the Purchase Invoice and add them to the Sales Invoice items list
 		for item in purchase_invoice_doc.items:
@@ -362,6 +387,11 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company, parent_o
 			'shipping_details': shipping_details,
 			'transit_numbers': transit_numbers
 		}
+		
+		# If parent_only is True, include company and customer info for autofill
+		if parent_only:
+			response_data['company'] = purchase_invoice_doc.supplier  # Company = supplier from Purchase Invoice
+			response_data['customer'] = purchase_invoice_doc.company  # Customer = company from Purchase Invoice
 		
 		# Set the response message to the list of item dictionaries
 		frappe.response['message'] = response_data

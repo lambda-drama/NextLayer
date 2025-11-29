@@ -11,6 +11,7 @@ class ScanningOperation(Document):
 		self.validate_verification_user()
 		self.validate_items()
 		self.auto_fill_missing_warehouses()
+		self.auto_set_verified_by_for_offloading()
 		self.compute_uom_conversions_and_totals()
 		self.compute_verification_status()
 
@@ -42,7 +43,7 @@ class ScanningOperation(Document):
 	def validate_verification_complete(self):
 		"""Validate that verification is complete before allowing submission"""
 		# If both scanned_by and verified_by are set, verification must be complete
-		if self.scanned_by and self.verified_by:
+		if self.scanned_by and self.verified_by and self.operation != "Offloading":
 			if self.verification_status != "Verified":
 				frappe.throw(
 					"Only submit if fully verified. Current verification status: {0}".format(self.verification_status),
@@ -55,11 +56,23 @@ class ScanningOperation(Document):
 					"Only the verifier can submit this document when both scanner and verifier are assigned.",
 					title="Submission Restricted"
 				)
+		if self.operation == "Offloading" and self.verification_status != "Verified":
+			frappe.throw(
+				"Offloading operations must be fully verified before submission. Current verification status: {0}".format(self.verification_status),
+				title="Verification Required"
+			)
+      
 		# If only scanned_by is set, scanner can submit regardless of verification status
 
 	def validate_verification_user(self):
 		"""Validate verification user (no restrictions - same user can scan and verify if needed)"""
 		pass
+
+	def auto_set_verified_by_for_offloading(self):
+		"""For Offloading operations, automatically set verified_by to document owner if not set"""
+		if self.operation == "Offloading" and not self.verified_by:
+			# Set verified_by to the document owner (creator)
+			self.verified_by = self.owner
 
 	def validate_items(self):
 		"""Validate that all items have required fields"""
@@ -445,33 +458,5 @@ def check_stock_availability(item_code, warehouse, quantity, posting_date=None, 
 		return {"available": False, "message": f"Error checking stock: {str(e)}"}
 
 
-@frappe.whitelist()
-def get_items_from_scanning_operation(scanning_operation):
-	"""Get items from Scanning Operation for creating other documents"""
-	try:
-		so_doc = frappe.get_doc("Scanning Operation", scanning_operation)
-
-		items = []
-		for item in so_doc.items:
-			items.append({
-				"item_code": item.item_code,
-				"item_name": item.item_name,
-				"quantity": item.quantity,
-				"warehouse": item.warehouse,
-				"description": item.description,
-				"barcode": item.barcode
-			})
-
-		return {
-			"items": items,
-			"customer": so_doc.customer,
-			"company": so_doc.company,
-			"date": so_doc.date,
-			"posting_time": so_doc.posting_time
-		}
-
-	except Exception as e:
-		frappe.log_error(f"Error getting items from scanning operation {scanning_operation}: {str(e)}")
-		return None
 
 

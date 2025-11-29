@@ -1,7 +1,7 @@
 // Copyright (c) 2025, jr@gmail.com and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("Scanning Operation", {
+	frappe.ui.form.on("Scanning Operation", {
 	refresh(frm) {
 		// Set focus on barcode field for automatic scanning
 		if (frm.doc.scan_barcode && frm.fields_dict.scan_barcode) {
@@ -10,6 +10,11 @@ frappe.ui.form.on("Scanning Operation", {
 
 		if (frm.doc.docstatus === 1) {
 			add_create_buttons(frm);
+		}
+
+		// Add "Get Items From" button for Offloading operations (always show when operation is Offloading)
+		if (frm.doc.operation === "Offloading") {
+			add_get_items_from_button(frm);
 		}
 
 		setup_automatic_barcode_detection(frm);
@@ -69,6 +74,18 @@ frappe.ui.form.on("Scanning Operation", {
 		frm.set_value("dt_warehouse", "");
 		// frm.set_value("customer", "");
 		// frm.set_value("supplier", "");
+		
+		// Show/hide "Get Items" button based on operation
+		// Show button immediately when operation is set to Offloading (even before saving)
+		if (frm.doc.operation === "Offloading") {
+			add_get_items_from_button(frm);
+		} else {
+			// Remove the button if operation is not Offloading
+			// Only clear if document is not submitted (to preserve Create buttons)
+			if (frm.doc.docstatus === 0) {
+				frm.page.clear_actions_menu();
+			}
+		}
 	},
 
 	ds_warehouse(frm) {
@@ -123,6 +140,155 @@ function setup_automatic_barcode_detection(frm) {
 				}
 			}
 		}
+	});
+}
+
+// Function to add "Get Items" button for Offloading operations
+function add_get_items_from_button(frm) {
+	// Remove existing "Get Items" button if it exists to avoid duplicates
+	frm.page.clear_actions_menu();
+	
+	frm.add_custom_button(__('Get Items'), function() {
+		// Check if document is already submitted
+		if (frm.doc.docstatus === 1) {
+			frappe.msgprint({
+				title: __("Cannot Modify"),
+				message: __("Cannot get items from Scanning Operation. Document is already submitted."),
+				indicator: "orange"
+			});
+			return;
+		}
+		
+		// Create dialog with Parent checkbox (default checked)
+		let parent_only = true; // Default to checked
+		let dialog = new frappe.ui.Dialog({
+			title: __('Select Scanning Operation'),
+			fields: [
+				{
+					label: __('Parent Items'),
+					fieldname: 'parent_only',
+					fieldtype: 'Check',
+					default: 1, // Default checked
+					onchange: function() {
+						parent_only = dialog.get_value('parent_only') || false;
+					}
+				}
+			],
+			primary_action_label: __('Select'),
+			primary_action: function() {
+				parent_only = dialog.get_value('parent_only') || false;
+				dialog.hide();
+				
+				// First, get the list of already referenced Loading operations
+				frappe.call({
+					method: 'nextlayer.next_layer.api.scanning_utils.get_referenced_loading_operations',
+					callback: function(response) {
+						let referenced_operations = [];
+						if (response && response.message) {
+							referenced_operations = response.message || [];
+						}
+						
+						// Now open MultiSelectDialog to select Scanning Operations with operation = "Loading"
+						new frappe.ui.form.MultiSelectDialog({
+							doctype: "Scanning Operation",
+							target: frm,
+							setters: {
+								operation: "Loading"
+							},
+							add_filters_group: 1,
+							date_field: "date",
+							get_query() {
+								let filters = { 
+									operation: "Loading",
+									docstatus: 1  // Only show submitted Scanning Operations
+								};
+								
+								// Exclude already referenced Scanning Operations
+								if (referenced_operations.length > 0) {
+									filters.name = ["not in", referenced_operations];
+								}
+								
+								return {
+									filters: filters
+								}
+							},
+							action(selections) {
+								// Check if selections exist and are not empty
+								if (selections && selections.length > 0) {
+									// Clear the items table before adding new items
+									frappe.model.clear_table(frm.doc, "items");
+									
+									// Set the scanning_operation field to the first selected operation
+									// (or handle multiple if the field supports it)
+									if (selections.length > 0) {
+										frm.set_value('scanning_operation', selections[0]);
+									}
+									
+									// Iterate over each selected Scanning Operation
+									selections.forEach(function(scanning_operation) {
+										// Call server-side method to fetch items from the selected Scanning Operation
+										frappe.call({
+											method: 'nextlayer.next_layer.api.scanning_utils.get_items_from_scanning_operation',
+											args: {
+												scanning_operation: scanning_operation,
+												parent_only: parent_only
+											},
+											callback: function(response) {
+												if (response && response.message && response.message.items) {
+													// Items fetched successfully, iterate over the items
+													response.message.items.forEach(function(item) {
+														// Add each item to the Scanning Operation child table (items)
+														var new_item = frm.add_child('items');
+														new_item.item_code = item.item_code;
+														new_item.item_name = item.item_name;
+														new_item.quantity = item.quantity;
+														// For Offloading, use the default target warehouse from current document
+														new_item.warehouse = frm.doc.dt_warehouse || item.warehouse || "";
+														new_item.barcode = item.barcode || "";
+														new_item.description = item.description || "";
+														new_item.uom = item.uom || "";
+														new_item.stock_uom = item.stock_uom || "";
+														new_item.uom_conversion_factor = item.uom_conversion_factor || 1.0;
+														new_item.qty_as_per_stock_uom = item.qty_as_per_stock_uom || 0;
+														new_item.uomcontainers = item.uomcontainers || 0;
+														new_item.uomcartons = item.uomcartons || 0;
+														new_item.container_conversion_factor = item.container_conversion_factor || 0;
+														new_item.carton_conversion_factor = item.carton_conversion_factor || 0;
+														new_item.verified_qty = 0; // Reset verified quantity
+													});
+													
+													// Refresh the items table
+													frm.refresh_field("items");
+													
+													frappe.show_alert({
+														message: __("Successfully added items from {0}", [scanning_operation]),
+														indicator: "green"
+													}, 3);
+												} else {
+													frappe.msgprint({
+														title: __("Error"),
+														message: __("Failed to fetch items from {0}", [scanning_operation]),
+														indicator: "red"
+													});
+												}
+											}
+										});
+									});
+								} else {
+									frappe.msgprint({
+										title: __("No Selection"),
+										message: __("No Scanning Operations selected"),
+										indicator: "orange"
+									});
+								}
+								cur_dialog.hide();
+							}
+						});
+					}
+				});
+			}
+		});
+		dialog.show();
 	});
 }
 
@@ -612,11 +778,18 @@ function add_item_to_table_for_verification(frm, item_data) {
 	}
 
 	// Find existing item row (same item + warehouse combination)
+	// For Offloading, also check by item_code only since items come from "Get Items"
 	let existing_row = null;
 	if (frm.doc.items) {
 		frm.doc.items.forEach(function(row, index) {
-			if (row.item_code === item_data.item_code && row.warehouse === warehouse) {
-				existing_row = index;
+			if (row.item_code === item_data.item_code) {
+				// For Offloading, match by item_code only (warehouse may vary)
+				if (frm.doc.operation === "Offloading") {
+					existing_row = index;
+				} else if (row.warehouse === warehouse) {
+					// For Loading, match by both item_code and warehouse
+					existing_row = index;
+				}
 			}
 		});
 	}
@@ -650,14 +823,45 @@ function add_item_to_table_for_verification(frm, item_data) {
 			indicator: "blue"
 		});
 	} else {
-		// Item not found in original scan - show error
-		frappe.msgprint({
-			title: __("Item Not Found in Original Scan"),
-			message: __("Item {0} with barcode {1} was not found in the original scan. Verifier can only verify items that were originally scanned. Please ask the scanner to scan this item first.", [item_data.item_name, item_data.barcode]),
-			indicator: "red"
-		});
-		frm.set_value("scan_barcode", "");
-		return;
+		// For Offloading operations, if item not found, allow adding it (items come from Get Items, not scanning)
+		if (frm.doc.operation === "Offloading") {
+			// In Offloading, items are added via "Get Items", so we can add new items during verification
+			let new_row = frm.add_child("items");
+			new_row.item_code = item_data.item_code;
+			new_row.item_name = item_data.item_name;
+			new_row.quantity = 0; // Start with 0 quantity since it wasn't scanned
+			new_row.verified_qty = 1; // Set verified quantity to 1
+			new_row.barcode = item_data.barcode;
+			new_row.warehouse = warehouse;
+
+			// Prefer sales_uom; fallback to parent Scanning Operation.uom
+			if (item_data.sales_uom) {
+				new_row.uom = item_data.sales_uom;
+			} else if (frm.doc && frm.doc.uom) {
+				new_row.uom = frm.doc.uom;
+			}
+
+			if (item_data.description) {
+				new_row.description = item_data.description;
+			}
+
+			frappe.show_alert({
+				message: __("Item {0} added and verified (Offloading mode)", [item_data.item_name]),
+				indicator: "blue"
+			});
+
+			frm.refresh_field("items");
+			frm.save();
+		} else {
+			// For Loading operations, item must be scanned first
+			frappe.msgprint({
+				title: __("Item Not Found in Original Scan"),
+				message: __("Item {0} with barcode {1} was not found in the original scan. Verifier can only verify items that were originally scanned. Please ask the scanner to scan this item first.", [item_data.item_name, item_data.barcode]),
+				indicator: "red"
+			});
+			frm.set_value("scan_barcode", "");
+			return;
+		}
 	}
 
 	frm.refresh_field("items");
