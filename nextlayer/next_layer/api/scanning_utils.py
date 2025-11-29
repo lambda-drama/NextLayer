@@ -64,12 +64,42 @@ def get_items_from_scanning_operation(scanning_operation, parent_only=False):
 		if parent_only:
 			items = group_scanning_items_by_parent(items)
 
+		# Get shipping details
+		shipping_details = {
+			"container_no": so_doc.container_no or '',
+			"port_of_loading": so_doc.port_of_loading or '',
+			"data_ncab": so_doc.data_ncab or '',
+			"bil": so_doc.bil or '',
+			"bill_of_exit": so_doc.bill_of_exit or '',
+			"estimated_date_of_departure": so_doc.estimated_date_of_departure or '',
+			"destination": so_doc.destination or '',
+			"port_of_discharge": so_doc.port_of_discharge or '',
+			"container_quantity": so_doc.container_quantity or 0,
+			"shipping_line": so_doc.shipping_line or '',
+			"estimated_date_of_arrival": so_doc.estimated_date_of_arrival or '',
+			"remaining_days": so_doc.remaining_days or 0,
+			"actual_arrival_date": so_doc.actual_arrival_date or '',
+			"shipping_status": so_doc.shipping_status or ''
+		}
+
+		# Get accounting dimensions
+		accounting_details = {
+			"marka": so_doc.marka or '',
+			"branch": so_doc.branch or '',
+			"company_group": so_doc.company_group or '',
+			"cost_center": so_doc.cost_center or '',
+			"project": so_doc.project or ''
+		}
+
 		return {
 			"items": items,
 			"customer": so_doc.customer,
 			"company": so_doc.company,
 			"date": so_doc.date,
-			"posting_time": so_doc.posting_time
+			"posting_time": so_doc.posting_time,
+			"scanning_name": so_doc.scanning_name or '',
+			"shipping_details": shipping_details,
+			"accounting_details": accounting_details
 		}
 
 	except Exception as e:

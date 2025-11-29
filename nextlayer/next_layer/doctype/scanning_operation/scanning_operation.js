@@ -257,6 +257,40 @@ function add_get_items_from_button(frm) {
 														new_item.verified_qty = 0; // Reset verified quantity
 													});
 													
+													// Update scanning name if provided
+													if (response.message.scanning_name) {
+														frm.set_value('scanning_name', response.message.scanning_name);
+													}
+													
+													// Update shipping details if provided
+													if (response.message.shipping_details) {
+														var shipping = response.message.shipping_details;
+														if (shipping.container_no) frm.set_value('container_no', shipping.container_no);
+														if (shipping.port_of_loading) frm.set_value('port_of_loading', shipping.port_of_loading);
+														if (shipping.data_ncab) frm.set_value('data_ncab', shipping.data_ncab);
+														if (shipping.bil) frm.set_value('bil', shipping.bil);
+														if (shipping.bill_of_exit) frm.set_value('bill_of_exit', shipping.bill_of_exit);
+														if (shipping.estimated_date_of_departure) frm.set_value('estimated_date_of_departure', shipping.estimated_date_of_departure);
+														if (shipping.destination) frm.set_value('destination', shipping.destination);
+														if (shipping.port_of_discharge) frm.set_value('port_of_discharge', shipping.port_of_discharge);
+														if (shipping.container_quantity) frm.set_value('container_quantity', shipping.container_quantity);
+														if (shipping.shipping_line) frm.set_value('shipping_line', shipping.shipping_line);
+														if (shipping.estimated_date_of_arrival) frm.set_value('estimated_date_of_arrival', shipping.estimated_date_of_arrival);
+														if (shipping.remaining_days) frm.set_value('remaining_days', shipping.remaining_days);
+														if (shipping.actual_arrival_date) frm.set_value('actual_arrival_date', shipping.actual_arrival_date);
+														if (shipping.shipping_status) frm.set_value('shipping_status', shipping.shipping_status);
+													}
+													
+													// Update accounting dimensions if provided
+													if (response.message.accounting_details) {
+														var accounting = response.message.accounting_details;
+														if (accounting.marka) frm.set_value('marka', accounting.marka);
+														if (accounting.branch) frm.set_value('branch', accounting.branch);
+														if (accounting.company_group) frm.set_value('company_group', accounting.company_group);
+														if (accounting.cost_center) frm.set_value('cost_center', accounting.cost_center);
+														if (accounting.project) frm.set_value('project', accounting.project);
+													}
+													
 													// Refresh the items table
 													frm.refresh_field("items");
 													
