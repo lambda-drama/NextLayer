@@ -21,6 +21,15 @@ function show_invoice_settings_modal(frm, doctype) {
 				default: frm.doc.posting_date || frappe.datetime.get_today()
 			},
 			{
+				fieldtype: 'Column Break'
+			},
+			{
+				label: __('Due Date'),
+				fieldname: 'due_date',
+				fieldtype: 'Date',
+				default: frm.doc.due_date || ''
+			},
+			{
 				fieldtype: 'Section Break',
 				label: __('Accounting Dimensions')
 			},
@@ -49,7 +58,14 @@ function show_invoice_settings_modal(frm, doctype) {
 				fieldname: 'branch',
 				fieldtype: 'Link',
 				options: 'Branch',
-				default: frm.doc.branch || ''
+				default: frm.doc.branch || '',
+				get_query: function() {
+					return {
+						filters: {
+							custom_company: frm.doc.company || ''
+						}
+					};
+				}
 			},
 			{
 				fieldtype: 'Section Break',
@@ -93,6 +109,56 @@ function show_invoice_settings_modal(frm, doctype) {
 			// Get values from dialog
 			let values = settings_dialog.get_values();
 			
+			// Validate mandatory fields before saving
+			let validation_errors = [];
+			
+			// Check mandatory accounting dimensions (only if company is set)
+			if (frm.doc.company) {
+				frappe.call({
+					method: 'nextlayer.next_layer.api.invoice_utils.check_mandatory_accounting_dimensions',
+					args: {
+						company: frm.doc.company
+					},
+					async: false,
+					callback: function(response) {
+						if (response && response.message) {
+							console.log("Mulamwa",response.message);
+							let mandatory = response.message;
+						
+						// Check Branch
+						if (mandatory.branch && !values.branch) {
+							validation_errors.push(__('Branch is mandatory for this company'));
+						}
+						
+						// Check Company Group
+						if (mandatory.company_group && !values.company_group) {
+							validation_errors.push(__('Company Group is mandatory for this company'));
+						}
+						
+						// Check Marka
+						if (mandatory.marka && !values.marka) {
+							validation_errors.push(__('Marka is mandatory for this company'));
+						}
+					}
+				}
+				});
+			}
+			
+			// Check Set Accepted Warehouse
+			if (!values.set_warehouse) {
+				validation_errors.push(__('Set Accepted Warehouse is mandatory'));
+			}
+			
+			// If there are validation errors, show them and don't save
+			if (validation_errors.length > 0) {
+				frappe.msgprint({
+					title: __('Validation Error'),
+					message: validation_errors.join('<br>'),
+					indicator: 'red'
+				});
+				return;
+			}
+			
 			// Update form fields
 			if (values.custom_invoice_no !== undefined) {
 				frm.set_value('custom_invoice_no', values.custom_invoice_no);
@@ -114,6 +180,9 @@ function show_invoice_settings_modal(frm, doctype) {
 			}
 			if (values.posting_date !== undefined) {
 				frm.set_value('posting_date', values.posting_date);
+			}
+			if (values.due_date !== undefined) {
+				frm.set_value('due_date', values.due_date);
 			}
 			
 			// Close dialog
@@ -199,8 +268,8 @@ frappe.ui.form.on("Purchase Invoice", {
 												var purchase_invoice_items = response.message.purchase_invoice_items || [];
 												var shipping_details = response.message.shipping_details || {};
 
-												// If parent_only is True, autofill company and supplier
-												if (parent_only && response.message.company && response.message.supplier) {
+												// Always autofill company and supplier (regardless of parent_only)
+												if (response.message.company && response.message.supplier) {
 													frm.set_value('company', response.message.company);
 													frm.set_value('supplier', response.message.supplier);
 												}

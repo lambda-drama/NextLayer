@@ -11,12 +11,22 @@ def get_accounts(item_code, company):
 		item_doc = frappe.get_doc("Item", item_code)
 		item_defaults = item_doc.get("item_defaults")
 
+		# First, try to get income account from item defaults
 		if item_defaults:
 			for default in item_defaults:
 				if default.get("company") == company:
-					this_company = frappe.get_doc("Company", company)
-					income_account = this_company.default_income_account
-					return income_account
+					# Check if income_account is set in item default
+					if default.get("income_account"):
+						return default.get("income_account")
+		
+		# Fallback: Get from company defaults
+		if company:
+			try:
+				company_doc = frappe.get_doc("Company", company)
+				if company_doc.default_income_account:
+					return company_doc.default_income_account
+			except Exception:
+				pass
 
 		return None
 
@@ -43,6 +53,91 @@ def get_expense_accounts(item_code, company):
 	except Exception as e:
 		frappe.log_error(f"Error fetching expense account for {item_code}: {str(e)[:140]}", "Expense Account Fetch Error")
 		return None
+
+
+@frappe.whitelist()
+def check_mandatory_accounting_dimensions(company):
+	"""Check which accounting dimensions are mandatory for a company based on dimension defaults"""
+	try:
+		# Validate company parameter
+		if not company:
+			return {
+				'branch': False,
+				'company_group': False,
+				'marka': False
+			}
+		
+		mandatory_fields = {
+			'branch': False,
+			'company_group': False,
+			'marka': False
+		}
+		
+		# Get all accounting dimensions
+		accounting_dimensions = frappe.get_all("Accounting Dimension",
+			filters={"disabled": 0},
+			fields=["name", "document_type", "fieldname"]
+		)
+		
+		# Check each dimension for mandatory_for_bs in Dimension Defaults
+		for dim in accounting_dimensions:
+			if dim.document_type in ["Branch", "Company Group", "Marka"]:
+				# Try direct SQL query first (more reliable for child tables)
+				try:
+					dim_defaults = frappe.db.sql("""
+						SELECT mandatory_for_bs 
+						FROM `tabDimension Defaults`
+						WHERE parent = %s AND company = %s AND mandatory_for_bs = 1
+						LIMIT 1
+					""", (dim.name, company), as_dict=True)
+					
+					if dim_defaults:
+						# This dimension is mandatory for this company
+						if dim.document_type == "Branch":
+							mandatory_fields['branch'] = True
+						elif dim.document_type == "Company Group":
+							mandatory_fields['company_group'] = True
+						elif dim.document_type == "Marka":
+							mandatory_fields['marka'] = True
+						continue
+				except Exception as sql_error:
+					frappe.log_error(f"SQL error checking dimension {dim.name}: {str(sql_error)}", "Dimension Check Error")
+				
+				# Fallback: Get the full Accounting Dimension document to access child table
+				try:
+					dim_doc = frappe.get_doc("Accounting Dimension", dim.name)
+					
+					# Check Dimension Defaults child table (try different possible field names)
+					child_table = None
+					if hasattr(dim_doc, 'dimension_defaults'):
+						child_table = dim_doc.dimension_defaults
+					elif hasattr(dim_doc, 'defaults'):
+						child_table = dim_doc.defaults
+					
+					if child_table:
+						for default in child_table:
+							if default.company == company and getattr(default, 'mandatory_for_bs', 0) == 1:
+								# This dimension is mandatory for this company
+								if dim.document_type == "Branch":
+									mandatory_fields['branch'] = True
+								elif dim.document_type == "Company Group":
+									mandatory_fields['company_group'] = True
+								elif dim.document_type == "Marka":
+									mandatory_fields['marka'] = True
+								break
+				except Exception as dim_error:
+					frappe.log_error(f"Error checking dimension {dim.name}: {str(dim_error)}", "Dimension Check Error")
+					continue
+		
+		return mandatory_fields
+		
+	except Exception as e:
+		frappe.log_error(f"Error checking mandatory accounting dimensions: {str(e)}", "Accounting Dimension Check Error")
+		return {
+			'branch': False,
+			'company_group': False,
+			'marka': False
+		}
 
 
 def group_items_by_parent(items, parent_only=False):
@@ -182,10 +277,16 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 	try:
 		sales_invoice_doc = frappe.get_doc("Sales Invoice", selected_sales_invoice)
 		
-		# If parent_only is True and company is not provided, use customer from Sales Invoice as company
-		if parent_only and not company:
-			company = sales_invoice_doc.customer
+		# Determine target company (customer from Sales Invoice, which becomes Purchase Invoice's company)
+		# Always use the customer from Sales Invoice as the company for Purchase Invoice
+		# This ensures consistency regardless of what company is passed from the frontend
+		target_company = sales_invoice_doc.customer
 		
+		# Always use target_company for Purchase Invoice (ignore the passed company parameter)
+		# Company = customer from Sales Invoice
+		company = target_company
+		
+		# Final validation
 		if not company:
 			frappe.throw("Company is not provided or is invalid.")
 		
@@ -195,9 +296,13 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 		
 		frappe.log_error(f"Fetched Sales Invoice: {selected_sales_invoice}", "Sales Invoice Document")
 		
+		# Use target_company (customer) for fetching expense accounts, as that's the company that will be used on Purchase Invoice
+		# This ensures expense accounts belong to the correct company
+		account_company = target_company if target_company else company
+		
 		for item in sales_invoice_doc.items:
-			income_account = get_accounts(item.item_code, company)
-			expense_account = get_expense_accounts(item.item_code, company)
+			income_account = get_accounts(item.item_code, account_company)
+			expense_account = get_expense_accounts(item.item_code, account_company)
 			
 			item_details = {
 				'item_code': item.item_code,
@@ -230,11 +335,20 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 		
 		frappe.log_error(f"Items fetched: {len(purchase_invoice_items)}", "Purchase Invoice Items")
 		
-		# If branch exists fetch it 
+		# Determine target company (customer from Sales Invoice, which becomes Purchase Invoice's company)
+		target_company = sales_invoice_doc.customer
+		
+		# If branch exists, validate it belongs to target company before including it
+		branch = ''
 		if sales_invoice_doc.branch:
-			branch = sales_invoice_doc.branch
-		else:
-			branch = ''
+			try:
+				branch_company = frappe.db.get_value("Branch", sales_invoice_doc.branch, "custom_company")
+				# Only include branch if it belongs to the target company
+				if branch_company == target_company:
+					branch = sales_invoice_doc.branch
+			except Exception:
+				# If branch doesn't exist or error, leave branch empty
+				pass
 			
 		marka = sales_invoice_doc.marka if sales_invoice_doc.marka else ''
 		is_export_sale = sales_invoice_doc.custom_is_export_sale
@@ -269,10 +383,10 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 			'transit_numbers': transit_numbers
 		}
 		
-		# If parent_only is True, include company and supplier info for autofill
-		if parent_only:
-			response_data['company'] = sales_invoice_doc.customer  # Company = customer from Sales Invoice
-			response_data['supplier'] = sales_invoice_doc.company  # Supplier = company from Sales Invoice
+		# Always include company and supplier info for autofill (regardless of parent_only)
+		# Company = customer from Sales Invoice, Supplier = company from Sales Invoice
+		response_data['company'] = sales_invoice_doc.customer
+		response_data['supplier'] = sales_invoice_doc.company
 
 		frappe.response['message'] = response_data
 
@@ -298,12 +412,22 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 		# Retrieve the selected Purchase Invoice document
 		purchase_invoice_doc = frappe.get_doc("Purchase Invoice", selected_purchase_invoice)
 		
-		# If parent_only is True and company is not provided, use supplier from Purchase Invoice as company
-		if parent_only and not company:
-			company = purchase_invoice_doc.supplier
+		# Determine target company (supplier from Purchase Invoice, which becomes Sales Invoice's company)
+		# Always use the supplier from Purchase Invoice as the company for Sales Invoice
+		# This ensures consistency regardless of what company is passed from the frontend
+		target_company = purchase_invoice_doc.supplier
 		
+		# Always use target_company for Sales Invoice (ignore the passed company parameter)
+		# Company = supplier from Purchase Invoice
+		company = target_company
+		
+		# Final validation
 		if not company:
 			frappe.throw("Company is not provided or is invalid.")
+		
+		# Use target_company (supplier) for fetching income accounts, as that's the company that will be used on Sales Invoice
+		# This ensures income accounts belong to the correct company
+		account_company = target_company if target_company else company
 		
 		# Iterate over items in the Purchase Invoice and add them to the Sales Invoice items list
 		for item in purchase_invoice_doc.items:
@@ -311,9 +435,9 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 			calculated_rate = (item.landed_cost_voucher_amount / item.qty) + item.rate if item.qty else item.rate
 			calculated_amount = calculated_rate * item.qty
 			
-			# Retrieve the income account associated with the item
-			income_account = get_accounts(item.item_code, company)
-			expense_account = get_expense_accounts(item.item_code, company)
+			# Retrieve the income account associated with the item using the target company (supplier)
+			income_account = get_accounts(item.item_code, account_company)
+			expense_account = get_expense_accounts(item.item_code, account_company)
 			
 			# Create a dictionary representing each item with additional details
 			item_details = {
@@ -336,6 +460,27 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 		# Apply parent/child grouping based on parent_only flag
 		sales_invoice_items = group_items_by_parent(sales_invoice_items, parent_only)
 		
+		# After grouping, ensure income accounts are set for all items (especially parent items)
+		# This is important because when child items are grouped into parent items,
+		# the parent item might not have an income_account set
+		# Use target_company (supplier) for fetching accounts, as that's the company that will be used on Sales Invoice
+		for item in sales_invoice_items:
+			if not item.get('income_account'):
+				# Fetch income account from item code if missing
+				item_code = item.get('item_code')
+				if item_code and account_company:
+					income_account = get_accounts(item_code, account_company)
+					if income_account:
+						item['income_account'] = income_account
+					else:
+						# If still no income account, try to get from company default
+						try:
+							company_doc = frappe.get_doc("Company", account_company)
+							if company_doc.default_income_account:
+								item['income_account'] = company_doc.default_income_account
+						except Exception:
+							pass
+		
 		# Fetch all transit numbers in the child table 
 		for transit in purchase_invoice_doc.custom_transit_number:
 			transit_number = {
@@ -346,11 +491,20 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 			}
 			transit_numbers.append(transit_number)
 		
-		# If branch exists fetch it 
+		# Determine target company (supplier from Purchase Invoice, which becomes Sales Invoice's company)
+		target_company = purchase_invoice_doc.supplier
+		
+		# If branch exists, validate it belongs to target company before including it
+		branch = ''
 		if purchase_invoice_doc.branch:
-			branch = purchase_invoice_doc.branch
-		else:
-			branch = ''
+			try:
+				branch_company = frappe.db.get_value("Branch", purchase_invoice_doc.branch, "custom_company")
+				# Only include branch if it belongs to the target company
+				if branch_company == target_company:
+					branch = purchase_invoice_doc.branch
+			except Exception:
+				# If branch doesn't exist or error, leave branch empty
+				pass
 			
 		marka = purchase_invoice_doc.marka if purchase_invoice_doc.marka else ''
 		
@@ -388,10 +542,10 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 			'transit_numbers': transit_numbers
 		}
 		
-		# If parent_only is True, include company and customer info for autofill
-		if parent_only:
-			response_data['company'] = purchase_invoice_doc.supplier  # Company = supplier from Purchase Invoice
-			response_data['customer'] = purchase_invoice_doc.company  # Customer = company from Purchase Invoice
+		# Always include company and customer info for autofill (regardless of parent_only)
+		# Company = supplier from Purchase Invoice, Customer = company from Purchase Invoice
+		response_data['company'] = purchase_invoice_doc.supplier
+		response_data['customer'] = purchase_invoice_doc.company
 		
 		# Set the response message to the list of item dictionaries
 		frappe.response['message'] = response_data

@@ -58,7 +58,14 @@ function show_invoice_settings_modal(frm, doctype) {
 				fieldname: 'branch',
 				fieldtype: 'Link',
 				options: 'Branch',
-				default: frm.doc.branch || ''
+				default: frm.doc.branch || '',
+				get_query: function() {
+					return {
+						filters: {
+							custom_company: frm.doc.company || ''
+						}
+					};
+				}
 			},
 			{
 				fieldtype: 'Section Break',
@@ -101,6 +108,55 @@ function show_invoice_settings_modal(frm, doctype) {
 		primary_action: function() {
 			// Get values from dialog
 			let values = settings_dialog.get_values();
+			
+			// Validate mandatory fields before saving
+			let validation_errors = [];
+			
+			// Check mandatory accounting dimensions (only if company is set)
+			if (frm.doc.company) {
+				frappe.call({
+					method: 'nextlayer.next_layer.api.invoice_utils.check_mandatory_accounting_dimensions',
+					args: {
+						company: frm.doc.company
+					},
+					async: false,
+					callback: function(response) {
+						if (response && response.message) {
+							let mandatory = response.message;
+						
+						// Check Branch
+						if (mandatory.branch && !values.branch) {
+							validation_errors.push(__('Branch is mandatory for this company'));
+						}
+						
+						// Check Company Group
+						if (mandatory.company_group && !values.company_group) {
+							validation_errors.push(__('Company Group is mandatory for this company'));
+						}
+						
+						// Check Marka
+						if (mandatory.marka && !values.marka) {
+							validation_errors.push(__('Marka is mandatory for this company'));
+						}
+					}
+				}
+				});
+			}
+			
+			// Check Source Warehouse (only mandatory if Update Stock is enabled)
+			if (frm.doc.update_stock == 1 && !values.set_warehouse) {
+				validation_errors.push(__('Source Warehouse is mandatory when Update Stock is enabled'));
+			}
+			
+			// If there are validation errors, show them and don't save
+			if (validation_errors.length > 0) {
+				frappe.msgprint({
+					title: __('Validation Error'),
+					message: validation_errors.join('<br>'),
+					indicator: 'red'
+				});
+				return;
+			}
 			
 			// Update form fields
 			if (values.custom_invoice_no !== undefined) {
@@ -209,8 +265,8 @@ frappe.ui.form.on("Sales Invoice", {
 												if (response && response.message) {
 													console.log(response.message)
 													
-													// If parent_only is True, autofill company and customer (only once)
-													if (parent_only && !company_customer_set && response.message.company && response.message.customer) {
+													// Always autofill company and customer (regardless of parent_only, only once)
+													if (!company_customer_set && response.message.company && response.message.customer) {
 														frm.set_value('company', response.message.company);
 														frm.set_value('customer', response.message.customer);
 														company_customer_set = true;
