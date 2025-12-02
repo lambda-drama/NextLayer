@@ -56,6 +56,44 @@ def get_expense_accounts(item_code, company):
 
 
 @frappe.whitelist()
+def check_invoice_number_exists(invoice_number, doctype, current_docname=None):
+	"""Check if an invoice with the given invoice number already exists"""
+	try:
+		if not invoice_number:
+			return False
+		
+		# Build filters to check for existing invoice with same number
+		filters = {
+			'custom_invoice_no': invoice_number
+		}
+		
+		# Exclude the current document if editing
+		if current_docname:
+			filters['name'] = ['!=', current_docname]
+		
+		# Check if any invoice exists with this number
+		existing_invoice = frappe.db.exists(doctype, filters)
+		
+		if existing_invoice:
+			return {
+				'exists': True,
+				'invoice_name': existing_invoice
+			}
+		
+		return {
+			'exists': False,
+			'invoice_name': None
+		}
+		
+	except Exception as e:
+		frappe.log_error(f"Error checking invoice number: {str(e)}", "Invoice Number Check Error")
+		return {
+			'exists': False,
+			'invoice_name': None
+		}
+
+
+@frappe.whitelist()
 def check_mandatory_accounting_dimensions(company):
 	"""Check which accounting dimensions are mandatory for a company based on dimension defaults"""
 	try:
@@ -352,6 +390,7 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 			
 		marka = sales_invoice_doc.marka if sales_invoice_doc.marka else ''
 		is_export_sale = sales_invoice_doc.custom_is_export_sale
+		shipping_mode = getattr(sales_invoice_doc, 'custom_shipping_mode', '') or ''
 		container_no = sales_invoice_doc.custom_container_no
 		invoice_no = sales_invoice_doc.name
 		bill_of_landing = sales_invoice_doc.custom_bill_of_landing
@@ -374,7 +413,8 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 			'destination': destination,
 			'bil': bil,
 			'estimated_date_of_departure': estimated_date_of_departure,
-			'estimated_date_of_arrival': estimated_date_of_arrival
+			'estimated_date_of_arrival': estimated_date_of_arrival,
+			'shipping_mode': shipping_mode
 		}
 
 		response_data = {
@@ -510,6 +550,7 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 		
 		# Fetch shipping details from selected_purchase_invoice
 		is_export_sale = purchase_invoice_doc.custom_is_export_sale
+		shipping_mode = getattr(purchase_invoice_doc, 'custom_shipping_mode', '') or ''
 		container_no = purchase_invoice_doc.custom_container_no
 		invoice_no = purchase_invoice_doc.name
 		bill_of_landing = purchase_invoice_doc.custom_bill_of_landing
@@ -533,7 +574,8 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 			'destination': destination,
 			'bil': bil,
 			'estimated_date_of_departure': estimated_date_of_departure,
-			'estimated_date_of_arrival': estimated_date_of_arrival
+			'estimated_date_of_arrival': estimated_date_of_arrival,
+			'shipping_mode': shipping_mode
 		}
 		
 		response_data = {

@@ -27,7 +27,7 @@ function show_invoice_settings_modal(frm, doctype) {
 				label: __('Due Date'),
 				fieldname: 'due_date',
 				fieldtype: 'Date',
-				default: frm.doc.due_date || ''
+				default: frm.doc.due_date || frappe.datetime.get_today()
 			},
 			{
 				fieldtype: 'Section Break',
@@ -80,7 +80,8 @@ function show_invoice_settings_modal(frm, doctype) {
 				get_query: function() {
 					return {
 						filters: {
-							company: frm.doc.company
+							company: frm.doc.company,
+							is_group: 0
 						}
 					};
 				}
@@ -147,6 +148,24 @@ function show_invoice_settings_modal(frm, doctype) {
 			// Check Set Accepted Warehouse
 			if (!values.set_warehouse) {
 				validation_errors.push(__('Set Accepted Warehouse is mandatory'));
+			}
+			
+			// Check if invoice number already exists (only if invoice number is provided)
+			if (values.custom_invoice_no) {
+				frappe.call({
+					method: 'nextlayer.next_layer.api.invoice_utils.check_invoice_number_exists',
+					args: {
+						invoice_number: values.custom_invoice_no,
+						doctype: 'Purchase Invoice',
+						current_docname: frm.doc.name
+					},
+					async: false,
+					callback: function(response) {
+						if (response && response.message && response.message.exists) {
+							validation_errors.push(__('Purchase Invoice {0} already exists', [values.custom_invoice_no]));
+						}
+					}
+				});
 			}
 			
 			// If there are validation errors, show them and don't save
@@ -304,6 +323,9 @@ frappe.ui.form.on("Purchase Invoice", {
 													
 													// Update form fields with the fetched shipping details
 													frm.set_value('custom_is_export_sale', shipping_details.is_export_sale);
+													if (shipping_details.shipping_mode) {
+														frm.set_value('custom_shipping_mode', shipping_details.shipping_mode);
+													}
 													frm.set_value('custom_invoice_no', shipping_details.invoice_no);
 													frm.set_value('custom_container_no', shipping_details.container_no || '');
 													frm.set_value('custom_bill_of_landing', shipping_details.bill_of_landing || '');
