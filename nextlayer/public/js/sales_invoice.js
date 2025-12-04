@@ -291,6 +291,11 @@ frappe.ui.form.on("Sales Invoice", {
 														company_customer_set = true;
 													}
 													
+													// Set set_posting_time to ticked by default (only once)
+													if (completed_requests === 1) {
+														frm.set_value('set_posting_time', 1);
+													}
+													
 													// Items fetched successfully, iterate over the items
 													response.message.sales_invoice_items.forEach(function(item) {
 														// Add each item to the Sales Invoice child table (items)

@@ -123,7 +123,6 @@ function show_invoice_settings_modal(frm, doctype) {
 					async: false,
 					callback: function(response) {
 						if (response && response.message) {
-							console.log("Mulamwa",response.message);
 							let mandatory = response.message;
 						
 						// Check Branch
@@ -292,6 +291,9 @@ frappe.ui.form.on("Purchase Invoice", {
 													frm.set_value('company', response.message.company);
 													frm.set_value('supplier', response.message.supplier);
 												}
+
+												// Set set_posting_time to ticked by default
+												frm.set_value('set_posting_time', 1);
 
 												if (purchase_invoice_items.length > 0) {
 													// Items fetched successfully, iterate over the items
