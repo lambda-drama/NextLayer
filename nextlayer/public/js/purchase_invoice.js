@@ -1,6 +1,7 @@
 // Function to show invoice settings modal
 function show_invoice_settings_modal(frm, doctype) {
 	let price_list_field = doctype === 'Sales Invoice' ? 'selling_price_list' : 'buying_price_list';
+	let should_submit = false;
 	
 	let settings_dialog = new frappe.ui.Dialog({
 		title: __('Invoice Settings'),
@@ -103,6 +104,16 @@ function show_invoice_settings_modal(frm, doctype) {
 						}
 					};
 				}
+			},
+			{
+				fieldtype: 'Section Break',
+				label: __('Stock Settings')
+			},
+			{
+				label: __('Update Stock'),
+				fieldname: 'update_stock',
+				fieldtype: 'Check',
+				default: 1
 			}
 		],
 		primary_action_label: __('Save'),
@@ -202,14 +213,63 @@ function show_invoice_settings_modal(frm, doctype) {
 			if (values.due_date !== undefined) {
 				frm.set_value('due_date', values.due_date);
 			}
+			if (values.update_stock !== undefined) {
+				frm.set_value('update_stock', values.update_stock);
+			}
 			
 			// Close dialog
 			settings_dialog.hide();
 			
 			// Refresh and save
 			frm.refresh();
-			frm.save();
+			
+			console.log('Primary action clicked, should_submit value:', should_submit);
+			console.log('Checkbox checked state:', settings_dialog.$wrapper.find('#allow_submit_checkbox').is(':checked'));
+			
+			if (should_submit) {
+				console.log('Attempting to save and submit...');
+				// First save, then submit using frm.save('Submit')
+				frm.save().then(() => {
+					console.log('Save completed, now submitting...');
+					frm.save('Submit').then(() => {
+						console.log('Submit completed successfully');
+					}).catch((err) => {
+						console.log('Submit failed:', err);
+					});
+				}).catch((err) => {
+					console.log('Save failed:', err);
+				});
+			} else {
+				console.log('Only saving (no submit)...');
+				// Just save
+				frm.save();
+			}
 		}
+	});
+	
+	// Add custom footer with checkbox on the left
+	settings_dialog.$wrapper.find('.modal-footer').css({
+		'display': 'flex',
+		'justify-content': 'space-between',
+		'align-items': 'center'
+	});
+	
+	// Create checkbox container and prepend to footer
+	let checkbox_html = `
+		<div class="allow-submit-container" style="display: flex; align-items: center; gap: 8px;">
+			<input type="checkbox" id="allow_submit_checkbox" style="width: 16px; height: 16px; cursor: pointer;">
+			<label for="allow_submit_checkbox" style="margin: 0; cursor: pointer; font-weight: normal;">${__('Allow Submit')}</label>
+		</div>
+	`;
+	settings_dialog.$wrapper.find('.modal-footer').prepend(checkbox_html);
+	
+	// Handle checkbox change to toggle button text
+	settings_dialog.$wrapper.find('#allow_submit_checkbox').on('change', function() {
+		should_submit = $(this).is(':checked');
+		console.log('Checkbox changed, should_submit:', should_submit);
+		let btn_text = should_submit ? __('Save & Submit') : __('Save');
+		settings_dialog.$wrapper.find('.btn-primary').text(btn_text);
+		console.log('Button text changed to:', btn_text);
 	});
 	
 	settings_dialog.show();

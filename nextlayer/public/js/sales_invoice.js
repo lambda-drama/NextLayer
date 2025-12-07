@@ -1,7 +1,8 @@
 // Function to show invoice settings modal
 function show_invoice_settings_modal(frm, doctype) {
 	let price_list_field = doctype === 'Sales Invoice' ? 'selling_price_list' : 'buying_price_list';
-	
+	let should_submit = false;
+
 	let settings_dialog = new frappe.ui.Dialog({
 		title: __('Invoice Settings'),
 		fields: [
@@ -103,16 +104,26 @@ function show_invoice_settings_modal(frm, doctype) {
 						}
 					};
 				}
+			},
+			{
+				fieldtype: 'Section Break',
+				label: __('Stock Settings')
+			},
+			{
+				label: __('Update Stock'),
+				fieldname: 'update_stock',
+				fieldtype: 'Check',
+				default: 1
 			}
 		],
 		primary_action_label: __('Save'),
 		primary_action: function() {
 			// Get values from dialog
 			let values = settings_dialog.get_values();
-			
+
 			// Validate mandatory fields before saving
 			let validation_errors = [];
-			
+
 			// Check mandatory accounting dimensions (only if company is set)
 			if (frm.doc.company) {
 				frappe.call({
@@ -124,17 +135,17 @@ function show_invoice_settings_modal(frm, doctype) {
 					callback: function(response) {
 						if (response && response.message) {
 							let mandatory = response.message;
-						
+
 						// Check Branch
 						if (mandatory.branch && !values.branch) {
 							validation_errors.push(__('Branch is mandatory for this company'));
 						}
-						
+
 						// Check Company Group
 						if (mandatory.company_group && !values.company_group) {
 							validation_errors.push(__('Company Group is mandatory for this company'));
 						}
-						
+
 						// Check Marka
 						if (mandatory.marka && !values.marka) {
 							validation_errors.push(__('Marka is mandatory for this company'));
@@ -143,12 +154,12 @@ function show_invoice_settings_modal(frm, doctype) {
 				}
 				});
 			}
-			
+
 			// Check Source Warehouse (only mandatory if Update Stock is enabled)
 			if (frm.doc.update_stock == 1 && !values.set_warehouse) {
 				validation_errors.push(__('Source Warehouse is mandatory when Update Stock is enabled'));
 			}
-			
+
 			// Check if invoice number already exists (only if invoice number is provided)
 			if (values.custom_invoice_no) {
 				frappe.call({
@@ -166,7 +177,7 @@ function show_invoice_settings_modal(frm, doctype) {
 					}
 				});
 			}
-			
+
 			// If there are validation errors, show them and don't save
 			if (validation_errors.length > 0) {
 				frappe.msgprint({
@@ -176,7 +187,7 @@ function show_invoice_settings_modal(frm, doctype) {
 				});
 				return;
 			}
-			
+
 			// Update form fields
 			if (values.custom_invoice_no !== undefined) {
 				frm.set_value('custom_invoice_no', values.custom_invoice_no);
@@ -202,16 +213,65 @@ function show_invoice_settings_modal(frm, doctype) {
 			if (values.due_date !== undefined) {
 				frm.set_value('due_date', values.due_date);
 			}
-			
+			if (values.update_stock !== undefined) {
+				frm.set_value('update_stock', values.update_stock);
+			}
+
 			// Close dialog
 			settings_dialog.hide();
-			
+
 			// Refresh and save
 			frm.refresh();
-			frm.save();
+
+			console.log('Primary action clicked, should_submit value:', should_submit);
+			console.log('Checkbox checked state:', settings_dialog.$wrapper.find('#allow_submit_checkbox').is(':checked'));
+
+			if (should_submit) {
+				console.log('Attempting to save and submit...');
+				// First save, then submit using frm.save('Submit')
+				frm.save().then(() => {
+					console.log('Save completed, now submitting...');
+					frm.save('Submit').then(() => {
+						console.log('Submit completed successfully');
+					}).catch((err) => {
+						console.log('Submit failed:', err);
+					});
+				}).catch((err) => {
+					console.log('Save failed:', err);
+				});
+			} else {
+				console.log('Only saving (no submit)...');
+				// Just save
+				frm.save();
+			}
 		}
 	});
-	
+
+	// Add custom footer with checkbox on the left
+	settings_dialog.$wrapper.find('.modal-footer').css({
+		'display': 'flex',
+		'justify-content': 'space-between',
+		'align-items': 'center'
+	});
+
+	// Create checkbox container and prepend to footer
+	let checkbox_html = `
+		<div class="allow-submit-container" style="display: flex; align-items: center; gap: 8px;">
+			<input type="checkbox" id="allow_submit_checkbox" style="width: 16px; height: 16px; cursor: pointer;">
+			<label for="allow_submit_checkbox" style="margin: 0; cursor: pointer; font-weight: normal;">${__('Allow Submit')}</label>
+		</div>
+	`;
+	settings_dialog.$wrapper.find('.modal-footer').prepend(checkbox_html);
+
+	// Handle checkbox change to toggle button text
+	settings_dialog.$wrapper.find('#allow_submit_checkbox').on('change', function() {
+		should_submit = $(this).is(':checked');
+		console.log('Checkbox changed, should_submit:', should_submit);
+		let btn_text = should_submit ? __('Save & Submit') : __('Save');
+		settings_dialog.$wrapper.find('.btn-primary').text(btn_text);
+		console.log('Button text changed to:', btn_text);
+	});
+
 	settings_dialog.show();
 }
 
@@ -239,7 +299,7 @@ frappe.ui.form.on("Sales Invoice", {
 					primary_action: function() {
 						parent_only = dialog.get_value('parent_only') || false;
 						dialog.hide();
-						
+
 						// Open MultiSelectDialog after getting parent_only setting
 						new frappe.ui.form.MultiSelectDialog({
 							doctype: "Purchase Invoice",
@@ -258,16 +318,16 @@ frappe.ui.form.on("Sales Invoice", {
 								// Check if selections exist and are not empty
 								if (selections && selections.length > 0) {
 									console.log(selections)
-									
+
 									// Clear the items table before adding new items
 									frappe.model.clear_table(frm.doc, "items");
 									frm.doc.group_same_items = 0;
-									
+
 									// Track completed requests
 									let completed_requests = 0;
 									let total_requests = selections.length;
 									let company_customer_set = false;  // Flag to ensure company/customer is set only once
-									
+
 									// Iterate over each selected Purchase Invoice
 									selections.forEach(function(purchase_invoice) {
 										// Call server-side method to fetch items from the selected Purchase Invoice
@@ -280,22 +340,22 @@ frappe.ui.form.on("Sales Invoice", {
 											},
 											callback: function(response) {
 												completed_requests++;
-												
+
 												if (response && response.message) {
 													console.log(response.message)
-													
+
 													// Always autofill company and customer (regardless of parent_only, only once)
 													if (!company_customer_set && response.message.company && response.message.customer) {
 														frm.set_value('company', response.message.company);
 														frm.set_value('customer', response.message.customer);
 														company_customer_set = true;
 													}
-													
+
 													// Set set_posting_time to ticked by default (only once)
 													if (completed_requests === 1) {
 														frm.set_value('set_posting_time', 1);
 													}
-													
+
 													// Items fetched successfully, iterate over the items
 													response.message.sales_invoice_items.forEach(function(item) {
 														// Add each item to the Sales Invoice child table (items)
@@ -316,7 +376,7 @@ frappe.ui.form.on("Sales Invoice", {
 														new_item.custom_item_identifier = item.custom_item_identifier;
 														// Add other item fields as needed
 													});
-													
+
 													// Update the transit numbers
 													response.message.transit_numbers.forEach(function(transit_number) {
 														// Add each transit number to the Custom Transit Number child table
@@ -325,7 +385,7 @@ frappe.ui.form.on("Sales Invoice", {
 														new_transit.company = transit_number.company;
 														new_transit.transit_no = transit_number.transit_no;
 													});
-													
+
 													// Update form fields with the fetched shipping details
 													const shipping_details = response.message.shipping_details;
 													frm.set_value('custom_is_export_sale', shipping_details.is_export_sale);
@@ -347,7 +407,7 @@ frappe.ui.form.on("Sales Invoice", {
 												} else {
 													frappe.msgprint("Failed to fetch items from " + purchase_invoice);
 												}
-												
+
 												// When all requests are complete, show settings modal and refresh
 												if (completed_requests === total_requests) {
 													show_invoice_settings_modal(frm, 'Sales Invoice');
