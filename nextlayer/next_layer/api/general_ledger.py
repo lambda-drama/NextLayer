@@ -436,7 +436,6 @@ def update_match_status():
 
 		if not isinstance(data, dict):
 			frappe.throw(f"Expected dictionary data, got {type(data)}")
-		print("Data received for update_match_status:", data)
 		voucher_type = data.get("voucher_type")
 		voucher_no = data.get("voucher_no")
 		company = data.get("company")

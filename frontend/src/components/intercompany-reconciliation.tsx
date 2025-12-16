@@ -1010,7 +1010,7 @@ export default function IntercompanyReconciliation() {
       // OPTIMISTIC UPDATE: Immediately update UI
       const optimisticStatusMap = { ...backendMatchStatus }
       const pairedEntriesSet = new Set<string>()
-      
+
       selectedEntriesArray.forEach(entryKey => {
         optimisticStatusMap[entryKey] = {
           status: 'Mismatch',
@@ -1019,7 +1019,7 @@ export default function IntercompanyReconciliation() {
           matched_by: null,
           matched_on: null
         }
-        
+
         // Find the entry to check for paired transactions
         const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
           `${entry.voucher_type}-${entry.voucher_no}` === entryKey
@@ -1027,7 +1027,7 @@ export default function IntercompanyReconciliation() {
         const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
           `${entry.voucher_type}-${entry.voucher_no}` === entryKey
         )
-        
+
         const entry = entryA || entryB
         if (entry) {
           // Check for backend matched_with data
@@ -1035,7 +1035,7 @@ export default function IntercompanyReconciliation() {
             const matchedData = entry.backendMatchData.matched_with_parsed
             // Handle both single match (object) and multiple matches (array)
             const matches = Array.isArray(matchedData) ? matchedData : [matchedData]
-            
+
             matches.forEach((match: any) => {
               if (match && match.voucher_type && match.voucher_no) {
                 const pairedKey = `${match.voucher_type}-${match.voucher_no}`
@@ -1043,7 +1043,7 @@ export default function IntercompanyReconciliation() {
               }
             })
           }
-          
+
           // Also check for frontend matchedEntry
           if (entry.matchedEntry) {
             const pairedKey = `${entry.matchedEntry.voucher_type}-${entry.matchedEntry.voucher_no}`
@@ -1051,7 +1051,7 @@ export default function IntercompanyReconciliation() {
           }
         }
       })
-      
+
       // Also update paired entries optimistically
       pairedEntriesSet.forEach(pairedKey => {
         optimisticStatusMap[pairedKey] = {
@@ -1062,7 +1062,7 @@ export default function IntercompanyReconciliation() {
           matched_on: null
         }
       })
-      
+
       setBackendMatchStatus(optimisticStatusMap)
       setHasBackendStatusData(true) // Mark that we have fresh backend data
 
@@ -1299,6 +1299,24 @@ export default function IntercompanyReconciliation() {
       }
 
       // Create pairs: match entries from Company A with entries from Company B
+      // Create a set of selected entry keys for quick lookup
+      const selectedKeysSet = new Set(Array.from(selectedEntries))
+
+      // Helper function to create a clean matched_with object (only essential fields)
+      const createMatchedWithObject = (entry: GLEntry) => {
+        return {
+          voucher_type: entry.voucher_type,
+          voucher_no: entry.voucher_no
+        }
+      }
+
+      // Helper function to check if a matched entry is in the selected entries
+      const isMatchedEntrySelected = (matchedEntry: any): boolean => {
+        if (!matchedEntry) return false
+        const matchedKey = `${matchedEntry.voucher_type}-${matchedEntry.voucher_no}`
+        return selectedKeysSet.has(matchedKey)
+      }
+
       const maxPairs = Math.max(companyAEntries.length, companyBEntries.length)
 
       for (let i = 0; i < maxPairs; i++) {
@@ -1306,32 +1324,39 @@ export default function IntercompanyReconciliation() {
         const entryB = companyBEntries[i]
 
         if (entryA) {
-          // Find the matched entry for entryA
-          let matchedEntry = entryA.matchedEntry
+          let matchedEntry: any = null
 
-          // If no matchedEntry found by frontend logic, try to find it manually
-          if (!matchedEntry && automatchEnabled) {
-            // Look for a corresponding entry in Company B with same amount and date
-            matchedEntry = findMatchingEntries.glDataBWithStatus.find(entryB => {
-              const dateMatch = entryA.posting_date === entryB.posting_date
+          // Priority 1: If entryB is selected at the same index, pair them together (manual selection takes priority)
+          if (entryB) {
+            matchedEntry = createMatchedWithObject(entryB)
+          } else {
+            // Priority 2: Check if entryA's pre-existing matchedEntry is also in selected entries
+            if (entryA.matchedEntry && isMatchedEntrySelected(entryA.matchedEntry)) {
+              matchedEntry = createMatchedWithObject(entryA.matchedEntry)
+            } else if (automatchEnabled) {
+              // Priority 3: Look for a matching entry in Company B that is also selected
+              const foundMatch = findMatchingEntries.glDataBWithStatus.find(entryB => {
+                const entryBKey = `${entryB.voucher_type}-${entryB.voucher_no}`
+                if (!selectedKeysSet.has(entryBKey)) return false // Must be in selected entries
 
-              if (bypassTotalCalculation) {
-                // Calculate net totals for both entries (credit - debit)
-                const netTotalA = entryA.credit - entryA.debit
-                const netTotalB = entryB.credit - entryB.debit
-                const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
-                return netTotalMatch && dateMatch
-              } else {
-                const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-                const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
-                return (debitCreditMatch || creditDebitMatch) && dateMatch
+                const dateMatch = entryA.posting_date === entryB.posting_date
+
+                if (bypassTotalCalculation) {
+                  const netTotalA = entryA.credit - entryA.debit
+                  const netTotalB = entryB.credit - entryB.debit
+                  const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
+                  return netTotalMatch && dateMatch
+                } else {
+                  const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+                  const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+                  return (debitCreditMatch || creditDebitMatch) && dateMatch
+                }
+              })
+
+              if (foundMatch) {
+                matchedEntry = createMatchedWithObject(foundMatch)
               }
-            })
-          }
-
-          // If still no match found, pair with the corresponding entryB from our selection
-          if (!matchedEntry && entryB) {
-            matchedEntry = entryB
+            }
           }
 
           bulkData.push({
@@ -1344,32 +1369,39 @@ export default function IntercompanyReconciliation() {
         }
 
         if (entryB) {
-          // Find the matched entry for entryB
-          let matchedEntry = entryB.matchedEntry
+          let matchedEntry: any = null
 
-          // If no matchedEntry found by frontend logic, try to find it manually
-          if (!matchedEntry && automatchEnabled) {
-            // Look for a corresponding entry in Company A with same amount and date
-            matchedEntry = findMatchingEntries.glDataAWithStatus.find(entryA => {
-              const dateMatch = entryA.posting_date === entryB.posting_date
+          // Priority 1: If entryA is selected at the same index, pair them together (manual selection takes priority)
+          if (entryA) {
+            matchedEntry = createMatchedWithObject(entryA)
+          } else {
+            // Priority 2: Check if entryB's pre-existing matchedEntry is also in selected entries
+            if (entryB.matchedEntry && isMatchedEntrySelected(entryB.matchedEntry)) {
+              matchedEntry = createMatchedWithObject(entryB.matchedEntry)
+            } else if (automatchEnabled) {
+              // Priority 3: Look for a matching entry in Company A that is also selected
+              const foundMatch = findMatchingEntries.glDataAWithStatus.find(entryA => {
+                const entryAKey = `${entryA.voucher_type}-${entryA.voucher_no}`
+                if (!selectedKeysSet.has(entryAKey)) return false // Must be in selected entries
 
-              if (bypassTotalCalculation) {
-                // Calculate net totals for both entries (credit - debit)
-                const netTotalA = entryA.credit - entryA.debit
-                const netTotalB = entryB.credit - entryB.debit
-                const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
-                return netTotalMatch && dateMatch
-              } else {
-                const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-                const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
-                return (debitCreditMatch || creditDebitMatch) && dateMatch
+                const dateMatch = entryA.posting_date === entryB.posting_date
+
+                if (bypassTotalCalculation) {
+                  const netTotalA = entryA.credit - entryA.debit
+                  const netTotalB = entryB.credit - entryB.debit
+                  const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
+                  return netTotalMatch && dateMatch
+                } else {
+                  const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
+                  const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+                  return (debitCreditMatch || creditDebitMatch) && dateMatch
+                }
+              })
+
+              if (foundMatch) {
+                matchedEntry = createMatchedWithObject(foundMatch)
               }
-            })
-          }
-
-          // If still no match found, pair with the corresponding entryA from our selection
-          if (!matchedEntry && entryA) {
-            matchedEntry = entryA
+            }
           }
 
           bulkData.push({
@@ -1601,9 +1633,9 @@ export default function IntercompanyReconciliation() {
     setIsIndividualProcessing(true)
     try {
       const entry = selectedEntryForAction
-      
+
       // Determine which company this entry belongs to
-      const entryCompany = findMatchingEntries.glDataAWithStatus.some(e => 
+      const entryCompany = findMatchingEntries.glDataAWithStatus.some(e =>
         e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no
       ) ? companyA : companyB
 
@@ -1671,12 +1703,12 @@ export default function IntercompanyReconciliation() {
   // Filter entries by status
   const filterEntriesByStatus = (entries: GLEntry[], isSideA: boolean = true) => {
     let filtered = entries
-    
+
     // Apply status filter
     if (statusFilter !== 'All') {
       filtered = filtered.filter(entry => entry.status === statusFilter)
     }
-    
+
     // Apply debit/credit filter
     if (debitCreditFilter === 'Debit => Credit') {
       if (isSideA) {
@@ -1696,7 +1728,7 @@ export default function IntercompanyReconciliation() {
       }
     }
     // If debitCreditFilter is 'All', no additional filtering needed
-    
+
     return filtered
   }
 
@@ -2810,7 +2842,7 @@ export default function IntercompanyReconciliation() {
                                 const hasFrontendMatch = entry.matchedEntry
                                 const hasBackendMatch = entry.backendMatchData?.matched_with_parsed
                                 const isMatched = entry.status === 'Match' || (hasFrontendMatch || hasBackendMatch)
-                                
+
                                 // If matched, show Unmatch button
                                 if (isMatched && (hasFrontendMatch || hasBackendMatch)) {
                                   return (
@@ -2825,7 +2857,7 @@ export default function IntercompanyReconciliation() {
                                     </Button>
                                   )
                                 }
-                                
+
                                 // If status is Mismatch but has a frontend match (auto-detected), show Match to confirm
                                 if (entry.status === 'Mismatch' && hasFrontendMatch) {
                                   return (
@@ -2840,7 +2872,7 @@ export default function IntercompanyReconciliation() {
                                     </Button>
                                   )
                                 }
-                                
+
                                 // Otherwise, show Manual Match button
                                 return (
                                   <Button
@@ -3095,7 +3127,7 @@ export default function IntercompanyReconciliation() {
                                 const hasFrontendMatch = entry.matchedEntry
                                 const hasBackendMatch = entry.backendMatchData?.matched_with_parsed
                                 const isMatched = entry.status === 'Match' || (hasFrontendMatch || hasBackendMatch)
-                                
+
                                 // If matched, show Unmatch button
                                 if (isMatched && (hasFrontendMatch || hasBackendMatch)) {
                                   return (
@@ -3110,7 +3142,7 @@ export default function IntercompanyReconciliation() {
                                     </Button>
                                   )
                                 }
-                                
+
                                 // If status is Mismatch but has a frontend match (auto-detected), show Match to confirm
                                 if (entry.status === 'Mismatch' && hasFrontendMatch) {
                                   return (
@@ -3125,7 +3157,7 @@ export default function IntercompanyReconciliation() {
                                     </Button>
                                   )
                                 }
-                                
+
                                 // Otherwise, show Manual Match button
                                 return (
                                   <Button
@@ -3535,19 +3567,19 @@ export default function IntercompanyReconciliation() {
                           matchedData = matchedData[0]
                         }
                       }
-                      
+
                       if (!matchedData) return <div className="text-gray-500">Match data</div>
-                      
+
                       const matchedEntry = findMatchingEntries.glDataAWithStatus.find(e =>
                         e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
                       ) || findMatchingEntries.glDataBWithStatus.find(e =>
                         e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
                       )
-                      
-                      const matchedCompany = findMatchingEntries.glDataAWithStatus.some(e => 
+
+                      const matchedCompany = findMatchingEntries.glDataAWithStatus.some(e =>
                         e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
                       ) ? companyA : companyB
-                      
+
                       return (
                         <>
                           <div className="font-medium text-blue-600">
@@ -3559,7 +3591,7 @@ export default function IntercompanyReconciliation() {
                           <div className="text-sm font-medium">
                             {matchedEntry ? (
                               matchedEntry.debit > 0 ?
-                                `Debit: ${formatCurrency(matchedEntry.debit, 
+                                `Debit: ${formatCurrency(matchedEntry.debit,
                                   matchedCompany === companyA ? getPartyCurrency(partyA, 'Customer') : getPartyCurrency(partyB, partyTypeB),
                                   matchedCompany === companyA ? partyA : partyB,
                                   matchedCompany === companyA ? 'Customer' : partyTypeB
