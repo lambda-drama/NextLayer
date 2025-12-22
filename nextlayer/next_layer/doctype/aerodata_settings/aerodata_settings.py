@@ -4,8 +4,6 @@
 from frappe.model.document import Document
 
 
-class AviationStackSettings(Document):
+class AerodataSettings(Document):
 	pass
-
-
 

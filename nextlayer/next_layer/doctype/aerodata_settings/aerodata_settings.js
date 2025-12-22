@@ -1,7 +1,7 @@
 // Copyright (c) 2025, Next Layer and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("Aviation Stack Settings", {
+frappe.ui.form.on("Aerodata Settings", {
 	refresh: function (frm) {
 		// Add button to lookup flight information
 		frm.add_custom_button(
@@ -16,7 +16,7 @@ frappe.ui.form.on("Aviation Stack Settings", {
 		frm.add_custom_button(
 			__("Test Connection"),
 			function () {
-				test_aviation_stack_connection(frm);
+				test_aerodata_connection(frm);
 			},
 			__("Actions")
 		).addClass("btn-info");
@@ -37,8 +37,8 @@ function lookup_flight_modal(frm) {
 				fieldname: "flight_number",
 				label: __("Flight Number"),
 				description: __(
-					"<strong>Use the Flight Number from your booking (e.g., D3189, D3186)</strong><br>" +
-					"<span style='color: #666;'>Note: Use flight numbers like 'D3189', NOT booking reference (J6HRDK) or ticket number (9915000320139)</span>"
+					"<strong>Enter the Flight Number (e.g., D3189, D3186)</strong><br>" +
+					"<span style='color: #666;'>Use the flight number from your booking confirmation</span>"
 				),
 				reqd: 1,
 			},
@@ -47,8 +47,7 @@ function lookup_flight_modal(frm) {
 				fieldname: "flight_date",
 				label: __("Flight Date"),
 				description: __(
-					"<strong>Recommended:</strong> Enter the flight date (e.g., 2025-12-18) to get accurate results. " +
-					"Some flights may not be found without a date."
+					"<strong>Recommended:</strong> Enter the flight date (e.g., 2025-12-18) to get accurate results."
 				),
 			},
 			{
@@ -62,11 +61,6 @@ function lookup_flight_modal(frm) {
 					"Enter multiple flight numbers separated by commas (e.g., D3189, D3186) to lookup multiple flights at once."
 				),
 			},
-			{
-				fieldtype: "Section Break",
-				label: __("Help"),
-			},
-		
 		],
 		primary_action_label: __("Lookup Flight(s)"),
 		primary_action: function (values) {
@@ -124,7 +118,7 @@ function lookup_single_flight(frm, flight_number, flight_date) {
 	frappe.show_alert(__("Looking up flight information..."), 3);
 
 	frappe.call({
-		method: "nextlayer.next_layer.api.aviation_stack_utils.get_flight_details",
+		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 		args: {
 			flight_number: flight_number,
 			flight_date: flight_date,
@@ -161,23 +155,13 @@ function lookup_single_flight(frm, flight_number, flight_date) {
 						`;
 					}
 					
-					if (result.tried_params) {
-						error_message += `
-							<p style="margin-top: 10px;"><strong>Parameters Tried:</strong></p>
-							<ul>
-								${result.tried_params.map(p => `<li>${p.join(", ")}</li>`).join("")}
-							</ul>
-						`;
-					}
-					
 					error_message += `
 						<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px;">
 							<p><strong>💡 Troubleshooting Tips:</strong></p>
 							<ul>
 								<li>Try entering the flight date (e.g., 2025-12-18 for D3189)</li>
 								<li>Verify the flight number is correct (e.g., D3189, not D3-189)</li>
-								<li>Check if the flight exists in Aviation Stack database</li>
-								<li>Some airlines may not be fully covered in the API</li>
+								<li>Check if the flight exists in Aerodata database</li>
 							</ul>
 						</div>
 					</div>
@@ -203,7 +187,7 @@ function lookup_multiple_flights(frm, flight_numbers, flight_date) {
 	
 	flight_numbers.forEach((flight_number, index) => {
 		frappe.call({
-			method: "nextlayer.next_layer.api.aviation_stack_utils.get_flight_details",
+			method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 			args: {
 				flight_number: flight_number,
 				flight_date: flight_date,
@@ -234,7 +218,7 @@ function lookup_multiple_flights(frm, flight_numbers, flight_date) {
 }
 
 function display_flight_info(flight_data, flight_number_searched = null) {
-	if (!flight_data || flight_data.length === 0) {
+	if (!flight_data || (Array.isArray(flight_data) && flight_data.length === 0)) {
 		frappe.msgprint({
 			title: __("No Flight Found"),
 			message: __(
@@ -248,13 +232,37 @@ function display_flight_info(flight_data, flight_number_searched = null) {
 		return;
 	}
 
-	// Display the first flight result (most relevant)
-	const flight = flight_data[0];
-	const flight_info = flight.flight || {};
+	// Handle both single flight object and array of flights
+	let flights = Array.isArray(flight_data) ? flight_data : [flight_data];
+	
+	// If multiple flights, show them all (e.g., multi-leg flights)
+	if (flights.length > 1) {
+		display_multiple_flights_info(
+			flights.map(f => ({ flight_number: flight_number_searched, data: f })),
+			false
+		);
+		return;
+	}
+	
+	const flight = flights[0];
+	
+	// Extract flight information based on Aerodata API structure
+	const flight_number = flight.number || flight.flightNumber || flight_number_searched || "N/A";
+	const airline = flight.airline || {};
 	const departure = flight.departure || {};
 	const arrival = flight.arrival || {};
-	const airline = flight.airline || {};
 	const aircraft = flight.aircraft || {};
+	const status = flight.status || "N/A";
+	const distance = flight.greatCircleDistance || {};
+	
+	// Extract airport information
+	const dep_airport = departure.airport || {};
+	const arr_airport = arrival.airport || {};
+	
+	// Extract scheduled times
+	const dep_scheduled = departure.scheduledTime || {};
+	const arr_scheduled = arrival.scheduledTime || {};
+	const arr_predicted = arrival.predictedTime || {};
 
 	let message = `
 		<div style="padding: 15px; max-width: 900px;">
@@ -264,42 +272,51 @@ function display_flight_info(flight_data, flight_number_searched = null) {
 			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
 				<div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
 					<h4 style="margin: 0 0 10px 0; color: #333;">Flight Details</h4>
-					<p><strong>Flight Number:</strong> ${flight_info.iata || flight_info.icao || "N/A"}</p>
-					<p><strong>Airline:</strong> ${airline.name || "N/A"}</p>
-					<p><strong>Aircraft:</strong> ${aircraft?.registration || aircraft?.iata || "N/A"}</p>
-					<p><strong>Status:</strong> <span style="color: ${get_status_color(flight.flight_status)}; font-weight: bold;">${flight.flight_status || "N/A"}</span></p>
+					<p><strong>Flight Number:</strong> ${flight_number}</p>
+					<p><strong>Airline:</strong> ${airline.name || "N/A"} (${airline.iata || ""}${airline.icao ? "/" + airline.icao : ""})</p>
+					<p><strong>Aircraft:</strong> ${aircraft.model || "N/A"}</p>
+					<p><strong>Status:</strong> <span style="color: ${get_status_color(status)}; font-weight: bold;">${status}</span></p>
+					${distance.km ? `<p><strong>Distance:</strong> ${distance.km} km (${distance.mile} miles)</p>` : ""}
 				</div>
 				
 				<div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
 					<h4 style="margin: 0 0 10px 0; color: #333;">Route</h4>
-					<p><strong>From:</strong> ${departure.airport || "N/A"} (${departure.iata || "N/A"})</p>
-					<p><strong>To:</strong> ${arrival.airport || "N/A"} (${arrival.iata || "N/A"})</p>
+					<p><strong>From:</strong> ${dep_airport.name || dep_airport.shortName || "N/A"} (${dep_airport.iata || "N/A"})</p>
+					<p><strong>To:</strong> ${arr_airport.name || arr_airport.shortName || "N/A"} (${arr_airport.iata || "N/A"})</p>
+					${dep_airport.municipalityName ? `<p><strong>Departure City:</strong> ${dep_airport.municipalityName}</p>` : ""}
+					${arr_airport.municipalityName ? `<p><strong>Arrival City:</strong> ${arr_airport.municipalityName}</p>` : ""}
 				</div>
 			</div>
 			
 			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
 				<div style="background: #e3f2fd; padding: 10px; border-radius: 5px;">
 					<h4 style="margin: 0 0 10px 0; color: #1976d2;">🛫 Departure</h4>
-					<p><strong>Airport:</strong> ${departure.airport || "N/A"}</p>
+					<p><strong>Airport:</strong> ${dep_airport.name || dep_airport.shortName || "N/A"}</p>
+					<p><strong>Code:</strong> ${dep_airport.iata || "N/A"} / ${dep_airport.icao || "N/A"}</p>
 					<p><strong>Terminal:</strong> ${departure.terminal || "N/A"}</p>
-					<p><strong>Gate:</strong> ${departure.gate || "N/A"}</p>
-					<p><strong>Scheduled:</strong> ${format_datetime(departure.scheduled) || "N/A"}</p>
-					<p><strong>Estimated:</strong> ${format_datetime(departure.estimated) || "N/A"}</p>
-					<p><strong>Actual:</strong> ${format_datetime(departure.actual) || "N/A"}</p>
-					<p><strong>Delay:</strong> ${departure.delay ? '<span style="color: #ff9800;">' + departure.delay + " minutes</span>" : '<span style="color: #4caf50;">On time</span>'}</p>
+					<p><strong>Scheduled (Local):</strong> ${dep_scheduled.local || "N/A"}</p>
+					<p><strong>Scheduled (UTC):</strong> ${dep_scheduled.utc || "N/A"}</p>
+					${dep_airport.timeZone ? `<p><strong>Time Zone:</strong> ${dep_airport.timeZone}</p>` : ""}
 				</div>
 				
 				<div style="background: #e8f5e9; padding: 10px; border-radius: 5px;">
 					<h4 style="margin: 0 0 10px 0; color: #388e3c;">🛬 Arrival</h4>
-					<p><strong>Airport:</strong> ${arrival.airport || "N/A"}</p>
+					<p><strong>Airport:</strong> ${arr_airport.name || arr_airport.shortName || "N/A"}</p>
+					<p><strong>Code:</strong> ${arr_airport.iata || "N/A"} / ${arr_airport.icao || "N/A"}</p>
 					<p><strong>Terminal:</strong> ${arrival.terminal || "N/A"}</p>
-					<p><strong>Gate:</strong> ${arrival.gate || "N/A"}</p>
-					<p><strong>Scheduled:</strong> ${format_datetime(arrival.scheduled) || "N/A"}</p>
-					<p><strong>Estimated:</strong> ${format_datetime(arrival.estimated) || "N/A"}</p>
-					<p><strong>Actual:</strong> ${format_datetime(arrival.actual) || "N/A"}</p>
-					<p><strong>Delay:</strong> ${arrival.delay ? '<span style="color: #ff9800;">' + arrival.delay + " minutes</span>" : '<span style="color: #4caf50;">On time</span>'}</p>
+					<p><strong>Scheduled (Local):</strong> ${arr_scheduled.local || "N/A"}</p>
+					<p><strong>Scheduled (UTC):</strong> ${arr_scheduled.utc || "N/A"}</p>
+					${arr_predicted.local ? `<p><strong>Predicted (Local):</strong> <span style="color: #ff9800;">${arr_predicted.local}</span></p>` : ""}
+					${arr_predicted.utc ? `<p><strong>Predicted (UTC):</strong> <span style="color: #ff9800;">${arr_predicted.utc}</span></p>` : ""}
+					${arr_airport.timeZone ? `<p><strong>Time Zone:</strong> ${arr_airport.timeZone}</p>` : ""}
 				</div>
 			</div>
+			
+			${flight.lastUpdatedUtc ? `
+				<div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+					<p style="margin: 0; color: #666; font-size: 12px;"><strong>Last Updated:</strong> ${format_datetime(flight.lastUpdatedUtc)}</p>
+				</div>
+			` : ""}
 		</div>
 	`;
 
@@ -321,47 +338,54 @@ function display_multiple_flights_info(all_results, has_errors) {
 					<p><strong>Error:</strong> ${result.error}</p>
 				</div>
 			`;
-		} else if (result.data && result.data.length > 0) {
-			const flight = result.data[0];
-			const flight_info = flight.flight || {};
-			const departure = flight.departure || {};
-			const arrival = flight.arrival || {};
-			const airline = flight.airline || {};
-			
-			message += `
-				<div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #4caf50;">
-					<h4 style="margin: 0 0 15px 0; color: #333;">✈️ Flight ${result.flight_number}</h4>
-					<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-						<div>
-							<p><strong>Flight:</strong> ${flight_info.iata || flight_info.icao || "N/A"}</p>
-							<p><strong>Airline:</strong> ${airline.name || "N/A"}</p>
-							<p><strong>Status:</strong> <span style="color: ${get_status_color(flight.flight_status)}; font-weight: bold;">${flight.flight_status || "N/A"}</span></p>
-						</div>
-						<div>
-							<p><strong>Route:</strong> ${departure.iata || "N/A"} → ${arrival.iata || "N/A"}</p>
-							<p><strong>Departure:</strong> ${format_datetime(departure.scheduled) || "N/A"}</p>
-							<p><strong>Arrival:</strong> ${format_datetime(arrival.scheduled) || "N/A"}</p>
-						</div>
-					</div>
-					<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
-						<details>
-							<summary style="cursor: pointer; color: #1976d2;">View Full Details</summary>
-							<div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+		} else if (result.data) {
+			let flights = Array.isArray(result.data) ? result.data : [result.data];
+			if (flights.length > 0) {
+				flights.forEach((flight, flightIndex) => {
+					const departure = flight.departure || {};
+					const arrival = flight.arrival || {};
+					const airline = flight.airline || {};
+					const dep_airport = departure.airport || {};
+					const arr_airport = arrival.airport || {};
+					const dep_scheduled = departure.scheduledTime || {};
+					const arr_scheduled = arrival.scheduledTime || {};
+					const arr_predicted = arrival.predictedTime || {};
+					
+					message += `
+						<div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #4caf50;">
+							<h4 style="margin: 0 0 15px 0; color: #333;">✈️ Flight ${flight.number || result.flight_number}${flights.length > 1 ? ` - Leg ${flightIndex + 1}` : ""}</h4>
+							<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
 								<div>
-									<p><strong>🛫 Departure Terminal:</strong> ${departure.terminal || "N/A"}</p>
-									<p><strong>Gate:</strong> ${departure.gate || "N/A"}</p>
-									<p><strong>Delay:</strong> ${departure.delay ? departure.delay + " min" : "On time"}</p>
+									<p><strong>Flight:</strong> ${flight.number || result.flight_number}</p>
+									<p><strong>Airline:</strong> ${airline.name || "N/A"} (${airline.iata || ""}${airline.icao ? "/" + airline.icao : ""})</p>
+									<p><strong>Aircraft:</strong> ${flight.aircraft?.model || "N/A"}</p>
+									<p><strong>Status:</strong> <span style="color: ${get_status_color(flight.status)}; font-weight: bold;">${flight.status || "N/A"}</span></p>
 								</div>
 								<div>
-									<p><strong>🛬 Arrival Terminal:</strong> ${arrival.terminal || "N/A"}</p>
-									<p><strong>Gate:</strong> ${arrival.gate || "N/A"}</p>
-									<p><strong>Delay:</strong> ${arrival.delay ? arrival.delay + " min" : "On time"}</p>
+									<p><strong>Route:</strong> ${dep_airport.iata || "N/A"} → ${arr_airport.iata || "N/A"}</p>
+									<p><strong>From:</strong> ${dep_airport.name || dep_airport.shortName || "N/A"}</p>
+									<p><strong>To:</strong> ${arr_airport.name || arr_airport.shortName || "N/A"}</p>
 								</div>
 							</div>
-						</details>
-					</div>
-				</div>
-			`;
+							<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding-top: 10px; border-top: 1px solid #ddd;">
+								<div>
+									<p><strong>🛫 Departure</strong></p>
+									<p style="margin: 5px 0;"><strong>Local:</strong> ${dep_scheduled.local || "N/A"}</p>
+									<p style="margin: 5px 0;"><strong>UTC:</strong> ${dep_scheduled.utc || "N/A"}</p>
+									${departure.terminal ? `<p style="margin: 5px 0;"><strong>Terminal:</strong> ${departure.terminal}</p>` : ""}
+								</div>
+								<div>
+									<p><strong>🛬 Arrival</strong></p>
+									<p style="margin: 5px 0;"><strong>Local:</strong> ${arr_scheduled.local || "N/A"}</p>
+									<p style="margin: 5px 0;"><strong>UTC:</strong> ${arr_scheduled.utc || "N/A"}</p>
+									${arr_predicted.local ? `<p style="margin: 5px 0;"><strong>Predicted:</strong> <span style="color: #ff9800;">${arr_predicted.local}</span></p>` : ""}
+									${arrival.terminal ? `<p style="margin: 5px 0;"><strong>Terminal:</strong> ${arrival.terminal}</p>` : ""}
+								</div>
+							</div>
+						</div>
+					`;
+				});
+			}
 		} else {
 			message += `
 				<div style="background: #fff3e0; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #ff9800;">
@@ -408,11 +432,11 @@ function get_status_color(status) {
 	return "#666";
 }
 
-function test_aviation_stack_connection(frm) {
-	frappe.show_alert(__("Testing Aviation Stack connection..."), 3);
+function test_aerodata_connection(frm) {
+	frappe.show_alert(__("Testing Aerodata connection..."), 3);
 
 	frappe.call({
-		method: "nextlayer.next_layer.api.aviation_stack_utils.test_connection",
+		method: "nextlayer.next_layer.api.aerodata_utils.test_connection",
 		callback: function (r) {
 			if (r.message && r.message.success) {
 				frappe.show_alert(__("Connection test successful!"), 5, "green");

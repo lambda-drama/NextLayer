@@ -8,3 +8,5 @@ from frappe.tests.utils import FrappeTestCase
 class TestAviationStackSettings(FrappeTestCase):
 	pass
 
+
+
