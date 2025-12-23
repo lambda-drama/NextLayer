@@ -36,6 +36,9 @@ fixtures = [
                     "Delivery Note-custom_scanning_operation",
                     "Item-custom_parent_item",
                     "Item-custom_is_parent",
+                    "Expense Claim Detail-custom_flight_no",
+                    "Expense Claim-custom_flight_no",
+                    "Expense Claim-custom_column_break_luxng",
                 ),
             ]
         ],
@@ -101,6 +104,7 @@ doctype_js = {
 	"Item":"public/js/item.js",
 	"Sales Invoice":"public/js/sales_invoice.js",
 	"Purchase Invoice":"public/js/purchase_invoice.js",
+	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
