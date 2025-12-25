@@ -13,7 +13,9 @@ frappe.ui.form.on("Expense Claim", {
 	
 	refresh: function(frm) {
 		// Add event listener to flight number field for Enter key
-		if (frm.fields_dict.custom_flight_no) {
+		if (frm.fields_dict.custom_flight_no && frm.fields_dict.custom_flight_no.$input) {
+			// Remove existing listeners to avoid duplicates
+			frm.fields_dict.custom_flight_no.$input.off('keydown');
 			frm.fields_dict.custom_flight_no.$input.on('keydown', function(e) {
 				if (e.keyCode === 13) {
 					e.preventDefault();
@@ -24,6 +26,13 @@ frappe.ui.form.on("Expense Claim", {
 					}
 				}
 			});
+		}
+		
+		// Add "Additional Expenses" button after submit (only show if document is submitted)
+		if (frm.doc.docstatus === 1) {
+			frm.add_custom_button(__("Additional Expenses"), function() {
+				show_additional_expenses_modal(frm);
+			}, __("Create"));
 		}
 	}
 });
@@ -558,4 +567,1238 @@ function get_status_color(status) {
 		return "#00bcd4";
 	}
 	return "#666";
+}
+
+// Additional Expenses Modal
+function show_additional_expenses_modal(frm) {
+	// Create a temporary document for the child table
+	let temp_doc = {
+		doctype: "Expense Claim",
+		expenses: []
+	};
+	
+	// Create a dialog with expense claim detail child table
+	let d = new frappe.ui.Dialog({
+		title: __("Additional Expenses"),
+		size: 'extra-large',
+		fields: [
+			{
+				fieldtype: "HTML",
+				fieldname: "expense_table",
+				options: `
+					<div id="additional_expenses_table" style="min-height: 500px; margin-bottom: 20px;">
+						<!-- Expense Claim Detail table will be rendered here -->
+					</div>
+				`,
+			},
+			{
+				fieldtype: "Check",
+				fieldname: "create_journal_entry",
+				label: __("Create Journal Entry (Book as Paid)"),
+				default: 0,
+			},
+		],
+		primary_action_label: __("Create Expense Claim"),
+		primary_action: function(values) {
+			create_additional_expense_claim(frm, d, temp_doc, values.create_journal_entry);
+		},
+		secondary_action_label: __("Cancel"),
+		secondary_action: function() {
+			d.hide();
+		},
+	});
+	
+	// Store temp_doc in dialog
+	d.temp_doc = temp_doc;
+	
+	// Show dialog first
+	d.show();
+	
+	// Initialize the child table after dialog is shown
+	setTimeout(function() {
+		initialize_additional_expenses_table(d, temp_doc);
+	}, 500);
+}
+
+function initialize_additional_expenses_table(dialog, temp_doc) {
+	// Get the wrapper
+	let table_wrapper = dialog.$wrapper.find('#additional_expenses_table');
+	
+	// Create a mock form object for the grid
+	let mock_frm = {
+		doc: temp_doc,
+		add_child: function(child_doctype) {
+			return frappe.model.add_child(temp_doc, child_doctype, "expenses");
+		},
+		refresh_field: function(fieldname) {
+			if (fieldname === "expenses" && dialog.grid) {
+				dialog.grid.refresh();
+			}
+		},
+		get_docfield: function(fieldname) {
+			return null;
+		}
+	};
+	
+	// Load doctype first, then create grid
+	frappe.model.with_doctype("Expense Claim Detail", function() {
+		// Create grid wrapper
+		let grid_wrapper = $('<div class="form-grid"></div>').appendTo(table_wrapper);
+		
+		// Try to create grid - if it fails, use manual table
+		try {
+			// Check if Grid class exists
+			if (typeof frappe.ui.form.Grid !== 'undefined') {
+				let grid = new frappe.ui.form.Grid({
+					doctype: "Expense Claim Detail",
+					parent: temp_doc,
+					parentfield: "expenses",
+					frm: mock_frm,
+					wrapper: grid_wrapper,
+					controls: true,
+					allow_bulk_edit: false,
+				});
+				
+				// Store grid reference
+				dialog.grid = grid;
+				dialog.temp_doc = temp_doc;
+				
+				// Refresh the grid
+				grid.refresh();
+			} else {
+				// Fallback: create a simple manual table
+				create_manual_expense_table(dialog, temp_doc, table_wrapper);
+			}
+		} catch (e) {
+			console.error("Error creating grid:", e);
+			// Fallback: create a simple manual table
+			create_manual_expense_table(dialog, temp_doc, table_wrapper);
+		}
+	});
+}
+
+function create_manual_expense_table(dialog, temp_doc, wrapper) {
+	// Create a simple table structure as fallback
+	let table_html = `
+		<div class="form-section">
+			<div class="section-head">
+				<span class="section-title">Expense Details</span>
+				<button class="btn btn-sm btn-primary add-row" style="float: right;">
+					<i class="fa fa-plus"></i> Add Row
+				</button>
+			</div>
+			<div class="section-body">
+				<div class="expense-items-list"></div>
+			</div>
+		</div>
+	`;
+	
+	wrapper.html(table_html);
+	
+	// Add row button handler
+	wrapper.find('.add-row').on('click', function() {
+		add_expense_row(dialog, temp_doc, wrapper.find('.expense-items-list'));
+	});
+	
+	// Add initial row
+	add_expense_row(dialog, temp_doc, wrapper.find('.expense-items-list'));
+}
+
+function add_expense_row(dialog, temp_doc, container) {
+	let row = frappe.model.add_child(temp_doc, "Expense Claim Detail", "expenses");
+	let row_html = `
+		<div class="expense-row" data-name="${row.name}" style="border: 1px solid #d1d8dd; padding: 15px; margin-bottom: 10px; border-radius: 4px;">
+			<div class="row">
+				<div class="col-md-4">
+					<div class="form-group">
+						<div class="expense-type-wrapper" data-field="expense_type"></div>
+					</div>
+				</div>
+				<div class="col-md-2">
+					<div class="form-group">
+						<label>PRN No<span class="prn-required-indicator" style="display: none; color: red;">*</span></label>
+						<input type="text" class="form-control prn-number" data-field="custom_prn_number" placeholder="PRN Number">
+					</div>
+				</div>
+				<div class="col-md-3">
+					<div class="form-group">
+						<label>Date</label>
+						<input type="date" class="form-control expense-date" data-field="expense_date" value="${frappe.datetime.get_today()}">
+					</div>
+				</div>
+				<div class="col-md-3">
+					<div class="form-group">
+						<label>Amount</label>
+						<input type="number" class="form-control expense-amount" data-field="amount" placeholder="0.00" step="0.01">
+					</div>
+				</div>
+			</div>
+			<!-- Hotel Fields (shown only when expense_type === 'Hotel') -->
+			<div class="hotel-fields" style="display: none;">
+				<div class="row">
+					<div class="col-md-4">
+						<div class="form-group">
+							<label>Check-in Date</label>
+							<input type="date" class="form-control hotel-checkin-date" data-field="hotel_checkin_date">
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<label>Check-out Date</label>
+							<input type="date" class="form-control hotel-checkout-date" data-field="hotel_checkout_date">
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<label>Hotel Name</label>
+							<input type="text" class="form-control" data-field="custom_hotel_name" placeholder="Hotel Name">
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-4">
+						<div class="form-group">
+							<div class="hotel-territory-wrapper" data-field="hotel_territory"></div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<div class="hotel-location-wrapper" data-field="hotel_location"></div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<label>Rate per Day</label>
+							<input type="number" class="form-control" data-field="rate_per_day" placeholder="0.00" step="0.01">
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-12">
+						<div class="form-group">
+							<label>Purpose</label>
+							<textarea class="form-control" data-field="purpose" rows="2" placeholder="Purpose"></textarea>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Travel Fields (shown only when expense_type === 'Travel') -->
+			<div class="travel-fields" style="display: none;">
+				<div class="row">
+					<div class="col-md-4">
+						<div class="form-group">
+							<div class="booked-by-wrapper" data-field="custom_booked_by"></div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<label>Date of Purchase</label>
+							<input type="date" class="form-control" data-field="custom_date_of_purchase">
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<label>Travel Type</label>
+							<select class="form-control" data-field="custom_travel_type">
+								<option value="">Select Travel Type</option>
+								<option value="One Way">One Way</option>
+								<option value="Return">Return</option>
+							</select>
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-4">
+						<div class="form-group">
+							<div class="departure-airport-wrapper" data-field="custom_departure_airport"></div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<div class="arrival-airport-wrapper" data-field="custom_arrival_airport"></div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<div class="airlines-wrapper" data-field="custom_airlines"></div>
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-6">
+						<div class="form-group">
+							<div class="date-of-travel-wrapper" data-field="custom_date_of_travel"></div>
+						</div>
+					</div>
+					<div class="col-md-6">
+						<div class="form-group">
+							<div class="date-of-arrival-wrapper" data-field="custom_date_of_arrival"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Description (always visible, at the bottom) -->
+			<div class="row">
+				<div class="col-md-12">
+					<div class="form-group">
+						<label>Description</label>
+						<textarea class="form-control expense-description" data-field="description" rows="2" placeholder="Description"></textarea>
+					</div>
+				</div>
+			</div>
+			<div class="row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
+				<div class="col-md-12" style="text-align: right;">
+					<button class="btn btn-sm btn-danger remove-row">
+						<i class="fa fa-trash"></i> Remove
+					</button>
+				</div>
+			</div>
+		</div>
+	`;
+	
+	let $row = $(row_html).appendTo(container);
+	
+	// Create Expense Type link field
+	frappe.model.with_doctype("Expense Claim Type", function() {
+		let expense_type_wrapper = $row.find('.expense-type-wrapper');
+		let expense_type_field = frappe.ui.form.make_control({
+			df: {
+				fieldtype: "Link",
+				fieldname: "expense_type",
+				options: "Expense Claim Type",
+				label: "Expense Type",
+				reqd: 1
+			},
+			parent: expense_type_wrapper,
+			render_input: true
+		});
+		
+		expense_type_field.refresh();
+		expense_type_field.set_value(row.expense_type || "");
+		
+		// Function to update conditional fields based on expense type
+		function update_conditional_fields() {
+			let selected_type = expense_type_field.get_value();
+			if (selected_type) {
+				frappe.model.set_value(row.doctype, row.name, "expense_type", selected_type);
+				// Use the selected value directly (it's the name of the Expense Claim Type)
+				toggle_conditional_fields($row, selected_type);
+			} else {
+				// Hide all conditional fields if no expense type selected
+				toggle_conditional_fields($row, "");
+			}
+		}
+		
+		// Hook into the link field's value change
+		// Frappe link fields trigger events when value is set via autocomplete
+		expense_type_field.$input.on('change', function() {
+			update_conditional_fields();
+		});
+		
+		// Also listen when the link field's value is set programmatically
+		let original_set_value = expense_type_field.set_value;
+		expense_type_field.set_value = function(value) {
+			original_set_value.call(this, value);
+			setTimeout(update_conditional_fields, 50);
+		};
+		
+		// Listen to the autocomplete selection event
+		expense_type_field.$input.on('awesomplete-selectcomplete', function() {
+			setTimeout(update_conditional_fields, 50);
+		});
+		
+		// Listen to blur event
+		expense_type_field.$input.on('blur', function() {
+			setTimeout(update_conditional_fields, 50);
+		});
+		
+		// Initial update if value exists
+		if (row.expense_type) {
+			setTimeout(function() {
+				update_conditional_fields();
+			}, 300);
+		}
+	});
+	
+	// Create Hotel Territory link field
+	frappe.model.with_doctype("Territory", function() {
+		try {
+			let hotel_territory_wrapper = $row.find('.hotel-territory-wrapper');
+			let hotel_territory_field = frappe.ui.form.make_control({
+				df: {
+					fieldtype: "Link",
+					fieldname: "hotel_territory",
+					options: "Territory",
+					label: "Hotel Territory"
+				},
+				parent: hotel_territory_wrapper,
+				render_input: true
+			});
+			hotel_territory_field.refresh();
+			hotel_territory_field.set_value(row.hotel_territory || "");
+			
+			// Store field reference on row element for later access
+			$row.data('hotel_territory_field', hotel_territory_field);
+			
+			hotel_territory_field.$input.on('change blur', function() {
+				let value = hotel_territory_field.get_value();
+				frappe.model.set_value(row.doctype, row.name, "hotel_territory", value);
+				// Force update locals
+				if (locals[row.doctype] && locals[row.doctype][row.name]) {
+					locals[row.doctype][row.name].hotel_territory = value;
+				}
+				// Also update the row object directly
+				row.hotel_territory = value;
+			});
+		} catch(e) {
+			console.warn("Could not create Hotel Territory link field:", e);
+		}
+	}, function() {
+		// Doctype doesn't exist, skip
+	});
+	
+	// Create Hotel Location link field
+	frappe.model.with_doctype("Location", function() {
+		try {
+			let hotel_location_wrapper = $row.find('.hotel-location-wrapper');
+			let hotel_location_field = frappe.ui.form.make_control({
+				df: {
+					fieldtype: "Link",
+					fieldname: "hotel_location",
+					options: "Location",
+					label: "Hotel Location"
+				},
+				parent: hotel_location_wrapper,
+				render_input: true
+			});
+			hotel_location_field.refresh();
+			hotel_location_field.set_value(row.hotel_location || "");
+			
+			// Store field reference on row element for later access
+			$row.data('hotel_location_field', hotel_location_field);
+			
+			hotel_location_field.$input.on('change blur', function() {
+				let value = hotel_location_field.get_value();
+				frappe.model.set_value(row.doctype, row.name, "hotel_location", value);
+				// Force update locals
+				if (locals[row.doctype] && locals[row.doctype][row.name]) {
+					locals[row.doctype][row.name].hotel_location = value;
+				}
+				// Also update the row object directly
+				row.hotel_location = value;
+			});
+		} catch(e) {
+			console.warn("Could not create Hotel Location link field:", e);
+		}
+	}, function() {
+		// Doctype doesn't exist, skip
+	});
+	
+	// Create Departure Airport link field
+	frappe.model.with_doctype("Airport", function() {
+		try {
+			let dep_airport_wrapper = $row.find('.departure-airport-wrapper');
+			let dep_airport_field = frappe.ui.form.make_control({
+				df: {
+					fieldtype: "Link",
+					fieldname: "custom_departure_airport",
+					options: "Airport",
+					label: "Departure Airport"
+				},
+				parent: dep_airport_wrapper,
+				render_input: true
+			});
+			dep_airport_field.refresh();
+			dep_airport_field.set_value(row.custom_departure_airport || "");
+			
+			// Store field reference with both naming patterns
+			$row.data('departure_airport_field', dep_airport_field);
+			$row.data('custom_departure_airport_field', dep_airport_field);
+			
+			dep_airport_field.$input.on('change', function() {
+				let value = dep_airport_field.get_value();
+				frappe.model.set_value(row.doctype, row.name, "custom_departure_airport", value);
+				row.custom_departure_airport = value;
+			});
+		} catch(e) {
+			console.warn("Could not create Departure Airport link field:", e);
+		}
+	}, function() {
+		// Doctype doesn't exist, skip
+	});
+	
+	// Create Arrival Airport link field
+	frappe.model.with_doctype("Airport", function() {
+		try {
+			let arr_airport_wrapper = $row.find('.arrival-airport-wrapper');
+			let arr_airport_field = frappe.ui.form.make_control({
+				df: {
+					fieldtype: "Link",
+					fieldname: "custom_arrival_airport",
+					options: "Airport",
+					label: "Arrival Airport"
+				},
+				parent: arr_airport_wrapper,
+				render_input: true
+			});
+			arr_airport_field.refresh();
+			arr_airport_field.set_value(row.custom_arrival_airport || "");
+			
+			// Store field reference with both naming patterns
+			$row.data('arrival_airport_field', arr_airport_field);
+			$row.data('custom_arrival_airport_field', arr_airport_field);
+			
+			arr_airport_field.$input.on('change', function() {
+				let value = arr_airport_field.get_value();
+				frappe.model.set_value(row.doctype, row.name, "custom_arrival_airport", value);
+				row.custom_arrival_airport = value;
+			});
+		} catch(e) {
+			console.warn("Could not create Arrival Airport link field:", e);
+		}
+	}, function() {
+		// Doctype doesn't exist, skip
+	});
+	
+	// Create Airlines link field
+	frappe.model.with_doctype("Airlines", function() {
+		try {
+			let airlines_wrapper = $row.find('.airlines-wrapper');
+			let airlines_field = frappe.ui.form.make_control({
+				df: {
+					fieldtype: "Link",
+					fieldname: "custom_airlines",
+					options: "Airlines",
+					label: "Airlines"
+				},
+				parent: airlines_wrapper,
+				render_input: true
+			});
+			airlines_field.refresh();
+			airlines_field.set_value(row.custom_airlines || "");
+			
+			// Store field reference with both naming patterns
+			$row.data('airlines_field', airlines_field);
+			$row.data('custom_airlines_field', airlines_field);
+			
+			airlines_field.$input.on('change', function() {
+				let value = airlines_field.get_value();
+				frappe.model.set_value(row.doctype, row.name, "custom_airlines", value);
+				row.custom_airlines = value;
+			});
+		} catch(e) {
+			console.warn("Could not create Airlines link field:", e);
+		}
+	}, function() {
+		// Doctype doesn't exist, skip
+	});
+	
+	// Create Booked By link field
+	frappe.model.with_doctype("User", function() {
+		try {
+			let booked_by_wrapper = $row.find('.booked-by-wrapper');
+			let booked_by_field = frappe.ui.form.make_control({
+				df: {
+					fieldtype: "Link",
+					fieldname: "custom_booked_by",
+					options: "User",
+					label: "Booked By"
+				},
+				parent: booked_by_wrapper,
+				render_input: true
+			});
+			booked_by_field.refresh();
+			booked_by_field.set_value(row.custom_booked_by || "");
+			
+			// Store field reference with both naming patterns
+			$row.data('booked_by_field', booked_by_field);
+			$row.data('custom_booked_by_field', booked_by_field);
+			
+			booked_by_field.$input.on('change blur', function() {
+				let value = booked_by_field.get_value();
+				frappe.model.set_value(row.doctype, row.name, "custom_booked_by", value);
+				// Force update locals
+				if (locals[row.doctype] && locals[row.doctype][row.name]) {
+					locals[row.doctype][row.name].custom_booked_by = value;
+				}
+				// Also update the row object directly
+				row.custom_booked_by = value;
+			});
+		} catch(e) {
+			console.warn("Could not create Booked By link field:", e);
+		}
+	}, function() {
+		// Doctype doesn't exist, skip
+	});
+	
+	// Create Date of Travel datetime field
+	try {
+		let date_of_travel_wrapper = $row.find('.date-of-travel-wrapper');
+		let date_of_travel_field = frappe.ui.form.make_control({
+			df: {
+				fieldtype: "Datetime",
+				fieldname: "custom_date_of_travel",
+				label: "Date of Travel"
+			},
+			parent: date_of_travel_wrapper,
+			render_input: true
+		});
+		date_of_travel_field.refresh();
+		if (row.custom_date_of_travel) {
+			date_of_travel_field.set_value(row.custom_date_of_travel);
+		}
+		
+		// Store field reference with both naming patterns
+		$row.data('date_of_travel_field', date_of_travel_field);
+		$row.data('custom_date_of_travel_field', date_of_travel_field);
+		
+		date_of_travel_field.$input.on('change', function() {
+			let value = date_of_travel_field.get_value();
+			frappe.model.set_value(row.doctype, row.name, "custom_date_of_travel", value);
+			row.custom_date_of_travel = value;
+		});
+	} catch(e) {
+		console.warn("Could not create Date of Travel field:", e);
+	}
+	
+	// Create Date of Arrival datetime field
+	try {
+		let date_of_arrival_wrapper = $row.find('.date-of-arrival-wrapper');
+		let date_of_arrival_field = frappe.ui.form.make_control({
+			df: {
+				fieldtype: "Datetime",
+				fieldname: "custom_date_of_arrival",
+				label: "Date of Arrival"
+			},
+			parent: date_of_arrival_wrapper,
+			render_input: true
+		});
+		date_of_arrival_field.refresh();
+		if (row.custom_date_of_arrival) {
+			date_of_arrival_field.set_value(row.custom_date_of_arrival);
+		}
+		
+		// Store field reference with both naming patterns
+		$row.data('date_of_arrival_field', date_of_arrival_field);
+		$row.data('custom_date_of_arrival_field', date_of_arrival_field);
+		
+		date_of_arrival_field.$input.on('change', function() {
+			let value = date_of_arrival_field.get_value();
+			frappe.model.set_value(row.doctype, row.name, "custom_date_of_arrival", value);
+			row.custom_date_of_arrival = value;
+		});
+	} catch(e) {
+		console.warn("Could not create Date of Arrival field:", e);
+	}
+	
+	// Function to calculate total nights and amount for Hotel expenses
+	function calculate_hotel_totals() {
+		let expense_type = row.expense_type || "";
+		let expense_type_lower = expense_type.toLowerCase().trim();
+		
+		if (expense_type_lower === 'hotel' || expense_type_lower.includes('hotel')) {
+			let checkin_date = $row.find('.hotel-checkin-date').val();
+			let checkout_date = $row.find('.hotel-checkout-date').val();
+			let rate_per_day = parseFloat($row.find('input[data-field="rate_per_day"]').val()) || 0;
+			
+			// Calculate total nights
+			let total_nights = 0;
+			if (checkin_date && checkout_date) {
+				let checkin = new Date(checkin_date);
+				let checkout = new Date(checkout_date);
+				if (checkout > checkin) {
+					let diff_time = checkout - checkin;
+					total_nights = Math.ceil(diff_time / (1000 * 60 * 60 * 24));
+				}
+			}
+			
+			// Update total nights in row data
+			frappe.model.set_value(row.doctype, row.name, "total_nights", total_nights);
+			
+			// Calculate amount = rate_per_day × total_nights
+			let calculated_amount = rate_per_day * total_nights;
+			if (calculated_amount > 0) {
+				frappe.model.set_value(row.doctype, row.name, "amount", calculated_amount);
+				// Update the amount field in the UI
+				$row.find('input[data-field="amount"]').val(calculated_amount.toFixed(2));
+			}
+		}
+	}
+	
+	// Bind input handlers to update the row data
+	$row.find('input, textarea, select').on('change', function() {
+		let field = $(this).data('field');
+		let value = $(this).val();
+		if (field) {
+			frappe.model.set_value(row.doctype, row.name, field, value);
+		}
+		
+		// Calculate hotel totals when check-in, check-out, or rate changes
+		if ($(this).hasClass('hotel-checkin-date') || 
+		    $(this).hasClass('hotel-checkout-date') || 
+		    $(this).data('field') === 'rate_per_day') {
+			calculate_hotel_totals();
+		}
+	});
+	
+	// Store calculate function on row for access from toggle function
+	$row.data('calculate-hotel-totals', calculate_hotel_totals);
+	
+	// Initial toggle will be handled by the expense_type_field change handler above
+	
+	// Remove row handler
+	$row.find('.remove-row').on('click', function() {
+		frappe.model.remove_from_locals(row.doctype, row.name);
+		$row.remove();
+	});
+}
+
+// Flight lookup for modal rows
+function lookup_flight_for_modal_row(dialog, $row, row, flight_number) {
+	if (!flight_number || !flight_number.trim()) {
+		return;
+	}
+	
+	frappe.show_alert(__("Looking up flight information..."), 3);
+	
+	frappe.call({
+		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
+		args: {
+			flight_number: flight_number.trim(),
+		},
+		callback: function (r) {
+			if (r.message) {
+				const result = r.message;
+				
+				if (result.success) {
+					// Show flight details modal for user confirmation
+					show_flight_confirmation_modal_for_row(dialog, $row, row, result.data, flight_number.trim());
+				} else {
+					frappe.show_alert(
+						__("Failed to fetch flight details: ") + (result.error || "Unknown error"),
+						5,
+						"red"
+					);
+					
+					frappe.msgprint({
+						title: __("Flight Lookup Failed"),
+						message: __(`
+							<div style="padding: 10px;">
+								<p><strong>Flight Number:</strong> ${flight_number}</p>
+								<p><strong>Error:</strong> ${result.error || "Unknown error"}</p>
+								${result.error_details ? `<p><strong>Details:</strong> ${result.error_details}</p>` : ""}
+							</div>
+						`),
+						indicator: "red",
+					});
+				}
+			}
+		},
+		error: function() {
+			frappe.show_alert(__("Error looking up flight information."), 5, "red");
+		}
+	});
+}
+
+// Show flight confirmation modal for modal row
+function show_flight_confirmation_modal_for_row(dialog, $row, row, flight_data, flight_number_searched) {
+	if (!flight_data || (Array.isArray(flight_data) && flight_data.length === 0)) {
+		frappe.msgprint({
+			title: __("No Flight Found"),
+			message: __("No flight information found for the provided number."),
+			indicator: "orange",
+		});
+		return;
+	}
+	
+	// Handle both single flight object and array of flights
+	let flights = Array.isArray(flight_data) ? flight_data : [flight_data];
+	
+	// For multi-leg flights, use first departure and last arrival (full journey)
+	const first_flight = flights[0];
+	const last_flight = flights[flights.length - 1];
+	
+	// Extract flight information
+	const airline = first_flight.airline || {};
+	const departure = first_flight.departure || {};
+	const arrival = last_flight.arrival || {};
+	
+	const dep_airport = departure.airport || {};
+	const arr_airport = arrival.airport || {};
+	
+	const dep_scheduled = departure.scheduledTime || {};
+	const arr_scheduled = arrival.scheduledTime || {};
+	
+	// Format datetimes for display
+	const dep_datetime_display = dep_scheduled.local || "";
+	const arr_datetime_display = arr_scheduled.local || "";
+	
+	// Build route display
+	let route_display = `${dep_airport.iata || "N/A"} → ${arr_airport.iata || "N/A"}`;
+	if (flights.length > 1) {
+		let route_parts = [];
+		flights.forEach((flight) => {
+			let dep = flight.departure?.airport?.iata || "";
+			let arr = flight.arrival?.airport?.iata || "";
+			if (dep && arr) {
+				route_parts.push(`${dep} → ${arr}`);
+			}
+		});
+		route_display = route_parts.join(" → ");
+	}
+	
+	// Build HTML for flight details
+	let flight_info_html = `
+		<div style="padding: 15px;">
+			<h3 style="margin-top: 0;">✈️ Flight Information</h3>
+			<div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+				<p><strong>Flight:</strong> ${flight_number_searched}</p>
+				<p><strong>Airline:</strong> ${airline.name || "N/A"}</p>
+				<p><strong>Route:</strong> ${route_display}</p>
+				<p><strong>From:</strong> ${dep_airport.name || dep_airport.shortName || "N/A"} (${dep_airport.iata || "N/A"})</p>
+				<p><strong>To:</strong> ${arr_airport.name || arr_airport.shortName || "N/A"} (${arr_airport.iata || "N/A"})</p>
+				<p><strong>Departure:</strong> ${dep_datetime_display || "N/A"}</p>
+				<p><strong>Arrival:</strong> ${arr_datetime_display || "N/A"}</p>
+			</div>
+			<div style="padding: 10px; background: #fff3cd; border-radius: 5px;">
+				<p style="margin: 0;"><strong>Is this the correct flight information?</strong></p>
+				<p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Click "Confirm" to auto-fill the travel fields.</p>
+			</div>
+		</div>
+	`;
+	
+	// Create confirmation modal
+	let d = new frappe.ui.Dialog({
+		title: __("Confirm Flight Information"),
+		fields: [
+			{
+				fieldtype: "HTML",
+				fieldname: "flight_info",
+				options: flight_info_html,
+			},
+		],
+		primary_action_label: __("Confirm"),
+		primary_action: function (values) {
+			fill_travel_fields_for_modal_row(dialog, $row, row, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled);
+			d.hide();
+		},
+		secondary_action_label: __("Cancel"),
+		secondary_action: function () {
+			d.hide();
+		},
+	});
+	
+	d.show();
+}
+
+// Fill travel fields for modal row
+function fill_travel_fields_for_modal_row(dialog, $row, row, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled) {
+	// Extract airport information
+	let dep_airport_name = dep_airport.name || dep_airport.shortName || "";
+	let dep_airport_iata = dep_airport.iata || "";
+	let dep_airport_icao = dep_airport.icao || "";
+	let dep_airport_city = dep_airport.municipalityName || "";
+	let dep_airport_country = dep_airport.countryCode || "";
+	
+	let arr_airport_name = arr_airport.name || arr_airport.shortName || "";
+	let arr_airport_iata = arr_airport.iata || "";
+	let arr_airport_icao = arr_airport.icao || "";
+	let arr_airport_city = arr_airport.municipalityName || "";
+	let arr_airport_country = arr_airport.countryCode || "";
+	
+	// Extract airline information
+	let airline_name = airline.name || "";
+	let airline_iata = airline.iata || "";
+	let airline_icao = airline.icao || "";
+	
+	// Format datetime helper (reuse from existing function)
+	function format_datetime_for_frappe(datetime_str) {
+		if (!datetime_str) return null;
+		try {
+			let cleaned = datetime_str.trim();
+			cleaned = cleaned.replace(/[+-]\d{2}:?\d{2}\s*$/, '');
+			if (cleaned.includes('T')) {
+				cleaned = cleaned.replace('T', ' ');
+			}
+			let parts = cleaned.trim().split(/\s+/);
+			if (parts.length < 2) {
+				let match = cleaned.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/);
+				if (match) {
+					parts = [match[1], match[2]];
+				} else {
+					return null;
+				}
+			}
+			let date_part = parts[0];
+			let time_part = parts[1];
+			if (time_part.includes('.')) {
+				time_part = time_part.split('.')[0];
+			}
+			if (time_part.match(/^\d{2}:\d{2}$/)) {
+				time_part = time_part + ':00';
+			}
+			let formatted = date_part + ' ' + time_part;
+			if (formatted.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+				return formatted;
+			}
+			return null;
+		} catch (e) {
+			return null;
+		}
+	}
+	
+	let dep_datetime = null;
+	let arr_datetime = null;
+	
+	if (dep_scheduled.local) {
+		dep_datetime = format_datetime_for_frappe(dep_scheduled.local);
+	}
+	
+	if (arr_scheduled.local) {
+		arr_datetime = format_datetime_for_frappe(arr_scheduled.local);
+	}
+	
+	// Show loading message
+	frappe.show_alert(__("Creating/updating airline and airport records..."), 3);
+	
+	// Create/get airline and airports, then fill the fields
+	let promises = [];
+	
+	// Get or create airline
+	if (airline_name) {
+		promises.push(
+			frappe.call({
+				method: "nextlayer.next_layer.api.flight_utils.get_or_create_airline",
+				args: {
+					airline_name: airline_name,
+					airline_iata: airline_iata,
+					airline_icao: airline_icao,
+				},
+			})
+		);
+	} else {
+		promises.push(Promise.resolve({ message: null }));
+	}
+	
+	// Get or create departure airport
+	if (dep_airport_name) {
+		promises.push(
+			frappe.call({
+				method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+				args: {
+					airport_name: dep_airport_name,
+					airport_iata: dep_airport_iata,
+					airport_icao: dep_airport_icao,
+					airport_city: dep_airport_city,
+					airport_country: dep_airport_country,
+				},
+			})
+		);
+	} else {
+		promises.push(Promise.resolve({ message: null }));
+	}
+	
+	// Get or create arrival airport
+	if (arr_airport_name) {
+		promises.push(
+			frappe.call({
+				method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+				args: {
+					airport_name: arr_airport_name,
+					airport_iata: arr_airport_iata,
+					airport_icao: arr_airport_icao,
+					airport_city: arr_airport_city,
+					airport_country: arr_airport_country,
+				},
+			})
+		);
+	} else {
+		promises.push(Promise.resolve({ message: null }));
+	}
+	
+	// Wait for all API calls to complete
+	Promise.all(promises).then(function(results) {
+		let airline_record = results[0].message || null;
+		let dep_airport_record = results[1].message || null;
+		let arr_airport_record = results[2].message || null;
+		
+		// Fill in the flight details with linked records
+		if (dep_airport_record) {
+			frappe.model.set_value(row.doctype, row.name, "custom_departure_airport", dep_airport_record);
+			// Update link field control if it exists
+			let dep_field = $row.data('departure_airport_field');
+			if (dep_field) {
+				dep_field.set_value(dep_airport_record);
+			}
+		}
+		
+		if (arr_airport_record) {
+			frappe.model.set_value(row.doctype, row.name, "custom_arrival_airport", arr_airport_record);
+			// Update link field control if it exists
+			let arr_field = $row.data('arrival_airport_field');
+			if (arr_field) {
+				arr_field.set_value(arr_airport_record);
+			}
+		}
+		
+		if (airline_record) {
+			frappe.model.set_value(row.doctype, row.name, "custom_airlines", airline_record);
+			// Update link field control if it exists
+			let airline_field = $row.data('airlines_field');
+			if (airline_field) {
+				airline_field.set_value(airline_record);
+			}
+		}
+		
+		if (dep_datetime) {
+			frappe.model.set_value(row.doctype, row.name, "custom_date_of_travel", dep_datetime);
+			// Update datetime field control if it exists
+			let travel_date_field = $row.data('date_of_travel_field');
+			if (travel_date_field) {
+				travel_date_field.set_value(dep_datetime);
+			}
+		}
+		
+		if (arr_datetime) {
+			frappe.model.set_value(row.doctype, row.name, "custom_date_of_arrival", arr_datetime);
+			// Update datetime field control if it exists
+			let arrival_date_field = $row.data('date_of_arrival_field');
+			if (arrival_date_field) {
+				arrival_date_field.set_value(arr_datetime);
+			}
+		}
+		
+		frappe.show_alert(__("Flight information filled successfully!"), 3, "green");
+	}).catch(function(error) {
+		frappe.show_alert(__("Error creating airline/airport records. Please check manually."), 5, "red");
+		frappe.log_error(error, "Flight Fill Error");
+	});
+}
+
+function toggle_conditional_fields($row, expense_type) {
+	// Hide all conditional fields first
+	$row.find('.hotel-fields').hide();
+	$row.find('.travel-fields').hide();
+	
+	// Show/hide PRN required indicator
+	let prn_required = false;
+	
+	// Show fields based on expense_type (case-insensitive comparison)
+	if (expense_type) {
+		let expense_type_lower = expense_type.toLowerCase().trim();
+		// Check if expense type is "Hotel" (exact match or contains hotel)
+		if (expense_type_lower === 'hotel' || expense_type_lower.includes('hotel')) {
+			$row.find('.hotel-fields').show();
+			// Trigger calculation after showing fields
+			setTimeout(function() {
+				let calc_func = $row.data('calculate-hotel-totals');
+				if (calc_func) calc_func();
+			}, 100);
+		}
+		// Check if expense type is "Travel" (exact match or contains travel)
+		if (expense_type_lower === 'travel' || expense_type_lower.includes('travel')) {
+			$row.find('.travel-fields').show();
+			prn_required = true;
+		}
+	}
+	
+	// Show/hide PRN required indicator
+	if (prn_required) {
+		$row.find('.prn-required-indicator').show();
+	} else {
+		$row.find('.prn-required-indicator').hide();
+	}
+}
+
+function create_additional_expense_claim(original_frm, dialog, temp_doc, create_journal_entry = false) {
+	// Get expense items from the grid
+	let expense_items = [];
+	
+	if (temp_doc.expenses && temp_doc.expenses.length > 0) {
+		temp_doc.expenses.forEach(function(row) {
+			if (row.expense_type) {
+				// Refresh row from locals to get latest values
+				let row_name = row.name;
+				if (row_name && locals['Expense Claim Detail'] && locals['Expense Claim Detail'][row_name]) {
+					row = locals['Expense Claim Detail'][row_name];
+				}
+				
+				// Get row element to read link field values if not in row object
+				let $row_element = dialog.$wrapper.find(`.expense-row[data-name="${row_name}"]`);
+				
+				// Helper to get value from row or link field control
+				function get_field_value(fieldname) {
+					// First check row object
+					let value = row[fieldname];
+					
+					// If value is not in row, try to get from link field control
+					if (!value && $row_element.length) {
+						// Try different field reference patterns
+						let field_control = $row_element.data(`${fieldname}_field`) || 
+						                      $row_element.data(fieldname.replace('custom_', '') + '_field');
+						
+						if (field_control && typeof field_control.get_value === 'function') {
+							try {
+								value = field_control.get_value();
+								// Update row with the value
+								if (value) {
+									row[fieldname] = value;
+									// Also update locals
+									if (locals[row.doctype] && locals[row.doctype][row.name]) {
+										locals[row.doctype][row.name][fieldname] = value;
+									}
+								}
+							} catch(e) {
+								console.warn(`Error getting value for ${fieldname}:`, e);
+							}
+						} else {
+							// Try to read directly from the input field
+							let field_wrapper = $row_element.find(`[data-field="${fieldname}"]`);
+							if (field_wrapper.length) {
+								let input = field_wrapper.find('input').first();
+								if (input.length) {
+									value = input.val();
+									if (value) {
+										row[fieldname] = value;
+										// Also update locals
+										if (locals[row.doctype] && locals[row.doctype][row.name]) {
+											locals[row.doctype][row.name][fieldname] = value;
+										}
+									}
+								}
+							}
+						}
+					}
+					return value || null;
+				}
+				
+				// Calculate total nights and amount for Hotel expenses before collecting data
+				let expense_type_lower = (row.expense_type || "").toLowerCase().trim();
+				if (expense_type_lower === 'hotel' || expense_type_lower.includes('hotel')) {
+					// Calculate total nights from check-in and check-out dates
+					if (row.hotel_checkin_date && row.hotel_checkout_date) {
+						let checkin = new Date(row.hotel_checkin_date);
+						let checkout = new Date(row.hotel_checkout_date);
+						if (checkout > checkin) {
+							let diff_time = checkout - checkin;
+							let total_nights = Math.ceil(diff_time / (1000 * 60 * 60 * 24));
+							row.total_nights = total_nights;
+							
+							// Calculate amount = rate_per_day × total_nights
+							let rate_per_day = parseFloat(row.rate_per_day) || 0;
+							if (rate_per_day > 0 && total_nights > 0) {
+								row.amount = rate_per_day * total_nights;
+							}
+						}
+					}
+				}
+				
+				let item = {
+					expense_type: row.expense_type,
+					expense_date: row.expense_date || frappe.datetime.get_today(),
+					amount: row.amount || 0,
+					sanctioned_amount: row.sanctioned_amount || row.amount || 0,
+					cost_center: row.cost_center,
+					project: row.project,
+					company: row.company || original_frm.doc.company,
+					receipt: row.receipt,
+					description: row.description,
+					// PRN Number
+					custom_prn_number: row.custom_prn_number,
+					// Hotel fields - use helper to get link field values
+					hotel_checkin_date: row.hotel_checkin_date,
+					hotel_checkout_date: row.hotel_checkout_date,
+					purpose: row.purpose,
+					hotel_territory: get_field_value('hotel_territory'),
+					hotel_location: get_field_value('hotel_location'),
+					custom_hotel_name: row.custom_hotel_name,
+					total_nights: row.total_nights,
+					rate_per_day: row.rate_per_day,
+					// Travel custom fields
+					custom_flight_no: row.custom_flight_no,
+					custom_date_of_purchase: row.custom_date_of_purchase,
+					custom_travel_type: row.custom_travel_type,
+					custom_booked_by: get_field_value('custom_booked_by'),
+					custom_departure_airport: get_field_value('custom_departure_airport'),
+					custom_arrival_airport: get_field_value('custom_arrival_airport'),
+					custom_airlines: get_field_value('custom_airlines'),
+					custom_date_of_travel: get_field_value('custom_date_of_travel'),
+					custom_date_of_arrival: get_field_value('custom_date_of_arrival'),
+				};
+				expense_items.push(item);
+			}
+		});
+	}
+	
+	if (expense_items.length === 0) {
+		frappe.msgprint({
+			title: __("No Expenses"),
+			message: __("Please add at least one expense item."),
+			indicator: "orange",
+		});
+		return;
+	}
+	
+	// Validate PRN number for Travel expense type
+	for (let i = 0; i < expense_items.length; i++) {
+		let item = expense_items[i];
+		if (item.expense_type) {
+			let expense_type_lower = (item.expense_type || "").toLowerCase().trim();
+			if ((expense_type_lower === 'travel' || expense_type_lower.includes('travel'))) {
+				let prn_number = item.custom_prn_number;
+				if (!prn_number || (typeof prn_number === 'string' && prn_number.trim() === '')) {
+					frappe.msgprint({
+						title: __("Validation Error"),
+						message: __("PRN Number is mandatory when Expense Type is Travel."),
+						indicator: "red",
+					});
+					return;
+				}
+			}
+		}
+	}
+	
+	// Show loading
+	frappe.show_alert(__("Creating additional expense claim..."), 3);
+	
+	// Create new expense claim
+	frappe.call({
+		method: "nextlayer.next_layer.api.expense_claim_utils.create_additional_expense_claim",
+		args: {
+			original_expense_claim: original_frm.doc.name,
+			expense_items: expense_items,
+			company: original_frm.doc.company,
+			employee: original_frm.doc.employee,
+			expense_approver: original_frm.doc.expense_approver,
+			create_journal_entry: create_journal_entry || false,
+		},
+		callback: function(r) {
+			if (r.message) {
+				if (r.message.success) {
+					let message = __("Additional expense claim created successfully!");
+					if (r.message.journal_entry_name) {
+						message += " " + __("Journal Entry {0} has been created and submitted.", [r.message.journal_entry_name]);
+					}
+					frappe.show_alert(message, 5, "green");
+					dialog.hide();
+					
+					// Open the new expense claim
+					frappe.set_route("Form", "Expense Claim", r.message.expense_claim_name);
+				} else {
+					frappe.msgprint({
+						title: __("Error"),
+						message: r.message.error || __("Failed to create additional expense claim"),
+						indicator: "red",
+					});
+				}
+			}
+		},
+		error: function(r) {
+			frappe.msgprint({
+				title: __("Error"),
+				message: __("An error occurred while creating the additional expense claim."),
+				indicator: "red",
+			});
+		}
+	});
 }
