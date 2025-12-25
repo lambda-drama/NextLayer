@@ -39,6 +39,7 @@ fixtures = [
                     "Expense Claim Detail-custom_flight_no",
                     "Expense Claim-custom_flight_no",
                     "Expense Claim-custom_column_break_luxng",
+                    "Expense Claim-custom_book_journal",
                 ),
             ]
         ],
@@ -68,6 +69,9 @@ doc_events = {
     "Payment Entry": {
         "before_submit": "nextlayer.next_layer.api.general_ledger.clear_intercompany_fields_before_submit",
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
+    },
+    "Expense Claim": {
+        "on_submit": "nextlayer.next_layer.api.expense_claim_utils.create_journal_entry_on_submit",
     },
     "Item": {
         "before_save": "nextlayer.next_layer.controllers.generate_barcode.auto_generate_barcode_for_item",
