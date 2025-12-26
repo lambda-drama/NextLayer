@@ -365,8 +365,6 @@ function fill_expense_claim_fields(frm, flights, dep_airport, arr_airport, airli
 		if (!datetime_str) return null;
 		
 		try {
-			// Remove timezone offset - match patterns like +04:00, -03:00, +0300, -0500
-			// Use a more explicit regex that matches at the end of string
 			let cleaned = datetime_str.trim();
 			
 			// Remove timezone patterns: +HH:MM, -HH:MM, +HHMM, -HHMM at the end
@@ -580,7 +578,7 @@ function show_additional_expenses_modal(frm) {
 	// Create a dialog with expense claim detail child table
 	let d = new frappe.ui.Dialog({
 		title: __("Additional Expenses"),
-		size: 'extra-large',
+		size: 'large',
 		fields: [
 			{
 				fieldtype: "HTML",
@@ -591,16 +589,12 @@ function show_additional_expenses_modal(frm) {
 					</div>
 				`,
 			},
-			{
-				fieldtype: "Check",
-				fieldname: "create_journal_entry",
-				label: __("Create Journal Entry (Book as Paid)"),
-				default: 0,
-			},
 		],
 		primary_action_label: __("Create Expense Claim"),
 		primary_action: function(values) {
-			create_additional_expense_claim(frm, d, temp_doc, values.create_journal_entry);
+			// Get checkbox value from custom footer
+			let create_journal_entry = d.$wrapper.find('#create_journal_entry_checkbox').is(':checked');
+			create_additional_expense_claim(frm, d, temp_doc, create_journal_entry);
 		},
 		secondary_action_label: __("Cancel"),
 		secondary_action: function() {
@@ -613,6 +607,22 @@ function show_additional_expenses_modal(frm) {
 	
 	// Show dialog first
 	d.show();
+	
+	// Add checkbox to footer on the left side of buttons
+	setTimeout(function() {
+		let footer = d.$wrapper.find('.modal-footer');
+		if (footer.length) {
+			let checkbox_html = `
+				<div style="float: left; margin-top: 8px;">
+					<label style="font-weight: normal; margin: 0; cursor: pointer;">
+						<input type="checkbox" id="create_journal_entry_checkbox" checked style="margin-right: 5px;">
+						${__("Create Journal Entry")}
+					</label>
+				</div>
+			`;
+			footer.prepend(checkbox_html);
+		}
+	}, 100);
 	
 	// Initialize the child table after dialog is shown
 	setTimeout(function() {
@@ -714,19 +724,13 @@ function add_expense_row(dialog, temp_doc, container) {
 						<div class="expense-type-wrapper" data-field="expense_type"></div>
 					</div>
 				</div>
-				<div class="col-md-2">
-					<div class="form-group">
-						<label>PRN No<span class="prn-required-indicator" style="display: none; color: red;">*</span></label>
-						<input type="text" class="form-control prn-number" data-field="custom_prn_number" placeholder="PRN Number">
-					</div>
-				</div>
-				<div class="col-md-3">
+				<div class="col-md-4">
 					<div class="form-group">
 						<label>Date</label>
 						<input type="date" class="form-control expense-date" data-field="expense_date" value="${frappe.datetime.get_today()}">
 					</div>
 				</div>
-				<div class="col-md-3">
+				<div class="col-md-4">
 					<div class="form-group">
 						<label>Amount</label>
 						<input type="number" class="form-control expense-amount" data-field="amount" placeholder="0.00" step="0.01">
@@ -774,10 +778,24 @@ function add_expense_row(dialog, temp_doc, container) {
 					</div>
 				</div>
 				<div class="row">
+					<div class="col-md-6">
+						<div class="form-group">
+							<label>City<span style="color: red;">*</span></label>
+							<input type="text" class="form-control hotel-city" data-field="hotel_city" placeholder="City" required>
+						</div>
+					</div>
+					<div class="col-md-6">
+						<div class="form-group">
+							<label>Country<span style="color: red;">*</span></label>
+							<input type="text" class="form-control hotel-country" data-field="hotel_country" placeholder="Country" required>
+						</div>
+					</div>
+				</div>
+				<div class="row">
 					<div class="col-md-12">
 						<div class="form-group">
-							<label>Purpose</label>
-							<textarea class="form-control" data-field="purpose" rows="2" placeholder="Purpose"></textarea>
+							<label>Purpose<span style="color: red;">*</span></label>
+							<textarea class="form-control hotel-purpose" data-field="purpose" rows="2" placeholder="Purpose" required></textarea>
 						</div>
 					</div>
 				</div>
@@ -787,6 +805,12 @@ function add_expense_row(dialog, temp_doc, container) {
 				<div class="row">
 					<div class="col-md-4">
 						<div class="form-group">
+							<label>PRN No<span class="prn-required-indicator" style="color: red;">*</span></label>
+							<input type="text" class="form-control prn-number" data-field="custom_prn_number" placeholder="PRN Number">
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
 							<div class="booked-by-wrapper" data-field="custom_booked_by"></div>
 						</div>
 					</div>
@@ -794,16 +818,6 @@ function add_expense_row(dialog, temp_doc, container) {
 						<div class="form-group">
 							<label>Date of Purchase</label>
 							<input type="date" class="form-control" data-field="custom_date_of_purchase">
-						</div>
-					</div>
-					<div class="col-md-4">
-						<div class="form-group">
-							<label>Travel Type</label>
-							<select class="form-control" data-field="custom_travel_type">
-								<option value="">Select Travel Type</option>
-								<option value="One Way">One Way</option>
-								<option value="Return">Return</option>
-							</select>
 						</div>
 					</div>
 				</div>
@@ -825,14 +839,24 @@ function add_expense_row(dialog, temp_doc, container) {
 					</div>
 				</div>
 				<div class="row">
-					<div class="col-md-6">
+					<div class="col-md-4">
 						<div class="form-group">
 							<div class="date-of-travel-wrapper" data-field="custom_date_of_travel"></div>
 						</div>
 					</div>
-					<div class="col-md-6">
+					<div class="col-md-4">
 						<div class="form-group">
 							<div class="date-of-arrival-wrapper" data-field="custom_date_of_arrival"></div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="form-group">
+							<label>Travel Type</label>
+							<select class="form-control" data-field="custom_travel_type">
+								<option value="">Select Travel Type</option>
+								<option value="One Way">One Way</option>
+								<option value="Return">Return</option>
+							</select>
 						</div>
 					</div>
 				</div>
@@ -1241,11 +1265,8 @@ function add_expense_row(dialog, temp_doc, container) {
 		}
 	});
 	
-	// Store calculate function on row for access from toggle function
 	$row.data('calculate-hotel-totals', calculate_hotel_totals);
-	
-	// Initial toggle will be handled by the expense_type_field change handler above
-	
+		
 	// Remove row handler
 	$row.find('.remove-row').on('click', function() {
 		frappe.model.remove_from_locals(row.doctype, row.name);
@@ -1271,7 +1292,6 @@ function lookup_flight_for_modal_row(dialog, $row, row, flight_number) {
 				const result = r.message;
 				
 				if (result.success) {
-					// Show flight details modal for user confirmation
 					show_flight_confirmation_modal_for_row(dialog, $row, row, result.data, flight_number.trim());
 				} else {
 					frappe.show_alert(
@@ -1311,10 +1331,8 @@ function show_flight_confirmation_modal_for_row(dialog, $row, row, flight_data, 
 		return;
 	}
 	
-	// Handle both single flight object and array of flights
 	let flights = Array.isArray(flight_data) ? flight_data : [flight_data];
 	
-	// For multi-leg flights, use first departure and last arrival (full journey)
 	const first_flight = flights[0];
 	const last_flight = flights[flights.length - 1];
 	
@@ -1580,9 +1598,6 @@ function toggle_conditional_fields($row, expense_type) {
 	$row.find('.hotel-fields').hide();
 	$row.find('.travel-fields').hide();
 	
-	// Show/hide PRN required indicator
-	let prn_required = false;
-	
 	// Show fields based on expense_type (case-insensitive comparison)
 	if (expense_type) {
 		let expense_type_lower = expense_type.toLowerCase().trim();
@@ -1598,15 +1613,7 @@ function toggle_conditional_fields($row, expense_type) {
 		// Check if expense type is "Travel" (exact match or contains travel)
 		if (expense_type_lower === 'travel' || expense_type_lower.includes('travel')) {
 			$row.find('.travel-fields').show();
-			prn_required = true;
 		}
-	}
-	
-	// Show/hide PRN required indicator
-	if (prn_required) {
-		$row.find('.prn-required-indicator').show();
-	} else {
-		$row.find('.prn-required-indicator').hide();
 	}
 }
 
@@ -1711,6 +1718,8 @@ function create_additional_expense_claim(original_frm, dialog, temp_doc, create_
 					purpose: row.purpose,
 					hotel_territory: get_field_value('hotel_territory'),
 					hotel_location: get_field_value('hotel_location'),
+					hotel_city: row.hotel_city,
+					hotel_country: row.hotel_country,
 					custom_hotel_name: row.custom_hotel_name,
 					total_nights: row.total_nights,
 					rate_per_day: row.rate_per_day,
@@ -1739,17 +1748,55 @@ function create_additional_expense_claim(original_frm, dialog, temp_doc, create_
 		return;
 	}
 	
-	// Validate PRN number for Travel expense type
+	// Validate fields based on expense type
 	for (let i = 0; i < expense_items.length; i++) {
 		let item = expense_items[i];
 		if (item.expense_type) {
 			let expense_type_lower = (item.expense_type || "").toLowerCase().trim();
+			
+			// Validate Travel expense type
 			if ((expense_type_lower === 'travel' || expense_type_lower.includes('travel'))) {
 				let prn_number = item.custom_prn_number;
 				if (!prn_number || (typeof prn_number === 'string' && prn_number.trim() === '')) {
 					frappe.msgprint({
 						title: __("Validation Error"),
 						message: __("PRN Number is mandatory when Expense Type is Travel."),
+						indicator: "red",
+					});
+					return;
+				}
+			}
+			
+			// Validate Hotel expense type
+			if ((expense_type_lower === 'hotel' || expense_type_lower.includes('hotel'))) {
+				// Check City
+				let hotel_city = item.hotel_city;
+				if (!hotel_city || (typeof hotel_city === 'string' && hotel_city.trim() === '')) {
+					frappe.msgprint({
+						title: __("Validation Error"),
+						message: __("City is mandatory when Expense Type is Hotel."),
+						indicator: "red",
+					});
+					return;
+				}
+				
+				// Check Country
+				let hotel_country = item.hotel_country;
+				if (!hotel_country || (typeof hotel_country === 'string' && hotel_country.trim() === '')) {
+					frappe.msgprint({
+						title: __("Validation Error"),
+						message: __("Country is mandatory when Expense Type is Hotel."),
+						indicator: "red",
+					});
+					return;
+				}
+				
+				// Check Purpose
+				let purpose = item.purpose;
+				if (!purpose || (typeof purpose === 'string' && purpose.trim() === '')) {
+					frappe.msgprint({
+						title: __("Validation Error"),
+						message: __("Purpose is mandatory when Expense Type is Hotel."),
 						indicator: "red",
 					});
 					return;

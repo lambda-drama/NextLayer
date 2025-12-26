@@ -71,6 +71,7 @@ doc_events = {
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
     },
     "Expense Claim": {
+        "before_submit": "nextlayer.next_layer.api.expense_claim_utils.set_expense_approver_and_status",
         "on_submit": "nextlayer.next_layer.api.expense_claim_utils.create_journal_entry_on_submit",
     },
     "Item": {
