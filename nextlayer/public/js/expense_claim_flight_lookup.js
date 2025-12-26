@@ -11,6 +11,87 @@ frappe.ui.form.on("Expense Claim", {
 		}
 	},
 	
+	custom_amount: function(frm) {
+		convert_and_update_amount(frm);
+	},
+	
+	custom_currency: function(frm) {
+		convert_and_update_amount(frm);
+	},
+	
+	before_save: function(frm) {
+		// Count travel expenses
+		let travel_count = 0;
+		if (frm.doc.expenses && frm.doc.expenses.length > 0) {
+			frm.doc.expenses.forEach(function(row) {
+				if (row.expense_type && row.expense_type.toLowerCase().includes("travel")) {
+					travel_count++;
+				}
+			});
+		}
+		
+		// If no travel expenses and custom_amount exists, create/update travel row in child table
+		if (travel_count === 0 && frm.doc.custom_amount) {
+			// Use custom_amountcompany_currency if available (already converted), otherwise use custom_amount
+			let amount_to_use = frm.doc.custom_amountcompany_currency || frm.doc.custom_amount;
+			
+			// Create a new travel expense row
+			let travel_row = frm.add_child("expenses");
+			travel_row.expense_type = "Travel";
+			travel_row.amount = amount_to_use;
+			travel_row.sanctioned_amount = amount_to_use;
+			travel_row.expense_date = frm.doc.expense_claim_date || frappe.datetime.get_today();
+			
+			// Set the values using frappe.model.set_value
+			frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_type", "Travel");
+			frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", amount_to_use);
+			frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", amount_to_use);
+			if (frm.doc.expense_claim_date) {
+				frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_date", frm.doc.expense_claim_date);
+			}
+		}
+		
+		// Transfer travel details from main doctype to child table if expense type is Travel
+		if (frm.doc.expenses && frm.doc.expenses.length > 0) {
+			frm.doc.expenses.forEach(function(row) {
+				// Check if expense type is Travel (case-insensitive)
+				if (row.expense_type && row.expense_type.toLowerCase().includes("travel")) {
+					// Field mapping: main doctype -> child table
+					// Note: main doctype has custom_pnr_number_ (with underscore), child table has custom_prn_number
+					let field_mappings = [
+						{ main: "custom_departure_airport", child: "custom_departure_airport" },
+						{ main: "custom_arrival_airport", child: "custom_arrival_airport" },
+						{ main: "custom_airlines", child: "custom_airlines" },
+						{ main: "custom_date_of_travel", child: "custom_date_of_travel" },
+						{ main: "custom_date_of_arrival", child: "custom_date_of_arrival" },
+						{ main: "custom_date_of_purchase", child: "custom_date_of_purchase" },
+						{ main: "custom_booked_by", child: "custom_booked_by" },
+						{ main: "custom_travel_type", child: "custom_travel_type" },
+						{ main: "custom_pnr_number_", child: "custom_prn_number" }, // Note: different field names
+					];
+					
+					// Transfer values if child table field is missing/empty and main doctype has value
+					field_mappings.forEach(function(mapping) {
+						let main_value = frm.doc[mapping.main];
+						let child_value = row[mapping.child];
+						
+						// If child field is missing/empty and main has value, transfer it
+						if ((!child_value || child_value === "" || child_value === null) && main_value) {
+							row[mapping.child] = main_value;
+							frappe.model.set_value(row.doctype, row.name, mapping.child, main_value);
+						}
+					});
+					
+					// Update amount with converted value if custom_amountcompany_currency exists
+					if (frm.doc.custom_amountcompany_currency) {
+						frappe.model.set_value(row.doctype, row.name, "amount", frm.doc.custom_amountcompany_currency);
+						frappe.model.set_value(row.doctype, row.name, "sanctioned_amount", frm.doc.custom_amountcompany_currency);
+					}
+				}
+			});
+		}
+	},
+	
 	refresh: function(frm) {
 		// Add event listener to flight number field for Enter key
 		if (frm.fields_dict.custom_flight_no && frm.fields_dict.custom_flight_no.$input) {
@@ -433,6 +514,28 @@ function fill_expense_claim_fields(frm, flights, dep_airport, arr_airport, airli
 		// If target_row is provided (from child table), use that specific row
 		target_expense_row = target_row;
 	} else {
+		// Remove empty rows (rows with no expense_type) before processing
+		if (frm.doc.expenses && frm.doc.expenses.length > 0) {
+			// Collect rows to remove (iterate backwards to avoid index issues)
+			let rows_to_remove = [];
+			for (let i = frm.doc.expenses.length - 1; i >= 0; i--) {
+				let row = frm.doc.expenses[i];
+				// Check if row is empty (no expense_type)
+				if (!row.expense_type || row.expense_type.trim() === "") {
+					rows_to_remove.push(i);
+				}
+			}
+			// Remove empty rows
+			if (rows_to_remove.length > 0) {
+				rows_to_remove.forEach(function(index) {
+					frappe.model.remove_from_locals("Expense Claim Detail", frm.doc.expenses[index].name);
+					frm.doc.expenses.splice(index, 1);
+				});
+				// Refresh the expenses field to update UI
+				frm.refresh_field("expenses");
+			}
+		}
+		
 		// Otherwise, find or create Travel expense row (from main form)
 		// Check if there's an existing expense with "Travel" in expense_type
 		if (frm.doc.expenses && frm.doc.expenses.length > 0) {
@@ -519,7 +622,7 @@ function fill_expense_claim_fields(frm, flights, dep_airport, arr_airport, airli
 		let dep_airport_record = results[1].message || null;
 		let arr_airport_record = results[2].message || null;
 		
-		// Fill in the flight details with linked records
+		// Fill in the flight details with linked records in child table
 		if (dep_airport_record) {
 			frappe.model.set_value(target_expense_row.doctype, target_expense_row.name, "custom_departure_airport", dep_airport_record);
 		}
@@ -540,10 +643,54 @@ function fill_expense_claim_fields(frm, flights, dep_airport, arr_airport, airli
 			frappe.model.set_value(target_expense_row.doctype, target_expense_row.name, "custom_date_of_arrival", arr_datetime);
 		}
 		
+		// Also fill main Expense Claim doctype fields
+		// Update the document directly and then refresh
+		if (dep_airport_record) {
+			frm.doc.custom_departure_airport = dep_airport_record;
+			frm.set_value("custom_departure_airport", dep_airport_record);
+		}
+		
+		if (arr_airport_record) {
+			frm.doc.custom_arrival_airport = arr_airport_record;
+			frm.set_value("custom_arrival_airport", arr_airport_record);
+		}
+		
+		if (airline_record) {
+			frm.doc.custom_airlines = airline_record;
+			frm.set_value("custom_airlines", airline_record);
+		}
+		
+		if (dep_datetime) {
+			frm.doc.custom_date_of_travel = dep_datetime;
+			frm.set_value("custom_date_of_travel", dep_datetime);
+		}
+		
+		if (arr_datetime) {
+			frm.doc.custom_date_of_arrival = arr_datetime;
+			frm.set_value("custom_date_of_arrival", arr_datetime);
+		}
+		
+		// Also update locals to ensure data persistence
+		if (locals[frm.doctype] && locals[frm.doctype][frm.doc.name]) {
+			if (dep_airport_record) locals[frm.doctype][frm.doc.name].custom_departure_airport = dep_airport_record;
+			if (arr_airport_record) locals[frm.doctype][frm.doc.name].custom_arrival_airport = arr_airport_record;
+			if (airline_record) locals[frm.doctype][frm.doc.name].custom_airlines = airline_record;
+			if (dep_datetime) locals[frm.doctype][frm.doc.name].custom_date_of_travel = dep_datetime;
+			if (arr_datetime) locals[frm.doctype][frm.doc.name].custom_date_of_arrival = arr_datetime;
+		}
+		
 		frappe.show_alert(__("Flight information filled successfully!"), 3, "green");
 		
 		// Refresh the form to show updated values
 		frm.refresh_field("expenses");
+		// Refresh main doctype fields
+		setTimeout(function() {
+			frm.refresh_field("custom_departure_airport");
+			frm.refresh_field("custom_arrival_airport");
+			frm.refresh_field("custom_airlines");
+			frm.refresh_field("custom_date_of_travel");
+			frm.refresh_field("custom_date_of_arrival");
+		}, 200);
 	}).catch(function(error) {
 		frappe.show_alert(__("Error creating airline/airport records. Please check manually."), 5, "red");
 		frappe.log_error(error, "Flight Fill Error");
@@ -788,49 +935,49 @@ function add_expense_row(dialog, temp_doc, container) {
 						<div class="form-group">
 							<label>Country<span style="color: red;">*</span></label>
 							<input type="text" class="form-control hotel-country" data-field="hotel_country" placeholder="Country" required>
-						</div>
-					</div>
-				</div>
-				<div class="row">
-					<div class="col-md-12">
-						<div class="form-group">
-							<label>Purpose<span style="color: red;">*</span></label>
-							<textarea class="form-control hotel-purpose" data-field="purpose" rows="2" placeholder="Purpose" required></textarea>
-						</div>
 					</div>
 				</div>
 			</div>
+			<div class="row">
+				<div class="col-md-12">
+					<div class="form-group">
+							<label>Purpose<span style="color: red;">*</span></label>
+							<textarea class="form-control hotel-purpose" data-field="purpose" rows="2" placeholder="Purpose" required></textarea>
+					</div>
+				</div>
+			</div>
+			</div>
 			<!-- Travel Fields (shown only when expense_type === 'Travel') -->
 			<div class="travel-fields" style="display: none;">
-				<div class="row">
+			<div class="row">
 					<div class="col-md-4">
-						<div class="form-group">
+					<div class="form-group">
 							<label>PRN No<span class="prn-required-indicator" style="color: red;">*</span></label>
 							<input type="text" class="form-control prn-number" data-field="custom_prn_number" placeholder="PRN Number">
-						</div>
 					</div>
+				</div>
 					<div class="col-md-4">
-						<div class="form-group">
+					<div class="form-group">
 							<div class="booked-by-wrapper" data-field="custom_booked_by"></div>
-						</div>
 					</div>
+				</div>
 					<div class="col-md-4">
-						<div class="form-group">
+					<div class="form-group">
 							<label>Date of Purchase</label>
 							<input type="date" class="form-control" data-field="custom_date_of_purchase">
-						</div>
 					</div>
+				</div>
 				</div>
 				<div class="row">
 					<div class="col-md-4">
-						<div class="form-group">
+					<div class="form-group">
 							<div class="departure-airport-wrapper" data-field="custom_departure_airport"></div>
-						</div>
 					</div>
+				</div>
 					<div class="col-md-4">
 						<div class="form-group">
 							<div class="arrival-airport-wrapper" data-field="custom_arrival_airport"></div>
-						</div>
+			</div>
 					</div>
 					<div class="col-md-4">
 						<div class="form-group">
@@ -873,8 +1020,8 @@ function add_expense_row(dialog, temp_doc, container) {
 			<div class="row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
 				<div class="col-md-12" style="text-align: right;">
 					<button class="btn btn-sm btn-danger remove-row">
-						<i class="fa fa-trash"></i> Remove
-					</button>
+				<i class="fa fa-trash"></i> Remove
+			</button>
 				</div>
 			</div>
 		</div>
@@ -1266,7 +1413,7 @@ function add_expense_row(dialog, temp_doc, container) {
 	});
 	
 	$row.data('calculate-hotel-totals', calculate_hotel_totals);
-		
+	
 	// Remove row handler
 	$row.find('.remove-row').on('click', function() {
 		frappe.model.remove_from_locals(row.doctype, row.name);
@@ -1848,4 +1995,121 @@ function create_additional_expense_claim(original_frm, dialog, temp_doc, create_
 			});
 		}
 	});
+}
+
+// Function to convert custom_amount from custom_currency (transaction currency) to company currency and update child table
+function convert_and_update_amount(frm) {
+	// First, ensure custom_amount is set in custom_currency (transaction currency)
+	if (!frm.doc.custom_amount || !frm.doc.custom_currency || !frm.doc.company) {
+		return;
+	}
+	
+	let custom_amount = parseFloat(frm.doc.custom_amount) || 0;
+	if (custom_amount === 0) {
+		return;
+	}
+	
+	// custom_amount is already in custom_currency (transaction currency) - keep it as is
+	// Now convert to company currency for child table
+	
+	// Get company default currency
+	frappe.db.get_value("Company", frm.doc.company, "default_currency", function(r) {
+		if (!r || !r.default_currency) {
+			return;
+		}
+		
+		let company_currency = r.default_currency;
+		let from_currency = frm.doc.custom_currency; // Transaction currency
+		
+		// If currencies are the same, no conversion needed
+		if (from_currency === company_currency) {
+			// Same currency, use amount directly
+			update_travel_row_amount(frm, custom_amount);
+			return;
+		}
+		
+		// Get exchange rate and convert from transaction currency to company currency
+		let transaction_date = frm.doc.expense_claim_date || frappe.datetime.get_today();
+		
+		frappe.call({
+			method: "erpnext.setup.utils.get_exchange_rate",
+			args: {
+				from_currency: from_currency,
+				to_currency: company_currency,
+				transaction_date: transaction_date,
+				company: frm.doc.company
+			},
+			callback: function(rate_result) {
+				if (rate_result.message) {
+					let exchange_rate = rate_result.message;
+					let converted_amount = custom_amount * exchange_rate;
+					
+					// Update travel row with converted amount (in company currency)
+					update_travel_row_amount(frm, converted_amount);
+					
+					// Update custom_amountcompany_currency field with converted amount
+					frm.set_value("custom_amountcompany_currency", converted_amount);
+					
+					// Show conversion info to user
+					frappe.show_alert(
+						__("Converted: {0} {1} = {2} {3}", [
+							custom_amount.toFixed(2),
+							from_currency,
+							converted_amount.toFixed(2),
+							company_currency
+						]),
+						3,
+						"blue"
+					);
+				} else {
+					// If exchange rate not found, use original amount
+					update_travel_row_amount(frm, custom_amount);
+					frappe.show_alert(
+						__("Exchange rate not found. Using original amount."),
+						3,
+						"orange"
+					);
+				}
+			},
+			error: function() {
+				// On error, use original amount
+				update_travel_row_amount(frm, custom_amount);
+			}
+		});
+	});
+}
+
+// Helper function to update travel row amount in child table
+function update_travel_row_amount(frm, converted_amount) {
+	if (!frm.doc.expenses || frm.doc.expenses.length === 0) {
+		return;
+	}
+	
+	// Find travel expense row
+	let travel_row = null;
+	for (let i = 0; i < frm.doc.expenses.length; i++) {
+		let row = frm.doc.expenses[i];
+		if (row.expense_type && row.expense_type.toLowerCase().includes("travel")) {
+			travel_row = row;
+			break;
+		}
+	}
+	
+	// If no travel row found, create one
+	if (!travel_row) {
+		travel_row = frm.add_child("expenses");
+		travel_row.expense_type = "Travel";
+		travel_row.expense_date = frm.doc.expense_claim_date || frappe.datetime.get_today();
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_type", "Travel");
+		if (frm.doc.expense_claim_date) {
+			frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_date", frm.doc.expense_claim_date);
+		}
+	}
+	
+	// Update amount and sanctioned_amount
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", converted_amount);
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", converted_amount);
+	
+	// Refresh the expenses field to show updated values
+	frm.refresh_field("expenses");
 }

@@ -282,6 +282,160 @@ def create_journal_entry_for_expense_claim(expense_claim):
 		raise
 
 
+def update_child_table_details(doc, method):
+	"""
+	Hook function called before Expense Claim is saved.
+	Updates child table details based on main doctype fields.
+	
+	Args:
+		doc: Expense Claim document
+		method: Method name (before_save)
+	"""
+	try:
+		# Count travel expenses
+		travel_count = 0
+		if doc.expenses:
+			for row in doc.expenses:
+				if row.expense_type and "travel" in row.expense_type.lower():
+					travel_count += 1
+		
+		# If no travel expenses and custom_amount exists, create a travel row
+		if travel_count == 0 and hasattr(doc, 'custom_amount') and doc.custom_amount:
+			# Convert currency if custom_currency (transaction currency) is different from company currency
+			# custom_amount is in custom_currency (transaction currency)
+			custom_amount = doc.custom_amount
+			converted_amount = custom_amount
+			
+			# Get company default currency
+			company_currency = None
+			if doc.company:
+				company_currency = frappe.get_cached_value("Company", doc.company, "default_currency")
+			
+			# Convert if currencies are different
+			if (hasattr(doc, 'custom_currency') and doc.custom_currency and 
+			    company_currency and doc.custom_currency != company_currency):
+				try:
+					transaction_date = doc.expense_claim_date or frappe.utils.today()
+					exchange_rate = frappe.utils.get_exchange_rate(
+						doc.custom_currency,
+						company_currency,
+						transaction_date,
+						doc.company
+					)
+					converted_amount = float(custom_amount) * exchange_rate
+				except Exception as e:
+					frappe.log_error(
+						f"Error converting currency for Expense Claim {doc.name}: {str(e)}",
+						"Expense Claim Utils Warning"
+					)
+					# Use original amount if conversion fails
+					converted_amount = float(custom_amount) if custom_amount else 0
+			else:
+				# Same currency or no currency specified, use amount directly
+				try:
+					converted_amount = float(custom_amount) if custom_amount else 0
+				except (ValueError, TypeError):
+					converted_amount = 0
+			
+			# Create a new travel expense row
+			row = doc.append("expenses", {})
+			row.expense_type = "Travel"
+			# Use custom_amountcompany_currency if available (already converted), otherwise use converted_amount
+			amount_to_use = doc.custom_amountcompany_currency if hasattr(doc, 'custom_amountcompany_currency') and doc.custom_amountcompany_currency else converted_amount
+			row.amount = amount_to_use
+			row.sanctioned_amount = amount_to_use
+			if hasattr(doc, 'expense_claim_date') and doc.expense_claim_date:
+				row.expense_date = doc.expense_claim_date
+			else:
+				row.expense_date = frappe.utils.today()
+		
+		# Transfer travel details from main doctype to child table if expense type is Travel
+		if doc.expenses:
+			for row in doc.expenses:
+				# Check if expense type is Travel (case-insensitive)
+				if row.expense_type and "travel" in row.expense_type.lower():
+					# Field mapping: main doctype -> child table
+					field_mappings = [
+						("custom_departure_airport", "custom_departure_airport"),
+						("custom_arrival_airport", "custom_arrival_airport"),
+						("custom_airlines", "custom_airlines"),
+						("custom_date_of_travel", "custom_date_of_travel"),
+						("custom_date_of_arrival", "custom_date_of_arrival"),
+						("custom_date_of_purchase", "custom_date_of_purchase"),
+						("custom_booked_by", "custom_booked_by"),
+						("custom_travel_type", "custom_travel_type"),
+						("custom_pnr_number_", "custom_prn_number"),  # Note: different field names
+					]
+					
+					# Transfer values if child table field is missing/empty and main doctype has value
+					for main_field, child_field in field_mappings:
+						if hasattr(doc, main_field):
+							main_value = doc.get(main_field)
+							child_value = row.get(child_field)
+							
+							# If child field is missing/empty and main has value, transfer it
+							if main_value and (not child_value or child_value == "" or child_value is None):
+								row.set(child_field, main_value)
+					
+					# Special handling for custom_amount -> amount: use custom_amountcompany_currency if available
+					if hasattr(doc, 'custom_amount') and doc.custom_amount is not None:
+						# Use custom_amountcompany_currency if it exists (already converted), otherwise convert
+						if hasattr(doc, 'custom_amountcompany_currency') and doc.custom_amountcompany_currency:
+							# Use the already converted amount
+							row.amount = doc.custom_amountcompany_currency
+							row.sanctioned_amount = doc.custom_amountcompany_currency
+						else:
+							# Convert if needed
+							custom_amount = doc.custom_amount
+							converted_amount = custom_amount
+							
+							# Get company default currency
+							company_currency = None
+							if doc.company:
+								company_currency = frappe.get_cached_value("Company", doc.company, "default_currency")
+							
+							# Convert if currencies are different
+							# custom_amount is in custom_currency (transaction currency), convert to company currency
+							if (hasattr(doc, 'custom_currency') and doc.custom_currency and 
+							    company_currency and doc.custom_currency != company_currency):
+								try:
+									transaction_date = doc.expense_claim_date or frappe.utils.today()
+									exchange_rate = frappe.utils.get_exchange_rate(
+										doc.custom_currency,
+										company_currency,
+										transaction_date,
+										doc.company
+									)
+									converted_amount = float(custom_amount) * exchange_rate
+								except Exception as e:
+									frappe.log_error(
+										f"Error converting currency for Expense Claim {doc.name}: {str(e)}",
+										"Expense Claim Utils Warning"
+									)
+									# Use original amount if conversion fails
+									try:
+										converted_amount = float(custom_amount) if custom_amount else 0
+									except (ValueError, TypeError):
+										converted_amount = 0
+							else:
+								# Same currency or no currency specified
+								try:
+									converted_amount = float(custom_amount) if custom_amount else 0
+								except (ValueError, TypeError):
+									converted_amount = 0
+							
+							# Update row with converted amount
+							row.amount = converted_amount
+							row.sanctioned_amount = converted_amount
+	except Exception as e:
+		# Log error but don't prevent save
+		frappe.log_error(
+			f"Error updating child table details for Expense Claim {doc.name}: {str(e)}",
+			"Expense Claim Utils Error"
+		)
+		# Don't throw - let save proceed
+
+
 def set_expense_approver_and_status(doc, method):
 	"""
 	Hook function called before Expense Claim is submitted.
