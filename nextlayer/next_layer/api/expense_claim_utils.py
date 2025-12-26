@@ -129,6 +129,8 @@ def create_additional_expense_claim(original_expense_claim, expense_items, compa
 				"purpose": safe_get(item, "purpose"),
 				"hotel_territory": safe_get(item, "hotel_territory"),
 				"hotel_location": safe_get(item, "hotel_location"),
+				"hotel_city": safe_get(item, "hotel_city"),
+				"hotel_country": safe_get(item, "hotel_country"),
 				"custom_hotel_name": safe_get(item, "custom_hotel_name"),
 				"total_nights": safe_get(item, "total_nights"),
 				"custom_hotel": safe_get(item, "custom_hotel"),
@@ -153,9 +155,6 @@ def create_additional_expense_claim(original_expense_claim, expense_items, compa
 			
 			# Append the expense detail
 			new_ec.append("expenses", expense_detail)
-			
-			# Explicitly set custom_prn_number on the last appended row
-			# This ensures it's saved even if the field wasn't recognized during append
 			
 		# Insert and save
 		new_ec.insert(ignore_permissions=True)
@@ -281,6 +280,43 @@ def create_journal_entry_for_expense_claim(expense_claim):
 	except Exception as e:
 		frappe.log_error(f"Error creating journal entry: {str(e)}", "Expense Claim Utils Error")
 		raise
+
+
+def set_expense_approver_and_status(doc, method):
+	"""
+	Hook function called before Expense Claim is submitted.
+	Sets expense_approver to Administrator if null, and updates approval_status if needed.
+	
+	Args:
+		doc: Expense Claim document
+		method: Method name (before_submit)
+	"""
+	try:
+		# Set expense_approver to Administrator if it's null or empty
+		if not doc.expense_approver:
+			doc.expense_approver = "Administrator"
+			frappe.msgprint(
+				_("Expense Approver has been set to Administrator."),
+				indicator="blue",
+				alert=True
+			)
+		
+		# If approval_status is Draft and custom_traveller_name is filled, change to Approved
+		if hasattr(doc, 'approval_status') and doc.approval_status == "Draft":
+			if hasattr(doc, 'custom_traveller_name') and doc.custom_traveller_name:
+				doc.approval_status = "Approved"
+				frappe.msgprint(
+					_("Approval Status has been changed from Draft to Approved."),
+					indicator="green",
+					alert=True
+				)
+	except Exception as e:
+		# Log error but don't prevent submission
+		frappe.log_error(
+			f"Error setting expense approver/status for Expense Claim {doc.name}: {str(e)}",
+			"Expense Claim Utils Error"
+		)
+		# Don't throw - let submission proceed
 
 
 def create_journal_entry_on_submit(doc, method):
