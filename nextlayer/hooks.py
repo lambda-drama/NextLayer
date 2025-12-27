@@ -92,6 +92,12 @@ fixtures = [
         "filters": [
             
         ]
+    },
+     {
+        "doctype": "Receipt Entry Remark",
+        "filters": [
+            
+        ]
     }
 ]
 
