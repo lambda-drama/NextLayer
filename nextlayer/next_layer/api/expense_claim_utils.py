@@ -155,7 +155,7 @@ def create_additional_expense_claim(original_expense_claim, expense_items, compa
 			
 			# Append the expense detail
 			new_ec.append("expenses", expense_detail)
-			
+		
 		# Insert and save
 		new_ec.insert(ignore_permissions=True)
 		new_ec.submit()
@@ -163,9 +163,20 @@ def create_additional_expense_claim(original_expense_claim, expense_items, compa
 		
 		# Create journal entry if requested
 		journal_entry_name = None
+		journal_entry_names = None
 		if create_journal_entry:
 			try:
-				journal_entry_name = create_journal_entry_for_expense_claim(new_ec)
+				journal_entry_result = create_journal_entry_for_expense_claim(new_ec)
+				# Handle None (when is_paid is ticked - ERPNext handles it), string, or list
+				if journal_entry_result is None:
+					# is_paid is ticked, ERPNext handles GL entries automatically
+					journal_entry_name = None
+					journal_entry_names = None
+				elif isinstance(journal_entry_result, list):
+					journal_entry_names = journal_entry_result
+					journal_entry_name = ", ".join(journal_entry_result)  # For backward compatibility
+				else:
+					journal_entry_name = journal_entry_result
 			except Exception as e:
 				frappe.log_error(f"Error creating journal entry for expense claim {new_ec.name}: {str(e)}", "Expense Claim Utils Error")
 				# Don't fail the whole operation if journal entry creation fails
@@ -175,6 +186,7 @@ def create_additional_expense_claim(original_expense_claim, expense_items, compa
 			"success": True,
 			"expense_claim_name": new_ec.name,
 			"journal_entry_name": journal_entry_name,
+			"journal_entry_names": journal_entry_names,  # List of journal entries if multiple
 		}
 		
 	except Exception as e:
@@ -187,15 +199,29 @@ def create_additional_expense_claim(original_expense_claim, expense_items, compa
 
 def create_journal_entry_for_expense_claim(expense_claim):
 	"""
-	Create a Journal Entry to book the expense claim as paid
+	Create a Journal Entry to book the expense claim
+	
+	When is_paid is ticked:
+	- ERPNext automatically creates GL entries, so we don't create a journal entry
+	
+	When is_paid is not ticked:
+	- Creates journal entry that debits payable and credits payment account
 	
 	Args:
 		expense_claim: Expense Claim document
 	
 	Returns:
-		str: Journal Entry name
+		str: Journal Entry name, or None if is_paid is ticked
 	"""
 	try:
+		# Check if is_paid is ticked
+		is_paid = getattr(expense_claim, 'is_paid', 0)
+		
+		# If is_paid is ticked, ERPNext handles GL entries automatically
+		# So we don't need to create a journal entry
+		if is_paid:
+			return None
+		
 		# Get total amount from expense claim
 		total_amount = expense_claim.total_sanctioned_amount or expense_claim.total_claimed_amount or 0
 		
@@ -205,11 +231,6 @@ def create_journal_entry_for_expense_claim(expense_claim):
 		# Get company details
 		company = expense_claim.company
 		company_doc = frappe.get_doc("Company", company)
-		
-		# Get default accounts from company
-		# For expense claim payment, we typically:
-		# - Debit: Expense Claim Payable Account (or default payable account)
-		# - Credit: Bank/Cash Account (or default payment account)
 		
 		# Get payable account from expense claim or company default
 		payable_account = expense_claim.payable_account or company_doc.default_expense_claim_payable_account
@@ -231,12 +252,18 @@ def create_journal_entry_for_expense_claim(expense_claim):
 		if not payment_account:
 			frappe.throw(_("Please set Default Bank Account or Default Cash Account in Company settings"))
 		
-		# Create Journal Entry
+		# Get posting date safely
+		posting_date = getattr(expense_claim, 'expense_claim_date', None) or \
+		              getattr(expense_claim, 'posting_date', None) or \
+		              frappe.utils.today()
+		
+		# Create Journal Entry: Debit Payable, Credit Payment Account
+		# Only reference Expense Claim on the debit row (payable account), not on credit row
 		je = frappe.get_doc({
 			"doctype": "Journal Entry",
 			"voucher_type": "Journal Entry",
 			"company": company,
-			"posting_date": frappe.utils.today(),
+			"posting_date": posting_date,
 			"user_remark": f"Payment for Expense Claim {expense_claim.name}",
 			"accounts": [
 				{
@@ -250,8 +277,7 @@ def create_journal_entry_for_expense_claim(expense_claim):
 				{
 					"account": payment_account,
 					"credit_in_account_currency": total_amount,
-					"reference_type": "Expense Claim",
-					"reference_name": expense_claim.name,
+					# No reference_type/reference_name on credit row
 				}
 			]
 		})
@@ -280,6 +306,160 @@ def create_journal_entry_for_expense_claim(expense_claim):
 	except Exception as e:
 		frappe.log_error(f"Error creating journal entry: {str(e)}", "Expense Claim Utils Error")
 		raise
+
+
+def update_child_table_details(doc, method):
+	"""
+	Hook function called before Expense Claim is saved.
+	Updates child table details based on main doctype fields.
+	
+	Args:
+		doc: Expense Claim document
+		method: Method name (before_save)
+	"""
+	try:
+		# Count travel expenses
+		travel_count = 0
+		if doc.expenses:
+			for row in doc.expenses:
+				if row.expense_type and "travel" in row.expense_type.lower():
+					travel_count += 1
+		
+		# If no travel expenses and custom_amount exists, create a travel row
+		if travel_count == 0 and hasattr(doc, 'custom_amount') and doc.custom_amount:
+			# Convert currency if custom_currency (transaction currency) is different from company currency
+			# custom_amount is in custom_currency (transaction currency)
+			custom_amount = doc.custom_amount
+			converted_amount = custom_amount
+			
+			# Get company default currency
+			company_currency = None
+			if doc.company:
+				company_currency = frappe.get_cached_value("Company", doc.company, "default_currency")
+			
+			# Convert if currencies are different
+			if (hasattr(doc, 'custom_currency') and doc.custom_currency and 
+			    company_currency and doc.custom_currency != company_currency):
+				try:
+					transaction_date = doc.expense_claim_date or frappe.utils.today()
+					exchange_rate = frappe.utils.get_exchange_rate(
+						doc.custom_currency,
+						company_currency,
+						transaction_date,
+						doc.company
+					)
+					converted_amount = float(custom_amount) * exchange_rate
+				except Exception as e:
+					frappe.log_error(
+						f"Error converting currency for Expense Claim {doc.name}: {str(e)}",
+						"Expense Claim Utils Warning"
+					)
+					# Use original amount if conversion fails
+					converted_amount = float(custom_amount) if custom_amount else 0
+			else:
+				# Same currency or no currency specified, use amount directly
+				try:
+					converted_amount = float(custom_amount) if custom_amount else 0
+				except (ValueError, TypeError):
+					converted_amount = 0
+			
+			# Create a new travel expense row
+			row = doc.append("expenses", {})
+			row.expense_type = "Travel"
+			# Use custom_amountcompany_currency if available (already converted), otherwise use converted_amount
+			amount_to_use = doc.custom_amountcompany_currency if hasattr(doc, 'custom_amountcompany_currency') and doc.custom_amountcompany_currency else converted_amount
+			row.amount = amount_to_use
+			row.sanctioned_amount = amount_to_use
+			if hasattr(doc, 'expense_claim_date') and doc.expense_claim_date:
+				row.expense_date = doc.expense_claim_date
+			else:
+				row.expense_date = frappe.utils.today()
+		
+		# Transfer travel details from main doctype to child table if expense type is Travel
+		if doc.expenses:
+			for row in doc.expenses:
+				# Check if expense type is Travel (case-insensitive)
+				if row.expense_type and "travel" in row.expense_type.lower():
+					# Field mapping: main doctype -> child table
+					field_mappings = [
+						("custom_departure_airport", "custom_departure_airport"),
+						("custom_arrival_airport", "custom_arrival_airport"),
+						("custom_airlines", "custom_airlines"),
+						("custom_date_of_travel", "custom_date_of_travel"),
+						("custom_date_of_arrival", "custom_date_of_arrival"),
+						("custom_date_of_purchase", "custom_date_of_purchase"),
+						("custom_booked_by", "custom_booked_by"),
+						("custom_travel_type", "custom_travel_type"),
+						("custom_pnr_number_", "custom_prn_number"),  # Note: different field names
+					]
+					
+					# Transfer values if child table field is missing/empty and main doctype has value
+					for main_field, child_field in field_mappings:
+						if hasattr(doc, main_field):
+							main_value = doc.get(main_field)
+							child_value = row.get(child_field)
+							
+							# If child field is missing/empty and main has value, transfer it
+							if main_value and (not child_value or child_value == "" or child_value is None):
+								row.set(child_field, main_value)
+					
+					# Special handling for custom_amount -> amount: use custom_amountcompany_currency if available
+					if hasattr(doc, 'custom_amount') and doc.custom_amount is not None:
+						# Use custom_amountcompany_currency if it exists (already converted), otherwise convert
+						if hasattr(doc, 'custom_amountcompany_currency') and doc.custom_amountcompany_currency:
+							# Use the already converted amount
+							row.amount = doc.custom_amountcompany_currency
+							row.sanctioned_amount = doc.custom_amountcompany_currency
+						else:
+							# Convert if needed
+							custom_amount = doc.custom_amount
+							converted_amount = custom_amount
+							
+							# Get company default currency
+							company_currency = None
+							if doc.company:
+								company_currency = frappe.get_cached_value("Company", doc.company, "default_currency")
+							
+							# Convert if currencies are different
+							# custom_amount is in custom_currency (transaction currency), convert to company currency
+							if (hasattr(doc, 'custom_currency') and doc.custom_currency and 
+							    company_currency and doc.custom_currency != company_currency):
+								try:
+									transaction_date = doc.expense_claim_date or frappe.utils.today()
+									exchange_rate = frappe.utils.get_exchange_rate(
+										doc.custom_currency,
+										company_currency,
+										transaction_date,
+										doc.company
+									)
+									converted_amount = float(custom_amount) * exchange_rate
+								except Exception as e:
+									frappe.log_error(
+										f"Error converting currency for Expense Claim {doc.name}: {str(e)}",
+										"Expense Claim Utils Warning"
+									)
+									# Use original amount if conversion fails
+									try:
+										converted_amount = float(custom_amount) if custom_amount else 0
+									except (ValueError, TypeError):
+										converted_amount = 0
+							else:
+								# Same currency or no currency specified
+								try:
+									converted_amount = float(custom_amount) if custom_amount else 0
+								except (ValueError, TypeError):
+									converted_amount = 0
+							
+							# Update row with converted amount
+							row.amount = converted_amount
+							row.sanctioned_amount = converted_amount
+	except Exception as e:
+		# Log error but don't prevent save
+		frappe.log_error(
+			f"Error updating child table details for Expense Claim {doc.name}: {str(e)}",
+			"Expense Claim Utils Error"
+		)
+		# Don't throw - let save proceed
 
 
 def set_expense_approver_and_status(doc, method):
@@ -324,6 +504,9 @@ def create_journal_entry_on_submit(doc, method):
 	Hook function called when Expense Claim is submitted.
 	Creates a journal entry if custom_book_journal is checked.
 	
+	Note: If is_paid is ticked, ERPNext automatically creates GL entries,
+	so we don't create a journal entry in that case.
+	
 	Args:
 		doc: Expense Claim document
 		method: Method name (on_submit)
@@ -331,12 +514,34 @@ def create_journal_entry_on_submit(doc, method):
 	try:
 		# Check if custom_book_journal is checked
 		if hasattr(doc, 'custom_book_journal') and doc.custom_book_journal:
-			# Create journal entry
-			journal_entry_name = create_journal_entry_for_expense_claim(doc)
+			# Check if is_paid is ticked - if so, ERPNext handles it automatically
+			is_paid = getattr(doc, 'is_paid', 0)
+			if is_paid:
+				frappe.msgprint(
+					_("Expense Claim is marked as paid. ERPNext will automatically create GL entries."),
+					indicator="blue",
+					alert=True
+				)
+				return
+			
+			# Create journal entry (only when is_paid is not ticked)
+			journal_entry_result = create_journal_entry_for_expense_claim(doc)
+			
+			# Handle None (shouldn't happen here since we checked is_paid), string, or list
+			if journal_entry_result is None:
+				# This shouldn't happen since we checked is_paid above, but handle it gracefully
+				return
+			elif isinstance(journal_entry_result, list):
+				journal_entry_names = journal_entry_result
+				message = _("Journal Entries {0} have been created and submitted for this expense claim.").format(
+					", ".join([frappe.bold(name) for name in journal_entry_names])
+				)
+			else:
+				message = _("Journal Entry {0} has been created and submitted for this expense claim.").format(
+					frappe.bold(journal_entry_result)
+				)
 			frappe.msgprint(
-				_("Journal Entry {0} has been created and submitted for this expense claim.").format(
-					frappe.bold(journal_entry_name)
-				),
+				message,
 				indicator="green",
 				alert=True
 			)
