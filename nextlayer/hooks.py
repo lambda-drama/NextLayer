@@ -50,27 +50,41 @@ fixtures = [
                     "Expense Claim-custom_airlines",
                     "Expense Claim-custom_amount",
                     "Expense Claim-custom_column_break_smd2y",
-                    
                     # "Expense Claim-custom_column_break_ffvc7",
                     "Expense Claim-custom_date_of_travel",
-                    
                     "Expense Claim-custom_date_of_arrival",
                     "Expense Claim-custom_date_of_purchase",
-                    # "Expense Claim-custom_column_break_bhygl",
-                    # "Expense Claim-custom_booked_by",
-                    # "Expense Claim-custom_travel_type",
+                   
                     # "Expense Claim-custom_pnr_number_",
                     "Expense Claim-custom_amountcompany_currency",
                     "Expense Claim-custom_column_break_ajbxm",
                     "Expense Claim-custom_booked_by",
                     "Expense Claim-custom_travel_type",
                     "Expense Claim-custom_pnr_number_",
-                    
+
                     # "Expense Claim-custom_amount",
+                    "Sales Invoice-custom_engine",
+                    "Sales Invoice-custom_chassis_no",
+                    "Sales Invoice-custom_column_break_o0b9s",
+                    "Sales Invoice-custom_model",
+                    "Sales Invoice-custom_color",
+                    "Sales Invoice-custom_owner_information",   
 
                 ),
             ]
         ],
+    },
+    {
+        "doctype": "Custom HTML Block",
+        "filters": [
+            ["name", "in", ["Main Dashboard Table"]]
+        ]
+    },
+     {
+        "doctype": "Receipt Entry Remark",
+        "filters": [
+
+        ]
     }
 ]
 
