@@ -71,6 +71,12 @@ fixtures = [
                 ),
             ]
         ],
+    },
+    {
+        "doctype": "Custom HTML Block",
+        "filters": [
+            ["name", "in", ["Main Dashboard Table"]]
+        ]
     }
 ]
 
