@@ -80,10 +80,10 @@ fixtures = [
             ["name", "in", ["Main Dashboard Table"]]
         ]
     },
-     {
-        "doctype": "Receipt Entry Remark",
+    {
+        "doctype": "Server Script",
         "filters": [
-
+            ["module", "=", "NextLayer"]
         ]
     }
 ]
