@@ -50,10 +50,10 @@ fixtures = [
                     "Expense Claim-custom_airlines",
                     "Expense Claim-custom_amount",
                     "Expense Claim-custom_column_break_smd2y",
-                    
+
                     # "Expense Claim-custom_column_break_ffvc7",
                     "Expense Claim-custom_date_of_travel",
-                    
+
                     "Expense Claim-custom_date_of_arrival",
                     "Expense Claim-custom_date_of_purchase",
                     # "Expense Claim-custom_column_break_bhygl",
@@ -65,7 +65,7 @@ fixtures = [
                     "Expense Claim-custom_booked_by",
                     "Expense Claim-custom_travel_type",
                     "Expense Claim-custom_pnr_number_",
-                    
+
                     # "Expense Claim-custom_amount",
 
                 ),
@@ -81,7 +81,7 @@ fixtures = [
      {
         "doctype": "Receipt Entry Remark",
         "filters": [
-            
+
         ]
     }
 ]
