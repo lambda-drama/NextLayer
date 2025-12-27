@@ -68,7 +68,8 @@ fixtures = [
                     "Sales Invoice-custom_column_break_o0b9s",
                     "Sales Invoice-custom_model",
                     "Sales Invoice-custom_color",
-                    "Sales Invoice-custom_owner_information",   
+                    "Sales Invoice-custom_owner_information",
+                    
 
                 ),
             ]
