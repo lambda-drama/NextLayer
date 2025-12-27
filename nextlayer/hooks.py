@@ -87,8 +87,8 @@ fixtures = [
             ["module", "=", "NextLayer"]
         ]
     },
-     {
-        "doctype": "Receipt Entry Remark",
+    {
+        "doctype": "Server Script",
         "filters": [
             
         ]
