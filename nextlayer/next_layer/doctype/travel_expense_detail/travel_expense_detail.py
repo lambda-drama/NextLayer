@@ -8,3 +8,5 @@ from frappe.model.document import Document
 class TravelExpenseDetail(Document):
 	pass
 
+
+
