@@ -18,12 +18,14 @@ def get_balance(company=None):
             "company": company,
             "is_group": 0
         },
-        fields=["name"]
+        fields=["name", "account_name"]
     )
 
+    result = []
     total_balance = 0.0
 
     for acc in cash_accounts:
+        account_balance = 0.0
         # Use Frappe ORM to sum debit and credit from GL Entries
         gl_entries = frappe.get_all(
             "GL Entry",
@@ -31,9 +33,21 @@ def get_balance(company=None):
             fields=["debit", "credit"]
         )
         for entry in gl_entries:
-            total_balance += flt(entry.debit) - flt(entry.credit)
+            balance = flt(entry.debit) - flt(entry.credit)
+            account_balance += balance
+            total_balance += balance
+        
+        if account_balance != 0:
+            result.append({
+                "Account": acc.account_name or acc.name,
+                "Balance": account_balance
+            })
 
-    return {
-        "value": total_balance,
-        "fieldtype": "Currency"
-    }
+    # If no accounts with balance, return total
+    if not result:
+        return [{
+            "Account Type": "Cash",
+            "Total Balance": total_balance
+        }]
+    
+    return result
