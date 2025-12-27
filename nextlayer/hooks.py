@@ -40,6 +40,20 @@ fixtures = [
                     "Expense Claim-custom_flight_no",
                     "Expense Claim-custom_column_break_luxng",
                     "Expense Claim-custom_book_journal",
+                    "Expense Claim-custom_pnr_number_",
+                    "Expense Claim-custom_travel_type",
+                    "Expense Claim-custom_booked_by",
+                    "Expense Claim-custom_column_break_bhygl",
+                    "Expense Claim-custom_date_of_purchase",
+                    "Expense Claim-custom_date_of_arrival",
+                    "Expense Claim-custom_date_of_travel",
+                    "Expense Claim-custom_column_break_ffvc7",
+                    "Expense Claim-custom_airlines",
+                    "Expense Claim-custom_arrival_airport",
+                    "Expense Claim-custom_departure_airport",
+                    "Expense Claim-custom_travel_details",
+                    "Expense Claim-custom_amountcompany_currency",
+
                 ),
             ]
         ],
@@ -77,6 +91,7 @@ doc_events = {
         "on_cancel": "nextlayer.next_layer.api.general_ledger.cleanup_intercompany_matches_on_cancel",
     },
     "Expense Claim": {
+        "before_save": "nextlayer.next_layer.api.expense_claim_utils.update_child_table_details",
         "before_submit": "nextlayer.next_layer.api.expense_claim_utils.set_expense_approver_and_status",
         "on_submit": "nextlayer.next_layer.api.expense_claim_utils.create_journal_entry_on_submit",
     },
@@ -116,6 +131,7 @@ doctype_js = {
 	"Sales Invoice":"public/js/sales_invoice.js",
 	"Purchase Invoice":"public/js/purchase_invoice.js",
 	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
+	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}

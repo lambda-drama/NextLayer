@@ -1,0 +1,260 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-12-26 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "expense_type",
+  "expense_date",
+  "amount",
+  "sanctioned_amount",
+  "column_break_1",
+  "description",
+  "section_break_hotel",
+  "hotel_checkin_date",
+  "hotel_checkout_date",
+  "custom_hotel_name",
+  "column_break_hotel1",
+  "hotel_territory",
+  "hotel_location",
+  "rate_per_day",
+  "column_break_hotel2",
+  "hotel_city",
+  "hotel_country",
+  "purpose",
+  "section_break_travel",
+  "custom_prn_number",
+  "custom_date_of_purchase",
+  "custom_travel_type",
+  "column_break_travel1",
+  "custom_booked_by",
+  "custom_departure_airport",
+  "custom_arrival_airport",
+  "column_break_travel2",
+  "custom_airlines",
+  "custom_date_of_travel",
+  "custom_date_of_arrival",
+  "section_break_accounting",
+  "cost_center",
+  "project"
+ ],
+ "fields": [
+  {
+   "fieldname": "expense_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Expense Type",
+   "options": "Expense Claim Type",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "expense_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Expense Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sanctioned_amount",
+   "fieldtype": "Currency",
+   "label": "Sanctioned Amount"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "section_break_hotel",
+   "fieldtype": "Section Break",
+   "label": "Hotel Details"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "hotel_checkin_date",
+   "fieldtype": "Date",
+   "label": "Check-in Date"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "hotel_checkout_date",
+   "fieldtype": "Date",
+   "label": "Check-out Date"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "custom_hotel_name",
+   "fieldtype": "Data",
+   "label": "Hotel Name"
+  },
+  {
+   "fieldname": "column_break_hotel1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "hotel_territory",
+   "fieldtype": "Link",
+   "label": "Hotel Territory",
+   "options": "Territory"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "hotel_location",
+   "fieldtype": "Link",
+   "label": "Hotel Location",
+   "options": "Location"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "rate_per_day",
+   "fieldtype": "Currency",
+   "label": "Rate per Day"
+  },
+  {
+   "fieldname": "column_break_hotel2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "hotel_city",
+   "fieldtype": "Data",
+   "label": "City",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "hotel_country",
+   "fieldtype": "Data",
+   "label": "Country",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "purpose",
+   "fieldtype": "Small Text",
+   "label": "Purpose",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "section_break_travel",
+   "fieldtype": "Section Break",
+   "label": "Travel Details"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_prn_number",
+   "fieldtype": "Data",
+   "label": "PRN Number",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_date_of_purchase",
+   "fieldtype": "Date",
+   "label": "Date of Purchase"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_travel_type",
+   "fieldtype": "Select",
+   "label": "Travel Type",
+   "options": "\nOne Way\nReturn"
+  },
+  {
+   "fieldname": "column_break_travel1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_booked_by",
+   "fieldtype": "Link",
+   "label": "Booked By",
+   "options": "User"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_departure_airport",
+   "fieldtype": "Link",
+   "label": "Departure Airport",
+   "options": "Airport"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_arrival_airport",
+   "fieldtype": "Link",
+   "label": "Arrival Airport",
+   "options": "Airport"
+  },
+  {
+   "fieldname": "column_break_travel2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_airlines",
+   "fieldtype": "Link",
+   "label": "Airlines",
+   "options": "Airlines"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_date_of_travel",
+   "fieldtype": "Datetime",
+   "label": "Date of Travel"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "fieldname": "custom_date_of_arrival",
+   "fieldtype": "Datetime",
+   "label": "Date of Arrival"
+  },
+  {
+   "fieldname": "section_break_accounting",
+   "fieldtype": "Section Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "modified": "2025-12-26 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Travel Expense Detail",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
+
+
+
