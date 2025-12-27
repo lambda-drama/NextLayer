@@ -67,6 +67,13 @@ fixtures = [
                     "Expense Claim-custom_pnr_number_",
 
                     # "Expense Claim-custom_amount",
+                    "Sales Invoice-custom_engine",
+                    "Sales Invoice-custom_chassis_no",
+                    "Sales Invoice-custom_column_break_o0b9s",
+                    "Sales Invoice-custom_model",
+                    "Sales Invoice-custom_color",
+                    "Sales Invoice-custom_owner_information",
+                    
 
                 ),
             ]
