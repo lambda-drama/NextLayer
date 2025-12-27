@@ -79,12 +79,6 @@ fixtures = [
         "filters": [
             ["name", "in", ["Main Dashboard Table"]]
         ]
-    },
-    {
-        "doctype": "Server Script",
-        "filters": [
-            ["module", "=", "NextLayer"]
-        ]
     }
 ]
 
