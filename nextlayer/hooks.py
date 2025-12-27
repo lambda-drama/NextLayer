@@ -79,6 +79,12 @@ fixtures = [
         "filters": [
             ["name", "in", ["Main Dashboard Table"]]
         ]
+    },
+     {
+        "doctype": "Receipt Entry Remark",
+        "filters": [
+            
+        ]
     }
 ]
 
