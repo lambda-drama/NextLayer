@@ -41,6 +41,7 @@ fixtures = [
                     "Expense Claim-custom_column_break_luxng",
                     "Expense Claim-custom_book_journal",
                     "Expense Claim-custom_travel_details",
+                    "Expense Claim-custom_column_1",
                     "Expense Claim-custom_departure_airport",
                     "Expense Claim-custom_arrival_airport",
                     "Expense Claim-custom_airlines",
