@@ -1,5 +1,6 @@
 {
  "aggregate_function_based_on": "",
+ "color": "#b0b0b0",
  "creation": "2025-12-26 23:50:50.019488",
  "currency": "",
  "docstatus": 0,
@@ -13,7 +14,7 @@
  "is_standard": 1,
  "label": "Customer To Delivery",
  "method": "nextlayer.next_layer.number_card.customer_to_delivery.customer_to_delivery.get_customer_to_delivery_count",
- "modified": "2025-12-28 06:08:48.318649",
+ "modified": "2025-12-28 22:28:41.907191",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Customer To Delivery",
