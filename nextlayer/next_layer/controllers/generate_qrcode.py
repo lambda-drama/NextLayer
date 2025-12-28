@@ -11,6 +11,18 @@ except ImportError:
 	QRCODE_AVAILABLE = False
 
 
+def sanitize_filename(name):
+	"""
+	Sanitize filename by replacing special characters that could cause path issues.
+	"""
+	import re
+	# Replace special characters with underscores
+	safe_name = re.sub(r'[<>:"/\\|?*]', '_', name)
+	# Replace spaces and other problematic characters
+	safe_name = safe_name.replace(' ', '_').replace('#', '%23')
+	return safe_name
+
+
 def generate_qr_code_for_invoice(invoice_name, print_format_name):
 	"""
 	Generate QR code for sales invoice based on print format.
@@ -87,8 +99,10 @@ Invoice No: {invoice_name}"""
 		os.makedirs(barcodes_folder, exist_ok=True)
 		
 		# Make filename unique per print format to avoid overwriting
-		format_suffix = print_format_name.replace(" ", "_").replace("-", "_")
-		filename = f"QRCode_{format_suffix}_{invoice_name.replace('#', '%23')}.png"
+		# Sanitize invoice name to remove path characters
+		format_suffix = sanitize_filename(print_format_name)
+		safe_invoice_name = sanitize_filename(invoice_name)
+		filename = f"QRCode_{format_suffix}_{safe_invoice_name}.png"
 		file_path = os.path.join(barcodes_folder, filename)
 		
 		# Write file directly to barcodes folder
@@ -132,8 +146,10 @@ def get_invoice_qr_code_url(invoice_name, print_format_name):
 	"""
 	try:
 		# Make filename unique per print format
-		format_suffix = print_format_name.replace(" ", "_").replace("-", "_")
-		filename = f"QRCode_{format_suffix}_{invoice_name.replace('#', '%23')}.png"
+		# Sanitize invoice name to remove path characters
+		format_suffix = sanitize_filename(print_format_name)
+		safe_invoice_name = sanitize_filename(invoice_name)
+		filename = f"QRCode_{format_suffix}_{safe_invoice_name}.png"
 		file_url = f"/files/barcodes/{filename}"
 		
 		# Check if file exists in database
@@ -155,6 +171,8 @@ def get_invoice_qr_code_url(invoice_name, print_format_name):
 		return generate_qr_code_for_invoice(invoice_name, print_format_name)
 		
 	except Exception as e:
+		# Log error but don't break PDF generation - return a fallback
 		frappe.log_error(f"Error getting QR code URL for invoice {invoice_name}: {str(e)}")
+		# Return a placeholder or empty string so the print format doesn't break
 		return None
 
