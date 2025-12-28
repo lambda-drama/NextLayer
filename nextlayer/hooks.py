@@ -198,10 +198,9 @@ doctype_js = {
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "nextlayer.utils.jinja_methods",
-# 	"filters": "nextlayer.utils.jinja_filters"
-# }
+jinja = {
+	"methods": "nextlayer.next_layer.utils.jinja_methods"
+}
 
 # Installation
 # ------------
