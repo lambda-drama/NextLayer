@@ -1,5 +1,5 @@
 {
- "color": "#ff0000",
+ "color": "#ff9100",
  "creation": "2025-12-27 09:37:14.735210",
  "currency": "KES",
  "docstatus": 0,
@@ -11,7 +11,7 @@
  "is_standard": 1,
  "label": "Cash Balance",
  "method": "nextlayer.next_layer.number_card.cash_balance.get_cash_balance.get_balance",
- "modified": "2025-12-28 22:28:06.021827",
+ "modified": "2025-12-28 22:32:04.495805",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cash Balance",
