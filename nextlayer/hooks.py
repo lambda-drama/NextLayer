@@ -68,7 +68,8 @@ fixtures = [
                     "Sales Invoice-custom_column_break_o0b9s",
                     "Sales Invoice-custom_model",
                     "Sales Invoice-custom_color",
-                    "Sales Invoice-custom_owner_information",   
+                    "Sales Invoice-custom_owner_information",
+                    
 
                 ),
             ]
@@ -77,13 +78,25 @@ fixtures = [
     {
         "doctype": "Custom HTML Block",
         "filters": [
-            ["name", "in", ["Main Dashboard Table"]]
+            ["name", "in", ["Main Dashboard Table", "Company Filter"]]
+        ]
+    },
+    {
+        "doctype": "Server Script",
+        "filters": [
+            ["module", "=", "NextLayer"]
+        ]
+    },
+    {
+        "doctype": "Server Script",
+        "filters": [
+            
         ]
     },
      {
         "doctype": "Receipt Entry Remark",
         "filters": [
-
+            
         ]
     }
 ]
@@ -185,10 +198,9 @@ doctype_js = {
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "nextlayer.utils.jinja_methods",
-# 	"filters": "nextlayer.utils.jinja_filters"
-# }
+jinja = {
+	"methods": "nextlayer.next_layer.utils.jinja_methods"
+}
 
 # Installation
 # ------------

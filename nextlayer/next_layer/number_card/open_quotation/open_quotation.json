@@ -1,7 +1,8 @@
 {
  "aggregate_function_based_on": "",
+ "color": "#63a86f",
  "creation": "2025-12-26 23:37:25.333433",
- "currency": "KES",
+ "currency": "",
  "docstatus": 0,
  "doctype": "Number Card",
  "document_type": "Quotation",
@@ -12,7 +13,8 @@
  "is_public": 1,
  "is_standard": 1,
  "label": "Open Quotation",
- "modified": "2025-12-27 10:28:29.505834",
+ "method": "nextlayer.next_layer.number_card.open_quotation.open_quotation.get_open_quotation_count",
+ "modified": "2025-12-28 22:29:16.517693",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Open Quotation",
@@ -22,5 +24,5 @@
  "show_full_number": 0,
  "show_percentage_stats": 1,
  "stats_time_interval": "Daily",
- "type": "Document Type"
+ "type": "Custom"
 }
