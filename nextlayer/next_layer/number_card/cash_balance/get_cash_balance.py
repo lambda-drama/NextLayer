@@ -85,6 +85,6 @@ def get_balance(company=None):
             total_balance += flt(entry.debit) - flt(entry.credit)
 
     return {
-        "value": total_balance,
+        "value": float(total_balance),
         "fieldtype": "Currency"
     }

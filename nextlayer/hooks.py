@@ -78,7 +78,7 @@ fixtures = [
     {
         "doctype": "Custom HTML Block",
         "filters": [
-            ["name", "in", ["Main Dashboard Table"]]
+            ["name", "in", ["Main Dashboard Table", "Company Filter"]]
         ]
     },
     {
