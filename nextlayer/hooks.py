@@ -100,6 +100,18 @@ fixtures = [
         "filters": [
             
         ]
+    },
+     {
+        "dt": "Client Script",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Sales Shipment Cost Repost"
+                ]
+            ]
+        ]
     }
 ]
 
@@ -162,7 +174,6 @@ doc_events = {
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 
 doctype_js = {
-	"Sales Shipment Cost":"public/js/sales_shipment.js",
 	"Company":"public/js/company.js",
 	"Item":"public/js/item.js",
 	"Sales Invoice":"public/js/sales_invoice.js",
