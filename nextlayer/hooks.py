@@ -70,6 +70,8 @@ fixtures = [
                     "Sales Invoice-custom_color",
                     "Sales Invoice-custom_owner_information",
                     
+                    "Sales Invoice-custom_assembled_by",
+                    
 
                 ),
             ]

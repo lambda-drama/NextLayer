@@ -145,7 +145,7 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
 
         # Execute the customer ledger summary report
         columns, data = customer_ledger_execute(filters)
-
+        print("Customer ledger summary - report data fetched", data)
         # Extract party names from the data for currency determination
         party_names = []
         for row in data:
@@ -200,7 +200,7 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
                 totals["totalDebit"] += entry["debit"]
                 totals["totalCredit"] += entry["credit"]
                 totals["totalClosingBalance"] += entry["closing_balance"]
-
+        print("Customer ledger summary totals:", entries)
         return {
             "entries": entries,
             "totals": totals,
@@ -341,7 +341,7 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
                 totals["totalDebit"] += entry["debit"]
                 totals["totalCredit"] += entry["credit"]
                 totals["totalClosingBalance"] += entry["closing_balance"]
-
+        print('Supplier ledger summary totals:', entries)
         return {
             "entries": entries,
             "totals": totals,
