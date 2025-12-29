@@ -1,0 +1,13 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Sales Shipment Cost",
+  "enabled": 1,
+  "modified": "2025-12-30 01:46:23.560647",
+  "module": "",
+  "name": "Sales Shipment Cost Repost",
+  "script": "frappe.ui.form.on(\"Sales Shipment Cost\", {\n\trefresh: function(frm){\n\t\n\t\tif (frm.doc.docstatus === 1 && (frappe.user.has_role(\"System Manager\") || frappe.user.has_role(\"Administrator\"))) {\n\t\t\n\t\t\t// Check if GL entries exist for this Sales Shipment Cost\n\t\t\tfrappe.call({\n\t\t\t\tmethod: \"nextlayer.next_layer.controllers.sales_shipment.check_gl_entries_exist\",\n\t\t\t\targs: {\n\t\t\t\t\tdocname: frm.doc.name\n\t\t\t\t},\n\t\t\t\tcallback: function(r) {\n\t\t\t\t\tif (r.message && !r.message.exists) {\n\t\t\t\t\t\tfrm.add_custom_button(__(\"Repost Ledgers\"), function() {\n\t\t\t\t\t\t\trepost_gl_entries(frm);\n\t\t\t\t\t\t}, __(\"Actions\"));\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\t\t}\n\t},\n})\n\n\nfunction repost_gl_entries(frm) {\n\tfrappe.confirm(\n\t\t__(\"Are you sure you want to repost GL entries for this Sales Shipment Cost? This will delete existing GL entries and recreate them.\"),\n\t\tfunction() {\n\t\t\t// Yes\n\t\t\tfrappe.call({\n\t\t\t\tmethod: \"nextlayer.next_layer.controllers.sales_shipment.repost_gl_entries\",\n\t\t\t\targs: {\n\t\t\t\t\tdocname: frm.doc.name\n\t\t\t\t},\n\t\t\t\tfreeze: true,\n\t\t\t\tfreeze_message: __(\"Reposting GL entries...\"),\n\t\t\t\tcallback: function(r) {\n\t\t\t\t\tif (r.message && r.message.success) {\n\t\t\t\t\t\tfrappe.show_alert({\n\t\t\t\t\t\t\tmessage: __(\"GL entries reposted successfully\"),\n\t\t\t\t\t\t\tindicator: \"green\"\n\t\t\t\t\t\t}, 5);\n\t\t\t\t\t\tfrm.reload_doc();\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\t\t},\n\t\tfunction() {\n\t\t}\n\t);\n}",
+  "view": "Form"
+ }
+]
