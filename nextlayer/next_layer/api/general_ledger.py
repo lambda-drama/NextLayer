@@ -33,7 +33,7 @@ def get_general_ledger_data(filters):
 
 		# Skip company permission check - allow access to all companies for reconciliation
 		filters.setdefault("show_remarks", 1)
-		filters.setdefault("categorize_by", "Categorize by Voucher (Consolidated)")
+		filters.setdefault("group_by", "Group by Voucher (Consolidated)")
 		filters.setdefault("include_dimensions", 1)
 		filters.setdefault("include_default_book_entries", 1)
 
@@ -102,7 +102,7 @@ def get_permission_aware_gl_data(filters):
 
 		# Set default values
 		filters.setdefault("show_remarks", 1)
-		filters.setdefault("categorize_by", "Categorize by Voucher (Consolidated)")
+		filters.setdefault("group_by", "Group by Voucher (Consolidated)")
 		filters.setdefault("include_dimensions", 1)
 		filters.setdefault("include_default_book_entries", 1)
 
