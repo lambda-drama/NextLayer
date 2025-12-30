@@ -276,6 +276,60 @@ function show_invoice_settings_modal(frm, doctype) {
 }
 
 frappe.ui.form.on("Sales Invoice", {
+	validate: function(frm) {
+		// Auto-fetch advances from Sales Order if invoice is created from an order
+		// This runs before Python validate, so advances are pulled early
+		if (frm.doc.docstatus == 0) {
+			// Check if Sales Invoice is created from a Sales Order
+			let sales_order = frm.doc.sales_order;
+			if (!sales_order && frm.doc.items && frm.doc.items.length > 0) {
+				for (let item of frm.doc.items) {
+					if (item.sales_order) {
+						sales_order = item.sales_order;
+						break;
+					}
+				}
+			}
+			
+			// If Sales Order exists and no advances are present, fetch them automatically
+			if (sales_order && frm.doc.customer && (!frm.doc.advances || frm.doc.advances.length === 0)) {
+				frappe.call({
+					method: "nextlayer.next_layer.controllers.sales_invoice.fetch_advances_from_sales_order_api",
+					args: {
+						sales_order: sales_order,
+						customer: frm.doc.customer,
+						// sales_invoice_name: frm.doc.name || null
+					},
+					async: false,  // Make it synchronous so it completes before validation
+					callback: function(r) {
+						if (r.message && r.message.success && r.message.advances && r.message.advances.length > 0) {
+							// Clear existing advances
+							frm.clear_table("advances");
+							
+							// Add advances directly to the form
+							r.message.advances.forEach(function(advance) {
+								let advance_row = frm.add_child("advances");
+								advance_row.allocated_amount = advance.allocated_amount;
+								advance_row.advance_amount = advance.advance_amount;
+								advance_row.advance_account = advance.advance_account;
+								advance_row.difference_posting_date = advance.difference_posting_date;
+								advance_row.reference_type = advance.reference_type;
+								advance_row.reference_name = advance.reference_name;
+								advance_row.reference_row = advance.reference_row;
+								advance_row.remarks = advance.remarks;
+							});
+							
+							// Refresh advances table
+							frm.refresh_field("advances");
+						}
+					},
+					error: function(r) {
+						// Silently fail - don't show error if no advances found
+					}
+				});
+			}
+		}
+	},
 	refresh: function(frm) {
 		if (frm.doc.docstatus == 0) {
 			// Add a custom button to open dialog for Parent Purchase Invoice
