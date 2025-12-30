@@ -154,7 +154,7 @@ const rawEntries = result.message?.data?.entries || []
       }
 
       // Filter and process regular GL entries (exclude special rows)
-      const entries: GLEntry[] = rawEntries
+      const filteredEntries = rawEntries
         .filter((entry: any) => {
           if (!entry.posting_date || typeof entry.account !== "string") {
             return false
@@ -164,39 +164,87 @@ const rawEntries = result.message?.data?.entries || []
                  !entry.account.includes("'Total'") &&
                  !entry.account.includes("'Closing (Opening + Total)'")
         })
-        .map((entry: any, index: number) => {
-          let balance = 0
-          for (let i = 0; i <= index; i++) {
-            const prevEntry = rawEntries.filter((e: any) =>
-              e.posting_date &&
-              typeof e.account === "string" &&
-              !e.account.includes("'Opening'") &&
-              !e.account.includes("'Total'") &&
-              !e.account.includes("'Closing (Opening + Total)'")
-            )[i]
+        .map((entry: any) => ({
+          gl_entry: entry.gl_entry,
+          posting_date: entry.posting_date,
+          account: entry.account,
+          voucher_type: entry.voucher_type || "",
+          voucher_no: entry.voucher_no || "",
+          debit: parseFloat(entry.debit) || 0,
+          credit: parseFloat(entry.credit) || 0,
+          against: entry.against || "",
+          remarks: entry.remarks || "",
+          party_type: entry.party_type,
+          party: entry.party,
+          cost_center: entry.cost_center,
+          project: entry.project,
+        }))
 
-            if (prevEntry) {
-              balance += (parseFloat(prevEntry.debit) || 0) - (parseFloat(prevEntry.credit) || 0)
-            }
+      // Consolidate entries by voucher (group by voucher_type + voucher_no)
+      // This prevents journal entries with multiple GL entries from appearing multiple times
+      const consolidatedMap = new Map<string, GLEntry>()
+      
+      filteredEntries.forEach((entry: any) => {
+        const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
+        
+        if (consolidatedMap.has(voucherKey)) {
+          // Aggregate debits and credits for the same voucher
+          const existing = consolidatedMap.get(voucherKey)!
+          existing.debit += entry.debit
+          existing.credit += entry.credit
+          // Keep the first account, or combine if needed
+          if (existing.account !== entry.account) {
+            // For consolidated view, we can show multiple accounts or just the first
+            // Using the first account is fine for reconciliation purposes
           }
-
-          return {
+          // Combine remarks if different
+          if (entry.remarks && existing.remarks && existing.remarks !== entry.remarks) {
+            existing.remarks = `${existing.remarks}; ${entry.remarks}`
+          }
+        } else {
+          // First entry for this voucher
+          consolidatedMap.set(voucherKey, {
             gl_entry: entry.gl_entry,
             posting_date: entry.posting_date,
             account: entry.account,
-            voucher_type: entry.voucher_type || "",
-            voucher_no: entry.voucher_no || "",
-            debit: parseFloat(entry.debit) || 0,
-            credit: parseFloat(entry.credit) || 0,
-            balance,
-            against: entry.against || "",
-            remarks: entry.remarks || "",
+            voucher_type: entry.voucher_type,
+            voucher_no: entry.voucher_no,
+            debit: entry.debit,
+            credit: entry.credit,
+            balance: 0, // Will be calculated below
+            against: entry.against,
+            remarks: entry.remarks,
             party_type: entry.party_type,
             party: entry.party,
             cost_center: entry.cost_center,
             project: entry.project,
-          }
+          })
+        }
+      })
+
+      // Convert map to array and sort
+      const sortedEntries = Array.from(consolidatedMap.values())
+        .sort((a, b) => {
+          // Sort by posting date, then by voucher
+          const dateCompare = new Date(a.posting_date).getTime() - new Date(b.posting_date).getTime()
+          if (dateCompare !== 0) return dateCompare
+          return `${a.voucher_type}-${a.voucher_no}`.localeCompare(`${b.voucher_type}-${b.voucher_no}`)
         })
+
+      // Calculate running balance
+      const entries: GLEntry[] = sortedEntries.map((entry, index) => {
+        let balance = 0
+        for (let i = 0; i <= index; i++) {
+          const prevEntry = sortedEntries[i]
+          if (prevEntry) {
+            balance += prevEntry.debit - prevEntry.credit
+          }
+        }
+        return {
+          ...entry,
+          balance
+        }
+      })
 
       setData(entries)
     } catch (err: any) {
