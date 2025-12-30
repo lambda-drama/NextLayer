@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Badge } from "./ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
@@ -1806,34 +1807,29 @@ export default function IntercompanyReconciliation() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select
+                    <Combobox
+                      options={[
+                        ...displayCompaniesA.map((company) => ({
+                          name: company.name,
+                          value: company.name,
+                        })),
+                        // Show autofilled company if it's not in current list
+                        ...(companyA && !displayCompaniesA.some(c => c.name === companyA)
+                          ? [{ name: companyA, value: companyA }]
+                          : []),
+                      ]}
                       value={companyA}
                       onValueChange={handleCompanyAChange}
+                      placeholder={
+                        !customerViewEnabled ? "Enable Customer View to select" :
+                        allCompaniesLoading ? "Loading..." :
+                        (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
+                        "Select Company"
+                      }
                       disabled={!customerViewEnabled || allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
-                    >
-                      <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={
-                          !customerViewEnabled ? "Enable Customer View to select" :
-                          allCompaniesLoading ? "Loading..." :
-                          (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
-                          "Select Company"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
-                        {/* Use conditional companies based on checkbox state */}
-                        {displayCompaniesA.map((company) => (
-                          <SelectItem key={company.name} value={company.name}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                        {/* Show autofilled company if it's not in current list */}
-                        {companyA && !displayCompaniesA.some(c => c.name === companyA) && (
-                          <SelectItem key={companyA} value={companyA}>
-                            {companyA}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      searchPlaceholder="Search companies..."
+                      emptyMessage="No companies found."
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Party Type</label>
@@ -1849,33 +1845,28 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Party</label>
-                    <Select
+                    <Combobox
+                      options={[
+                        ...displayPartiesA.map((party) => ({
+                          name: party.name,
+                          value: party.name,
+                        })),
+                        // Show autofilled party if it's not in current list
+                        ...(partyA && !displayPartiesA.some(p => p.name === partyA)
+                          ? [{ name: partyA, value: partyA }]
+                          : []),
+                      ]}
                       value={partyA}
                       onValueChange={setPartyA}
+                      placeholder={
+                        !customerViewEnabled ? "Enable Customer View to select" :
+                        partiesALoading ? "Loading..." :
+                        "Select Party"
+                      }
                       disabled={!customerViewEnabled || partiesALoading}
-                    >
-                      <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={
-                          !customerViewEnabled ? "Enable Customer View to select" :
-                          partiesALoading ? "Loading..." :
-                          "Select Party"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
-                        {/* Use conditional parties based on checkbox state */}
-                        {displayPartiesA.map((party) => (
-                          <SelectItem key={party.name} value={party.name}>
-                            {party.name}
-                          </SelectItem>
-                        ))}
-                        {/* Show autofilled party if it's not in current list */}
-                        {partyA && !displayPartiesA.some(p => p.name === partyA) && (
-                          <SelectItem key={partyA} value={partyA}>
-                            {partyA}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      searchPlaceholder="Search parties..."
+                      emptyMessage="No parties found."
+                    />
                   </div>
                 </div>
               </div>
@@ -1902,34 +1893,29 @@ export default function IntercompanyReconciliation() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Company</label>
-                    <Select
+                    <Combobox
+                      options={[
+                        ...displayCompaniesB.map((company) => ({
+                          name: company.name,
+                          value: company.name,
+                        })),
+                        // Show autofilled company if it's not in current list
+                        ...(companyB && !displayCompaniesB.some(c => c.name === companyB)
+                          ? [{ name: companyB, value: companyB }]
+                          : []),
+                      ]}
                       value={companyB}
                       onValueChange={handleCompanyBChange}
+                      placeholder={
+                        !supplierViewEnabled ? "Enable Supplier View to select" :
+                        allCompaniesLoading ? "Loading..." :
+                        (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
+                        "Select Company"
+                      }
                       disabled={!supplierViewEnabled || allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
-                    >
-                      <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={
-                          !supplierViewEnabled ? "Enable Supplier View to select" :
-                          allCompaniesLoading ? "Loading..." :
-                          (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
-                          "Select Company"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
-                        {/* Use conditional companies based on checkbox state */}
-                        {displayCompaniesB.map((company) => (
-                          <SelectItem key={company.name} value={company.name}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                        {/* Show autofilled company if it's not in current list */}
-                        {companyB && !displayCompaniesB.some(c => c.name === companyB) && (
-                          <SelectItem key={companyB} value={companyB}>
-                            {companyB}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      searchPlaceholder="Search companies..."
+                      emptyMessage="No companies found."
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Party Type</label>
@@ -1945,33 +1931,28 @@ export default function IntercompanyReconciliation() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Party</label>
-                    <Select
+                    <Combobox
+                      options={[
+                        ...displayPartiesB.map((party) => ({
+                          name: party.name,
+                          value: party.name,
+                        })),
+                        // Show autofilled party if it's not in current list
+                        ...(partyB && !displayPartiesB.some(p => p.name === partyB)
+                          ? [{ name: partyB, value: partyB }]
+                          : []),
+                      ]}
                       value={partyB}
                       onValueChange={handlePartyBChange}
+                      placeholder={
+                        !supplierViewEnabled ? "Enable Supplier View to select" :
+                        partiesBLoading ? "Loading..." :
+                        "Select Party"
+                      }
                       disabled={!supplierViewEnabled || partiesBLoading}
-                    >
-                      <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                        <SelectValue placeholder={
-                          !supplierViewEnabled ? "Enable Supplier View to select" :
-                          partiesBLoading ? "Loading..." :
-                          "Select Party"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
-                        {/* Use conditional parties based on checkbox state */}
-                        {displayPartiesB.map((party) => (
-                          <SelectItem key={party.name} value={party.name}>
-                            {party.name}
-                          </SelectItem>
-                        ))}
-                        {/* Show autofilled party if it's not in current list */}
-                        {partyB && !displayPartiesB.some(p => p.name === partyB) && (
-                          <SelectItem key={partyB} value={partyB}>
-                            {partyB}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      searchPlaceholder="Search parties..."
+                      emptyMessage="No parties found."
+                    />
                   </div>
                 </div>
               </div>
