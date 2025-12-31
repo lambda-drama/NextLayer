@@ -277,6 +277,24 @@ function show_invoice_settings_modal(frm, doctype) {
 
 frappe.ui.form.on("Sales Invoice", {
 	validate: function(frm) {
+		if (frm.doc.customer && (!frm.doc.custom_invoice_no || !frm.doc.custom_invoice_no.startsWith("GLI-"))) {
+			frappe.call({
+				method: "nextlayer.next_layer.controllers.sales_invoice.generate_gl_invoice_number",
+				args: {
+					customer: frm.doc.customer,
+					posting_date: frm.doc.posting_date || null
+				},
+				callback: function(r) {
+					if (r.message && r.message.success && r.message.invoice_number) {
+						frm.set_value("custom_invoice_no", r.message.invoice_number);
+						frm.refresh_field("custom_invoice_no");
+					}
+				},
+				error: function(r) {
+					// Silently fail - don't show error if generation fails
+				}
+			});
+		}
 		// Auto-fetch advances from Sales Order if invoice is created from an order
 		// This runs before Python validate, so advances are pulled early
 		if (frm.doc.docstatus == 0) {
@@ -290,7 +308,7 @@ frappe.ui.form.on("Sales Invoice", {
 					}
 				}
 			}
-			
+
 			// If Sales Order exists and no advances are present, fetch them automatically
 			if (sales_order && frm.doc.customer && (!frm.doc.advances || frm.doc.advances.length === 0)) {
 				frappe.call({
@@ -305,7 +323,7 @@ frappe.ui.form.on("Sales Invoice", {
 						if (r.message && r.message.success && r.message.advances && r.message.advances.length > 0) {
 							// Clear existing advances
 							frm.clear_table("advances");
-							
+
 							// Add advances directly to the form
 							r.message.advances.forEach(function(advance) {
 								let advance_row = frm.add_child("advances");
@@ -318,7 +336,7 @@ frappe.ui.form.on("Sales Invoice", {
 								advance_row.reference_row = advance.reference_row;
 								advance_row.remarks = advance.remarks;
 							});
-							
+
 							// Refresh advances table
 							frm.refresh_field("advances");
 						}

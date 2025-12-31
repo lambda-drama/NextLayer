@@ -176,9 +176,15 @@ def repost_gl_entries(docname):
     """
     # Check permissions - only System Manager and Administrator can repost
     user_roles = frappe.get_roles()
-    if "System Manager" not in user_roles and "Administrator" not in user_roles:
-        frappe.throw(_("You do not have permission to repost GL entries. Only System Manager and Administrator can perform this action."))
-    
+    allowed_roles = {"System Manager", "Administrator", "Stock Manager"}
+
+    user_roles = set(frappe.get_roles(frappe.session.user))
+
+    if not user_roles.intersection(allowed_roles):
+        frappe.throw(
+            _("You do not have permission to repost GL entries. Only System Manager, Administrator, or Stock Manager can perform this action.")
+        )
+
     doc = frappe.get_doc("Sales Shipment Cost", docname)
     
     # Check if document is submitted

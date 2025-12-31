@@ -71,6 +71,8 @@ fixtures = [
                     "Sales Invoice-custom_owner_information",
                     
                     "Sales Invoice-custom_assembled_by",
+                    "Sales Invoice-custom_registered_owner",
+                    "Customer Group-custom_unique_gl_series"
                     
                 ),
             ]
@@ -117,6 +119,9 @@ fixtures = [
 
 
 doc_events = {
+    "Sales Order": {
+        "before_save": "nextlayer.next_layer.controllers.sales_order.before_save",
+    },
     "Sales Shipment Cost": {
         "on_update":"nextlayer.next_layer.controllers.sales_shipment.update_landed_cost_rows",
         "on_submit": "nextlayer.next_layer.controllers.sales_shipment.on_submit",
@@ -177,6 +182,7 @@ doctype_js = {
 	"Company":"public/js/company.js",
 	"Item":"public/js/item.js",
 	"Sales Invoice":"public/js/sales_invoice.js",
+	"Sales Order":"public/js/sales_order.js",
 	"Purchase Invoice":"public/js/purchase_invoice.js",
 	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",

@@ -88,6 +88,7 @@
         <td style="padding:0px; margin:0px;"> 
                     <div class="" style="margin-bottom: 8px; color: #800080;font-size:20px; font-weight:700; padding-bottom: 10px;"><b>FAAHFAAHIN</b></div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>MAGACA MILKIILAHA: </b>{{doc.customer_name}}</div>
+            <div class="" style="margin-bottom: 8px; color: #800080;"><b>Registered Owner: </b>{{doc.custom_registered_owner or ""}}</div>
             
             {% set party = doc.customer %}
             {% set balance = 0 %}
@@ -117,7 +118,7 @@
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Invoice No:</b> {{doc.name}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Date:</b> {{doc.get_formatted("posting_date")}}</div>
              <div class="" style="margin-bottom: 8px; color: #800080;"><b>RV No#:</b> {{sales_order_number}}</div>
-            <div class="" style="margin-bottom: 8px; color: #800080;"><b>Assembled by:</b> {{sales_person_name}}</div>
+            <div class="" style="margin-bottom: 8px; color: #800080;"><b>Assembled by:</b> {{doc.custom_assembled_by}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>VAT:</b> {{doc.get_formatted("total_taxes_and_charges")}}</div>
         </td>
     </tr>
