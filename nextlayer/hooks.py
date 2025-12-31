@@ -72,6 +72,7 @@ fixtures = [
                     
                     "Sales Invoice-custom_assembled_by",
                     "Sales Invoice-custom_registered_owner",
+                    "Customer Group-custom_unique_gl_series"
                     
                 ),
             ]
