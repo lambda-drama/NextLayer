@@ -1,37 +1,39 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:assembler",
- "creation": "2025-12-31 16:42:50.696995",
+ "autoname": "field:registered_owner",
+ "creation": "2025-12-31 17:01:11.292990",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "assembler",
-  "employee"
+  "registered_owner",
+  "column_break_izud",
+  "phone_no"
  ],
  "fields": [
   {
-   "fieldname": "assembler",
+   "fieldname": "registered_owner",
    "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Assembler Name",
-   "reqd": 1,
+   "label": "Registered Owner",
    "unique": 1
   },
   {
-   "fieldname": "employee",
-   "fieldtype": "Link",
-   "label": "Employee",
-   "options": "Employee"
+   "fieldname": "phone_no",
+   "fieldtype": "Data",
+   "label": "Phone No"
+  },
+  {
+   "fieldname": "column_break_izud",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-31 17:07:06.979313",
+ "modified": "2025-12-31 17:06:58.468342",
  "modified_by": "Administrator",
  "module": "Next Layer",
- "name": "Assembly Specialist",
+ "name": "Registered Owner",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
