@@ -24,15 +24,14 @@ def execute(filters=None):
 def get_columns():
 	return [
 		{
-			"fieldname": "item_code",
-			"label": _("Item Code"),
-			"fieldtype": "Link",
-			"options": "Item",
+			"fieldname": "mode_of_payment",
+			"label": _("Mode of Payment"),
+			"fieldtype": "Data",
 			"width": 150
 		},
 		{
 			"fieldname": "quantity",
-			"label": _("Quantity"),
+			"label": _("Qty"),
 			"fieldtype": "Float",
 			"width": 100
 		},
@@ -55,23 +54,32 @@ def get_data(filters):
 	date = filters.get("date")
 	company = filters.get("company")
 
-	# Query Sales Invoice items for the specified date and company
+	# Query Sales Order items with mode of payment from Payment Entry
 	data = frappe.db.sql("""
 		SELECT
-			sii.item_code,
-			sii.qty as quantity,
-			sii.rate,
-			sii.amount
+			COALESCE(
+				(SELECT GROUP_CONCAT(DISTINCT pe.mode_of_payment SEPARATOR ', ')
+				 FROM `tabPayment Entry Reference` per
+				 INNER JOIN `tabPayment Entry` pe ON pe.name = per.parent
+				 WHERE per.reference_name = so.name
+				 AND per.reference_doctype = 'Sales Order'
+				 AND pe.docstatus = 1
+				 LIMIT 1),
+				''
+			) as mode_of_payment,
+			soi.qty as quantity,
+			soi.rate,
+			soi.amount
 		FROM
-			`tabSales Invoice Item` sii
+			`tabSales Order Item` soi
 		INNER JOIN
-			`tabSales Invoice` si ON sii.parent = si.name
+			`tabSales Order` so ON soi.parent = so.name
 		WHERE
-			DATE(si.posting_date) = %(date)s
-			AND si.company = %(company)s
-			AND si.docstatus = 1
+			DATE(so.transaction_date) = %(date)s
+			AND so.company = %(company)s
+			AND so.docstatus = 1
 		ORDER BY
-			sii.item_code, si.name, sii.idx
+			so.name, soi.idx
 	""", {
 		"date": date,
 		"company": company
