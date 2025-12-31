@@ -1748,7 +1748,7 @@
   "name": "Sales Invoice-custom_assembled_by",
   "no_copy": 0,
   "non_negative": 0,
-  "options": "User",
+  "options": "Assembly Specialist",
   "permlevel": 0,
   "placeholder": null,
   "precision": "",
