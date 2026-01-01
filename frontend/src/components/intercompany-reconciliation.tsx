@@ -672,9 +672,9 @@ export default function IntercompanyReconciliation() {
       const backendStatus = backendMatchStatus[key]
 
       // Use backend status if available, otherwise use client-side logic
-      let status: 'Match' | 'Mismatch' | 'Pending'
+      let status: 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
       if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
-        status = backendStatus.status
+        status = backendStatus.status as 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
       } else {
         // If backend status is null/undefined or doesn't exist, check if there's a frontend match
         // Only show Match if auto-match is enabled AND there's actually a matching entry
@@ -739,9 +739,9 @@ export default function IntercompanyReconciliation() {
       const backendStatus = backendMatchStatus[key]
 
       // Use backend status if available, otherwise use client-side logic
-      let status: 'Match' | 'Mismatch' | 'Pending'
+      let status: 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
       if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
-        status = backendStatus.status
+        status = backendStatus.status as 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
       } else {
         // If backend status is null/undefined or doesn't exist, check if there's a frontend match
         // Only show Match if auto-match is enabled AND there's actually a matching entry
@@ -838,6 +838,7 @@ export default function IntercompanyReconciliation() {
     let matchedA = 0
     let mismatchedA = 0
     let pendingA = 0
+    let matchWithIntransitA = 0
 
     findMatchingEntries.glDataAWithStatus.forEach(entry => {
       switch (entry.status) {
@@ -850,6 +851,9 @@ export default function IntercompanyReconciliation() {
         case 'Pending':
           pendingA++
           break
+        case 'Match with In-Transit':
+          matchWithIntransitA++
+          break
       }
     })
 
@@ -857,6 +861,7 @@ export default function IntercompanyReconciliation() {
     let matchedB = 0
     let mismatchedB = 0
     let pendingB = 0
+    let matchWithIntransitB = 0
 
     findMatchingEntries.glDataBWithStatus.forEach(entry => {
       switch (entry.status) {
@@ -869,6 +874,9 @@ export default function IntercompanyReconciliation() {
         case 'Pending':
           pendingB++
           break
+        case 'Match with In-Transit':
+          matchWithIntransitB++
+          break
       }
     })
 
@@ -880,19 +888,22 @@ export default function IntercompanyReconciliation() {
         total: totalA,
         matched: matchedA,
         mismatched: mismatchedA,
-        pending: pendingA
+        pending: pendingA,
+        matchWithIntransit: matchWithIntransitA
       },
       companyB: {
         total: totalB,
         matched: matchedB,
         mismatched: mismatchedB,
-        pending: pendingB
+        pending: pendingB,
+        matchWithIntransit: matchWithIntransitB
       },
       overall: {
         total: totalA + totalB,
         matched: matchedA + matchedB,
         mismatched: mismatchedA + mismatchedB,
-        pending: pendingA + pendingB
+        pending: pendingA + pendingB,
+        matchWithIntransit: matchWithIntransitA + matchWithIntransitB
       }
     }
   }, [findMatchingEntries, hasBackendStatusData, glDataA, glDataB])
@@ -1742,12 +1753,14 @@ export default function IntercompanyReconciliation() {
 
 
   // Get status badge component
-  const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending') => {
+  const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit') => {
     switch (status) {
       case 'Match':
         return <Badge className="bg-green-100 text-green-800 border-green-200">✓ Match</Badge>
       case 'Mismatch':
         return <Badge className="bg-red-100 text-red-800 border-red-200">✗ Mismatch</Badge>
+      case 'Match with In-Transit':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">✓ Match with Intransit</Badge>
       default:
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">? Pending</Badge>
     }
@@ -2429,7 +2442,7 @@ export default function IntercompanyReconciliation() {
               <div className="mt-6 pt-6 border-t border-blue-200">
                 <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
                 {summaryStats ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
                       <div className="text-3xl font-bold text-green-700">
                         {summaryStats.overall.matched}
@@ -2441,6 +2454,12 @@ export default function IntercompanyReconciliation() {
                         {summaryStats.overall.mismatched}
                       </div>
                       <div className="text-lg text-red-600 font-medium">Total Mismatched</div>
+                    </div>
+                    <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
+                      <div className="text-3xl font-bold text-blue-700">
+                        {summaryStats.overall.matchWithIntransit || 0}
+                      </div>
+                      <div className="text-lg text-blue-600 font-medium">Match with Intransit</div>
                     </div>
                     {/* <div className="text-center p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
                       <div className="text-3xl font-bold text-yellow-700">

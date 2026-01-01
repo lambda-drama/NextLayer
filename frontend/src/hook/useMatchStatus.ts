@@ -4,7 +4,7 @@ export interface MatchStatusData {
   voucher_type: string
   voucher_no: string
   company: string
-  status: 'Match' | 'Mismatch' | 'Pending'
+  status: 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
   matched_with?: any
 }
 
