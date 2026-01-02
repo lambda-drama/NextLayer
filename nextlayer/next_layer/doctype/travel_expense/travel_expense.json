@@ -2,20 +2,21 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "naming_series:",
- "creation": "2025-12-26 00:00:00.000000",
+ "creation": "2025-12-26 00:00:00",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
-  "field_order": [
+ "field_order": [
   "naming_series",
   "company",
-  "traveler_name",
   "is_addition",
   "travel_group",
-  "flight_no",
   "column_break_1",
   "posting_date",
+  "traveler_name",
+  "currency",
+  "flight_no",
   "section_break_travel",
   "custom_departure_airport",
   "custom_arrival_airport",
@@ -59,12 +60,12 @@
   "section_break_advance",
   "advances",
   "section_break_totals",
-  "currency",
   "total",
   "total_taxes_and_charges",
   "grand_total",
   "section_break_hidden",
-  "expense_claim"
+  "expense_claim",
+  "amended_from"
  ],
  "fields": [
   {
@@ -105,6 +106,8 @@
   {
    "fieldname": "flight_no",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Flight No"
   },
   {
@@ -393,10 +396,22 @@
    "label": "Expense Claim",
    "options": "Expense Claim",
    "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Travel Expense",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "index_web_pages_for_search": 1,
- "modified": "2025-12-26 00:00:00.000000",
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-01-02 13:32:22.376147",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
@@ -416,9 +431,9 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
  "track_changes": 1
 }
-
