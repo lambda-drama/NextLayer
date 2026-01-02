@@ -5,21 +5,85 @@
 let flight_lookup_in_progress = false;
 
 frappe.ui.form.on("Travel Expense", {
-	flight_no: function(frm) {
-		if (frm.doc.flight_no && frm.doc.flight_no.trim()) {
-			lookup_flight_for_travel_expense(frm);
-		}
-	},
-	
 	travel_amount: function(frm) {
 		convert_and_update_amount(frm);
 	},
 	
-	travel_currency: function(frm) {
+	currency: function(frm) {
 		convert_and_update_amount(frm);
+		recalculate_all_expense_amounts_company_currency(frm);
+		calculate_totals(frm);
+	},
+	
+	company: function(frm) {
+		if (frm.doc.travel_amount && frm.doc.currency) {
+			convert_and_update_amount(frm);
+		}
+		recalculate_all_expense_amounts_company_currency(frm);
+		calculate_totals(frm);z
+	},
+	
+	posting_date: function(frm) {
+		// Recalculate conversion when posting date changes (exchange rate might be different)
+		if (frm.doc.travel_amount && frm.doc.currency) {
+			convert_and_update_amount(frm);
+		}
+		recalculate_all_expense_amounts_company_currency(frm);
+		calculate_totals(frm);
+	},
+	
+	refresh: function(frm) {
+		calculate_totals(frm);
+		
+		// Add event listeners to expenses child table
+		if (frm.fields_dict.expenses && frm.fields_dict.expenses.grid) {
+			frm.fields_dict.expenses.grid.wrapper.on('change', function() {
+				calculate_totals(frm);
+			});
+		}
+		
+		// Add event listeners to taxes_and_charges child table
+		if (frm.fields_dict.taxes_and_charges && frm.fields_dict.taxes_and_charges.grid) {
+			frm.fields_dict.taxes_and_charges.grid.wrapper.on('change', function() {
+				calculate_totals(frm);
+			});
+		}
+		
+		// Add event listeners to flight number field for Enter key and blur
+		if (frm.fields_dict.flight_no && frm.fields_dict.flight_no.$input) {
+			frm.fields_dict.flight_no.$input.off('keydown blur');
+			
+			frm.fields_dict.flight_no.$input.on('keydown', function(e) {
+				if (e.keyCode === 13) {
+					e.preventDefault();
+					if (frm.doc.flight_no && frm.doc.flight_no.trim()) {
+						if (!flight_lookup_in_progress) {
+							lookup_flight_for_travel_expense(frm);
+						}
+					}
+				}
+			});
+			
+			frm.fields_dict.flight_no.$input.on('blur', function() {
+				if (frm.doc.flight_no && frm.doc.flight_no.trim()) {
+					if (!flight_lookup_in_progress) {
+						lookup_flight_for_travel_expense(frm);
+					}
+				}
+			});
+		}
+		
+		// Add "Additional Expenses" button
+		if (!frm.is_new()) {
+			frm.add_custom_button(__("Additional Expenses"), function() {
+				show_additional_expenses_modal(frm);
+			}, __("Actions"));
+		}
 	},
 	
 	before_save: function(frm) {
+		// Calculate totals before save
+		calculate_totals(frm);
 		// Count travel expenses
 		let travel_count = 0;
 		if (frm.doc.expenses && frm.doc.expenses.length > 0) {
@@ -32,22 +96,51 @@ frappe.ui.form.on("Travel Expense", {
 		
 		// If no travel expenses and travel_amount exists, create/update travel row in child table
 		if (travel_count === 0 && frm.doc.travel_amount) {
-			// Use travel_amount_company_currency if available (already converted), otherwise use travel_amount
-			let amount_to_use = frm.doc.travel_amount_company_currency || frm.doc.travel_amount;
+			// Use travel_amount for amount (transaction currency)
+			let amount_transaction = frm.doc.travel_amount || 0;
+			// Use amountcompany_currency for amount_company_currency (company currency)
+			let amount_company = frm.doc.amountcompany_currency || 0;
+			
+			// If amountcompany_currency is not set, convert it
+			if (!amount_company || amount_company === 0) {
+				// Try to get company currency and convert
+				if (frm.doc.company && frm.doc.currency) {
+					frappe.db.get_value("Company", frm.doc.company, "default_currency", function(r) {
+						if (r && r.default_currency) {
+							let company_currency = r.default_currency;
+							if (frm.doc.currency === company_currency) {
+								amount_company = amount_transaction;
+							} else {
+								// Will be converted by convert_expense_amount_to_company_currency
+								amount_company = amount_transaction; // Temporary, will be updated
+							}
+						}
+					});
+				} else {
+					amount_company = amount_transaction; // Fallback
+				}
+			}
 			
 			// Create a new travel expense row
 			let travel_row = frm.add_child("expenses");
 			travel_row.expense_type = "Travel";
-			travel_row.amount = amount_to_use;
-			travel_row.sanctioned_amount = amount_to_use;
+			travel_row.amount = amount_transaction; // Transaction currency
+			travel_row.amount_company_currency = amount_company; // Company currency
+			travel_row.sanctioned_amount = amount_company || amount_transaction; // Use company currency for sanctioned
 			travel_row.expense_date = frm.doc.posting_date || frappe.datetime.get_today();
 			
 			// Set the values using frappe.model.set_value
 			frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_type", "Travel");
-			frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", amount_to_use);
-			frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", amount_to_use);
+			frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", amount_transaction);
+			frappe.model.set_value(travel_row.doctype, travel_row.name, "amount_company_currency", amount_company);
+			frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", amount_company || amount_transaction);
 			if (frm.doc.posting_date) {
 				frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_date", frm.doc.posting_date);
+			}
+			
+			// Convert to company currency if needed
+			if (frm.doc.company && frm.doc.currency && frm.doc.posting_date) {
+				convert_expense_amount_to_company_currency(frm, travel_row.doctype, travel_row.name);
 			}
 		}
 		
@@ -82,10 +175,20 @@ frappe.ui.form.on("Travel Expense", {
 						}
 					});
 					
-					// Update amount with converted value if travel_amount_company_currency exists
-					if (frm.doc.travel_amount_company_currency) {
-						frappe.model.set_value(row.doctype, row.name, "amount", frm.doc.travel_amount_company_currency);
-						frappe.model.set_value(row.doctype, row.name, "sanctioned_amount", frm.doc.travel_amount_company_currency);
+					// Update amount with travel_amount (transaction currency)
+					// Update amount_company_currency with amountcompany_currency (company currency)
+					if (frm.doc.travel_amount) {
+						frappe.model.set_value(row.doctype, row.name, "amount", frm.doc.travel_amount);
+					}
+					
+					if (frm.doc.amountcompany_currency) {
+						frappe.model.set_value(row.doctype, row.name, "amount_company_currency", frm.doc.amountcompany_currency);
+						frappe.model.set_value(row.doctype, row.name, "sanctioned_amount", frm.doc.amountcompany_currency);
+					} else if (frm.doc.travel_amount) {
+						// If amountcompany_currency is not set, convert it
+						convert_expense_amount_to_company_currency(frm, row.doctype, row.name);
+						// Use travel_amount as fallback for sanctioned_amount
+						frappe.model.set_value(row.doctype, row.name, "sanctioned_amount", frm.doc.travel_amount);
 					}
 				}
 			});
@@ -93,10 +196,29 @@ frappe.ui.form.on("Travel Expense", {
 	},
 	
 	refresh: function(frm) {
-		// Add event listener to flight number field for Enter key
+		// Calculate totals on refresh
+		calculate_totals(frm);
+		
+		// Add event listeners to expenses child table
+		if (frm.fields_dict.expenses && frm.fields_dict.expenses.grid) {
+			frm.fields_dict.expenses.grid.wrapper.on('change', function() {
+				calculate_totals(frm);
+			});
+		}
+		
+		// Add event listeners to taxes_and_charges child table
+		if (frm.fields_dict.taxes_and_charges && frm.fields_dict.taxes_and_charges.grid) {
+			frm.fields_dict.taxes_and_charges.grid.wrapper.on('change', function() {
+				calculate_totals(frm);
+			});
+		}
+		
+		// Add event listeners to flight number field for Enter key and blur
 		if (frm.fields_dict.flight_no && frm.fields_dict.flight_no.$input) {
 			// Remove existing listeners to avoid duplicates
-			frm.fields_dict.flight_no.$input.off('keydown');
+			frm.fields_dict.flight_no.$input.off('keydown blur');
+			
+			// Enter key handler
 			frm.fields_dict.flight_no.$input.on('keydown', function(e) {
 				if (e.keyCode === 13) {
 					e.preventDefault();
@@ -104,6 +226,15 @@ frappe.ui.form.on("Travel Expense", {
 						if (!flight_lookup_in_progress) {
 							lookup_flight_for_travel_expense(frm);
 						}
+					}
+				}
+			});
+			
+			// Blur handler - trigger lookup when field loses focus
+			frm.fields_dict.flight_no.$input.on('blur', function(e) {
+				if (frm.doc.flight_no && frm.doc.flight_no.trim()) {
+					if (!flight_lookup_in_progress) {
+						lookup_flight_for_travel_expense(frm);
 					}
 				}
 			});
@@ -120,16 +251,39 @@ frappe.ui.form.on("Travel Expense", {
 
 // Handle flight lookup from child table (Travel Expense Detail)
 frappe.ui.form.on("Travel Expense Detail", {
-	custom_flight_no: function(frm, cdt, cdn) {
+	amount: function(frm, cdt, cdn) {
+		// Get the row and preserve the amount value (transaction currency)
 		let row = locals[cdt][cdn];
-		if (row.custom_flight_no && row.custom_flight_no.trim()) {
-			lookup_flight_for_travel_expense_detail(frm, row, cdn);
+		if (!row) return;
+		
+		// Get the value the user just entered (this is in transaction currency)
+		let transaction_amount = parseFloat(row.amount) || 0;
+		
+		// Ensure amount field stays as transaction currency (don't let it be overwritten)
+		// The amount field should always be in transaction currency
+		if (row.amount !== transaction_amount && transaction_amount > 0) {
+			frappe.model.set_value(cdt, cdn, "amount", transaction_amount);
 		}
+		
+		// Convert to company currency (this only updates amount_company_currency, not amount)
+		convert_expense_amount_to_company_currency(frm, cdt, cdn);
+		
+		// Recalculate totals when amount changes
+		calculate_totals(frm);
+	},
+	
+	expenses_remove: function(frm, cdt, cdn) {
+		// Recalculate totals when expense row is removed
+		calculate_totals(frm);
 	},
 	
 	refresh: function(frm) {
-		// Add event listener to flight number field in the grid for Enter key
+		// Add event listeners to flight number field in the grid for Enter key and blur
 		if (frm.fields_dict.expenses && frm.fields_dict.expenses.grid) {
+			// Remove existing listeners to avoid duplicates
+			frm.fields_dict.expenses.grid.wrapper.off('keydown blur', 'input[data-fieldname="custom_flight_no"]');
+			
+			// Enter key handler
 			frm.fields_dict.expenses.grid.wrapper.on('keydown', 'input[data-fieldname="custom_flight_no"]', function(e) {
 				if (e.keyCode === 13) {
 					e.preventDefault();
@@ -142,7 +296,36 @@ frappe.ui.form.on("Travel Expense Detail", {
 					}
 				}
 			});
+			
+			// Blur handler - trigger lookup when field loses focus
+			frm.fields_dict.expenses.grid.wrapper.on('blur', 'input[data-fieldname="custom_flight_no"]', function(e) {
+				let row_name = $(this).closest('.grid-row').attr('data-name');
+				if (row_name) {
+					let row = locals['Travel Expense Detail'][row_name];
+					if (row && row.custom_flight_no && row.custom_flight_no.trim()) {
+						// Use a small delay to ensure the value is updated in the row
+						setTimeout(function() {
+							if (!flight_lookup_in_progress || flight_lookup_in_progress !== row_name) {
+								lookup_flight_for_travel_expense_detail(frm, row, row_name);
+							}
+						}, 100);
+					}
+				}
+			});
 		}
+	}
+});
+
+// Handle taxes and charges child table
+frappe.ui.form.on("Sales Taxes and Charges", {
+	tax_amount: function(frm, cdt, cdn) {
+		// Recalculate totals when tax amount changes
+		calculate_totals(frm);
+	},
+	
+	taxes_and_charges_remove: function(frm, cdt, cdn) {
+		// Recalculate totals when tax row is removed
+		calculate_totals(frm);
 	}
 });
 
@@ -714,10 +897,10 @@ function get_status_color(status) {
 	return "#666";
 }
 
-// Function to convert travel_amount from travel_currency (transaction currency) to company currency and update child table
+// Function to convert travel_amount from currency (transaction currency) to company currency and update child table
 function convert_and_update_amount(frm) {
-	// First, ensure travel_amount is set in travel_currency (transaction currency)
-	if (!frm.doc.travel_amount || !frm.doc.travel_currency || !frm.doc.company) {
+	// First, ensure travel_amount is set in currency (transaction currency)
+	if (!frm.doc.travel_amount || !frm.doc.currency || !frm.doc.company) {
 		return;
 	}
 	
@@ -726,7 +909,7 @@ function convert_and_update_amount(frm) {
 		return;
 	}
 	
-	// travel_amount is already in travel_currency (transaction currency) - keep it as is
+	// travel_amount is already in currency (transaction currency) - keep it as is
 	// Now convert to company currency for child table
 	
 	// Get company default currency
@@ -736,12 +919,15 @@ function convert_and_update_amount(frm) {
 		}
 		
 		let company_currency = r.default_currency;
-		let from_currency = frm.doc.travel_currency; // Transaction currency
+		let from_currency = frm.doc.currency; // Transaction currency
 		
 		// If currencies are the same, no conversion needed
 		if (from_currency === company_currency) {
 			// Same currency, use amount directly
 			update_travel_row_amount(frm, travel_amount);
+			// Set amountcompany_currency to the same value
+			frm.set_value("amountcompany_currency", travel_amount);
+			frm.refresh_field("amountcompany_currency");
 			return;
 		}
 		
@@ -760,12 +946,13 @@ function convert_and_update_amount(frm) {
 				if (rate_result.message) {
 					let exchange_rate = rate_result.message;
 					let converted_amount = travel_amount * exchange_rate;
-					
+					console.log("Travel amount", travel_amount, "converted to", converted_amount, "using rate", exchange_rate);
 					// Update travel row with converted amount (in company currency)
-					update_travel_row_amount(frm, converted_amount);
+					update_travel_row_amount(frm, travel_amount);
 					
-					// Update travel_amount_company_currency field with converted amount
-					frm.set_value("travel_amount_company_currency", converted_amount);
+					// Update amountcompany_currency field with converted amount
+					frm.set_value("amountcompany_currency", converted_amount);
+					frm.refresh_field("amountcompany_currency");
 					
 					// Show conversion info to user
 					frappe.show_alert(
@@ -779,8 +966,12 @@ function convert_and_update_amount(frm) {
 						"blue"
 					);
 				} else {
+					console.log("Travel amount", travel_amount, "not converted due to missing exchange rate.");
 					// If exchange rate not found, use original amount
 					update_travel_row_amount(frm, travel_amount);
+					// Set amountcompany_currency to original amount (assuming same currency if no rate found)
+					frm.set_value("amountcompany_currency", travel_amount);
+					frm.refresh_field("amountcompany_currency");
 					frappe.show_alert(
 						__("Exchange rate not found. Using original amount."),
 						3,
@@ -791,6 +982,9 @@ function convert_and_update_amount(frm) {
 			error: function() {
 				// On error, use original amount
 				update_travel_row_amount(frm, travel_amount);
+				// Set amountcompany_currency to original amount
+				frm.set_value("amountcompany_currency", travel_amount);
+				frm.refresh_field("amountcompany_currency");
 			}
 		});
 	});
@@ -859,7 +1053,7 @@ function show_additional_expenses_modal(frm) {
 				fieldname: "transaction_currency",
 				label: __("Transaction Currency"),
 				options: "Currency",
-				default: frm.doc.travel_currency || company_currency,
+				default: frm.doc.currency || company_currency,
 				reqd: 1
 			},
 			{
@@ -2480,4 +2674,186 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc, create
 			});
 		}
 	});
+}
+
+// Function to recalculate all expense amounts in company currency
+function recalculate_all_expense_amounts_company_currency(frm) {
+	if (!frm.doc.expenses || frm.doc.expenses.length === 0) {
+		return;
+	}
+	
+	frm.doc.expenses.forEach(function(expense) {
+		if (expense.amount) {
+			convert_expense_amount_to_company_currency(frm, "Travel Expense Detail", expense.name);
+		}
+	});
+}
+
+// Function to convert expense amount to company currency
+// IMPORTANT: This function ONLY updates amount_company_currency, it does NOT touch the amount field
+function convert_expense_amount_to_company_currency(frm, cdt, cdn) {
+	if (!frm.doc.company || !frm.doc.currency || !frm.doc.posting_date) {
+		return;
+	}
+	
+	let row = locals[cdt][cdn];
+	if (!row) {
+		return;
+	}
+	
+	// Get the transaction currency amount (this is what the user entered)
+	let transaction_amount = parseFloat(row.amount) || 0;
+	
+	if (transaction_amount === 0) {
+		frappe.model.set_value(cdt, cdn, "amount_company_currency", 0);
+		return;
+	}
+	
+	// Ensure amount field is not overwritten - it should always be transaction currency
+	// If somehow it got changed, restore it
+	if (row.amount !== transaction_amount && transaction_amount > 0) {
+		frappe.model.set_value(cdt, cdn, "amount", transaction_amount);
+	}
+	
+	let transaction_currency = frm.doc.currency;
+	
+	// Get company currency
+	frappe.db.get_value("Company", frm.doc.company, "default_currency", function(r) {
+		if (!r || !r.default_currency) {
+			return;
+		}
+		
+		let company_currency = r.default_currency;
+		
+		// If currencies are the same, no conversion needed
+		if (transaction_currency === company_currency) {
+			frappe.model.set_value(cdt, cdn, "amount_company_currency", transaction_amount);
+			return;
+		}
+		
+		// Get exchange rate and convert
+		let transaction_date = frm.doc.posting_date || frappe.datetime.get_today();
+		
+		frappe.call({
+			method: "erpnext.setup.utils.get_exchange_rate",
+			args: {
+				from_currency: transaction_currency,
+				to_currency: company_currency,
+				transaction_date: transaction_date,
+				company: frm.doc.company
+			},
+			callback: function(rate_result) {
+				if (rate_result.message) {
+					let exchange_rate = rate_result.message;
+					let converted_amount = transaction_amount * exchange_rate;
+					// ONLY update amount_company_currency, never touch amount field
+					frappe.model.set_value(cdt, cdn, "amount_company_currency", converted_amount);
+				} else {
+					// If exchange rate not found, use original transaction amount
+					frappe.model.set_value(cdt, cdn, "amount_company_currency", transaction_amount);
+				}
+			},
+			error: function() {
+				// On error, use original transaction amount
+				frappe.model.set_value(cdt, cdn, "amount_company_currency", transaction_amount);
+			}
+		});
+	});
+}
+
+// Function to calculate totals from child tables
+function calculate_totals(frm) {
+	// Calculate total from expenses child table (transaction currency)
+	let total = 0;
+	let total_company_currency = 0;
+	if (frm.doc.expenses && frm.doc.expenses.length > 0) {
+		frm.doc.expenses.forEach(function(expense) {
+			if (expense.amount) {
+				total += parseFloat(expense.amount) || 0;
+			}
+			if (expense.amount_company_currency) {
+				total_company_currency += parseFloat(expense.amount_company_currency) || 0;
+			}
+		});
+	}
+	
+	// Calculate total taxes and charges (transaction currency)
+	let total_taxes_and_charges = 0;
+	if (frm.doc.taxes_and_charges && frm.doc.taxes_and_charges.length > 0) {
+		frm.doc.taxes_and_charges.forEach(function(tax) {
+			if (tax.tax_amount) {
+				total_taxes_and_charges += parseFloat(tax.tax_amount) || 0;
+			}
+		});
+	}
+	
+	// Convert taxes to company currency
+	let total_taxes_and_charges_company_currency = 0;
+	let transaction_currency = frm.doc.currency;
+	
+	if (frm.doc.company && transaction_currency && total_taxes_and_charges > 0) {
+		frappe.db.get_value("Company", frm.doc.company, "default_currency", function(r) {
+			if (r && r.default_currency) {
+				let company_currency = r.default_currency;
+				if (transaction_currency === company_currency) {
+					total_taxes_and_charges_company_currency = total_taxes_and_charges;
+				} else {
+					// Convert tax amount
+					let transaction_date = frm.doc.posting_date || frappe.datetime.get_today();
+					frappe.call({
+						method: "erpnext.setup.utils.get_exchange_rate",
+						args: {
+							from_currency: transaction_currency,
+							to_currency: company_currency,
+							transaction_date: transaction_date,
+							company: frm.doc.company
+						},
+						callback: function(rate_result) {
+							if (rate_result.message) {
+								let exchange_rate = rate_result.message;
+								total_taxes_and_charges_company_currency = total_taxes_and_charges * exchange_rate;
+							} else {
+								total_taxes_and_charges_company_currency = total_taxes_and_charges;
+							}
+							// Update totals after conversion
+							update_totals_fields(frm, total, total_company_currency, total_taxes_and_charges, total_taxes_and_charges_company_currency);
+						},
+						error: function() {
+							total_taxes_and_charges_company_currency = total_taxes_and_charges;
+							update_totals_fields(frm, total, total_company_currency, total_taxes_and_charges, total_taxes_and_charges_company_currency);
+						}
+					});
+					return; // Exit early, will update in callback
+				}
+			}
+			// Update totals (synchronous update)
+			update_totals_fields(frm, total, total_company_currency, total_taxes_and_charges, total_taxes_and_charges_company_currency);
+		});
+	} else {
+		// Update totals (synchronous update)
+		update_totals_fields(frm, total, total_company_currency, total_taxes_and_charges, total_taxes_and_charges_company_currency);
+	}
+}
+
+// Helper function to update totals fields
+function update_totals_fields(frm, total, total_company_currency, total_taxes_and_charges, total_taxes_and_charges_company_currency) {
+	// Calculate grand totals
+	let grand_total = total + total_taxes_and_charges;
+	let grand_total_company_currency = total_company_currency + total_taxes_and_charges_company_currency;
+	
+	// Update fields
+	frm.set_value("total", total);
+	frm.set_value("total_company_currency", total_company_currency);
+	frm.set_value("total_taxes_and_charges", total_taxes_and_charges);
+	frm.set_value("total_taxes_and_charges_company_currency", total_taxes_and_charges_company_currency);
+	frm.set_value("grand_total", grand_total);
+	frm.set_value("grand_total_company_currency", grand_total_company_currency);
+	
+	// Refresh fields to update UI
+	frm.refresh_field("total");
+	frm.refresh_field("total_company_currency");
+	frm.refresh_field("total_taxes_and_charges");
+	frm.refresh_field("total_taxes_and_charges_company_currency");
+	frm.refresh_field("grand_total");
+	frm.refresh_field("grand_total_company_currency");
 }

@@ -4,9 +4,69 @@
 import frappe
 from frappe.model.document import Document
 from frappe import _
+from frappe.utils import flt
 
 
 class TravelExpense(Document):
+	def validate(self):
+		"""Calculate totals from child tables"""
+		self.calculate_totals()
+	
+	def calculate_totals(self):
+		"""Calculate total, total_taxes_and_charges, and grand_total in both transaction and company currency"""
+		# Get company currency
+		company_currency = None
+		if self.company:
+			company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		
+		transaction_currency = self.currency
+		
+		# Calculate total from expenses child table (transaction currency)
+		total = 0
+		total_company_currency = 0
+		if self.expenses:
+			for expense in self.expenses:
+				if expense.amount:
+					total += flt(expense.amount)
+				# Sum company currency amounts
+				if expense.amount_company_currency:
+					total_company_currency += flt(expense.amount_company_currency)
+		
+		self.total = total
+		self.total_company_currency = total_company_currency
+		
+		# Calculate total taxes and charges (transaction currency)
+		total_taxes_and_charges = 0
+		total_taxes_and_charges_company_currency = 0
+		if self.taxes_and_charges:
+			for tax in self.taxes_and_charges:
+				if tax.tax_amount:
+					total_taxes_and_charges += flt(tax.tax_amount)
+					# Convert tax amount to company currency if needed
+					if transaction_currency and company_currency and transaction_currency != company_currency:
+						try:
+							transaction_date = self.posting_date or frappe.utils.today()
+							exchange_rate = frappe.utils.get_exchange_rate(
+								transaction_currency,
+								company_currency,
+								transaction_date,
+								self.company
+							)
+							total_taxes_and_charges_company_currency += flt(tax.tax_amount) * exchange_rate
+						except Exception:
+							# If conversion fails, use same amount
+							total_taxes_and_charges_company_currency += flt(tax.tax_amount)
+					else:
+						# Same currency, use same amount
+						total_taxes_and_charges_company_currency += flt(tax.tax_amount)
+		
+		self.total_taxes_and_charges = total_taxes_and_charges
+		self.total_taxes_and_charges_company_currency = total_taxes_and_charges_company_currency
+		
+		# Calculate grand total
+		self.grand_total = flt(total) + flt(total_taxes_and_charges)
+		self.grand_total_company_currency = flt(total_company_currency) + flt(total_taxes_and_charges_company_currency)
+	
 	def on_submit(self):
 		"""Create Expense Claim when Travel Expense is submitted"""
 		self.create_expense_claim()
