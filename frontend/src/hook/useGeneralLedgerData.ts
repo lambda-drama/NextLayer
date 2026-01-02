@@ -77,7 +77,12 @@ export function useGeneralLedgerData({
   const [error, setError] = useState<string | null>(null)
 
   const fetchGLData = useCallback(async () => {
-    if (!shouldLoadData || !company || !partyType || !party) return
+    if (!shouldLoadData || !company || !partyType || !party) {
+      // Clear data when shouldLoadData is false
+      setData([])
+      setReconciliationTotals(null)
+      return
+    }
 
     setLoading(true)
     setError(null)

@@ -9,7 +9,7 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3 } from "lucide-react"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -47,6 +47,7 @@ export default function IntercompanyReconciliation() {
   const [showOpeningEntries, setShowOpeningEntries] = useState<boolean>(false)
   const [shouldLoadData, setShouldLoadData] = useState(false)
   const [hasLoadedData, setHasLoadedData] = useState(false)
+  const [reloadTrigger, setReloadTrigger] = useState(0)
 
   // Status filtering and matching
   const [statusFilter, setStatusFilter] = useState<string>("Mismatch")
@@ -144,8 +145,16 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
-    shouldLoadData
+    shouldLoadData: shouldLoadData && reloadTrigger >= 0
   })
+
+  // Clear data when reloadTrigger is -1 (cache clear)
+  useEffect(() => {
+    if (reloadTrigger === -1) {
+      // Data will be cleared when shouldLoadData is false
+      // This effect ensures hooks reset their state
+    }
+  }, [reloadTrigger])
 
   // Permission-aware GL Data hooks for enhanced security
   const {
@@ -355,6 +364,55 @@ export default function IntercompanyReconciliation() {
 
     // Show a brief notification
     // console.log(`Navigating to ${entry.voucher_type} ${entry.voucher_no}. Your data will be preserved when you return.`)
+  }
+
+  // Clear cache function - clears both frontend and backend cache
+  const handleClearCache = async () => {
+    try {
+      // Clear frontend localStorage cache
+      localStorage.removeItem('intercompanyReconciliationState')
+
+      // Clear backend cache via API
+      const csrfToken = window.csrf_token
+      await fetch('/api/method/nextlayer.next_layer.api.general_ledger.clear_gl_cache', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Frappe-CSRF-Token': csrfToken ?? ''
+        },
+        body: JSON.stringify({
+          companyA,
+          companyB,
+          fromDate,
+          toDate,
+          partyA,
+          partyB
+        }),
+        credentials: 'include'
+      })
+
+      // Reset data loading flags
+      setHasLoadedData(false)
+      setShouldLoadData(false)
+
+      // Clear backend match status
+      setBackendMatchStatus({})
+
+      // Clear selected entries
+      setSelectedEntries(new Set())
+
+      // Show success message (optional - you can add a toast notification here)
+      // The data will be cleared and user can click "Load General Ledger Data" again
+    } catch (error) {
+      console.error('Error clearing cache:', error)
+      // Still clear frontend cache even if backend call fails
+      localStorage.removeItem('intercompanyReconciliationState')
+      setHasLoadedData(false)
+      setShouldLoadData(false)
+      setBackendMatchStatus({})
+      setSelectedEntries(new Set())
+    }
   }
 
   // Generate proper ERPNext URL for different voucher types
@@ -672,9 +730,9 @@ export default function IntercompanyReconciliation() {
       const backendStatus = backendMatchStatus[key]
 
       // Use backend status if available, otherwise use client-side logic
-      let status: 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
+      let status: 'Match' | 'Mismatch' | 'Pending'
       if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
-        status = backendStatus.status as 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
+        status = backendStatus.status
       } else {
         // If backend status is null/undefined or doesn't exist, check if there's a frontend match
         // Only show Match if auto-match is enabled AND there's actually a matching entry
@@ -739,9 +797,9 @@ export default function IntercompanyReconciliation() {
       const backendStatus = backendMatchStatus[key]
 
       // Use backend status if available, otherwise use client-side logic
-      let status: 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
+      let status: 'Match' | 'Mismatch' | 'Pending'
       if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
-        status = backendStatus.status as 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit'
+        status = backendStatus.status
       } else {
         // If backend status is null/undefined or doesn't exist, check if there's a frontend match
         // Only show Match if auto-match is enabled AND there's actually a matching entry
@@ -838,7 +896,6 @@ export default function IntercompanyReconciliation() {
     let matchedA = 0
     let mismatchedA = 0
     let pendingA = 0
-    let matchWithIntransitA = 0
 
     findMatchingEntries.glDataAWithStatus.forEach(entry => {
       switch (entry.status) {
@@ -851,9 +908,6 @@ export default function IntercompanyReconciliation() {
         case 'Pending':
           pendingA++
           break
-        case 'Match with In-Transit':
-          matchWithIntransitA++
-          break
       }
     })
 
@@ -861,7 +915,6 @@ export default function IntercompanyReconciliation() {
     let matchedB = 0
     let mismatchedB = 0
     let pendingB = 0
-    let matchWithIntransitB = 0
 
     findMatchingEntries.glDataBWithStatus.forEach(entry => {
       switch (entry.status) {
@@ -874,9 +927,6 @@ export default function IntercompanyReconciliation() {
         case 'Pending':
           pendingB++
           break
-        case 'Match with In-Transit':
-          matchWithIntransitB++
-          break
       }
     })
 
@@ -888,22 +938,19 @@ export default function IntercompanyReconciliation() {
         total: totalA,
         matched: matchedA,
         mismatched: mismatchedA,
-        pending: pendingA,
-        matchWithIntransit: matchWithIntransitA
+        pending: pendingA
       },
       companyB: {
         total: totalB,
         matched: matchedB,
         mismatched: mismatchedB,
-        pending: pendingB,
-        matchWithIntransit: matchWithIntransitB
+        pending: pendingB
       },
       overall: {
         total: totalA + totalB,
         matched: matchedA + matchedB,
         mismatched: mismatchedA + mismatchedB,
-        pending: pendingA + pendingB,
-        matchWithIntransit: matchWithIntransitA + matchWithIntransitB
+        pending: pendingA + pendingB
       }
     }
   }, [findMatchingEntries, hasBackendStatusData, glDataA, glDataB])
@@ -1753,14 +1800,12 @@ export default function IntercompanyReconciliation() {
 
 
   // Get status badge component
-  const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending' | 'Match with In-Transit') => {
+  const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending') => {
     switch (status) {
       case 'Match':
         return <Badge className="bg-green-100 text-green-800 border-green-200">✓ Match</Badge>
       case 'Mismatch':
         return <Badge className="bg-red-100 text-red-800 border-red-200">✗ Mismatch</Badge>
-      case 'Match with In-Transit':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">✓ Match with Intransit</Badge>
       default:
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">? Pending</Badge>
     }
@@ -1780,6 +1825,14 @@ export default function IntercompanyReconciliation() {
             </p>
           </div>
           <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              className="flex items-center space-x-2"
+              onClick={handleClearCache}
+              title="Clear cache"
+            >
+              <Eraser className="h-4 w-4" />
+            </Button>
             <Link to="/ledger">
               <Button
                 variant="outline"
@@ -1834,10 +1887,10 @@ export default function IntercompanyReconciliation() {
                       value={companyA}
                       onValueChange={handleCompanyAChange}
                       placeholder={
-                        !customerViewEnabled ? "Enable Customer View to select" :
-                        allCompaniesLoading ? "Loading..." :
-                        (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
-                        "Select Company"
+                          !customerViewEnabled ? "Enable Customer View to select" :
+                          allCompaniesLoading ? "Loading..." :
+                          (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
+                          "Select Company"
                       }
                       disabled={!customerViewEnabled || allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
                       searchPlaceholder="Search companies..."
@@ -1872,9 +1925,9 @@ export default function IntercompanyReconciliation() {
                       value={partyA}
                       onValueChange={setPartyA}
                       placeholder={
-                        !customerViewEnabled ? "Enable Customer View to select" :
-                        partiesALoading ? "Loading..." :
-                        "Select Party"
+                          !customerViewEnabled ? "Enable Customer View to select" :
+                          partiesALoading ? "Loading..." :
+                          "Select Party"
                       }
                       disabled={!customerViewEnabled || partiesALoading}
                       searchPlaceholder="Search parties..."
@@ -1920,10 +1973,10 @@ export default function IntercompanyReconciliation() {
                       value={companyB}
                       onValueChange={handleCompanyBChange}
                       placeholder={
-                        !supplierViewEnabled ? "Enable Supplier View to select" :
-                        allCompaniesLoading ? "Loading..." :
-                        (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
-                        "Select Company"
+                          !supplierViewEnabled ? "Enable Supplier View to select" :
+                          allCompaniesLoading ? "Loading..." :
+                          (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
+                          "Select Company"
                       }
                       disabled={!supplierViewEnabled || allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
                       searchPlaceholder="Search companies..."
@@ -1958,9 +2011,9 @@ export default function IntercompanyReconciliation() {
                       value={partyB}
                       onValueChange={handlePartyBChange}
                       placeholder={
-                        !supplierViewEnabled ? "Enable Supplier View to select" :
-                        partiesBLoading ? "Loading..." :
-                        "Select Party"
+                          !supplierViewEnabled ? "Enable Supplier View to select" :
+                          partiesBLoading ? "Loading..." :
+                          "Select Party"
                       }
                       disabled={!supplierViewEnabled || partiesBLoading}
                       searchPlaceholder="Search parties..."
@@ -2442,7 +2495,7 @@ export default function IntercompanyReconciliation() {
               <div className="mt-6 pt-6 border-t border-blue-200">
                 <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
                 {summaryStats ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
                       <div className="text-3xl font-bold text-green-700">
                         {summaryStats.overall.matched}
@@ -2454,12 +2507,6 @@ export default function IntercompanyReconciliation() {
                         {summaryStats.overall.mismatched}
                       </div>
                       <div className="text-lg text-red-600 font-medium">Total Mismatched</div>
-                    </div>
-                    <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-                      <div className="text-3xl font-bold text-blue-700">
-                        {summaryStats.overall.matchWithIntransit || 0}
-                      </div>
-                      <div className="text-lg text-blue-600 font-medium">Match with Intransit</div>
                     </div>
                     {/* <div className="text-center p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
                       <div className="text-3xl font-bold text-yellow-700">

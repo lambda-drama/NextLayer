@@ -44,9 +44,14 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
 
   useEffect(() => {
     const fetchData = async () => {
-      // if (!filters.shouldLoadData || !filters.company || !filters.party || !filters.fromDate || !filters.toDate) {
-      //   return
-      // }
+      if (!filters.shouldLoadData || !filters.company || !filters.party || !filters.fromDate || !filters.toDate) {
+        // Clear data when shouldLoadData is false
+        setData([])
+        setHiddenSummary({})
+        setTotalVisibleEntries(0)
+        setTotalHiddenEntries(0)
+        return
+      }
 
       setLoading(true)
       setError(null)
