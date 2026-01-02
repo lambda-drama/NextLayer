@@ -331,6 +331,8 @@ export default function IntercompanyReconciliation() {
     if (!companyA || !partyA || !companyB || !partyB) {
       return
     }
+    // Reset reload trigger to ensure fresh fetch
+    setReloadTrigger(prev => prev + 1)
     setShouldLoadData(true)
     setHasLoadedData(true)
   }
@@ -477,16 +479,15 @@ export default function IntercompanyReconciliation() {
     }
   }, [])
 
-  // Reset data loading flag when selections change, but allow refetch if data was previously loaded
+  // Reset data loading flag when selections change - require manual reload via button
   useEffect(() => {
-    if (hasLoadedData) {
-      // If data was previously loaded, keep shouldLoadData true to allow refetch with new parameters
-      setShouldLoadData(true)
-    } else {
-      // If data was never loaded, reset the flag
-      setShouldLoadData(false)
-    }
-  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries, hasLoadedData])
+    // When any filter changes, reset the loading flag and clear loaded data flag
+    // User must click "Load General Ledger Data" button to fetch new data
+    setShouldLoadData(false)
+    setHasLoadedData(false)
+    setBackendMatchStatus({}) // Also clear backend status
+    setHasBackendStatusData(false) // Reset backend status fetch flag
+  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries])
 
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
@@ -550,10 +551,11 @@ export default function IntercompanyReconciliation() {
     fetchMatchStatus()
   }, [glDataA, glDataB, companyA, companyB, hasBackendStatusData])
 
-  // Reset backend status cache when GL data changes (new data load)
+  // Reset backend status cache when GL data changes (new data load) or date range changes
   useEffect(() => {
     setHasBackendStatusData(false)
-  }, [glDataA, glDataB])
+    setBackendMatchStatus({}) // Clear existing status to force refetch
+  }, [glDataA, glDataB, fromDate, toDate])
 
   // Function to refresh backend statuses when needed (after matching operations)
   const refreshBackendStatuses = async () => {
@@ -675,15 +677,59 @@ export default function IntercompanyReconciliation() {
       return { glDataAWithStatus: [], glDataBWithStatus: [] }
     }
 
+    // Helper function to find matched entry from backend status in the current dataset
+    const findMatchedEntryFromBackend = (backendStatus: any, searchIn: GLEntry[]): GLEntry | undefined => {
+      if (!backendStatus?.matched_with_parsed) return undefined
+
+      const matchedData = backendStatus.matched_with_parsed
+      // Handle both single match (dict) and multiple matches (list)
+      const matchesToCheck = Array.isArray(matchedData) ? matchedData : [matchedData]
+
+      for (const match of matchesToCheck) {
+        if (!match || typeof match !== 'object') continue
+
+        const voucherType = match.voucher_type
+        const voucherNo = match.voucher_no
+
+        if (!voucherType || !voucherNo) continue
+
+        // Find the entry in the current dataset
+        const foundEntry = searchIn.find(
+          entry => entry.voucher_type === voucherType && entry.voucher_no === voucherNo
+        )
+
+        if (foundEntry) {
+          return foundEntry
+        }
+      }
+
+      return undefined
+    }
+
     // Create a map to track which entries have been matched to prevent duplicates
     const matchedEntriesB = new Set<string>()
     const matchedEntriesA = new Set<string>()
 
     // First pass: Process Company A entries and find their matches
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
-      // Find matching entry in Company B based on automatch setting
+      // Check if we have backend status for this entry first
+      const key = `${entryA.voucher_type}-${entryA.voucher_no}`
+      const backendStatus = backendMatchStatus[key]
+
+      // If backend says "Match", try to find the matched entry in current dataset
+      let backendMatchedEntry: GLEntry | undefined = undefined
+      if (backendStatus?.status === 'Match') {
+        backendMatchedEntry = findMatchedEntryFromBackend(backendStatus, glDataB)
+        // If found, mark it as used to prevent duplicate matching
+        if (backendMatchedEntry) {
+          const entryBKey = `${backendMatchedEntry.voucher_type}-${backendMatchedEntry.voucher_no}`
+          matchedEntriesB.add(entryBKey)
+        }
+      }
+
+      // Find matching entry in Company B based on automatch setting (only if backend didn't find one)
       // But ensure we don't match with an entry that's already been matched
-      const matchingEntry = glDataB.find(entryB => {
+      const matchingEntry = backendMatchedEntry || glDataB.find(entryB => {
         const entryBKey = `${entryB.voucher_type}-${entryB.voucher_no}`
 
         // Skip if this entry B has already been matched
@@ -719,15 +765,11 @@ export default function IntercompanyReconciliation() {
         }
       })
 
-      // If we found a match, mark it as used
-      if (matchingEntry) {
+      // If we found a match (from frontend logic), mark it as used
+      if (matchingEntry && !backendMatchedEntry) {
         const entryBKey = `${matchingEntry.voucher_type}-${matchingEntry.voucher_no}`
         matchedEntriesB.add(entryBKey)
       }
-
-      // Check if we have backend status for this entry
-      const key = `${entryA.voucher_type}-${entryA.voucher_no}`
-      const backendStatus = backendMatchStatus[key]
 
       // Use backend status if available, otherwise use client-side logic
       let status: 'Match' | 'Mismatch' | 'Pending'
@@ -743,10 +785,13 @@ export default function IntercompanyReconciliation() {
         }
       }
 
+      // Use backend matched entry if available, otherwise use frontend matched entry
+      const finalMatchedEntry = backendMatchedEntry || matchingEntry
+
       return {
         ...entryA,
         status,
-        matchedEntry: matchingEntry,
+        matchedEntry: finalMatchedEntry,
         backendMatchData: backendStatus
       }
     })
@@ -754,8 +799,23 @@ export default function IntercompanyReconciliation() {
     // Second pass: Process Company B entries and find their matches
     // console.log("Processing Company B entries...")
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
-      // Find matching entry in Company A based on amount AND date equality
-      const matchingEntry = glDataA.find(entryA => {
+      // Check if we have backend status for this entry first
+      const key = `${entryB.voucher_type}-${entryB.voucher_no}`
+      const backendStatus = backendMatchStatus[key]
+
+      // If backend says "Match", try to find the matched entry in current dataset
+      let backendMatchedEntry: GLEntry | undefined = undefined
+      if (backendStatus?.status === 'Match') {
+        backendMatchedEntry = findMatchedEntryFromBackend(backendStatus, glDataA)
+        // If found, mark it as used to prevent duplicate matching
+        if (backendMatchedEntry) {
+          const entryAKey = `${backendMatchedEntry.voucher_type}-${backendMatchedEntry.voucher_no}`
+          matchedEntriesA.add(entryAKey)
+        }
+      }
+
+      // Find matching entry in Company A based on amount AND date equality (only if backend didn't find one)
+      const matchingEntry = backendMatchedEntry || glDataA.find(entryA => {
         const entryAKey = `${entryA.voucher_type}-${entryA.voucher_no}`
 
         // Skip if this entry A has already been matched
@@ -786,15 +846,11 @@ export default function IntercompanyReconciliation() {
         }
       })
 
-      // If we found a match, mark it as used
-      if (matchingEntry) {
+      // If we found a match (from frontend logic), mark it as used
+      if (matchingEntry && !backendMatchedEntry) {
         const entryAKey = `${matchingEntry.voucher_type}-${matchingEntry.voucher_no}`
         matchedEntriesA.add(entryAKey)
       }
-
-      // Check if we have backend status for this entry
-      const key = `${entryB.voucher_type}-${entryB.voucher_no}`
-      const backendStatus = backendMatchStatus[key]
 
       // Use backend status if available, otherwise use client-side logic
       let status: 'Match' | 'Mismatch' | 'Pending'
@@ -810,10 +866,13 @@ export default function IntercompanyReconciliation() {
         }
       }
 
+      // Use backend matched entry if available, otherwise use frontend matched entry
+      const finalMatchedEntry = backendMatchedEntry || matchingEntry
+
       return {
         ...entryB,
         status: status,
-        matchedEntry: matchingEntry,
+        matchedEntry: finalMatchedEntry,
         backendMatchData: backendStatus
       }
     })
