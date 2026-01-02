@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface GLFilters {
   company: string
@@ -42,11 +42,25 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Use refs to store latest filter values to avoid triggering effect when dates change
+  const filtersRef = useRef(filters)
+  
+  // Update ref when filters change
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
+
   useEffect(() => {
     const fetchData = async () => {
-      // if (!filters.shouldLoadData || !filters.company || !filters.party || !filters.fromDate || !filters.toDate) {
-      //   return
-      // }
+      const currentFilters = filtersRef.current
+      if (!currentFilters.shouldLoadData || !currentFilters.company || !currentFilters.party || !currentFilters.fromDate || !currentFilters.toDate) {
+        // Clear data when shouldLoadData is false
+        setData([])
+        setHiddenSummary({})
+        setTotalVisibleEntries(0)
+        setTotalHiddenEntries(0)
+        return
+      }
 
       setLoading(true)
       setError(null)
@@ -54,15 +68,15 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
       // console.log("Filters being sent:", filters)
       try {
         const requestBody = {
-          company: filters.company,
-          party_type: filters.partyType,
-          party: filters.party,
-          from_date: filters.fromDate,
-          to_date: filters.toDate,
-          currency: filters.currency === "all" ? "" : filters.currency,
-          ignore_exchange_rate_revaluation: filters.ignoreExchangeRateRevaluation,
-          ignore_system_generated_notes: filters.ignoreSystemGeneratedNotes,
-          show_opening_entries: filters.showOpeningEntries
+          company: currentFilters.company,
+          party_type: currentFilters.partyType,
+          party: currentFilters.party,
+          from_date: currentFilters.fromDate,
+          to_date: currentFilters.toDate,
+          currency: currentFilters.currency === "all" ? "" : currentFilters.currency,
+          ignore_exchange_rate_revaluation: currentFilters.ignoreExchangeRateRevaluation,
+          ignore_system_generated_notes: currentFilters.ignoreSystemGeneratedNotes,
+          show_opening_entries: currentFilters.showOpeningEntries
         }
 
         // console.log("Making API request to:", '/api/method/nextlayer.next_layer.api.general_ledger.get_permission_aware_gl_data')
@@ -152,18 +166,7 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
     }
 
     fetchData()
-  }, [
-    filters.shouldLoadData,
-    filters.company,
-    filters.partyType,
-    filters.party,
-    filters.fromDate,
-    filters.toDate,
-    filters.currency,
-    filters.ignoreExchangeRateRevaluation,
-    filters.ignoreSystemGeneratedNotes,
-    filters.showOpeningEntries
-  ])
+  }, [filters.shouldLoadData, filters.company, filters.partyType, filters.party])
 
   return {
     data,

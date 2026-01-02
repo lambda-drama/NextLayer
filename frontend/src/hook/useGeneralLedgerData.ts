@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 
 export interface GLEntry {
   gl_entry?: string
@@ -76,8 +76,31 @@ export function useGeneralLedgerData({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Use refs to store latest date values to avoid recreating callback when dates change
+  const fromDateRef = useRef(fromDate)
+  const toDateRef = useRef(toDate)
+  const currencyRef = useRef(currency)
+  const ignoreExchangeRateRevaluationRef = useRef(ignoreExchangeRateRevaluation)
+  const ignoreSystemGeneratedNotesRef = useRef(ignoreSystemGeneratedNotes)
+  const showOpeningEntriesRef = useRef(showOpeningEntries)
+
+  // Update refs when values change
+  useEffect(() => {
+    fromDateRef.current = fromDate
+    toDateRef.current = toDate
+    currencyRef.current = currency
+    ignoreExchangeRateRevaluationRef.current = ignoreExchangeRateRevaluation
+    ignoreSystemGeneratedNotesRef.current = ignoreSystemGeneratedNotes
+    showOpeningEntriesRef.current = showOpeningEntries
+  }, [fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries])
+
   const fetchGLData = useCallback(async () => {
-    if (!shouldLoadData || !company || !partyType || !party) return
+    if (!shouldLoadData || !company || !partyType || !party) {
+      // Clear data when shouldLoadData is false
+      setData([])
+      setReconciliationTotals(null)
+      return
+    }
 
     setLoading(true)
     setError(null)
@@ -86,14 +109,14 @@ export function useGeneralLedgerData({
       company,
       party_type: partyType,
       party: [party],
-      from_date: fromDate,
-      to_date: toDate,
+      from_date: fromDateRef.current,
+      to_date: toDateRef.current,
       show_remarks: 1,
       include_dimensions: 0,
-      ...(currency && currency !== "all" && { currency }),
-      ...(ignoreExchangeRateRevaluation && { ignore_err: 1 }),
-      ...(ignoreSystemGeneratedNotes && { ignore_cr_dr_notes: 1 }),
-      ...(showOpeningEntries && { show_opening_entries: 1 }),
+      ...(currencyRef.current && currencyRef.current !== "all" && { currency: currencyRef.current }),
+      ...(ignoreExchangeRateRevaluationRef.current && { ignore_err: 1 }),
+      ...(ignoreSystemGeneratedNotesRef.current && { ignore_cr_dr_notes: 1 }),
+      ...(showOpeningEntriesRef.current && { show_opening_entries: 1 }),
     }
 
     try {
@@ -136,11 +159,6 @@ const rawEntries = result.message?.data?.entries || []
       const closingEntry = closingEntries[closingEntries.length - 1]
       // Get the first Opening entry which contains the actual opening balance
       const openingEntry = openingEntries[0]
-
-      // Debug logging
-      console.log("Opening entries found:", openingEntries.length)
-      console.log("First opening entry:", openingEntry)
-      console.log("Closing entry:", closingEntry)
 
       if (closingEntry) {
         setReconciliationTotals({
@@ -253,7 +271,7 @@ const rawEntries = result.message?.data?.entries || []
     } finally {
       setLoading(false)
     }
-  }, [shouldLoadData, company, partyType, party, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries])
+  }, [shouldLoadData, company, partyType, party])
 
   useEffect(() => {
     fetchGLData()
