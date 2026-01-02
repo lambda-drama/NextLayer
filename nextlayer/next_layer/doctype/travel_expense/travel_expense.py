@@ -283,7 +283,6 @@ class TravelExpense(Document):
 						"allocated_amount": advance_row.allocated_amount,
 					})
 			
-			# Insert and submit the expense claim
 			expense_claim.insert(ignore_permissions=True)
 			expense_claim.submit()
 			frappe.db.commit()
@@ -306,6 +305,4 @@ class TravelExpense(Document):
 				"Travel Expense Error"
 			)
 			frappe.throw(_("Error creating Expense Claim: {0}").format(str(e)))
-
-
-
+   
