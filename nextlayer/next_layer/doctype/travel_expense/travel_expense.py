@@ -68,27 +68,116 @@ class TravelExpense(Document):
 		self.grand_total_company_currency = flt(total_company_currency) + flt(total_taxes_and_charges_company_currency)
 	
 	def on_submit(self):
-		"""Create Expense Claim when Travel Expense is submitted"""
+		"""Create Expense Claim and Journal Entry when Travel Expense is submitted"""
+		# Create journal entry if is_paid is not ticked
+		if not self.is_paid:
+			from nextlayer.next_layer.api.travel_expense_utils import create_journal_entry_for_travel_expense
+			try:
+				journal_entry_name = create_journal_entry_for_travel_expense(self)
+				if journal_entry_name:
+					frappe.msgprint(
+						_("Journal Entry {0} has been created and submitted.").format(
+							frappe.bold(journal_entry_name)
+						),
+						indicator="green",
+						alert=True
+					)
+			except Exception as e:
+				frappe.log_error(
+					f"Error creating journal entry for Travel Expense {self.name}: {str(e)}",
+					"Travel Expense Error"
+				)
+				# Don't prevent submission if journal entry creation fails
+				frappe.msgprint(
+					_("Warning: Could not create journal entry. Please create it manually."),
+					indicator="orange",
+					alert=True
+				)
+		
+		# Create Expense Claim
 		self.create_expense_claim()
 	
 	def create_expense_claim(self):
 		"""Create an Expense Claim from Travel Expense"""
 		try:
 			# Get employee from traveler_name (Member)
+			# Note: Member is a standalone doctype and may not be linked to Employee
 			employee = None
 			if self.traveler_name:
-				# Try to get employee linked to member
-				employee_list = frappe.get_all(
-					"Employee",
-					filters={"custom_member": self.traveler_name},
-					fields=["name"],
-					limit=1
-				)
-				if employee_list:
-					employee = employee_list[0].name
+				# Try different methods to find employee linked to member
+				# Method 1: Check if Member doctype has employee field
+				try:
+					member_doc = frappe.get_doc("Member", self.traveler_name)
+					if hasattr(member_doc, 'employee') and member_doc.employee:
+						employee = member_doc.employee
+					elif hasattr(member_doc, 'custom_employee') and member_doc.custom_employee:
+						employee = member_doc.custom_employee
+				except Exception:
+					pass
+				
+				# Method 2: Try to find employee by name matching (if member name matches employee name)
+				if not employee:
+					try:
+						employee_list = frappe.get_all(
+							"Employee",
+							filters={"employee_name": self.traveler_name},
+							fields=["name"],
+							limit=1
+						)
+						if employee_list:
+							employee = employee_list[0].name
+					except Exception:
+						pass
+				
+				# Method 3: Try custom_member field if it exists (for backward compatibility)
+				if not employee:
+					try:
+						# Check if custom_member field exists first
+						employee_fields = frappe.get_meta("Employee").get_fieldnames()
+						if "custom_member" in employee_fields:
+							employee_list = frappe.get_all(
+								"Employee",
+								filters={"custom_member": self.traveler_name},
+								fields=["name"],
+								limit=1
+							)
+							if employee_list:
+								employee = employee_list[0].name
+					except Exception:
+						pass
 			
+			# If no employee found, use default employee (Administrator)
 			if not employee:
-				frappe.throw(_("Please link an Employee to the Traveler (Member) {0}").format(self.traveler_name))
+				# Try to get Administrator employee first
+				try:
+					admin_employee = frappe.db.get_value("Employee", {"user_id": "Administrator"}, "name")
+					if admin_employee:
+						employee = admin_employee
+					else:
+						# If Administrator employee doesn't exist, get any active employee
+						employee_list = frappe.get_all(
+							"Employee",
+							filters={"status": "Active"},
+							fields=["name"],
+							limit=1
+						)
+						if employee_list:
+							employee = employee_list[0].name
+						else:
+							# Last resort: get any employee
+							employee_list = frappe.get_all(
+								"Employee",
+								fields=["name"],
+								limit=1
+							)
+							if employee_list:
+								employee = employee_list[0].name
+				except Exception:
+					pass
+			
+			# If still no employee found, throw error
+			if not employee:
+				frappe.throw(_("Could not find an Employee. Please create at least one Employee in the system."))
 			
 			# Create Expense Claim
 			expense_claim = frappe.get_doc({
@@ -104,7 +193,9 @@ class TravelExpense(Document):
 				"marka": self.marka,
 				"cost_center": self.cost_center,
 				"project": self.project,
-				"payable_account": self.payable_account,
+				"payable_account": self.payable_account if not self.is_paid else None,
+				"is_paid": self.is_paid if hasattr(self, 'is_paid') else 0,
+				"mode_of_payment": self.mode_of_payment if (hasattr(self, 'is_paid') and self.is_paid and hasattr(self, 'mode_of_payment')) else None,
 				# Copy travel details
 				"custom_flight_no": self.flight_no,
 				"custom_departure_airport": self.custom_departure_airport,
@@ -121,11 +212,25 @@ class TravelExpense(Document):
 			# Add expenses from child table
 			if self.expenses:
 				for expense_row in self.expenses:
+					# Expense Claim uses company currency, so use amount_company_currency if available
+					# Otherwise use amount (which might be in transaction currency)
+					expense_amount = getattr(expense_row, 'amount_company_currency', None) or expense_row.amount or 0
+					
+					# Sanctioned amount should not exceed amount
+					# Use amount_company_currency for sanctioned_amount if available, otherwise use amount
+					sanctioned_amount_value = getattr(expense_row, 'sanctioned_amount', None)
+					if sanctioned_amount_value:
+						# If sanctioned_amount is set, ensure it doesn't exceed amount
+						sanctioned_amount_value = min(flt(sanctioned_amount_value), flt(expense_amount))
+					else:
+						# If not set, use the same as amount
+						sanctioned_amount_value = expense_amount
+					
 					expense_detail = {
 						"expense_type": expense_row.expense_type,
 						"expense_date": expense_row.expense_date,
-						"amount": expense_row.amount,
-						"sanctioned_amount": expense_row.sanctioned_amount or expense_row.amount,
+						"amount": expense_amount,
+						"sanctioned_amount": sanctioned_amount_value,
 						"description": expense_row.description,
 						"cost_center": expense_row.cost_center or self.cost_center,
 						"project": expense_row.project or self.project,

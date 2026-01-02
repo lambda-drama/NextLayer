@@ -20,7 +20,27 @@ frappe.ui.form.on("Travel Expense", {
 			convert_and_update_amount(frm);
 		}
 		recalculate_all_expense_amounts_company_currency(frm);
-		calculate_totals(frm);z
+		calculate_totals(frm);
+		
+		// Set company filter for payable_account when company changes
+		if (frm.doc.company) {
+			frm.set_query("payable_account", function() {
+				return {
+					filters: {
+						company: frm.doc.company
+					}
+				};
+			});
+			
+			// Set company filter for cost_center when company changes
+			frm.set_query("cost_center", function() {
+				return {
+					filters: {
+						company: frm.doc.company
+					}
+				};
+			});
+		}
 	},
 	
 	posting_date: function(frm) {
@@ -32,7 +52,76 @@ frappe.ui.form.on("Travel Expense", {
 		calculate_totals(frm);
 	},
 	
+	is_paid: function(frm) {
+		// Show/hide mode_of_payment and set payable_account requirement based on is_paid
+		if (frm.doc.is_paid) {
+			frm.set_df_property("mode_of_payment", "reqd", 1);
+			frm.set_df_property("payable_account", "reqd", 0);
+		} else {
+			frm.set_df_property("mode_of_payment", "reqd", 0);
+			frm.set_df_property("payable_account", "reqd", 1);
+		}
+		frm.refresh_field("mode_of_payment");
+		frm.refresh_field("payable_account");
+	},
+	
+	validate: function(frm) {
+		// Validate payable_account is mandatory when is_paid is not ticked
+		if (!frm.doc.is_paid && !frm.doc.payable_account) {
+			frappe.msgprint({
+				title: __("Validation Error"),
+				message: __("Payable Account is mandatory when 'Is Paid' is not ticked."),
+				indicator: "red",
+			});
+			frappe.validated = false;
+		}
+	},
+	
 	refresh: function(frm) {
+		// Set initial requirements based on is_paid
+		// Payable account is always visible, just mandatory when is_paid is not ticked
+		if (frm.doc.is_paid) {
+			frm.set_df_property("mode_of_payment", "reqd", 1);
+			frm.set_df_property("payable_account", "reqd", 0);
+		} else {
+			frm.set_df_property("mode_of_payment", "reqd", 0);
+			frm.set_df_property("payable_account", "reqd", 1);
+		}
+		frm.refresh_field("mode_of_payment");
+		frm.refresh_field("payable_account");
+		
+		// Set company filter for payable_account
+		frm.set_query("payable_account", function() {
+			if (!frm.doc.company) {
+				frappe.msgprint({
+					title: __("Warning"),
+					message: __("Please select a Company first."),
+					indicator: "orange",
+				});
+				return {
+					filters: {}
+				};
+			}
+			return {
+				filters: {
+					company: frm.doc.company
+				}
+			};
+		});
+		
+		// Set company filter for cost_center
+		frm.set_query("cost_center", function() {
+			if (!frm.doc.company) {
+				return {
+					filters: {}
+				};
+			}
+			return {
+				filters: {
+					company: frm.doc.company
+				}
+			};
+		});
 		calculate_totals(frm);
 		
 		// Add event listeners to expenses child table
@@ -94,16 +183,12 @@ frappe.ui.form.on("Travel Expense", {
 			});
 		}
 		
-		// If no travel expenses and travel_amount exists, create/update travel row in child table
 		if (travel_count === 0 && frm.doc.travel_amount) {
-			// Use travel_amount for amount (transaction currency)
 			let amount_transaction = frm.doc.travel_amount || 0;
-			// Use amountcompany_currency for amount_company_currency (company currency)
 			let amount_company = frm.doc.amountcompany_currency || 0;
 			
 			// If amountcompany_currency is not set, convert it
 			if (!amount_company || amount_company === 0) {
-				// Try to get company currency and convert
 				if (frm.doc.company && frm.doc.currency) {
 					frappe.db.get_value("Company", frm.doc.company, "default_currency", function(r) {
 						if (r && r.default_currency) {
@@ -111,22 +196,21 @@ frappe.ui.form.on("Travel Expense", {
 							if (frm.doc.currency === company_currency) {
 								amount_company = amount_transaction;
 							} else {
-								// Will be converted by convert_expense_amount_to_company_currency
-								amount_company = amount_transaction; // Temporary, will be updated
+								amount_company = amount_transaction;
 							}
 						}
 					});
 				} else {
-					amount_company = amount_transaction; // Fallback
+					amount_company = amount_transaction; 
 				}
 			}
 			
 			// Create a new travel expense row
 			let travel_row = frm.add_child("expenses");
 			travel_row.expense_type = "Travel";
-			travel_row.amount = amount_transaction; // Transaction currency
-			travel_row.amount_company_currency = amount_company; // Company currency
-			travel_row.sanctioned_amount = amount_company || amount_transaction; // Use company currency for sanctioned
+			travel_row.amount = amount_transaction; 
+			travel_row.amount_company_currency = amount_company; 
+			travel_row.sanctioned_amount = amount_company || amount_transaction;
 			travel_row.expense_date = frm.doc.posting_date || frappe.datetime.get_today();
 			
 			// Set the values using frappe.model.set_value
@@ -251,6 +335,22 @@ frappe.ui.form.on("Travel Expense", {
 
 // Handle flight lookup from child table (Travel Expense Detail)
 frappe.ui.form.on("Travel Expense Detail", {
+	cost_center: function(frm, cdt, cdn) {
+		// Set company filter for cost_center in child table
+		frm.set_query("cost_center", "expenses", function() {
+			if (!frm.doc.company) {
+				return {
+					filters: {}
+				};
+			}
+			return {
+				filters: {
+					company: frm.doc.company
+				}
+			};
+		});
+	},
+	
 	amount: function(frm, cdt, cdn) {
 		// Get the row and preserve the amount value (transaction currency)
 		let row = locals[cdt][cdn];
@@ -278,6 +378,20 @@ frappe.ui.form.on("Travel Expense Detail", {
 	},
 	
 	refresh: function(frm) {
+		// Set company filter for cost_center in child table
+		frm.set_query("cost_center", "expenses", function() {
+			if (!frm.doc.company) {
+				return {
+					filters: {}
+				};
+			}
+			return {
+				filters: {
+					company: frm.doc.company
+				}
+			};
+		});
+		
 		// Add event listeners to flight number field in the grid for Enter key and blur
 		if (frm.fields_dict.expenses && frm.fields_dict.expenses.grid) {
 			// Remove existing listeners to avoid duplicates
@@ -1380,8 +1494,7 @@ function add_expense_row(dialog, temp_doc, container) {
 					</div>
 					<div class="col-md-6">
 						<div class="form-group">
-							<label>Country<span style="color: red;">*</span></label>
-							<input type="text" class="form-control hotel-country" data-field="hotel_country" placeholder="Country" required>
+							<div class="hotel-country-wrapper" data-field="hotel_country"></div>
 					</div>
 				</div>
 			</div>
@@ -1612,6 +1725,44 @@ function add_expense_row(dialog, temp_doc, container) {
 		// Doctype doesn't exist, skip
 	});
 	
+	// Create Hotel Country link field
+	frappe.model.with_doctype("Country", function() {
+		try {
+			let hotel_country_wrapper = $row.find('.hotel-country-wrapper');
+			let hotel_country_field = frappe.ui.form.make_control({
+				df: {
+					fieldtype: "Link",
+					fieldname: "hotel_country",
+					options: "Country",
+					label: "Country",
+					reqd: 1
+				},
+				parent: hotel_country_wrapper,
+				render_input: true
+			});
+			hotel_country_field.refresh();
+			hotel_country_field.set_value(row.hotel_country || "");
+			
+			// Store field reference on row element for later access
+			$row.data('hotel_country_field', hotel_country_field);
+			
+			hotel_country_field.$input.on('change blur', function() {
+				let value = hotel_country_field.get_value();
+				frappe.model.set_value(row.doctype, row.name, "hotel_country", value);
+				// Force update locals
+				if (locals[row.doctype] && locals[row.doctype][row.name]) {
+					locals[row.doctype][row.name].hotel_country = value;
+				}
+				// Also update the row object directly
+				row.hotel_country = value;
+			});
+		} catch(e) {
+			console.warn("Could not create Hotel Country link field:", e);
+		}
+	}, function() {
+		// Doctype doesn't exist, skip
+	});
+	
 	// Create Departure Airport link field
 	frappe.model.with_doctype("Airport", function() {
 		try {
@@ -1810,7 +1961,8 @@ function add_expense_row(dialog, temp_doc, container) {
 	}
 	
 	// Function to calculate total nights and amount for Hotel expenses
-	// Note: rate_per_day should already be converted to company currency
+	// Note: All calculations in modal are in transaction currency
+	// Currency conversion will happen when data is added to Travel Expense child table
 	function calculate_hotel_totals() {
 		let expense_type = row.expense_type || "";
 		let expense_type_lower = expense_type.toLowerCase().trim();
@@ -1818,8 +1970,8 @@ function add_expense_row(dialog, temp_doc, container) {
 		if (expense_type_lower === 'hotel' || expense_type_lower.includes('hotel')) {
 			let checkin_date = $row.find('.hotel-checkin-date').val();
 			let checkout_date = $row.find('.hotel-checkout-date').val();
-			// Use the converted rate_per_day (stored in row data or use the input value if already converted)
-			let rate_per_day = row.converted_rate_per_day || parseFloat($row.find('input[data-field="rate_per_day"]').val()) || 0;
+			// Use rate_per_day in transaction currency (no conversion in modal)
+			let rate_per_day = row.rate_per_day || parseFloat($row.find('input[data-field="rate_per_day"]').val()) || 0;
 			
 			// Calculate total nights
 			let total_nights = 0;
@@ -1835,25 +1987,23 @@ function add_expense_row(dialog, temp_doc, container) {
 			// Update total nights in row data
 			frappe.model.set_value(row.doctype, row.name, "total_nights", total_nights);
 			
-			// Calculate amount = converted_rate_per_day × total_nights (both in company currency)
+			// Calculate amount = rate_per_day × total_nights (both in transaction currency)
 			let calculated_amount = rate_per_day * total_nights;
-			if (calculated_amount > 0) {
-				frappe.model.set_value(row.doctype, row.name, "amount", calculated_amount);
-				// Update the amount field in the UI
-				$row.find('input[data-field="amount"]').val(calculated_amount.toFixed(2));
-				row.amount = calculated_amount;
-				
-				// Update locals
-				if (locals[row.doctype] && locals[row.doctype][row.name]) {
-					locals[row.doctype][row.name].amount = calculated_amount;
-				}
-			} else {
-				// If amount is 0, just set it
-				frappe.model.set_value(row.doctype, row.name, "amount", 0);
-				$row.find('input[data-field="amount"]').val("0.00");
+			// Always update amount, even if 0
+			frappe.model.set_value(row.doctype, row.name, "amount", calculated_amount);
+			// Update the amount field in the UI
+			$row.find('input[data-field="amount"]').val(calculated_amount.toFixed(2));
+			row.amount = calculated_amount;
+			
+			// Update locals
+			if (locals[row.doctype] && locals[row.doctype][row.name]) {
+				locals[row.doctype][row.name].amount = calculated_amount;
 			}
 		}
 	}
+	
+	// Store calculate_hotel_totals function on row element for external access
+	$row.data('calculate-hotel-totals', calculate_hotel_totals);
 	
 	// Helper function to convert rate_per_day from transaction currency to company currency
 	function convert_rate_per_day(dialog, $row, row, transaction_rate) {
@@ -1978,13 +2128,12 @@ function add_expense_row(dialog, temp_doc, container) {
 		}
 	});
 	
-	// Add currency conversion for rate_per_day field (Hotel expenses)
+	// Handle rate_per_day field (Hotel expenses) - NO currency conversion in modal
+	// Just update value and calculate amount in transaction currency
+	// Currency conversion will happen when data is added to Travel Expense child table
 	$row.find('input[data-field="rate_per_day"]').on('change blur', function() {
 		let $rate_input = $(this);
 		let transaction_rate = parseFloat($rate_input.val()) || 0;
-		if (transaction_rate === 0) {
-			return;
-		}
 		
 		// Check if this is a hotel expense
 		let expense_type = row.expense_type || "";
@@ -1993,103 +2142,29 @@ function add_expense_row(dialog, temp_doc, container) {
 			return;
 		}
 		
-		// Convert rate_per_day from transaction currency to company currency
-		convert_rate_per_day(dialog, $row, row, transaction_rate);
+		// Update row data with the new rate (in transaction currency)
+		row.rate_per_day = transaction_rate;
+		frappe.model.set_value(row.doctype, row.name, "rate_per_day", transaction_rate);
+		
+		// Recalculate hotel totals (amount = rate_per_day × total_nights in transaction currency)
+		calculate_hotel_totals();
 	});
 	
-	// Add currency conversion for amount field
+	// Handle amount field - NO currency conversion in modal
+	// Just update value in transaction currency
+	// Currency conversion will happen when data is added to Travel Expense child table
 	$row.find('input[data-field="amount"]').on('change blur', function() {
 		let $amount_input = $(this);
 		let transaction_amount = parseFloat($amount_input.val()) || 0;
-		if (transaction_amount === 0) {
-			return;
+		
+		// Update amount in transaction currency (no conversion in modal)
+		frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
+		row.amount = transaction_amount;
+		
+		// Update locals
+		if (locals[row.doctype] && locals[row.doctype][row.name]) {
+			locals[row.doctype][row.name].amount = transaction_amount;
 		}
-		
-		// Get transaction currency from dialog - try multiple methods
-		let transaction_currency = null;
-		if (dialog.fields_dict && dialog.fields_dict.transaction_currency) {
-			transaction_currency = dialog.fields_dict.transaction_currency.get_value();
-		} else if (dialog.get_value) {
-			transaction_currency = dialog.get_value('transaction_currency');
-		} else {
-			// Try to get from dialog wrapper
-			let currency_field = dialog.$wrapper.find('[data-fieldname="transaction_currency"]');
-			if (currency_field.length) {
-				transaction_currency = currency_field.val();
-			}
-		}
-		
-		let company_currency = dialog.company_currency;
-		
-		if (!transaction_currency || !company_currency) {
-			console.warn("Currency conversion: Missing transaction_currency or company_currency", {
-				transaction_currency: transaction_currency,
-				company_currency: company_currency
-			});
-			return;
-		}
-		
-		// If currencies are the same, no conversion needed
-		if (transaction_currency === company_currency) {
-			frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
-			row.amount = transaction_amount;
-			return;
-		}
-		
-		// Get transaction date for exchange rate
-		let transaction_date = $row.find('input[data-field="expense_date"]').val() || frappe.datetime.get_today();
-		let company = dialog.original_frm ? dialog.original_frm.doc.company : null;
-		
-		if (!company) {
-			console.warn("Currency conversion: Missing company");
-			return;
-		}
-		
-		// Convert currency
-		frappe.call({
-			method: "erpnext.setup.utils.get_exchange_rate",
-			args: {
-				from_currency: transaction_currency,
-				to_currency: company_currency,
-				transaction_date: transaction_date,
-				company: company
-			},
-			callback: function(rate_result) {
-				if (rate_result.message) {
-					let exchange_rate = rate_result.message;
-					let converted_amount = transaction_amount * exchange_rate;
-					
-					// Update amount with converted value (in company currency)
-					frappe.model.set_value(row.doctype, row.name, "amount", converted_amount);
-					row.amount = converted_amount;
-					
-					// Update the input field value in UI
-					$amount_input.val(converted_amount.toFixed(2));
-					
-					// Also update locals
-					if (locals[row.doctype] && locals[row.doctype][row.name]) {
-						locals[row.doctype][row.name].amount = converted_amount;
-					}
-					
-					// Show conversion info
-					frappe.show_alert(
-						__("Converted: {0} {1} = {2} {3}", [
-							transaction_amount.toFixed(2),
-							transaction_currency,
-							converted_amount.toFixed(2),
-							company_currency
-						]),
-						2,
-						"blue"
-					);
-				} else {
-					console.warn("Currency conversion: Exchange rate not found");
-				}
-			},
-			error: function(err) {
-				console.warn("Currency conversion error:", err);
-			}
-		});
 	});
 	
 	$row.data('calculate-hotel-totals', calculate_hotel_totals);

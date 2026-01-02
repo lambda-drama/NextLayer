@@ -53,6 +53,9 @@
   "column_break_accounting",
   "cost_center",
   "project",
+  "section_break_payments",
+  "is_paid",
+  "mode_of_payment",
   "payable_account",
   "section_break_expenses",
   "expenses",
@@ -317,9 +320,29 @@
    "options": "Project"
   },
   {
+   "collapsible": 1,
+   "fieldname": "section_break_payments",
+   "fieldtype": "Section Break",
+   "label": "Payments"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_paid",
+   "fieldtype": "Check",
+   "label": "Is Paid"
+  },
+  {
+   "depends_on": "eval:doc.is_paid == 1",
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
    "fieldname": "payable_account",
    "fieldtype": "Link",
    "label": "Payable Account",
+   "mandatory_depends_on": "eval:doc.is_paid == 0",
    "options": "Account"
   },
   {

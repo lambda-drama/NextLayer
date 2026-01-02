@@ -172,7 +172,7 @@
    "fieldname": "custom_prn_number",
    "fieldtype": "Data",
    "label": "PRN Number",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
@@ -256,7 +256,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-02 14:49:45.902394",
+ "modified": "2026-01-02 17:19:43.773297",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense Detail",
