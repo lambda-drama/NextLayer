@@ -2,20 +2,22 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "naming_series:",
- "creation": "2025-12-26 00:00:00.000000",
+ "creation": "2025-12-26 00:00:00",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
-  "field_order": [
+ "field_order": [
   "naming_series",
   "company",
-  "traveler_name",
-  "is_addition",
   "travel_group",
-  "flight_no",
+  "currency",
+  "is_addition",
+  "original_expense",
   "column_break_1",
   "posting_date",
+  "traveler_name",
+  "flight_no",
   "section_break_travel",
   "custom_departure_airport",
   "custom_arrival_airport",
@@ -30,7 +32,7 @@
   "custom_pnr_number_",
   "column_break_travel3",
   "travel_amount",
-  "travel_currency",
+  "amountcompany_currency",
   "section_break_hotel",
   "hotel_checkin_date",
   "hotel_checkout_date",
@@ -51,6 +53,9 @@
   "column_break_accounting",
   "cost_center",
   "project",
+  "section_break_payments",
+  "is_paid",
+  "mode_of_payment",
   "payable_account",
   "section_break_expenses",
   "expenses",
@@ -59,12 +64,16 @@
   "section_break_advance",
   "advances",
   "section_break_totals",
-  "currency",
   "total",
   "total_taxes_and_charges",
   "grand_total",
+  "column_break_blkm",
+  "total_company_currency",
+  "total_taxes_and_charges_company_currency",
+  "grand_total_company_currency",
   "section_break_hidden",
-  "expense_claim"
+  "expense_claim",
+  "amended_from"
  ],
  "fields": [
   {
@@ -86,6 +95,7 @@
    "fieldname": "traveler_name",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Traveler Name",
    "options": "Member",
    "reqd": 1
@@ -105,6 +115,8 @@
   {
    "fieldname": "flight_no",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Flight No"
   },
   {
@@ -170,7 +182,7 @@
    "fieldname": "custom_booked_by",
    "fieldtype": "Link",
    "label": "Booked By",
-   "options": "User"
+   "options": "Member"
   },
   {
    "fieldname": "custom_travel_type",
@@ -191,14 +203,13 @@
    "fieldname": "travel_amount",
    "fieldtype": "Currency",
    "label": "Amount",
-   "options": "travel_currency"
+   "options": "currency"
   },
   {
-   "fetch_from": "company.default_currency",
-   "fieldname": "travel_currency",
-   "fieldtype": "Link",
-   "label": "Currency",
-   "options": "Currency"
+   "fieldname": "amountcompany_currency",
+   "fieldtype": "Currency",
+   "label": "Amount(Company Currency)",
+   "options": "Company:company:default_currency"
   },
   {
    "collapsible": 1,
@@ -309,9 +320,29 @@
    "options": "Project"
   },
   {
+   "collapsible": 1,
+   "fieldname": "section_break_payments",
+   "fieldtype": "Section Break",
+   "label": "Payments"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_paid",
+   "fieldtype": "Check",
+   "label": "Is Paid"
+  },
+  {
+   "depends_on": "eval:doc.is_paid == 1",
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
    "fieldname": "payable_account",
    "fieldtype": "Link",
    "label": "Payable Account",
+   "mandatory_depends_on": "eval:doc.is_paid == 0",
    "options": "Account"
   },
   {
@@ -354,10 +385,9 @@
    "label": "Totals"
   },
   {
-   "fetch_from": "company.default_currency",
    "fieldname": "currency",
    "fieldtype": "Link",
-   "label": "Currency",
+   "label": "Transaction Currency",
    "options": "Currency",
    "reqd": 1
   },
@@ -369,6 +399,13 @@
    "read_only": 1
   },
   {
+   "fieldname": "total_company_currency",
+   "fieldtype": "Currency",
+   "label": "Total (Company Currency)",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
    "fieldname": "total_taxes_and_charges",
    "fieldtype": "Currency",
    "label": "Total Taxes and Charges",
@@ -376,10 +413,24 @@
    "read_only": 1
   },
   {
+   "fieldname": "total_taxes_and_charges_company_currency",
+   "fieldtype": "Currency",
+   "label": "Total Taxes and Charges (Company Currency)",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
    "fieldname": "grand_total",
    "fieldtype": "Currency",
    "label": "Grand Total",
    "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "grand_total_company_currency",
+   "fieldtype": "Currency",
+   "label": "Grand Total (Company Currency)",
+   "options": "Company:company:default_currency",
    "read_only": 1
   },
   {
@@ -393,10 +444,32 @@
    "label": "Expense Claim",
    "options": "Expense Claim",
    "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Travel Expense",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "original_expense",
+   "fieldtype": "Link",
+   "label": "Original Expense",
+   "options": "Travel Expense"
+  },
+  {
+   "fieldname": "column_break_blkm",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
- "modified": "2025-12-26 00:00:00.000000",
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-01-02 15:14:16.585303",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
@@ -416,9 +489,9 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
  "track_changes": 1
 }
-

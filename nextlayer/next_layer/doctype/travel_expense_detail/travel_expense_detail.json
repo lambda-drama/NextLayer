@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2025-12-26 00:00:00.000000",
+ "creation": "2025-12-26 00:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -9,6 +9,7 @@
   "expense_type",
   "expense_date",
   "amount",
+  "amount_company_currency",
   "sanctioned_amount",
   "column_break_1",
   "description",
@@ -62,7 +63,16 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Amount",
+   "options": "currency",
    "reqd": 1
+  },
+  {
+   "fieldname": "amount_company_currency",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount (Company Currency)",
+   "options": "Company:company:default_currency",
+   "read_only": 1
   },
   {
    "fieldname": "sanctioned_amount",
@@ -135,21 +145,21 @@
    "fieldname": "hotel_city",
    "fieldtype": "Data",
    "label": "City",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
    "fieldname": "hotel_country",
    "fieldtype": "Data",
    "label": "Country",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
    "fieldname": "purpose",
    "fieldtype": "Small Text",
    "label": "Purpose",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
@@ -162,7 +172,7 @@
    "fieldname": "custom_prn_number",
    "fieldtype": "Data",
    "label": "PRN Number",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
@@ -186,7 +196,7 @@
    "fieldname": "custom_booked_by",
    "fieldtype": "Link",
    "label": "Booked By",
-   "options": "User"
+   "options": "Member"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
@@ -245,16 +255,16 @@
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
- "modified": "2025-12-26 00:00:00.000000",
+ "links": [],
+ "modified": "2026-01-02 17:19:43.773297",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense Detail",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
-
-
-
