@@ -559,5 +559,3 @@ def create_journal_entry_on_submit(doc, method):
 		)
 
 
-
-

@@ -438,9 +438,9 @@
    "fieldtype": "Section Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "expense_claim",
    "fieldtype": "Link",
-   "hidden": 1,
    "label": "Expense Claim",
    "options": "Expense Claim",
    "read_only": 1
@@ -469,7 +469,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-01-02 15:14:16.585303",
+ "modified": "2026-01-03 16:02:07.201273",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
