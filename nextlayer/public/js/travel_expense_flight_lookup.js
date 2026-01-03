@@ -22,12 +22,21 @@ frappe.ui.form.on("Travel Expense", {
 		recalculate_all_expense_amounts_company_currency(frm);
 		calculate_totals(frm);
 		
-		// Set company filter for payable_account when company changes
+		// Set company filter for payable_account and direct_payment_account when company changes
 		if (frm.doc.company) {
 			frm.set_query("payable_account", function() {
 				return {
 					filters: {
 						company: frm.doc.company
+					}
+				};
+			});
+			
+			frm.set_query("direct_payment_account", function() {
+				return {
+					filters: {
+						company: frm.doc.company,
+						account_type: ["in", ["Bank", "Cash"]]
 					}
 				};
 			});
@@ -53,16 +62,25 @@ frappe.ui.form.on("Travel Expense", {
 	},
 	
 	is_paid: function(frm) {
-		// Show/hide mode_of_payment and set payable_account requirement based on is_paid
+		// Show/hide direct_payment_account and set payable_account requirement based on is_paid
 		if (frm.doc.is_paid) {
-			frm.set_df_property("mode_of_payment", "reqd", 1);
+			frm.set_df_property("direct_payment_account", "reqd", 1);
 			frm.set_df_property("payable_account", "reqd", 0);
 		} else {
-			frm.set_df_property("mode_of_payment", "reqd", 0);
+			frm.set_df_property("direct_payment_account", "reqd", 0);
 			frm.set_df_property("payable_account", "reqd", 1);
 		}
-		frm.refresh_field("mode_of_payment");
+		frm.refresh_field("direct_payment_account");
 		frm.refresh_field("payable_account");
+	},
+	
+	flight_date: function(frm) {
+		// If flight number is already entered, trigger lookup with the new date
+		if (frm.doc.flight_no && frm.doc.flight_no.trim() && frm.doc.flight_date) {
+			if (!flight_lookup_in_progress) {
+				lookup_flight_for_travel_expense(frm);
+			}
+		}
 	},
 	
 	validate: function(frm) {
@@ -75,19 +93,29 @@ frappe.ui.form.on("Travel Expense", {
 			});
 			frappe.validated = false;
 		}
+		
+		// Validate direct_payment_account is mandatory when is_paid is ticked
+		if (frm.doc.is_paid && !frm.doc.direct_payment_account) {
+			frappe.msgprint({
+				title: __("Validation Error"),
+				message: __("Direct Payment Account is mandatory when 'Is Paid' is ticked."),
+				indicator: "red",
+			});
+			frappe.validated = false;
+		}
 	},
 	
 	refresh: function(frm) {
 		// Set initial requirements based on is_paid
 		// Payable account is always visible, just mandatory when is_paid is not ticked
 		if (frm.doc.is_paid) {
-			frm.set_df_property("mode_of_payment", "reqd", 1);
+			frm.set_df_property("direct_payment_account", "reqd", 1);
 			frm.set_df_property("payable_account", "reqd", 0);
 		} else {
-			frm.set_df_property("mode_of_payment", "reqd", 0);
+			frm.set_df_property("direct_payment_account", "reqd", 0);
 			frm.set_df_property("payable_account", "reqd", 1);
 		}
-		frm.refresh_field("mode_of_payment");
+		frm.refresh_field("direct_payment_account");
 		frm.refresh_field("payable_account");
 		
 		// Set company filter for payable_account
@@ -455,6 +483,16 @@ function lookup_flight_for_travel_expense(frm) {
 		return;
 	}
 	
+	// Get flight date if available
+	let flight_date = null;
+	if (frm.doc.flight_date) {
+		// Convert to YYYY-MM-DD format if it's a date field
+		flight_date = frappe.datetime.str_to_obj(frm.doc.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+		}
+	}
+	
 	// Mark lookup as in progress
 	flight_lookup_in_progress = true;
 	
@@ -464,6 +502,7 @@ function lookup_flight_for_travel_expense(frm) {
 		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 		args: {
 			flight_number: flight_number,
+			flight_date: flight_date || null,
 		},
 		callback: function (r) {
 			// Clear lookup flag
@@ -515,6 +554,22 @@ function lookup_flight_for_travel_expense_detail(frm, row, row_key) {
 		return;
 	}
 	
+	// Get flight date if available (check row first, then parent form)
+	let flight_date = null;
+	if (row.flight_date) {
+		// Convert to YYYY-MM-DD format if it's a date field
+		flight_date = frappe.datetime.str_to_obj(row.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+		}
+	} else if (frm.doc.flight_date) {
+		// Fallback to main form flight date if child row doesn't have it
+		flight_date = frappe.datetime.str_to_obj(frm.doc.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0];
+		}
+	}
+	
 	// Mark lookup as in progress
 	flight_lookup_in_progress = row_key;
 	
@@ -524,6 +579,7 @@ function lookup_flight_for_travel_expense_detail(frm, row, row_key) {
 		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 		args: {
 			flight_number: flight_number,
+			flight_date: flight_date || null,
 		},
 		callback: function (r) {
 			// Clear lookup flag
@@ -1182,9 +1238,7 @@ function show_additional_expenses_modal(frm) {
 		],
 		primary_action_label: __("Create Travel Expense"),
 		primary_action: function(values) {
-			// Get checkbox value from custom footer
-			let create_journal_entry = d.$wrapper.find('#create_journal_entry_checkbox').is(':checked');
-			create_additional_travel_expense(frm, d, temp_doc, create_journal_entry);
+			create_additional_travel_expense(frm, d, temp_doc);
 		},
 		secondary_action_label: __("Cancel"),
 		secondary_action: function() {
@@ -1211,21 +1265,6 @@ function show_additional_expenses_modal(frm) {
 		});
 	}
 	
-	// Add checkbox to footer on the left side of buttons
-	setTimeout(function() {
-		let footer = d.$wrapper.find('.modal-footer');
-		if (footer.length) {
-			let checkbox_html = `
-				<div style="float: left; margin-top: 8px;">
-					<label style="font-weight: normal; margin: 0; cursor: pointer;">
-						<input type="checkbox" id="create_journal_entry_checkbox" checked style="margin-right: 5px;">
-						${__("Create Journal Entry")}
-					</label>
-				</div>
-			`;
-			footer.prepend(checkbox_html);
-		}
-	}, 100);
 	
 	// Initialize the child table after dialog is shown
 	setTimeout(function() {
@@ -1317,13 +1356,20 @@ function show_additional_expenses_modal(frm) {
 											if (rate_result.message) {
 												let exchange_rate = rate_result.message;
 												let converted_amount = transaction_amount * exchange_rate;
-												frappe.model.set_value(row.doctype, row.name, "amount", converted_amount);
-												row.amount = converted_amount;
+												// Store original transaction currency amount
+												row.original_amount_transaction_currency = transaction_amount;
+												// Store converted company currency amount for display
+												row.amount_company_currency = converted_amount;
+												// Keep amount in transaction currency (don't convert it)
+												// Just update display to show converted amount
 												amount_input.val(converted_amount.toFixed(2));
+												// Store the original transaction currency amount in a data attribute
+												amount_input.data('transaction-currency-amount', transaction_amount);
 												
-												// Update locals
+												// Update locals - keep amount in transaction currency
 												if (locals[row.doctype] && locals[row.doctype][row.name]) {
-													locals[row.doctype][row.name].amount = converted_amount;
+													locals[row.doctype][row.name].amount_company_currency = converted_amount;
+													locals[row.doctype][row.name].original_amount_transaction_currency = transaction_amount;
 												}
 											}
 										}
@@ -2150,21 +2196,83 @@ function add_expense_row(dialog, temp_doc, container) {
 		calculate_hotel_totals();
 	});
 	
-	// Handle amount field - NO currency conversion in modal
-	// Just update value in transaction currency
-	// Currency conversion will happen when data is added to Travel Expense child table
+	// Handle amount field - convert to company currency when entered
 	$row.find('input[data-field="amount"]').on('change blur', function() {
 		let $amount_input = $(this);
 		let transaction_amount = parseFloat($amount_input.val()) || 0;
 		
-		// Update amount in transaction currency (no conversion in modal)
-		frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
-		row.amount = transaction_amount;
-		
-		// Update locals
-		if (locals[row.doctype] && locals[row.doctype][row.name]) {
-			locals[row.doctype][row.name].amount = transaction_amount;
+		if (transaction_amount === 0) {
+			return;
 		}
+		
+		// Get transaction currency from dialog
+		let transaction_currency = null;
+		if (dialog.fields_dict && dialog.fields_dict.transaction_currency) {
+			transaction_currency = dialog.fields_dict.transaction_currency.get_value();
+		} else if (dialog.get_value) {
+			transaction_currency = dialog.get_value('transaction_currency');
+		}
+		
+		let company_currency = dialog.company_currency;
+		
+		if (!transaction_currency || !company_currency) {
+			// If currencies not available, just store the amount
+			frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
+			row.amount = transaction_amount;
+			return;
+		}
+		
+		// If currencies are the same, no conversion needed
+		if (transaction_currency === company_currency) {
+			frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
+			row.amount = transaction_amount;
+			row.amount_company_currency = transaction_amount;
+			return;
+		}
+		
+		// Get transaction date for exchange rate
+		let transaction_date = $row.find('input[data-field="expense_date"]').val() || frappe.datetime.get_today();
+		let company = dialog.original_frm ? dialog.original_frm.doc.company : null;
+		
+		if (!company) {
+			frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
+			row.amount = transaction_amount;
+			return;
+		}
+		
+		// Convert currency
+		frappe.call({
+			method: "erpnext.setup.utils.get_exchange_rate",
+			args: {
+				from_currency: transaction_currency,
+				to_currency: company_currency,
+				transaction_date: transaction_date,
+				company: company
+			},
+			callback: function(rate_result) {
+				if (rate_result.message) {
+					let exchange_rate = rate_result.message;
+					let converted_amount = transaction_amount * exchange_rate;
+					
+					// Store transaction currency amount
+					frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
+					row.amount = transaction_amount;
+					
+					// Store company currency amount
+					row.amount_company_currency = converted_amount;
+					
+					// Update locals
+					if (locals[row.doctype] && locals[row.doctype][row.name]) {
+						locals[row.doctype][row.name].amount = transaction_amount;
+						locals[row.doctype][row.name].amount_company_currency = converted_amount;
+					}
+				} else {
+					// If conversion fails, just store the amount
+					frappe.model.set_value(row.doctype, row.name, "amount", transaction_amount);
+					row.amount = transaction_amount;
+				}
+			}
+		});
 	});
 	
 	$row.data('calculate-hotel-totals', calculate_hotel_totals);
@@ -2519,7 +2627,7 @@ function toggle_conditional_fields($row, expense_type) {
 	}
 }
 
-function create_additional_travel_expense(original_frm, dialog, temp_doc, create_journal_entry = false) {
+function create_additional_travel_expense(original_frm, dialog, temp_doc) {
 	// Get expense items from the grid
 	let expense_items = [];
 	
@@ -2602,11 +2710,34 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc, create
 					}
 				}
 				
+				// Get amount - use row.amount (which should be in transaction currency)
+				let amount = row.amount || 0;
+				
+				// Get company currency amount if available (should be set when amount was entered)
+				let amount_company_currency = row.amount_company_currency || null;
+				
+				// If amount_company_currency is not set but we have amount and currencies are different, convert now
+				if (!amount_company_currency && amount > 0) {
+					let transaction_currency = dialog.fields_dict && dialog.fields_dict.transaction_currency ? 
+						dialog.fields_dict.transaction_currency.get_value() : 
+						(dialog.original_frm.doc.currency || dialog.company_currency);
+					let company_currency = dialog.company_currency;
+					
+					if (transaction_currency && company_currency && transaction_currency !== company_currency) {
+						// We'll let the server do the conversion since we don't have exchange rate here
+						// Just pass the amount and transaction currency
+					} else {
+						// Same currency, set amount_company_currency = amount
+						amount_company_currency = amount;
+					}
+				}
+				
 				let item = {
 					expense_type: row.expense_type,
 					expense_date: row.expense_date || frappe.datetime.get_today(),
-					amount: row.amount || 0,
-					sanctioned_amount: row.sanctioned_amount || row.amount || 0,
+					amount: amount,  // Use transaction currency amount
+					amount_company_currency: amount_company_currency,  // Pass company currency amount if available
+					sanctioned_amount: row.sanctioned_amount || amount || 0,
 					cost_center: row.cost_center,
 					project: row.project,
 					company: row.company || original_frm.doc.company,
@@ -2710,6 +2841,11 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc, create
 	// Show loading
 	frappe.show_alert(__("Creating additional travel expense..."), 3);
 	
+	// Get transaction currency from dialog
+	let transaction_currency = dialog.fields_dict && dialog.fields_dict.transaction_currency ? 
+		dialog.fields_dict.transaction_currency.get_value() : 
+		(original_frm.doc.currency || dialog.company_currency);
+	
 	// Create new travel expense
 	frappe.call({
 		method: "nextlayer.next_layer.api.travel_expense_utils.create_additional_travel_expense",
@@ -2718,16 +2854,12 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc, create
 			expense_items: expense_items,
 			company: original_frm.doc.company,
 			traveler_name: original_frm.doc.traveler_name,
-			create_journal_entry: create_journal_entry || false,
+			transaction_currency: transaction_currency,
 		},
 		callback: function(r) {
 			if (r.message) {
 				if (r.message.success) {
-					let message = __("Additional travel expense created successfully!");
-					if (r.message.journal_entry_name) {
-						message += " " + __("Journal Entry {0} has been created and submitted.", [r.message.journal_entry_name]);
-					}
-					frappe.show_alert(message, 5, "green");
+					frappe.show_alert(__("Additional travel expense created successfully!"), 5, "green");
 					dialog.hide();
 					
 					// Open the new travel expense
