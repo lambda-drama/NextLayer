@@ -3,10 +3,12 @@
 
 import frappe
 from frappe import _
+from erpnext.setup.utils import get_exchange_rate
+from erpnext.setup.utils import get_exchange_rate
 
 
 @frappe.whitelist()
-def create_additional_travel_expense(original_travel_expense, expense_items, company=None, traveler_name=None, create_journal_entry=False):
+def create_additional_travel_expense(original_travel_expense, expense_items, company=None, traveler_name=None, transaction_currency=None):
 	"""
 	Create a new Travel Expense as an additional expense linked to the original
 	
@@ -15,7 +17,7 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 		expense_items: List of travel expense detail items
 		company: Company (optional, will use from original if not provided)
 		traveler_name: Traveler Name (optional, will use from original if not provided)
-		create_journal_entry: Boolean to create journal entry and book as paid
+		transaction_currency: Transaction currency from modal (optional)
 	
 	Returns:
 		dict: Success status and travel expense name
@@ -26,22 +28,26 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 			import json
 			expense_items = json.loads(expense_items)
 		
-		# Convert create_journal_entry to boolean
-		if isinstance(create_journal_entry, str):
-			create_journal_entry = create_journal_entry.lower() in ('true', '1', 'yes')
-		create_journal_entry = bool(create_journal_entry)
-		
 		# Get original travel expense
 		original_te = frappe.get_doc("Travel Expense", original_travel_expense)
+		
+		# Get company currency
+		company_currency = frappe.get_cached_value("Company", company or original_te.company, "default_currency")
+		
+		# Set transaction currency (use provided currency or default to company currency)
+		if not transaction_currency:
+			transaction_currency = getattr(original_te, 'currency', None) or company_currency
 		
 		# Create new travel expense - copy all relevant fields from original
 		new_te_data = {
 			"doctype": "Travel Expense",
 			"traveler_name": traveler_name or original_te.traveler_name,
 			"company": company or original_te.company,
+			"currency": transaction_currency,  # Set transaction currency
 			"is_addition": 1,
 			"travel_group": original_te.travel_group,
 			"posting_date": frappe.utils.today(),
+			"original_expense": original_te.name,
 		}
 		
 		# Copy mandatory accounting dimension fields from original
@@ -103,11 +109,16 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 					return getattr(data, key, default)
 				return default
 			
+			# Get amount and amount_company_currency from item
+			amount = safe_get(item, "amount", 0)
+			amount_company_currency = safe_get(item, "amount_company_currency")
+			
 			expense_detail = {
 				"expense_type": safe_get(item, "expense_type"),
 				"expense_date": safe_get(item, "expense_date") or frappe.utils.today(),
-				"amount": safe_get(item, "amount", 0),
-				"sanctioned_amount": safe_get(item, "sanctioned_amount") or safe_get(item, "amount", 0),
+				"amount": amount,
+				"amount_company_currency": amount_company_currency,  # Set company currency amount if provided
+				"sanctioned_amount": safe_get(item, "sanctioned_amount") or amount,
 				"cost_center": safe_get(item, "cost_center"),
 				"project": safe_get(item, "project"),
 				"company": safe_get(item, "company") or new_te.company,
@@ -146,30 +157,36 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 		# Insert and save
 		new_te.insert(ignore_permissions=True)
 		
-		# Recalculate totals and convert amounts to company currency before submitting
-		# This ensures grand_total and grand_total_company_currency are set correctly
+		# Recalculate totals first
 		new_te.calculate_totals()
 		
-		# Convert all expense amounts to company currency if needed
+		# Note: Amounts from modal are in transaction currency, need to convert to company currency
 		if new_te.expenses:
 			company_currency = frappe.get_cached_value("Company", new_te.company, "default_currency")
 			transaction_currency = getattr(new_te, 'currency', None) or company_currency
 			
 			if transaction_currency != company_currency:
+				# Different currencies - convert amounts from transaction currency to company currency
 				for expense in new_te.expenses:
-					if expense.amount and not expense.amount_company_currency:
+					if expense.amount:
+						# if not expense.amount_company_currency:
 						try:
 							transaction_date = expense.expense_date or new_te.posting_date or frappe.utils.today()
-							exchange_rate = frappe.utils.get_exchange_rate(
+							exchange_rate = get_exchange_rate(
 								transaction_currency,
 								company_currency,
 								transaction_date,
 								new_te.company
 							)
+							
+							# expense.amount is in transaction currency, convert to company currency
 							expense.amount_company_currency = expense.amount * exchange_rate
-						except Exception:
-							# If conversion fails, use same amount
+							
+						except Exception as e:
+							# If conversion fails, use same amount and log error
+							frappe.log_error(f"Error converting amount for expense: {str(e)}", "Travel Expense Currency Conversion")
 							expense.amount_company_currency = expense.amount
+				
 			else:
 				# Same currency, set amount_company_currency = amount
 				for expense in new_te.expenses:
@@ -182,34 +199,9 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 		new_te.submit()
 		frappe.db.commit()
 		
-		# Create journal entry if requested
-		journal_entry_name = None
-		journal_entry_names = None
-		if create_journal_entry:
-			try:
-				# Reload the document to ensure we have the latest totals
-				new_te.reload()
-				journal_entry_result = create_journal_entry_for_travel_expense(new_te)
-				# Handle None (when is_paid is ticked - ERPNext handles it), string, or list
-				if journal_entry_result is None:
-					# is_paid is ticked, ERPNext handles GL entries automatically
-					journal_entry_name = None
-					journal_entry_names = None
-				elif isinstance(journal_entry_result, list):
-					journal_entry_names = journal_entry_result
-					journal_entry_name = ", ".join(journal_entry_result)  # For backward compatibility
-				else:
-					journal_entry_name = journal_entry_result
-			except Exception as e:
-				frappe.log_error(f"Error creating journal entry for travel expense {new_te.name}: {str(e)}", "Travel Expense Utils Error")
-				# Don't fail the whole operation if journal entry creation fails
-				pass
-		
 		return {
 			"success": True,
 			"travel_expense_name": new_te.name,
-			"journal_entry_name": journal_entry_name,
-			"journal_entry_names": journal_entry_names,  # List of journal entries if multiple
 		}
 		
 	except Exception as e:
@@ -310,7 +302,7 @@ def create_journal_entry_for_travel_expense(travel_expense):
 		else:
 			# Convert payable account currency to company currency
 			try:
-				payable_exchange_rate = frappe.utils.get_exchange_rate(
+				payable_exchange_rate = get_exchange_rate(
 					payable_account_currency,
 					company_currency,
 					posting_date,
@@ -335,7 +327,7 @@ def create_journal_entry_for_travel_expense(travel_expense):
 		else:
 			# Payment account is in different currency, convert from payable account currency
 			try:
-				payment_exchange_rate = frappe.utils.get_exchange_rate(
+				payment_exchange_rate = get_exchange_rate(
 					payable_account_currency,
 					payment_account_currency,
 					posting_date,
@@ -343,7 +335,7 @@ def create_journal_entry_for_travel_expense(travel_expense):
 				)
 				payment_amount = total_amount * payment_exchange_rate
 				# Convert to base
-				payment_to_base_rate = frappe.utils.get_exchange_rate(
+				payment_to_base_rate = get_exchange_rate(
 					payment_account_currency,
 					company_currency,
 					posting_date,
@@ -502,7 +494,7 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				expense_base_amount = amount
 			else:
 				try:
-					exchange_rate = frappe.utils.get_exchange_rate(
+					exchange_rate = get_exchange_rate(
 						expense_account_currency,
 						company_currency,
 						posting_date,
@@ -537,7 +529,7 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			payable_base_amount = total_amount
 		else:
 			try:
-				payable_exchange_rate = frappe.utils.get_exchange_rate(
+				payable_exchange_rate = get_exchange_rate(
 					payable_account_currency,
 					company_currency,
 					posting_date,
@@ -579,14 +571,14 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			payment_base_amount = payable_base_amount
 		else:
 			try:
-				payment_exchange_rate = frappe.utils.get_exchange_rate(
+				payment_exchange_rate = get_exchange_rate(
 					payable_account_currency,
 					direct_payment_account_currency,
 					posting_date,
 					company
 				)
 				payment_amount = total_amount * payment_exchange_rate
-				payment_to_base_rate = frappe.utils.get_exchange_rate(
+				payment_to_base_rate = get_exchange_rate(
 					direct_payment_account_currency,
 					company_currency,
 					posting_date,
@@ -630,7 +622,7 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			je.currency = payable_account_currency
 			if payable_account_currency != company_currency:
 				try:
-					je.exchange_rate = frappe.utils.get_exchange_rate(
+					je.exchange_rate = get_exchange_rate(
 						payable_account_currency,
 						company_currency,
 						posting_date,

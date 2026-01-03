@@ -73,7 +73,6 @@
   "total_taxes_and_charges_company_currency",
   "grand_total_company_currency",
   "section_break_hidden",
-  "expense_claim",
   "amended_from"
  ],
  "fields": [
@@ -440,14 +439,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "allow_on_submit": 1,
-   "fieldname": "expense_claim",
-   "fieldtype": "Link",
-   "label": "Expense Claim",
-   "options": "Expense Claim",
-   "read_only": 1
-  },
-  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -461,7 +452,8 @@
    "fieldname": "original_expense",
    "fieldtype": "Link",
    "label": "Original Expense",
-   "options": "Travel Expense"
+   "options": "Travel Expense",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_blkm",
@@ -481,7 +473,7 @@
    "link_fieldname": "custom_travel_expense_ref"
   }
  ],
- "modified": "2026-01-03 19:32:44.678224",
+ "modified": "2026-01-03 19:47:22.974085",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
