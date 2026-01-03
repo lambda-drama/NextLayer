@@ -105,6 +105,73 @@ def get_flight_details(flight_number, flight_date=None):
 				if (flight_num == flight_number_upper.replace(" ", "") or 
 					flight_number_upper.replace(" ", "") in flight_num or
 					flight_num_original.replace(" ", "") == flight_number_upper.replace(" ", "")):
+					
+					# If flight_date is provided, filter by date
+					if flight_date:
+						# Extract departure date from flight data
+						# Check various possible date fields in the flight object
+						departure_date = None
+						
+						# Try to get departure date from different possible locations
+						departure = flight.get("departure") or flight.get("departureDate") or flight.get("departure_date")
+						departure_datetime = None
+						
+						if isinstance(departure, dict):
+							# Check for scheduledTime.local first (most common in Aerodata API)
+							scheduled_time = departure.get("scheduledTime")
+							if isinstance(scheduled_time, dict):
+								departure_datetime = scheduled_time.get("local") or scheduled_time.get("utc")
+							
+							# If not found, check other possible fields
+							if not departure_datetime:
+								departure_datetime = (
+									departure.get("dateTime") or 
+									departure.get("scheduledDateTime") or 
+									departure.get("date") or
+									departure.get("local") or
+									departure.get("scheduled")
+								)
+							if departure_datetime:
+								# Extract date part (YYYY-MM-DD) from datetime string
+								if isinstance(departure_datetime, str):
+									# Simple extraction: get first 10 characters if format is YYYY-MM-DD
+									# Handle formats like "2026-01-03 20:10+05:30" or "2026-01-03T20:10:00"
+									dt_str = departure_datetime.strip()
+									# Remove timezone and time parts
+									if '+' in dt_str:
+										dt_str = dt_str.split('+')[0]
+									if 'Z' in dt_str:
+										dt_str = dt_str.split('Z')[0]
+									if 'T' in dt_str:
+										dt_str = dt_str.split('T')[0]
+									if ' ' in dt_str:
+										dt_str = dt_str.split(' ')[0]
+									# Extract date part (should be YYYY-MM-DD format)
+									if len(dt_str) >= 10 and dt_str[4] == '-' and dt_str[7] == '-':
+										departure_date = dt_str[:10]
+						elif isinstance(departure, str):
+							# If departure is a string, try to extract date
+							if len(departure) >= 10:
+								departure_date = departure[:10]
+						
+						# If we still don't have a date, check top-level date fields
+						if not departure_date:
+							flight_date_field = flight.get("date") or flight.get("flightDate") or flight.get("flight_date")
+							if flight_date_field:
+								if isinstance(flight_date_field, str) and len(flight_date_field) >= 10:
+									departure_date = flight_date_field[:10]
+						
+						# Compare dates (both should be in YYYY-MM-DD format)
+						if departure_date:
+							if departure_date != flight_date:
+								# Date doesn't match, skip this flight
+								continue
+						else:
+							# Couldn't extract date, but user requested specific date
+							# Skip this flight to ensure we only return flights matching the requested date
+							frappe.logger().warning(f"Could not extract date from flight data for {flight_number}, skipping flight as date filter was requested")
+							continue
+					
 					matching_flights.append(flight)
 			
 			if matching_flights:
@@ -112,6 +179,13 @@ def get_flight_details(flight_number, flight_date=None):
 					"success": True,
 					"data": matching_flights,
 					"count": len(matching_flights),
+				}
+			elif flight_date:
+				# If date was specified but no flights matched, return error
+				return {
+					"success": False,
+					"error": f"No flight found for {flight_number} on {flight_date}",
+					"debug_info": f"Found flights but none matched the requested date {flight_date}"
 				}
 			elif flights:
 				# Return all flights if no exact match (might be multi-leg flights)

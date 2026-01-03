@@ -17,6 +17,7 @@
   "column_break_1",
   "posting_date",
   "traveler_name",
+  "flight_date",
   "flight_no",
   "section_break_travel",
   "custom_departure_airport",
@@ -464,12 +465,17 @@
   {
    "fieldname": "column_break_blkm",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "flight_date",
+   "fieldtype": "Date",
+   "label": "Flight Date"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-01-03 16:02:07.201273",
+ "modified": "2026-01-03 18:44:30.521409",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",

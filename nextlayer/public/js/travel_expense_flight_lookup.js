@@ -65,6 +65,15 @@ frappe.ui.form.on("Travel Expense", {
 		frm.refresh_field("payable_account");
 	},
 	
+	flight_date: function(frm) {
+		// If flight number is already entered, trigger lookup with the new date
+		if (frm.doc.flight_no && frm.doc.flight_no.trim() && frm.doc.flight_date) {
+			if (!flight_lookup_in_progress) {
+				lookup_flight_for_travel_expense(frm);
+			}
+		}
+	},
+	
 	validate: function(frm) {
 		// Validate payable_account is mandatory when is_paid is not ticked
 		if (!frm.doc.is_paid && !frm.doc.payable_account) {
@@ -455,6 +464,16 @@ function lookup_flight_for_travel_expense(frm) {
 		return;
 	}
 	
+	// Get flight date if available
+	let flight_date = null;
+	if (frm.doc.flight_date) {
+		// Convert to YYYY-MM-DD format if it's a date field
+		flight_date = frappe.datetime.str_to_obj(frm.doc.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+		}
+	}
+	
 	// Mark lookup as in progress
 	flight_lookup_in_progress = true;
 	
@@ -464,6 +483,7 @@ function lookup_flight_for_travel_expense(frm) {
 		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 		args: {
 			flight_number: flight_number,
+			flight_date: flight_date || null,
 		},
 		callback: function (r) {
 			// Clear lookup flag
@@ -515,6 +535,22 @@ function lookup_flight_for_travel_expense_detail(frm, row, row_key) {
 		return;
 	}
 	
+	// Get flight date if available (check row first, then parent form)
+	let flight_date = null;
+	if (row.flight_date) {
+		// Convert to YYYY-MM-DD format if it's a date field
+		flight_date = frappe.datetime.str_to_obj(row.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+		}
+	} else if (frm.doc.flight_date) {
+		// Fallback to main form flight date if child row doesn't have it
+		flight_date = frappe.datetime.str_to_obj(frm.doc.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0];
+		}
+	}
+	
 	// Mark lookup as in progress
 	flight_lookup_in_progress = row_key;
 	
@@ -524,6 +560,7 @@ function lookup_flight_for_travel_expense_detail(frm, row, row_key) {
 		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 		args: {
 			flight_number: flight_number,
+			flight_date: flight_date || null,
 		},
 		callback: function (r) {
 			// Clear lookup flag
