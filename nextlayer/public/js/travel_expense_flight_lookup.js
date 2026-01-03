@@ -22,12 +22,21 @@ frappe.ui.form.on("Travel Expense", {
 		recalculate_all_expense_amounts_company_currency(frm);
 		calculate_totals(frm);
 		
-		// Set company filter for payable_account when company changes
+		// Set company filter for payable_account and direct_payment_account when company changes
 		if (frm.doc.company) {
 			frm.set_query("payable_account", function() {
 				return {
 					filters: {
 						company: frm.doc.company
+					}
+				};
+			});
+			
+			frm.set_query("direct_payment_account", function() {
+				return {
+					filters: {
+						company: frm.doc.company,
+						account_type: ["in", ["Bank", "Cash"]]
 					}
 				};
 			});
@@ -53,15 +62,15 @@ frappe.ui.form.on("Travel Expense", {
 	},
 	
 	is_paid: function(frm) {
-		// Show/hide mode_of_payment and set payable_account requirement based on is_paid
+		// Show/hide direct_payment_account and set payable_account requirement based on is_paid
 		if (frm.doc.is_paid) {
-			frm.set_df_property("mode_of_payment", "reqd", 1);
+			frm.set_df_property("direct_payment_account", "reqd", 1);
 			frm.set_df_property("payable_account", "reqd", 0);
 		} else {
-			frm.set_df_property("mode_of_payment", "reqd", 0);
+			frm.set_df_property("direct_payment_account", "reqd", 0);
 			frm.set_df_property("payable_account", "reqd", 1);
 		}
-		frm.refresh_field("mode_of_payment");
+		frm.refresh_field("direct_payment_account");
 		frm.refresh_field("payable_account");
 	},
 	
@@ -84,19 +93,29 @@ frappe.ui.form.on("Travel Expense", {
 			});
 			frappe.validated = false;
 		}
+		
+		// Validate direct_payment_account is mandatory when is_paid is ticked
+		if (frm.doc.is_paid && !frm.doc.direct_payment_account) {
+			frappe.msgprint({
+				title: __("Validation Error"),
+				message: __("Direct Payment Account is mandatory when 'Is Paid' is ticked."),
+				indicator: "red",
+			});
+			frappe.validated = false;
+		}
 	},
 	
 	refresh: function(frm) {
 		// Set initial requirements based on is_paid
 		// Payable account is always visible, just mandatory when is_paid is not ticked
 		if (frm.doc.is_paid) {
-			frm.set_df_property("mode_of_payment", "reqd", 1);
+			frm.set_df_property("direct_payment_account", "reqd", 1);
 			frm.set_df_property("payable_account", "reqd", 0);
 		} else {
-			frm.set_df_property("mode_of_payment", "reqd", 0);
+			frm.set_df_property("direct_payment_account", "reqd", 0);
 			frm.set_df_property("payable_account", "reqd", 1);
 		}
-		frm.refresh_field("mode_of_payment");
+		frm.refresh_field("direct_payment_account");
 		frm.refresh_field("payable_account");
 		
 		// Set company filter for payable_account

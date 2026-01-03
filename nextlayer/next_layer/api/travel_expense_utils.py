@@ -373,12 +373,13 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"debit": payable_base_amount,
 					"party_type": "Member" if traveler else None,
 					"party": traveler if traveler else None,
-					# No reference_type/reference_name - Travel Expense is not a valid reference type
+					"custom_travel_expense_ref": travel_expense.name,
 				},
 				{
 					"account": payment_account,
 					"credit_in_account_currency": payment_amount,
 					"credit": payment_base_amount,
+					"custom_travel_expense_ref": travel_expense.name,
 				}
 			]
 		})
@@ -411,5 +412,247 @@ def create_journal_entry_for_travel_expense(travel_expense):
 		
 	except Exception as e:
 		frappe.log_error(f"Error creating journal entry: {str(e)}", "Travel Expense Utils Error")
+		raise
+
+
+def create_journal_entry_for_paid_travel_expense(travel_expense):
+	"""
+	Create a Journal Entry to book the travel expense when is_paid is ticked.
+	
+	Creates a single Journal Entry with 4 account rows:
+	1. Dr: Expense Account(s) - from expenses child table
+	2. Cr: Payable Account
+	3. Dr: Payable Account
+	4. Cr: Direct Payment Account
+	
+	Args:
+		travel_expense: Travel Expense document
+	
+	Returns:
+		str: Journal Entry name
+	"""
+	try:
+		# Validate required fields
+		if not travel_expense.direct_payment_account:
+			frappe.throw(_("Direct Payment Account is required when 'Is Paid' is ticked"))
+		
+		if not travel_expense.payable_account:
+			frappe.throw(_("Payable Account is required"))
+		
+		# Get company details
+		company = travel_expense.company
+		company_doc = frappe.get_doc("Company", company)
+		company_currency = company_doc.default_currency
+		
+		# Get transaction currency
+		transaction_currency = getattr(travel_expense, 'currency', None) or company_currency
+		
+		# Ensure totals are calculated
+		if hasattr(travel_expense, 'calculate_totals'):
+			travel_expense.calculate_totals()
+		
+		# Get total amount (use company currency amount)
+		total_amount = getattr(travel_expense, 'grand_total_company_currency', None) or getattr(travel_expense, 'total_company_currency', None) or 0
+		
+		if total_amount <= 0:
+			frappe.throw(_("Cannot create journal entry: Travel expense grand total is zero or negative. Please ensure expenses are added and amounts are set."))
+		
+		# Get payable account and direct payment account
+		payable_account = travel_expense.payable_account
+		direct_payment_account = travel_expense.direct_payment_account
+		
+		# Get account currencies
+		payable_account_currency = frappe.db.get_value("Account", payable_account, "account_currency") or company_currency
+		direct_payment_account_currency = frappe.db.get_value("Account", direct_payment_account, "account_currency") or company_currency
+		
+		# Get posting date
+		posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
+		
+		# Get traveler (Member) for party
+		traveler = getattr(travel_expense, 'traveler_name', None)
+		
+		# Build expense account entries from expenses child table
+		if not travel_expense.expenses:
+			frappe.throw(_("No expenses found. Please add expenses before submitting."))
+		
+		# Get company default expense account (Expense Claim Type doesn't have account field in standard ERPNext)
+		expense_account = company_doc.default_expense_account
+		if not expense_account:
+			frappe.throw(_("No expense account found. Please set Default Expense Account in Company settings."))
+		
+		# Validate all expense rows have expense type
+		for expense_row in travel_expense.expenses:
+			expense_type = expense_row.expense_type
+			if not expense_type:
+				frappe.throw(_("Expense Type is required for all expense rows"))
+		
+		# Use total amount for expense account (all expenses go to same account)
+		# The expense_accounts dict structure is kept for future extensibility if different accounts per type are needed
+		expense_accounts = {expense_account: total_amount}
+		
+		# Build journal entry accounts list
+		je_accounts = []
+		
+		# 1. Debit Expense Account(s)
+		for expense_account, amount in expense_accounts.items():
+			expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+			
+			# Calculate base amount
+			if expense_account_currency == company_currency:
+				expense_base_amount = amount
+			else:
+				try:
+					exchange_rate = frappe.utils.get_exchange_rate(
+						expense_account_currency,
+						company_currency,
+						posting_date,
+						company
+					)
+					expense_base_amount = amount * exchange_rate
+				except Exception:
+					expense_base_amount = amount
+			
+			# Get cost center and project from first expense row, or from main form
+			cost_center = travel_expense.cost_center
+			project = travel_expense.project
+			# Try to get from first expense row
+			if travel_expense.expenses and len(travel_expense.expenses) > 0:
+				first_expense_row = travel_expense.expenses[0]
+				if first_expense_row.cost_center:
+					cost_center = first_expense_row.cost_center
+				if first_expense_row.project:
+					project = first_expense_row.project
+			
+			je_accounts.append({
+				"account": expense_account,
+				"debit_in_account_currency": amount,
+				"debit": expense_base_amount,
+				"cost_center": cost_center,
+				"project": project,
+				"custom_travel_expense_ref": travel_expense.name,
+			})
+		
+		# 2. Credit Payable Account
+		if payable_account_currency == company_currency:
+			payable_base_amount = total_amount
+		else:
+			try:
+				payable_exchange_rate = frappe.utils.get_exchange_rate(
+					payable_account_currency,
+					company_currency,
+					posting_date,
+					company
+				)
+				payable_base_amount = total_amount * payable_exchange_rate
+			except Exception:
+				payable_base_amount = total_amount
+		
+		je_accounts.append({
+			"account": payable_account,
+			"credit_in_account_currency": total_amount,
+			"credit": payable_base_amount,
+			"party_type": "Member" if traveler else None,
+			"party": traveler if traveler else None,
+			"cost_center": travel_expense.cost_center,
+			"project": travel_expense.project,
+			"custom_travel_expense_ref": travel_expense.name,
+		})
+		
+		# 3. Debit Payable Account (to clear it)
+		je_accounts.append({
+			"account": payable_account,
+			"debit_in_account_currency": total_amount,
+			"debit": payable_base_amount,
+			"party_type": "Member" if traveler else None,
+			"party": traveler if traveler else None,
+			"cost_center": travel_expense.cost_center,
+			"project": travel_expense.project,
+			"custom_travel_expense_ref": travel_expense.name,
+		})
+		
+		# 4. Credit Direct Payment Account
+		if direct_payment_account_currency == company_currency:
+			payment_base_amount = total_amount
+			payment_amount = total_amount
+		elif direct_payment_account_currency == payable_account_currency:
+			payment_amount = total_amount
+			payment_base_amount = payable_base_amount
+		else:
+			try:
+				payment_exchange_rate = frappe.utils.get_exchange_rate(
+					payable_account_currency,
+					direct_payment_account_currency,
+					posting_date,
+					company
+				)
+				payment_amount = total_amount * payment_exchange_rate
+				payment_to_base_rate = frappe.utils.get_exchange_rate(
+					direct_payment_account_currency,
+					company_currency,
+					posting_date,
+					company
+				)
+				payment_base_amount = payment_amount * payment_to_base_rate
+			except Exception:
+				payment_amount = total_amount
+				payment_base_amount = payable_base_amount
+		
+		je_accounts.append({
+			"account": direct_payment_account,
+			"credit_in_account_currency": payment_amount,
+			"credit": payment_base_amount,
+			"cost_center": travel_expense.cost_center,
+			"project": travel_expense.project,
+			"custom_travel_expense_ref": travel_expense.name,
+		})
+		
+		# Determine if multi-currency
+		is_multi_currency = (
+			payable_account_currency != company_currency or 
+			direct_payment_account_currency != company_currency or
+			any(frappe.db.get_value("Account", acc["account"], "account_currency") != company_currency 
+				for acc in je_accounts if acc["account"] in expense_accounts)
+		)
+		
+		# Create Journal Entry
+		je = frappe.get_doc({
+			"doctype": "Journal Entry",
+			"voucher_type": "Journal Entry",
+			"company": company,
+			"posting_date": posting_date,
+			"multi_currency": 1 if is_multi_currency else 0,
+			"user_remark": f"Travel Expense {travel_expense.name} - Expense and Payment",
+			"accounts": je_accounts
+		})
+		
+		# Set currency for journal entry if multi-currency
+		if is_multi_currency:
+			je.currency = payable_account_currency
+			if payable_account_currency != company_currency:
+				try:
+					je.exchange_rate = frappe.utils.get_exchange_rate(
+						payable_account_currency,
+						company_currency,
+						posting_date,
+						company
+					)
+				except Exception:
+					je.exchange_rate = 1
+		
+		# Add accounting dimensions
+		if hasattr(travel_expense, 'company_group') and travel_expense.company_group:
+			je.company_group = travel_expense.company_group
+		if hasattr(travel_expense, 'branch') and travel_expense.branch:
+			je.branch = travel_expense.branch
+		
+		# Insert and submit the journal entry
+		je.insert(ignore_permissions=True)
+		je.submit()
+		frappe.db.commit()
+		
+		return je.name
+		
+	except Exception as e:
+		frappe.log_error(f"Error creating journal entry for paid travel expense: {str(e)}", "Travel Expense Utils Error")
 		raise
 
