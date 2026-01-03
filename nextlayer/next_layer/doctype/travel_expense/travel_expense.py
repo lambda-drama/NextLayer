@@ -69,6 +69,14 @@ class TravelExpense(Document):
 	
 	def on_submit(self):
 		"""Create Expense Claim and Journal Entry when Travel Expense is submitted"""
+		# Create Expense Claim first (before journal entry)
+		expense_claim_name = self.create_expense_claim()
+		
+		# Set the expense claim name in the travel expense field
+		if expense_claim_name:
+			self.expense_claim = expense_claim_name
+			self.db_set("expense_claim", expense_claim_name)
+		
 		# Create journal entry if is_paid is not ticked
 		if not self.is_paid:
 			from nextlayer.next_layer.api.travel_expense_utils import create_journal_entry_for_travel_expense
@@ -93,12 +101,13 @@ class TravelExpense(Document):
 					indicator="orange",
 					alert=True
 				)
-		
-		# Create Expense Claim
-		self.create_expense_claim()
 	
 	def create_expense_claim(self):
-		"""Create an Expense Claim from Travel Expense"""
+		"""Create an Expense Claim from Travel Expense
+		
+		Returns:
+			str: Expense Claim name if created successfully, None otherwise
+		"""
 		try:
 			# Get employee from traveler_name (Member)
 			# Note: Member is a standalone doctype and may not be linked to Employee
@@ -283,21 +292,27 @@ class TravelExpense(Document):
 						"allocated_amount": advance_row.allocated_amount,
 					})
 			
+			# Insert expense claim first (before submitting)
 			expense_claim.insert(ignore_permissions=True)
+			frappe.db.commit()
+			
+			# Get the expense claim name
+			expense_claim_name = expense_claim.name
+			
+			# Submit the expense claim
 			expense_claim.submit()
 			frappe.db.commit()
 			
-			# Link back to Travel Expense
-			self.expense_claim = expense_claim.name
-			self.db_set("expense_claim", expense_claim.name)
-			
 			frappe.msgprint(
 				_("Expense Claim {0} has been created and submitted.").format(
-					frappe.bold(expense_claim.name)
+					frappe.bold(expense_claim_name)
 				),
 				indicator="green",
 				alert=True
 			)
+			print("Huku ni noma", expense_claim_name)
+			# Return the expense claim name
+			return expense_claim_name
 			
 		except Exception as e:
 			frappe.log_error(
@@ -305,4 +320,7 @@ class TravelExpense(Document):
 				"Travel Expense Error"
 			)
 			frappe.throw(_("Error creating Expense Claim: {0}").format(str(e)))
+		
+		# Return None if something went wrong
+		return None
    

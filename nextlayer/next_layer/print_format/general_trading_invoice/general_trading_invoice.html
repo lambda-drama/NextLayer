@@ -4,6 +4,19 @@
 {% if doc.items and doc.items|length > 0 %}
     {% set sales_order_number = doc.items[0].sales_order or "" %}
 {% endif %}
+
+{% set ns = namespace(payment_entry_number="") %}
+
+{% if doc.advances and doc.advances|length > 0 %}
+    {% for advance in doc.advances %}
+        {% if not ns.payment_entry_number
+              and advance.reference_type == "Payment Entry"
+              and advance.reference_name %}
+            {% set ns.payment_entry_number = advance.reference_name %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
 <style>
     .print-format th {
         background-color: {{color}} !important;
@@ -55,10 +68,15 @@
     <tr>
         <td style="width:20%; vertical-align: top;">
             {% set company_letter = frappe.db.get_value("Company", doc.company, "default_letter_head") or 'Default' %}
-            {% if not letter_head_image %}
-                {% set letter_head_image = '/images/General Trading Logo.jpeg' %}
+            {% set letter_head_content = frappe.db.get_value('Letter Head', company_letter, 'content') or '' %}
+            {% set letter_head_image_src = extract_image_src_from_html(letter_head_content) %}
+            
+            {# Fallback to default image if no image found in letterhead #}
+            {% if not letter_head_image_src %}
+                {% set letter_head_image_src = '/images/General Trading Logo.jpeg' %}
             {% endif %}
-            <img src="{{ frappe.db.get_value('Letter Head', company_letter, 'image')}}" class="img-fluid" style="height:80px">
+            
+            <img src="{{ letter_head_image_src }}" class="img-fluid" style="height:100px">
         </td>
         <td style="width:60%; text-align:center; vertical-align: middle;">
             <div style="color: #800080; font-weight: bold; font-size: 18px; margin-bottom: 10px;">
@@ -117,7 +135,7 @@
             {% endif %}
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Invoice No:</b> {{doc.name}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Date:</b> {{doc.get_formatted("posting_date")}}</div>
-             <div class="" style="margin-bottom: 8px; color: #800080;"><b>RV No#:</b> {{sales_order_number}}</div>
+            <div class="" style="margin-bottom: 8px; color: #800080;"><b>RV No#:</b> {{ns.payment_entry_number or sales_order_number}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Assembled by:</b> {{doc.custom_assembled_by}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>VAT:</b> {{doc.get_formatted("total_taxes_and_charges")}}</div>
         </td>
