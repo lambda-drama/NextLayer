@@ -18,7 +18,7 @@ def get_cash_balance(company=None):
     user_group_names = [ug.parent for ug in user_groups]
     if not company:
         company = frappe.defaults.get_user_default("Company") or frappe.get_system_settings("default_company")
-
+    company_currency = frappe.get_cached_value('Company', company, 'default_currency')
     # Get all Cash accounts for the company (non-group)
     cash_accounts = frappe.get_all(
         "Account",
@@ -57,8 +57,9 @@ def get_cash_balance(company=None):
     # If no accounts with balance, return total
     if not result:
         return [{
-            "Account Type": "Cash",
-            "Total Balance": total_balance
+            "Account": "Cash",
+            "Currency": company_currency,
+            "Balance": total_balance
         }]
     
     return result

@@ -23,7 +23,7 @@ def get_accounts_balance(company=None):
     user_group_names = [ug.parent for ug in user_groups]
     if not company:
         company = frappe.defaults.get_user_default("Company") or frappe.get_system_settings("default_company")
-
+    company_currency = frappe.get_cached_value('Company', company, 'default_currency')
     # Get all Bank accounts (non-group) for the company
     bank_accounts = frappe.get_all(
         "Account",
@@ -49,8 +49,9 @@ def get_accounts_balance(company=None):
     if not result:
         total_balance = sum([get_balance_on(account=acc.name, company=company) for acc in bank_accounts])
         return [{
-            "Account Type": "Bank",
-            "Total Balance": round(total_balance, 2)
+            "Account": "Bank",
+            "Currency": company_currency,
+            "Total": round(total_balance, 2)
         }]
 
     return result
