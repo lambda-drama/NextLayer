@@ -20,6 +20,7 @@ app_license = "mit"
 # 		"has_permission": "nextlayer.api.permission.has_app_permission"
 # 	}
 # ]
+
 fixtures = [
     {
         "doctype": "Custom Field",

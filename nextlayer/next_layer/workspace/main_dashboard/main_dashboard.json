@@ -1,5 +1,4 @@
 {
- "app": "nextlayer",
  "charts": [],
  "content": "[{\"id\":\"yWN6dYUOI7\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Company Filter\",\"col\":4}},{\"id\":\"JVyyqiDVux\",\"type\":\"spacer\",\"data\":{\"col\":8}},{\"id\":\"WBQ7himY1q\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Cash Balance\",\"col\":3}},{\"id\":\"YS-hWtfJGf\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Bank Balance\",\"col\":3}},{\"id\":\"VENpPwA56H\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Open Quotation\",\"col\":3}},{\"id\":\"2irjuncff5\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Customer To Delivery\",\"col\":3}},{\"id\":\"E0ntJMuABm\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Main Dashboard Table\",\"col\":12}}]",
  "creation": "2025-12-27 09:11:00.029338",
@@ -22,9 +21,8 @@
  "indicator_color": "green",
  "is_hidden": 0,
  "label": "Main Dashboard",
- "link_type": "DocType",
  "links": [],
- "modified": "2025-12-28 06:13:11.061353",
+ "modified": "2026-01-05 00:54:50.124319",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Main Dashboard",
@@ -53,6 +51,5 @@
  "roles": [],
  "sequence_id": 41.0,
  "shortcuts": [],
- "title": "Main Dashboard",
- "type": "Workspace"
+ "title": "Main Dashboard"
 }
