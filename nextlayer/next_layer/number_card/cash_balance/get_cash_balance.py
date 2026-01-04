@@ -1,5 +1,6 @@
 import frappe
 from frappe.utils import flt
+from erpnext.setup.utils import get_exchange_rate
 
 
 def is_user_allowed_to_view_account(account_name, user=None):
@@ -71,7 +72,7 @@ def get_cash_balance(company=None):
             "company": company,
             "is_group": 0
         },
-        fields=["name", "account_name"]
+        fields=["name", "account_name", "account_currency"]
     )
 
     result = []
@@ -94,8 +95,12 @@ def get_cash_balance(company=None):
             total_balance += balance
         
         if account_balance != 0:
+            # Get company currency as fallback
+            company_currency = frappe.db.get_value("Company", company, "default_currency") or "USD"
             result.append({
                 "Account": acc.account_name or acc.name,
+                "Account Name": acc.name,
+                "Currency": acc.account_currency or company_currency,  # Return account currency
                 "Balance": account_balance
             })
 
@@ -113,9 +118,19 @@ def get_cash_balance(company=None):
 def get_balance(company=None):
     """
     Returns total cash balance for a company using Frappe ORM only.
+    Converts all account balances to company currency.
     """
     if not company:
         company = frappe.defaults.get_user_default("Company") or frappe.get_system_settings("default_company")
+
+    if not company:
+        return {
+            "value": 0.0,
+            "fieldtype": "Currency"
+        }
+
+    # Get company currency
+    company_currency = frappe.db.get_value("Company", company, "default_currency") or "USD"
 
     # Get all Cash accounts for the company (non-group)
     cash_accounts = frappe.get_all(
@@ -125,25 +140,50 @@ def get_balance(company=None):
             "company": company,
             "is_group": 0
         },
-        fields=["name"]
+        fields=["name", "account_currency"]
     )
 
     total_balance = 0.0
+    posting_date = frappe.utils.today()
 
     for acc in cash_accounts:
         # Check if user has permission to view this account
         if not is_user_allowed_to_view_account(acc.name):
             continue
+        
+        # Get account currency (defaults to company currency if not set)
+        account_currency = acc.get("account_currency") or company_currency
+        
         # Use Frappe ORM to sum debit and credit from GL Entries
         gl_entries = frappe.get_all(
             "GL Entry",
             filters={"account": acc.name, "company": company},
-            fields=["debit", "credit"]
+            fields=["debit", "credit", "posting_date"]
         )
+        
+        account_balance = 0.0
         for entry in gl_entries:
-            total_balance += flt(entry.debit) - flt(entry.credit)
+            balance = flt(entry.debit) - flt(entry.credit)
+            account_balance += balance
+        
+        # Convert to company currency if account currency is different
+        if account_currency != company_currency and account_balance != 0:
+            try:
+                exchange_rate = get_exchange_rate(
+                    account_currency,
+                    company_currency,
+                    posting_date,
+                    company
+                )
+                account_balance = account_balance * exchange_rate
+            except Exception:
+                # If exchange rate not found, use balance as-is (log error)
+                frappe.log_error(f"Exchange rate not found for {account_currency} to {company_currency}", "Cash Balance Currency Conversion")
+        
+        total_balance += account_balance
 
     return {
         "value": float(total_balance),
-        "fieldtype": "Currency"
+        "fieldtype": "Currency",
+        "currency": company_currency
     }
