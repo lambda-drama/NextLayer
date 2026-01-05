@@ -5,9 +5,12 @@ from erpnext.setup.utils import get_exchange_rate
 
 def is_user_allowed_to_view_account(account_name, user=None):
     """
-    Check if user is allowed to view an account based on custom_user_group.
+    Check if user is allowed to view an account.
+    First checks standard Frappe read permissions, then custom_user_group.
     - Administrator and System Manager roles bypass all permission checks
-    - If account has no custom_user_group, allow all users
+    - Step 1: Check standard Frappe read permission on Account document
+    - Step 2: If standard permission passes, check custom_user_group
+    - If account has no custom_user_group, allow if standard permission passes
     - If account has custom_user_group, only allow users who are members of that group
     """
     if not user:
@@ -18,10 +21,35 @@ def is_user_allowed_to_view_account(account_name, user=None):
         return True
     
     try:
+        # Step 1: First check standard Frappe read permission on Account document
+        try:
+            # Check if account exists first
+            if not frappe.db.exists("Account", account_name):
+                return False
+            
+            account_doc = frappe.get_doc("Account", account_name)
+            has_standard_permission = frappe.has_permission(
+                doctype="Account",
+                ptype="read",
+                user=user,
+                doc=account_doc
+            )
+            if not has_standard_permission:
+                # User doesn't have standard read permission, deny access
+                return False
+        except frappe.PermissionError:
+            # User doesn't have standard read permission, deny access
+            return False
+        except Exception as perm_error:
+            # If there's an error checking standard permissions, log and deny for security
+            frappe.log_error(f"Error checking standard permission for Account {account_name}: {str(perm_error)}", "Account Permission Check")
+            return False
+        
+        # Step 2: If standard permission passes, check custom_user_group
         # Get the account's custom_user_group using db.get_value to avoid permission issues
         user_group = frappe.db.get_value("Account", account_name, "custom_user_group")
         
-        # If no user group is set, allow all users
+        # If no user group is set, allow access (standard permission already passed)
         if not user_group:
             return True
         
