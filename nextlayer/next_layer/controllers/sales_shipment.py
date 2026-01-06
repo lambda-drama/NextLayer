@@ -152,7 +152,8 @@ def delete_gl_entries(doc):
 def check_gl_entries_exist(docname):
     """
     Check if GL entries exist for a Sales Shipment Cost document.
-    Returns True if GL entries exist, False otherwise.
+    Returns True if non-cancelled GL entries exist, False otherwise.
+    Button will appear if no entries exist OR all entries are cancelled.
     """
     doc = frappe.get_doc("Sales Shipment Cost", docname)
     
@@ -163,13 +164,14 @@ def check_gl_entries_exist(docname):
     
     if not sales_invoice:
         return {"exists": False}
-    # Check if GL entries exist with remarks matching this Sales Shipment Cost
+    # Check if non-cancelled GL entries exist with remarks matching this Sales Shipment Cost
     gl_entries = frappe.db.sql("""
         SELECT COUNT(*) as count
         FROM `tabGL Entry`
         WHERE voucher_type = %s
         AND voucher_no = %s
         AND remarks LIKE %s
+        AND is_cancelled = 0
     """, ("Sales Invoice", sales_invoice, f"Sales Shipment Cost - {doc.name}%"), as_dict=True)
     
     exists = gl_entries[0].count > 0 if gl_entries else False
