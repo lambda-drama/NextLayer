@@ -123,7 +123,19 @@
                 {% set balance = query[0].closing %}
             {% endif %}
 
-            <div class="" style="margin-bottom: 8px; color: #800080;"><b>Phone:</b> {{doc.contact_mobile or doc.contact_phone or ""}}</div>
+            {# Phone number priority: Registered Owner phone_no > contact_mobile > contact_phone #}
+            {% set phone_number = "" %}
+            {% if doc.custom_registered_owner %}
+                {% set registered_owner_phone = frappe.db.get_value("Registered Owner", doc.custom_registered_owner, "phone_no") %}
+                {% if registered_owner_phone %}
+                    {% set phone_number = registered_owner_phone %}
+                {% else %}
+                    {% set phone_number = doc.contact_mobile or doc.contact_phone or "" %}
+                {% endif %}
+            {% else %}
+                {% set phone_number = doc.contact_mobile or doc.contact_phone or "" %}
+            {% endif %}
+            <div class="" style="margin-bottom: 8px; color: #800080;"><b>Phone:</b> {{phone_number}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Model:</b> {{doc.custom_model or ""}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Color:</b> {{doc.custom_color or ""}}</div>
             <div class="" style="margin-bottom: 8px; color: #800080;"><b>Chassis No:</b> {{doc.custom_chassis_no or ""}}</div>

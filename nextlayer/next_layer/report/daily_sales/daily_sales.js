@@ -17,7 +17,8 @@ frappe.query_reports["Daily Sales"] = {
 			"fieldtype": "Select",
 			"options": [
 				"Receipt entry",
-				"Sales Invoice"
+				"Sales Invoice",
+				"Payment Entry"
 			],
 			"default": "Sales Invoice",
 			"reqd": 1
