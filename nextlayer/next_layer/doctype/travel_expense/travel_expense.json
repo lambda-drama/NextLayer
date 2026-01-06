@@ -17,8 +17,10 @@
   "column_break_1",
   "posting_date",
   "traveler_name",
+  "in_transit",
   "flight_date",
   "flight_no",
+  "flight_no_2",
   "section_break_travel",
   "custom_departure_airport",
   "custom_arrival_airport",
@@ -32,8 +34,12 @@
   "custom_travel_type",
   "custom_pnr_number_",
   "column_break_travel3",
-  "travel_amount",
-  "amountcompany_currency",
+  "section_break_second_flight",
+  "custom_departure_airport_2",
+  "custom_arrival_airport_2",
+  "column_break_second_flight1",
+  "custom_date_of_travel_2",
+  "custom_date_of_arrival_2",
   "section_break_hotel",
   "hotel_checkin_date",
   "hotel_checkout_date",
@@ -47,6 +53,10 @@
   "rate_per_day",
   "total_nights",
   "purpose",
+  "section_break_charges",
+  "travel_amount",
+  "column_break_dita",
+  "amountcompany_currency",
   "section_break_accounting",
   "company_group",
   "branch",
@@ -73,6 +83,7 @@
   "total_taxes_and_charges_company_currency",
   "grand_total_company_currency",
   "section_break_hidden",
+  "is_cancelled",
   "amended_from"
  ],
  "fields": [
@@ -102,6 +113,12 @@
   },
   {
    "default": "0",
+   "fieldname": "in_transit",
+   "fieldtype": "Check",
+   "label": "In-Transit"
+  },
+  {
+   "default": "0",
    "fieldname": "is_addition",
    "fieldtype": "Check",
    "label": "Is Addition"
@@ -118,6 +135,12 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Flight No"
+  },
+  {
+   "depends_on": "eval:doc.in_transit == 1",
+   "fieldname": "flight_no_2",
+   "fieldtype": "Data",
+   "label": "Second Flight No"
   },
   {
    "fieldname": "column_break_1",
@@ -200,16 +223,41 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "travel_amount",
-   "fieldtype": "Currency",
-   "label": "Amount",
-   "options": "currency"
+   "collapsible": 1,
+   "depends_on": "eval:doc.in_transit == 1",
+   "fieldname": "section_break_second_flight",
+   "fieldtype": "Section Break",
+   "label": "Second Flight Details"
   },
   {
-   "fieldname": "amountcompany_currency",
-   "fieldtype": "Currency",
-   "label": "Amount(Company Currency)",
-   "options": "Company:company:default_currency"
+   "depends_on": "eval:doc.in_transit == 1",
+   "fieldname": "custom_departure_airport_2",
+   "fieldtype": "Link",
+   "label": "Second Departure Airport",
+   "options": "Airport"
+  },
+  {
+   "depends_on": "eval:doc.in_transit == 1",
+   "fieldname": "custom_arrival_airport_2",
+   "fieldtype": "Link",
+   "label": "Second Arrival Airport",
+   "options": "Airport"
+  },
+  {
+   "fieldname": "column_break_second_flight1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.in_transit == 1",
+   "fieldname": "custom_date_of_travel_2",
+   "fieldtype": "Datetime",
+   "label": "Second Date of Travel"
+  },
+  {
+   "depends_on": "eval:doc.in_transit == 1",
+   "fieldname": "custom_date_of_arrival_2",
+   "fieldtype": "Datetime",
+   "label": "Second Date of Arrival"
   },
   {
    "collapsible": 1,
@@ -279,6 +327,23 @@
    "label": "Purpose"
   },
   {
+   "fieldname": "section_break_charges",
+   "fieldtype": "Section Break",
+   "label": "Charges"
+  },
+  {
+   "fieldname": "travel_amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "options": "currency"
+  },
+  {
+   "fieldname": "amountcompany_currency",
+   "fieldtype": "Currency",
+   "label": "Amount(Company Currency)",
+   "options": "Company:company:default_currency"
+  },
+  {
    "collapsible": 1,
    "fieldname": "section_break_accounting",
    "fieldtype": "Section Break",
@@ -340,6 +405,7 @@
    "options": "Account"
   },
   {
+   "depends_on": "eval:!doc.is_paid",
    "fieldname": "payable_account",
    "fieldtype": "Link",
    "label": "Payable Account",
@@ -463,6 +529,18 @@
    "fieldname": "flight_date",
    "fieldtype": "Date",
    "label": "Flight Date"
+  },
+  {
+   "fieldname": "column_break_dita",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "is_cancelled",
+   "fieldtype": "Check",
+   "label": "Is Cancelled",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -473,7 +551,7 @@
    "link_fieldname": "custom_travel_expense_ref"
   }
  ],
- "modified": "2026-01-03 19:47:22.974085",
+ "modified": "2026-01-07 01:49:03.916568",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
