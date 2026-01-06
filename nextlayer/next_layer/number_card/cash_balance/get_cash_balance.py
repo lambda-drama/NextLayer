@@ -145,8 +145,8 @@ def get_cash_balance(company=None):
 @frappe.whitelist()
 def get_balance(company=None):
     """
-    Returns total cash balance for a company using Frappe ORM only.
-    Converts all account balances to company currency.
+    Returns total cash balance for a company.
+    Uses get_cash_balance to sum individual account balances and converts to company currency.
     """
     if not company:
         company = frappe.defaults.get_user_default("Company") or frappe.get_system_settings("default_company")
@@ -157,45 +157,24 @@ def get_balance(company=None):
             "fieldtype": "Currency"
         }
 
-    # Get company currency
     company_currency = frappe.db.get_value("Company", company, "default_currency") or "USD"
-
-    # Get all Cash accounts for the company (non-group)
-    cash_accounts = frappe.get_all(
-        "Account",
-        filters={
-            "account_type": "Cash",
-            "company": company,
-            "is_group": 0
-        },
-        fields=["name", "account_currency"]
-    )
-
-    total_balance = 0.0
     posting_date = frappe.utils.today()
 
-    for acc in cash_accounts:
-        # Check if user has permission to view this account
-        if not is_user_allowed_to_view_account(acc.name):
+    # Get individual cash account balances
+    accounts = get_cash_balance(company)
+
+    total_balance = 0.0
+
+    for acc in accounts:
+        # Skip placeholder entries
+        if "Balance" not in acc:
             continue
-        
-        # Get account currency (defaults to company currency if not set)
-        account_currency = acc.get("account_currency") or company_currency
-        
-        # Use Frappe ORM to sum debit and credit from GL Entries
-        gl_entries = frappe.get_all(
-            "GL Entry",
-            filters={"account": acc.name, "company": company},
-            fields=["debit", "credit", "posting_date"]
-        )
-        
-        account_balance = 0.0
-        for entry in gl_entries:
-            balance = flt(entry.debit) - flt(entry.credit)
-            account_balance += balance
-        
-        # Convert to company currency if account currency is different
-        if account_currency != company_currency and account_balance != 0:
+
+        balance = flt(acc.get("Balance") or 0)
+        account_currency = acc.get("Currency") or company_currency
+
+        # Convert to company currency if different
+        if account_currency != company_currency and balance != 0:
             try:
                 exchange_rate = get_exchange_rate(
                     account_currency,
@@ -203,12 +182,14 @@ def get_balance(company=None):
                     posting_date,
                     company
                 )
-                account_balance = account_balance * exchange_rate
+                balance = balance * exchange_rate
             except Exception:
-                # If exchange rate not found, use balance as-is (log error)
-                frappe.log_error(f"Exchange rate not found for {account_currency} to {company_currency}", "Cash Balance Currency Conversion")
-        
-        total_balance += account_balance
+                frappe.log_error(
+                    f"Exchange rate not found for {account_currency} to {company_currency}",
+                    "Cash Balance Currency Conversion"
+                )
+
+        total_balance += balance
 
     return {
         "value": float(total_balance),

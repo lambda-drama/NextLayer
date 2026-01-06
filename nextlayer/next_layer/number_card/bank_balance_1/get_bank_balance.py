@@ -100,7 +100,7 @@ def get_accounts_balance(company=None):
     # Get all Bank accounts (non-group) for the company
     bank_accounts = frappe.get_all(
         "Account",
-        filters={"account_type": "Bank", "is_group": 0},
+        filters={"account_type": "Bank", "is_group": 0, "company": company},
         fields=["name", "account_name", "account_currency"]
     )
 
@@ -138,31 +138,15 @@ def get_accounts_balance(company=None):
 @frappe.whitelist()
 def get_balance(company=None):
     """
-    Returns total bank balance for a company using Frappe ORM (no SQL).
-    Converts all account balances to company currency.
+    Returns total bank balance for a company by summing all account balances
+    from get_accounts_balance and converting to company currency.
     """
     if not company:
         company = frappe.defaults.get_user_default("Company") or frappe.get_system_settings("default_company")
 
-    if not company:
-        return {
-            "value": 0.0,
-            "fieldtype": "Currency"
-        }
-
-    # Get company currency
     company_currency = frappe.db.get_value("Company", company, "default_currency") or "USD"
 
-    # Get all Bank accounts (non-group)
-    bank_accounts = frappe.get_all(
-        "Account",
-        filters={
-            "account_type": "Bank",
-            "company": company,
-            "is_group": 0
-        },
-        fields=["name", "account_currency"]
-    )
+    accounts = get_accounts_balance(company)  # call the existing function
 
     total_balance = 0.0
     posting_date = frappe.utils.today()
@@ -194,15 +178,15 @@ def get_balance(company=None):
                     posting_date,
                     company
                 )
-                account_balance = account_balance * exchange_rate
+                balance = balance * exchange_rate
+               
             except Exception:
-                # If exchange rate not found, use balance as-is (log error)
                 frappe.log_error(f"Exchange rate not found for {account_currency} to {company_currency}", "Bank Balance Currency Conversion")
 
         total_balance += account_balance
 
     return {
-        "value": float(total_balance),
+        "value": total_balance,
         "fieldtype": "Currency",
         "currency": company_currency
     }
