@@ -112,6 +112,10 @@ def _make_gl_entries(doc):
     }))
 
     make_gl_entries(gl_entries, cancel=False, update_outstanding="No")
+    
+    # Mark GL as posted after successful creation
+    frappe.db.set_value("Sales Shipment Cost", doc.name, "gl_posted", 1)
+    frappe.db.commit()
 
 def delete_gl_entries(doc):
     """
@@ -139,6 +143,10 @@ def delete_gl_entries(doc):
             DELETE FROM `tabGL Entry`
             WHERE voucher_type=%s AND voucher_no=%s
         """, (doc.doctype, doc.name))
+    
+    # Mark GL as not posted after successful deletion
+    frappe.db.set_value("Sales Shipment Cost", doc.name, "gl_posted", 0)
+    frappe.db.commit()
 
 @frappe.whitelist()
 def check_gl_entries_exist(docname):
@@ -195,7 +203,7 @@ def repost_gl_entries(docname):
         # Delete existing GL entries (if any)
         delete_gl_entries(doc)
         
-        # Recreate GL entries
+        # Recreate GL entries (this will set gl_posted = 1)
         _make_gl_entries(doc)
         
         frappe.msgprint(_("GL entries have been successfully reposted."), indicator="green")

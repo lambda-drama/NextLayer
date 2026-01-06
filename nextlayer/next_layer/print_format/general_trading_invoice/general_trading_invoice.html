@@ -105,8 +105,13 @@
     <tr style="padding:0px; margin:0px">
         <td style="padding:0px; margin:0px;"> 
                     <div class="" style="margin-bottom: 8px; color: #800080;font-size:20px; font-weight:700; padding-bottom: 10px;"><b>FAAHFAAHIN</b></div>
-            <div class="" style="margin-bottom: 8px; color: #800080;"><b>MAGACA MILKIILAHA: </b>{{doc.customer_name}}</div>
-            <div class="" style="margin-bottom: 8px; color: #800080;"><b>Registered Owner: </b>{{doc.custom_registered_owner or ""}}</div>
+            {% if doc.custom_registered_owner %}
+                {# If registered owner exists, replace MAGACA MILKIILAHA with Registered Owner #}
+                <div class="" style="margin-bottom: 8px; color: #800080;"><b>Registered Owner: </b>{{doc.custom_registered_owner}}</div>
+            {% else %}
+                {# If no registered owner, show MAGACA MILKIILAHA with customer name #}
+                <div class="" style="margin-bottom: 8px; color: #800080;"><b>MAGACA MILKIILAHA: </b>{{doc.customer_name}}</div>
+            {% endif %}
             
             {% set party = doc.customer %}
             {% set balance = 0 %}
