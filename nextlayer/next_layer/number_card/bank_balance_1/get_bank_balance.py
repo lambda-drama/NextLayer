@@ -146,7 +146,12 @@ def get_balance(company=None):
 
     company_currency = frappe.db.get_value("Company", company, "default_currency") or "USD"
 
-    accounts = get_accounts_balance(company)  # call the existing function
+    # Get all Bank accounts (non-group) for the company
+    bank_accounts = frappe.get_all(
+        "Account",
+        filters={"account_type": "Bank", "is_group": 0, "company": company},
+        fields=["name", "account_name", "account_currency"]
+    )
 
     total_balance = 0.0
     posting_date = frappe.utils.today()
@@ -157,7 +162,7 @@ def get_balance(company=None):
             continue
 
         # Get account currency (defaults to company currency if not set)
-        account_currency = acc.get("account_currency") or company_currency
+        account_currency = acc.account_currency or company_currency
 
         gl_entries = frappe.get_all(
             "GL Entry",
@@ -178,8 +183,8 @@ def get_balance(company=None):
                     posting_date,
                     company
                 )
-                balance = balance * exchange_rate
-               
+                account_balance = account_balance * exchange_rate
+
             except Exception:
                 frappe.log_error(f"Exchange rate not found for {account_currency} to {company_currency}", "Bank Balance Currency Conversion")
 
