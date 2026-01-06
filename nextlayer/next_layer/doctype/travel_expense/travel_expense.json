@@ -83,6 +83,7 @@
   "total_taxes_and_charges_company_currency",
   "grand_total_company_currency",
   "section_break_hidden",
+  "is_cancelled",
   "amended_from"
  ],
  "fields": [
@@ -532,6 +533,14 @@
   {
    "fieldname": "column_break_dita",
    "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "is_cancelled",
+   "fieldtype": "Check",
+   "label": "Is Cancelled",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -542,7 +551,7 @@
    "link_fieldname": "custom_travel_expense_ref"
   }
  ],
- "modified": "2026-01-07 01:13:33.439306",
+ "modified": "2026-01-07 01:49:03.916568",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",

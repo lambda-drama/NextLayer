@@ -227,11 +227,18 @@ frappe.ui.form.on("Travel Expense", {
 		// Setup event listeners for second flight number
 		setup_second_flight_listeners(frm);
 		
-		// Add "Additional Expenses" button
+		// Add "Additional Expenses" and "Cancel Charges" buttons
 		if (!frm.is_new()) {
 			frm.add_custom_button(__("Additional Expenses"), function() {
 				show_additional_expenses_modal(frm);
 			}, __("Actions"));
+			
+			// Only show Cancel Charges if document is submitted and not already cancelled
+			if (frm.doc.docstatus === 1 && !frm.doc.is_cancelled) {
+				frm.add_custom_button(__("Cancel Charges"), function() {
+					cancel_travel_expense_charges(frm);
+				}, __("Actions"));
+			}
 		}
 	},
 	
@@ -389,11 +396,18 @@ frappe.ui.form.on("Travel Expense", {
 			});
 		}
 		
-		// Add "Additional Expenses" button after submit (only show if document is submitted)
+		// Add "Additional Expenses" and "Cancel Charges" buttons after submit (only show if document is submitted)
 		if (frm.doc.docstatus === 1) {
 			frm.add_custom_button(__("Additional Expenses"), function() {
 				show_additional_expenses_modal(frm);
 			}, __("Create"));
+			
+			// Only show Cancel Charges if not already cancelled
+			if (!frm.doc.is_cancelled) {
+				frm.add_custom_button(__("Cancel Charges"), function() {
+					cancel_travel_expense_charges(frm);
+				}, __("Create"));
+			}
 		}
 	}
 });
@@ -1549,6 +1563,217 @@ function update_travel_row_amount(frm, converted_amount) {
 	frm.refresh_field("expenses");
 }
 
+// Auto-fill hotel details from original travel expense
+function auto_fill_hotel_details(dialog, row, $row_element) {
+	let original_frm = dialog.original_frm;
+	if (!original_frm || !original_frm.doc) return;
+	
+	// Get hotel details from original travel expense
+	let hotel_checkin_date = original_frm.doc.hotel_checkin_date || "";
+	let hotel_checkout_date = original_frm.doc.hotel_checkout_date || "";
+	let custom_hotel_name = original_frm.doc.custom_hotel_name || "";
+	let hotel_territory = original_frm.doc.hotel_territory || "";
+	let hotel_location = original_frm.doc.hotel_location || "";
+	let hotel_city = original_frm.doc.hotel_city || "";
+	let hotel_country = original_frm.doc.hotel_country || "";
+	let rate_per_day = original_frm.doc.rate_per_day || "";
+	let purpose = original_frm.doc.purpose || "";
+	
+	// Fill hotel fields
+	if (hotel_checkin_date) {
+		$row_element.find('.hotel-checkin-date').val(hotel_checkin_date);
+		frappe.model.set_value(row.doctype, row.name, "hotel_checkin_date", hotel_checkin_date);
+		row.hotel_checkin_date = hotel_checkin_date;
+	}
+	
+	if (hotel_checkout_date) {
+		$row_element.find('.hotel-checkout-date').val(hotel_checkout_date);
+		frappe.model.set_value(row.doctype, row.name, "hotel_checkout_date", hotel_checkout_date);
+		row.hotel_checkout_date = hotel_checkout_date;
+	}
+	
+	if (custom_hotel_name) {
+		$row_element.find('input[data-field="custom_hotel_name"]').val(custom_hotel_name);
+		frappe.model.set_value(row.doctype, row.name, "custom_hotel_name", custom_hotel_name);
+		row.custom_hotel_name = custom_hotel_name;
+	}
+	
+	if (hotel_territory) {
+		let hotel_territory_field = $row_element.data('hotel_territory_field');
+		if (hotel_territory_field) {
+			hotel_territory_field.set_value(hotel_territory);
+		}
+		frappe.model.set_value(row.doctype, row.name, "hotel_territory", hotel_territory);
+		row.hotel_territory = hotel_territory;
+	}
+	
+	if (hotel_location) {
+		let hotel_location_field = $row_element.data('hotel_location_field');
+		if (hotel_location_field) {
+			hotel_location_field.set_value(hotel_location);
+		}
+		frappe.model.set_value(row.doctype, row.name, "hotel_location", hotel_location);
+		row.hotel_location = hotel_location;
+	}
+	
+	if (hotel_city) {
+		$row_element.find('.hotel-city').val(hotel_city);
+		frappe.model.set_value(row.doctype, row.name, "hotel_city", hotel_city);
+		row.hotel_city = hotel_city;
+	}
+	
+	if (hotel_country) {
+		let hotel_country_field = $row_element.data('hotel_country_field');
+		if (hotel_country_field) {
+			hotel_country_field.set_value(hotel_country);
+		}
+		frappe.model.set_value(row.doctype, row.name, "hotel_country", hotel_country);
+		row.hotel_country = hotel_country;
+	}
+	
+	if (rate_per_day) {
+		$row_element.find('input[data-field="rate_per_day"]').val(rate_per_day);
+		frappe.model.set_value(row.doctype, row.name, "rate_per_day", rate_per_day);
+		row.rate_per_day = rate_per_day;
+	}
+	
+	if (purpose) {
+		$row_element.find('.hotel-purpose').val(purpose);
+		frappe.model.set_value(row.doctype, row.name, "purpose", purpose);
+		row.purpose = purpose;
+	}
+	
+	// Update locals
+	if (locals[row.doctype] && locals[row.doctype][row.name]) {
+		Object.assign(locals[row.doctype][row.name], {
+			hotel_checkin_date: hotel_checkin_date,
+			hotel_checkout_date: hotel_checkout_date,
+			custom_hotel_name: custom_hotel_name,
+			hotel_territory: hotel_territory,
+			hotel_location: hotel_location,
+			hotel_city: hotel_city,
+			hotel_country: hotel_country,
+			rate_per_day: rate_per_day,
+			purpose: purpose
+		});
+	}
+}
+
+// Auto-fill travel details from original travel expense
+function auto_fill_travel_details(dialog, row, $row_element) {
+	let original_frm = dialog.original_frm;
+	if (!original_frm || !original_frm.doc) return;
+	
+	// Get travel details from original travel expense
+	let custom_prn_number = original_frm.doc.custom_pnr_number_ || "";
+	let custom_booked_by = original_frm.doc.custom_booked_by || "";
+	let custom_date_of_purchase = original_frm.doc.custom_date_of_purchase || "";
+	let custom_departure_airport = original_frm.doc.custom_departure_airport || "";
+	let custom_arrival_airport = original_frm.doc.custom_arrival_airport || "";
+	let custom_airlines = original_frm.doc.custom_airlines || "";
+	let custom_date_of_travel = original_frm.doc.custom_date_of_travel || "";
+	let custom_date_of_arrival = original_frm.doc.custom_date_of_arrival || "";
+	let custom_travel_type = original_frm.doc.custom_travel_type || "";
+	let travel_amount = original_frm.doc.travel_amount || 0;
+	
+	// Fill travel fields
+	if (custom_prn_number) {
+		$row_element.find('.prn-number').val(custom_prn_number);
+		frappe.model.set_value(row.doctype, row.name, "custom_prn_number", custom_prn_number);
+		row.custom_prn_number = custom_prn_number;
+	}
+	
+	if (custom_booked_by) {
+		let booked_by_field = $row_element.data('booked_by_field');
+		if (booked_by_field) {
+			booked_by_field.set_value(custom_booked_by);
+		}
+		frappe.model.set_value(row.doctype, row.name, "custom_booked_by", custom_booked_by);
+		row.custom_booked_by = custom_booked_by;
+	}
+	
+	if (custom_date_of_purchase) {
+		$row_element.find('input[data-field="custom_date_of_purchase"]').val(custom_date_of_purchase);
+		frappe.model.set_value(row.doctype, row.name, "custom_date_of_purchase", custom_date_of_purchase);
+		row.custom_date_of_purchase = custom_date_of_purchase;
+	}
+	
+	if (custom_departure_airport) {
+		let departure_airport_field = $row_element.data('departure_airport_field');
+		if (departure_airport_field) {
+			departure_airport_field.set_value(custom_departure_airport);
+		}
+		frappe.model.set_value(row.doctype, row.name, "custom_departure_airport", custom_departure_airport);
+		row.custom_departure_airport = custom_departure_airport;
+	}
+	
+	if (custom_arrival_airport) {
+		let arrival_airport_field = $row_element.data('arrival_airport_field');
+		if (arrival_airport_field) {
+			arrival_airport_field.set_value(custom_arrival_airport);
+		}
+		frappe.model.set_value(row.doctype, row.name, "custom_arrival_airport", custom_arrival_airport);
+		row.custom_arrival_airport = custom_arrival_airport;
+	}
+	
+	if (custom_airlines) {
+		let airlines_field = $row_element.data('airlines_field');
+		if (airlines_field) {
+			airlines_field.set_value(custom_airlines);
+		}
+		frappe.model.set_value(row.doctype, row.name, "custom_airlines", custom_airlines);
+		row.custom_airlines = custom_airlines;
+	}
+	
+	if (custom_date_of_travel) {
+		let date_of_travel_field = $row_element.data('date_of_travel_field');
+		if (date_of_travel_field) {
+			// Convert datetime to format expected by datetime field
+			date_of_travel_field.set_value(custom_date_of_travel);
+		}
+		frappe.model.set_value(row.doctype, row.name, "custom_date_of_travel", custom_date_of_travel);
+		row.custom_date_of_travel = custom_date_of_travel;
+	}
+	
+	if (custom_date_of_arrival) {
+		let date_of_arrival_field = $row_element.data('date_of_arrival_field');
+		if (date_of_arrival_field) {
+			date_of_arrival_field.set_value(custom_date_of_arrival);
+		}
+		frappe.model.set_value(row.doctype, row.name, "custom_date_of_arrival", custom_date_of_arrival);
+		row.custom_date_of_arrival = custom_date_of_arrival;
+	}
+	
+	if (custom_travel_type) {
+		$row_element.find('select[data-field="custom_travel_type"]').val(custom_travel_type);
+		frappe.model.set_value(row.doctype, row.name, "custom_travel_type", custom_travel_type);
+		row.custom_travel_type = custom_travel_type;
+	}
+	
+	// Fill amount field
+	if (travel_amount && travel_amount > 0) {
+		$row_element.find('input[data-field="amount"]').val(travel_amount);
+		frappe.model.set_value(row.doctype, row.name, "amount", travel_amount);
+		row.amount = travel_amount;
+	}
+	
+	// Update locals
+	if (locals[row.doctype] && locals[row.doctype][row.name]) {
+		Object.assign(locals[row.doctype][row.name], {
+			custom_prn_number: custom_prn_number,
+			custom_booked_by: custom_booked_by,
+			custom_date_of_purchase: custom_date_of_purchase,
+			custom_departure_airport: custom_departure_airport,
+			custom_arrival_airport: custom_arrival_airport,
+			custom_airlines: custom_airlines,
+			custom_date_of_travel: custom_date_of_travel,
+			custom_date_of_arrival: custom_date_of_arrival,
+			custom_travel_type: custom_travel_type,
+			amount: travel_amount
+		});
+	}
+}
+
 // Additional Expenses Modal
 function show_additional_expenses_modal(frm) {
 	// Create a temporary document for the child table
@@ -1573,6 +1798,17 @@ function show_additional_expenses_modal(frm) {
 		size: 'large',
 		fields: [
 			{
+				fieldtype: "Select",
+				fieldname: "expense_category",
+				label: __("Expense Category"),
+				options: "\nRefund\nUpdate",
+				default: ""
+			},
+			{
+				fieldtype: "Column Break",
+				fieldname: "column_break_category"
+			},
+			{
 				fieldtype: "Link",
 				fieldname: "transaction_currency",
 				label: __("Transaction Currency"),
@@ -1581,12 +1817,51 @@ function show_additional_expenses_modal(frm) {
 				reqd: 1
 			},
 			{
+				fieldtype: "Section Break",
+				fieldname: "section_break_expense_details"
+			},
+			{
 				fieldtype: "HTML",
 				fieldname: "expense_table",
 				options: `
-					<div id="additional_expenses_table" style="min-height: 500px; margin-bottom: 20px;">
+					<div id="additional_expenses_table" style="min-height: 500px; margin-bottom: 20px; width: 100%; max-width: 100%;">
 						<!-- Travel Expense Detail table will be rendered here -->
 					</div>
+					<style>
+						#additional_expenses_table {
+							width: 100% !important;
+							max-width: 100% !important;
+						}
+						#additional_expenses_table .form-section {
+							width: 100% !important;
+							max-width: 100% !important;
+						}
+						#additional_expenses_table .section-body {
+							width: 100% !important;
+							max-width: 100% !important;
+						}
+						#additional_expenses_table .expense-items-list {
+							width: 100% !important;
+							max-width: 100% !important;
+						}
+						#additional_expenses_table .expense-row {
+							width: 100% !important;
+							max-width: 100% !important;
+							box-sizing: border-box;
+						}
+						#additional_expenses_table .form-grid {
+							width: 100% !important;
+							max-width: 100% !important;
+						}
+						.modal-body [data-fieldname="expense_table"] {
+							width: 100% !important;
+							max-width: 100% !important;
+						}
+						.modal-body [data-fieldname="expense_table"] .control-input-wrapper {
+							width: 100% !important;
+							max-width: 100% !important;
+						}
+					</style>
 				`,
 			},
 		],
@@ -1623,6 +1898,31 @@ function show_additional_expenses_modal(frm) {
 	// Initialize the child table after dialog is shown
 	setTimeout(function() {
 		initialize_additional_expenses_table(d, temp_doc);
+		
+		// Add handler for expense category change
+		setTimeout(function() {
+			if (d.fields_dict && d.fields_dict.expense_category) {
+				d.fields_dict.expense_category.$input.on('change', function() {
+					// When category changes, check if Update is selected and auto-fill existing rows
+					let expense_category = d.fields_dict.expense_category.get_value();
+					if (expense_category === "Update" && temp_doc.expenses && temp_doc.expenses.length > 0) {
+						temp_doc.expenses.forEach(function(row) {
+							let $row_element = d.$wrapper.find(`.expense-row[data-name="${row.name}"]`);
+							if ($row_element.length) {
+								let expense_type = row.expense_type || "";
+								let expense_type_lower = expense_type.toLowerCase();
+								
+								if (expense_type_lower.includes("hotel")) {
+									auto_fill_hotel_details(d, row, $row_element);
+								} else if (expense_type_lower.includes("travel")) {
+									auto_fill_travel_details(d, row, $row_element);
+								}
+							}
+						});
+					}
+				});
+			}
+		}, 100);
 		
 		// Add handler for transaction currency change to convert all amounts
 		setTimeout(function() {
@@ -1760,8 +2060,8 @@ function initialize_additional_expenses_table(dialog, temp_doc) {
 	
 	// Load doctype first, then create grid
 	frappe.model.with_doctype("Travel Expense Detail", function() {
-		// Create grid wrapper
-		let grid_wrapper = $('<div class="form-grid"></div>').appendTo(table_wrapper);
+		// Create grid wrapper with full width
+		let grid_wrapper = $('<div class="form-grid" style="width: 100%; max-width: 100%;"></div>').appendTo(table_wrapper);
 		
 		// Try to create grid - if it fails, use manual table
 		try {
@@ -1798,15 +2098,15 @@ function initialize_additional_expenses_table(dialog, temp_doc) {
 function create_manual_expense_table(dialog, temp_doc, wrapper) {
 	// Create a simple table structure as fallback
 	let table_html = `
-		<div class="form-section">
+		<div class="form-section" style="width: 100%; max-width: 100%;">
 			<div class="section-head">
 				<span class="section-title">Expense Details</span>
 				<button class="btn btn-sm btn-primary add-row" style="float: right;">
 					<i class="fa fa-plus"></i> Add Row
 				</button>
 			</div>
-			<div class="section-body">
-				<div class="expense-items-list"></div>
+			<div class="section-body" style="width: 100%; max-width: 100%;">
+				<div class="expense-items-list" style="width: 100%; max-width: 100%;"></div>
 			</div>
 		</div>
 	`;
@@ -2014,6 +2314,26 @@ function add_expense_row(dialog, temp_doc, container) {
 				frappe.model.set_value(row.doctype, row.name, "expense_type", selected_type);
 				// Use the selected value directly (it's the name of the Expense Claim Type)
 				toggle_conditional_fields($row, selected_type);
+				
+				// Auto-fill logic when Update is selected
+				let expense_category = dialog.fields_dict && dialog.fields_dict.expense_category ? 
+					dialog.fields_dict.expense_category.get_value() : "";
+				
+				if (expense_category === "Update") {
+					let selected_type_lower = (selected_type || "").toLowerCase();
+					
+					// Use setTimeout to ensure all fields are created before auto-filling
+					setTimeout(function() {
+						// Auto-fill hotel details
+						if (selected_type_lower.includes("hotel")) {
+							auto_fill_hotel_details(dialog, row, $row);
+						}
+						// Auto-fill travel details
+						else if (selected_type_lower.includes("travel")) {
+							auto_fill_travel_details(dialog, row, $row);
+						}
+					}, 300);
+				}
 			} else {
 				// Hide all conditional fields if no expense type selected
 				toggle_conditional_fields($row, "");
@@ -2263,14 +2583,14 @@ function add_expense_row(dialog, temp_doc, container) {
 	});
 	
 	// Create Booked By link field
-	frappe.model.with_doctype("User", function() {
+	frappe.model.with_doctype("Member", function() {
 		try {
 			let booked_by_wrapper = $row.find('.booked-by-wrapper');
 			let booked_by_field = frappe.ui.form.make_control({
 				df: {
 					fieldtype: "Link",
 					fieldname: "custom_booked_by",
-					options: "User",
+					options: "Member",
 					label: "Booked By"
 				},
 				parent: booked_by_wrapper,
@@ -3235,6 +3555,60 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc) {
 			});
 		}
 	});
+}
+
+// Cancel Charges - Create reverse journal entry and mark as cancelled
+function cancel_travel_expense_charges(frm) {
+	if (frm.doc.is_cancelled) {
+		frappe.msgprint({
+			title: __("Already Cancelled"),
+			message: __("This travel expense has already been cancelled."),
+			indicator: "orange"
+		});
+		return;
+	}
+	
+	frappe.confirm(
+		__("Are you sure you want to cancel the charges for this travel expense? This will create a reverse journal entry and mark the expense as cancelled."),
+		function() {
+			// Yes - proceed with cancellation
+			frappe.call({
+				method: "nextlayer.next_layer.api.travel_expense_utils.cancel_travel_expense_charges",
+				args: {
+					travel_expense_name: frm.doc.name
+				},
+				freeze: true,
+				freeze_message: __("Cancelling charges and creating reverse journal entry..."),
+				callback: function(r) {
+					if (r.message) {
+						if (r.message.success) {
+							frappe.show_alert({
+								message: __("Charges cancelled successfully. Reverse journal entry {0} created.", [r.message.journal_entry_name || ""]),
+								indicator: "green"
+							}, 5);
+							frm.reload_doc();
+						} else {
+							frappe.msgprint({
+								title: __("Error"),
+								message: r.message.error || __("Failed to cancel charges."),
+								indicator: "red"
+							});
+						}
+					}
+				},
+				error: function(r) {
+					frappe.msgprint({
+						title: __("Error"),
+						message: __("An error occurred while cancelling charges."),
+						indicator: "red"
+					});
+				}
+			});
+		},
+		function() {
+			// No - do nothing
+		}
+	);
 }
 
 // Function to recalculate all expense amounts in company currency

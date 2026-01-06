@@ -608,3 +608,117 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		frappe.log_error(f"Error creating journal entry for paid travel expense: {str(e)}", "Travel Expense Utils Error")
 		raise
 
+
+@frappe.whitelist()
+def cancel_travel_expense_charges(travel_expense_name):
+	"""
+	Cancel charges for a travel expense by creating a reverse journal entry
+	and marking the travel expense as cancelled.
+	
+	Args:
+		travel_expense_name: Name of the Travel Expense document
+	
+	Returns:
+		dict: Success status and journal entry name
+	"""
+	try:
+		# Get the travel expense document
+		travel_expense = frappe.get_doc("Travel Expense", travel_expense_name)
+		
+		# Check if already cancelled
+		if travel_expense.is_cancelled:
+			return {
+				"success": False,
+				"error": "Travel expense is already cancelled."
+			}
+		
+		# Find the original journal entry linked to this travel expense
+		original_je = frappe.db.sql("""
+			SELECT name, docstatus
+			FROM `tabJournal Entry`
+			WHERE EXISTS (
+				SELECT 1 FROM `tabJournal Entry Account`
+				WHERE parent = `tabJournal Entry`.name
+				AND custom_travel_expense_ref = %s
+			)
+			AND docstatus = 1
+			ORDER BY creation DESC
+			LIMIT 1
+		""", (travel_expense_name,), as_dict=True)
+		
+		if not original_je:
+			return {
+				"success": False,
+				"error": "No submitted journal entry found for this travel expense."
+			}
+		
+		original_je_name = original_je[0].name
+		original_je_doc = frappe.get_doc("Journal Entry", original_je_name)
+		
+		# Create reverse journal entry (swap debits and credits)
+		reverse_accounts = []
+		for account in original_je_doc.accounts:
+			# Swap debit and credit
+			# If original had debit, reverse should have credit (and vice versa)
+			original_debit = account.debit or 0
+			original_credit = account.credit or 0
+			original_debit_in_account_currency = account.debit_in_account_currency or original_debit
+			original_credit_in_account_currency = account.credit_in_account_currency or original_credit
+			
+			reverse_account = {
+				"account": account.account,
+				"debit": original_credit,
+				"debit_in_account_currency": original_credit_in_account_currency,
+				"credit": original_debit,
+				"credit_in_account_currency": original_debit_in_account_currency,
+				"party_type": account.party_type,
+				"party": account.party,
+				"cost_center": account.cost_center,
+				"project": account.project,
+				"custom_travel_expense_ref": travel_expense_name,
+			}
+			reverse_accounts.append(reverse_account)
+		
+		# Create reverse journal entry
+		reverse_je = frappe.get_doc({
+			"doctype": "Journal Entry",
+			"voucher_type": "Journal Entry",
+			"company": original_je_doc.company,
+			"posting_date": frappe.utils.today(),
+			"multi_currency": original_je_doc.multi_currency,
+			"user_remark": f"Reverse entry for cancelled Travel Expense {travel_expense_name}",
+			"accounts": reverse_accounts
+		})
+		
+		# Copy currency and exchange rate if multi-currency
+		if original_je_doc.multi_currency:
+			reverse_je.currency = original_je_doc.currency
+			reverse_je.exchange_rate = original_je_doc.exchange_rate
+		
+		# Copy accounting dimensions
+		if hasattr(original_je_doc, 'company_group') and original_je_doc.company_group:
+			reverse_je.company_group = original_je_doc.company_group
+		if hasattr(original_je_doc, 'branch') and original_je_doc.branch:
+			reverse_je.branch = original_je_doc.branch
+		
+		# Insert and submit the reverse journal entry
+		reverse_je.insert(ignore_permissions=True)
+		reverse_je.submit()
+		frappe.db.commit()
+		
+		# Update travel expense to mark as cancelled
+		frappe.db.set_value("Travel Expense", travel_expense_name, "is_cancelled", 1)
+		frappe.db.commit()
+		
+		return {
+			"success": True,
+			"journal_entry_name": reverse_je.name
+		}
+		
+	except Exception as e:
+		frappe.log_error(f"Error cancelling travel expense charges: {str(e)}", "Travel Expense Utils Error")
+		return {
+			"success": False,
+			"error": str(e)
+		}
+
