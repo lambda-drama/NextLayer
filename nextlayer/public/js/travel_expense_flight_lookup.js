@@ -83,6 +83,40 @@ frappe.ui.form.on("Travel Expense", {
 		}
 	},
 	
+	in_transit: function(frm) {
+		// Clear second flight fields when in_transit is unchecked
+		if (!frm.doc.in_transit) {
+			frm.set_value("flight_no_2", "");
+			frm.set_value("custom_departure_airport_2", "");
+			frm.set_value("custom_arrival_airport_2", "");
+			frm.set_value("custom_date_of_travel_2", "");
+			frm.set_value("custom_date_of_arrival_2", "");
+		} else {
+			// Setup event listeners when in_transit is checked
+			setup_second_flight_listeners(frm);
+		}
+	},
+	
+	flight_no_2: function(frm) {
+		// Direct field change handler for second flight number
+		// Use a small delay to avoid triggering while user is still typing
+		if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+			// Clear any existing timeout
+			if (frm._flight_no_2_timeout) {
+				clearTimeout(frm._flight_no_2_timeout);
+			}
+			
+			// Set a timeout to trigger lookup after user stops typing (500ms delay)
+			frm._flight_no_2_timeout = setTimeout(function() {
+				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+					if (!flight_lookup_in_progress) {
+						lookup_flight_for_travel_expense_second_flight(frm);
+					}
+				}
+			}, 500);
+		}
+	},
+	
 	validate: function(frm) {
 		// Validate payable_account is mandatory when is_paid is not ticked
 		if (!frm.doc.is_paid && !frm.doc.payable_account) {
@@ -189,6 +223,9 @@ frappe.ui.form.on("Travel Expense", {
 				}
 			});
 		}
+		
+		// Setup event listeners for second flight number
+		setup_second_flight_listeners(frm);
 		
 		// Add "Additional Expenses" button
 		if (!frm.is_new()) {
@@ -542,6 +579,116 @@ function lookup_flight_for_travel_expense(frm) {
 	});
 }
 
+function setup_second_flight_listeners(frm) {
+	// Add event listeners to second flight number field for Enter key and blur
+	// Use setTimeout to ensure field is available after form refresh
+	setTimeout(function() {
+		if (frm.fields_dict.flight_no_2 && frm.fields_dict.flight_no_2.$input) {
+			frm.fields_dict.flight_no_2.$input.off('keydown blur');
+			
+			frm.fields_dict.flight_no_2.$input.on('keydown', function(e) {
+				if (e.keyCode === 13) {
+					e.preventDefault();
+					if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+						if (!flight_lookup_in_progress) {
+							lookup_flight_for_travel_expense_second_flight(frm);
+						}
+					}
+				}
+			});
+			
+			frm.fields_dict.flight_no_2.$input.on('blur', function() {
+				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+					if (!flight_lookup_in_progress) {
+						lookup_flight_for_travel_expense_second_flight(frm);
+					}
+				}
+			});
+		}
+	}, 100);
+}
+
+function lookup_flight_for_travel_expense_second_flight(frm) {
+	let flight_number = frm.doc.flight_no_2 ? frm.doc.flight_no_2.trim() : "";
+	
+	if (!flight_number) {
+		return;
+	}
+	
+	if (!frm.doc.in_transit) {
+		return;
+	}
+	
+	// Skip if lookup is already in progress
+	if (flight_lookup_in_progress) {
+		return;
+	}
+	
+	// Get flight date if available (use second flight date if available, otherwise use first flight date)
+	let flight_date = null;
+	if (frm.doc.custom_date_of_travel_2) {
+		// Convert to YYYY-MM-DD format if it's a datetime field
+		flight_date = frappe.datetime.str_to_obj(frm.doc.custom_date_of_travel_2);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+		}
+	} else if (frm.doc.flight_date) {
+		// Fallback to main form flight date
+		flight_date = frappe.datetime.str_to_obj(frm.doc.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+		}
+	}
+	
+	// Mark lookup as in progress
+	flight_lookup_in_progress = true;
+	
+	frappe.show_alert(__("Looking up second flight information..."), 3);
+	
+	frappe.call({
+		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
+		args: {
+			flight_number: flight_number,
+			flight_date: flight_date || null,
+		},
+		callback: function (r) {
+			// Clear lookup flag
+			flight_lookup_in_progress = false;
+			
+			if (r.message) {
+				const result = r.message;
+				
+				if (result.success) {
+					// Show flight details modal for user confirmation (for second flight)
+					show_flight_confirmation_modal(frm, result.data, flight_number, null, true);
+				} else {
+					frappe.show_alert(
+						__("Failed to fetch second flight details: ") + (result.error || "Unknown error"),
+						5,
+						"red"
+					);
+					
+					frappe.msgprint({
+						title: __("Second Flight Lookup Failed"),
+						message: __(`
+							<div style="padding: 10px;">
+								<p><strong>Flight Number:</strong> ${flight_number}</p>
+								<p><strong>Error:</strong> ${result.error || "Unknown error"}</p>
+								${result.error_details ? `<p><strong>Details:</strong> ${result.error_details}</p>` : ""}
+							</div>
+						`),
+						indicator: "red",
+					});
+				}
+			}
+		},
+		error: function() {
+			// Clear lookup flag on error
+			flight_lookup_in_progress = false;
+		}
+	});
+}
+
 function lookup_flight_for_travel_expense_detail(frm, row, row_key) {
 	let flight_number = row.custom_flight_no ? row.custom_flight_no.trim() : "";
 	
@@ -619,7 +766,7 @@ function lookup_flight_for_travel_expense_detail(frm, row, row_key) {
 	});
 }
 
-function show_flight_confirmation_modal(frm, flight_data, flight_number_searched, target_row) {
+function show_flight_confirmation_modal(frm, flight_data, flight_number_searched, target_row, is_second_flight) {
 	if (!flight_data || (Array.isArray(flight_data) && flight_data.length === 0)) {
 		frappe.msgprint({
 			title: __("No Flight Found"),
@@ -715,16 +862,22 @@ function show_flight_confirmation_modal(frm, flight_data, flight_number_searched
 		`;
 	});
 	
+	// Determine modal title and confirmation message based on whether it's second flight
+	let modal_title = is_second_flight ? __("Confirm Second Flight Information") : __("Confirm Flight Information");
+	let confirm_message = is_second_flight 
+		? `Click "Confirm" to auto-fill the second flight details with origin (${dep_airport.iata || "N/A"}) to final destination (${arr_airport.iata || "N/A"}).`
+		: `Click "Confirm" to auto-fill the travel expense with origin (${dep_airport.iata || "N/A"}) to final destination (${arr_airport.iata || "N/A"}).`;
+	
 	// Create modal to show flight details and ask for confirmation
 	let d = new frappe.ui.Dialog({
-		title: __("Confirm Flight Information"),
+		title: modal_title,
 		fields: [
 			{
 				fieldtype: "HTML",
 				fieldname: "flight_info",
 				options: `
 					<div style="padding: 15px; max-width: 900px;">
-						<h3 style="margin-top: 0;">✈️ Flight Information (${flights.length} flight leg(s))</h3>
+						<h3 style="margin-top: 0;">✈️ ${is_second_flight ? "Second " : ""}Flight Information (${flights.length} flight leg(s))</h3>
 						
 						${flight_legs_html}
 						
@@ -745,7 +898,7 @@ function show_flight_confirmation_modal(frm, flight_data, flight_number_searched
 						
 						<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px;">
 							<p style="margin: 0;"><strong>Is this the correct flight information?</strong></p>
-							<p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Click "Confirm" to auto-fill the travel expense with origin (${dep_airport.iata || "N/A"}) to final destination (${arr_airport.iata || "N/A"}).</p>
+							<p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">${confirm_message}</p>
 						</div>
 					</div>
 				`,
@@ -753,10 +906,15 @@ function show_flight_confirmation_modal(frm, flight_data, flight_number_searched
 		],
 		primary_action_label: __("Confirm"),
 		primary_action: function (values) {
-			// Auto-fill the travel expense detail fields
-			// Pass all flights to handle multi-leg journeys
-			// If target_row is provided, fill that specific row; otherwise find/create Travel row
-			fill_travel_expense_fields(frm, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled, target_row);
+			if (is_second_flight) {
+				// Fill second flight fields
+				fill_second_flight_fields(frm, flight_data, flight_number_searched);
+			} else {
+				// Auto-fill the travel expense detail fields
+				// Pass all flights to handle multi-leg journeys
+				// If target_row is provided, fill that specific row; otherwise find/create Travel row
+				fill_travel_expense_fields(frm, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled, target_row);
+			}
 			d.hide();
 		},
 		secondary_action_label: __("Cancel"),
@@ -1047,6 +1205,202 @@ function fill_travel_expense_fields(frm, flights, dep_airport, arr_airport, airl
 	}).catch(function(error) {
 		frappe.show_alert(__("Error creating airline/airport records. Please check manually."), 5, "red");
 		frappe.log_error(error, "Travel Expense Flight Fill Error");
+	});
+}
+
+function fill_second_flight_fields(frm, flight_data, flight_number_searched) {
+	if (!flight_data || (Array.isArray(flight_data) && flight_data.length === 0)) {
+		frappe.show_alert(__("No flight data found for second flight."), 5, "orange");
+		return;
+	}
+	
+	// Handle both single flight object and array of flights
+	let flights = Array.isArray(flight_data) ? flight_data : [flight_data];
+	
+	// For multi-leg flights, use first departure and last arrival (full journey)
+	const first_flight = flights[0];
+	const last_flight = flights[flights.length - 1];
+	
+	// Extract flight information based on Aerodata API structure
+	const departure = first_flight.departure || {}; // First departure (origin)
+	const arrival = last_flight.arrival || {}; // Last arrival (final destination)
+	
+	// Extract airport information
+	const dep_airport = departure.airport || {};
+	const arr_airport = arrival.airport || {};
+	
+	let dep_airport_name = dep_airport.name || dep_airport.shortName || "";
+	let dep_airport_iata = dep_airport.iata || "";
+	let dep_airport_icao = dep_airport.icao || "";
+	let dep_airport_city = dep_airport.municipalityName || "";
+	let dep_airport_country = dep_airport.countryCode || "";
+	
+	let arr_airport_name = arr_airport.name || arr_airport.shortName || "";
+	let arr_airport_iata = arr_airport.iata || "";
+	let arr_airport_icao = arr_airport.icao || "";
+	let arr_airport_city = arr_airport.municipalityName || "";
+	let arr_airport_country = arr_airport.countryCode || "";
+	
+	// Extract datetime from scheduled times
+	const dep_scheduled = departure.scheduledTime || {};
+	const arr_scheduled = arrival.scheduledTime || {};
+	
+	// Helper function to convert datetime string to Frappe format
+	function format_datetime_for_frappe(datetime_str) {
+		if (!datetime_str) return null;
+		
+		try {
+			let cleaned = datetime_str.trim();
+			
+			// Remove timezone patterns: +HH:MM, -HH:MM, +HHMM, -HHMM at the end
+			cleaned = cleaned.replace(/[+-]\d{2}:?\d{2}\s*$/, '');
+			
+			// Handle ISO format with T separator
+			if (cleaned.includes('T')) {
+				cleaned = cleaned.replace('T', ' ');
+			}
+			
+			// Split into date and time parts
+			let parts = cleaned.trim().split(/\s+/);
+			if (parts.length < 2) {
+				// Try to extract manually if split didn't work
+				let match = cleaned.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/);
+				if (match) {
+					parts = [match[1], match[2]];
+				} else {
+					return null;
+				}
+			}
+			
+			let date_part = parts[0]; // YYYY-MM-DD
+			let time_part = parts[1]; // HH:mm or HH:mm:ss or HH:mm:ss.xxx
+			
+			// Remove milliseconds if present
+			if (time_part.includes('.')) {
+				time_part = time_part.split('.')[0];
+			}
+			
+			// Ensure time has seconds (HH:mm -> HH:mm:ss)
+			if (time_part.match(/^\d{2}:\d{2}$/)) {
+				time_part = time_part + ':00';
+			}
+			
+			// Combine to Frappe format: YYYY-MM-DD HH:mm:ss
+			let formatted = date_part + ' ' + time_part;
+			
+			// Validate format matches YYYY-MM-DD HH:mm:ss
+			if (formatted.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+				return formatted;
+			}
+			
+			console.warn("Datetime format validation failed. Input:", datetime_str, "Formatted:", formatted);
+			return null;
+		} catch (e) {
+			frappe.log_error("Error formatting datetime: " + e.message + " | Input: " + datetime_str, "Second Flight Datetime Format Error");
+			return null;
+		}
+	}
+	
+	let dep_datetime = null;
+	let arr_datetime = null;
+	
+	// Format datetimes for Frappe
+	if (dep_scheduled && dep_scheduled.local) {
+		dep_datetime = format_datetime_for_frappe(dep_scheduled.local);
+	}
+	
+	if (arr_scheduled && arr_scheduled.local) {
+		arr_datetime = format_datetime_for_frappe(arr_scheduled.local);
+	}
+	
+	// Show loading message
+	frappe.show_alert(__("Creating/updating airline and airport records for second flight..."), 3);
+	
+	// Create/get airline and airports, then fill the fields
+	let promises = [];
+	
+	// Get or create departure airport
+	if (dep_airport_name) {
+		promises.push(
+			frappe.call({
+				method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+				args: {
+					airport_name: dep_airport_name,
+					airport_iata: dep_airport_iata,
+					airport_icao: dep_airport_icao,
+					airport_city: dep_airport_city,
+					airport_country: dep_airport_country,
+				},
+			})
+		);
+	} else {
+		promises.push(Promise.resolve({ message: null }));
+	}
+	
+	// Get or create arrival airport
+	if (arr_airport_name) {
+		promises.push(
+			frappe.call({
+				method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+				args: {
+					airport_name: arr_airport_name,
+					airport_iata: arr_airport_iata,
+					airport_icao: arr_airport_icao,
+					airport_city: arr_airport_city,
+					airport_country: arr_airport_country,
+				},
+			})
+		);
+	} else {
+		promises.push(Promise.resolve({ message: null }));
+	}
+	
+	// Wait for all API calls to complete
+	Promise.all(promises).then(function(results) {
+		let dep_airport_record = results[0].message || null;
+		let arr_airport_record = results[1].message || null;
+		
+		// Fill in the second flight details
+		if (dep_airport_record) {
+			frm.doc.custom_departure_airport_2 = dep_airport_record;
+			frm.set_value("custom_departure_airport_2", dep_airport_record);
+		}
+		
+		if (arr_airport_record) {
+			frm.doc.custom_arrival_airport_2 = arr_airport_record;
+			frm.set_value("custom_arrival_airport_2", arr_airport_record);
+		}
+		
+		if (dep_datetime) {
+			frm.doc.custom_date_of_travel_2 = dep_datetime;
+			frm.set_value("custom_date_of_travel_2", dep_datetime);
+		}
+		
+		if (arr_datetime) {
+			frm.doc.custom_date_of_arrival_2 = arr_datetime;
+			frm.set_value("custom_date_of_arrival_2", arr_datetime);
+		}
+		
+		// Also update locals to ensure data persistence
+		if (locals[frm.doctype] && locals[frm.doctype][frm.doc.name]) {
+			if (dep_airport_record) locals[frm.doctype][frm.doc.name].custom_departure_airport_2 = dep_airport_record;
+			if (arr_airport_record) locals[frm.doctype][frm.doc.name].custom_arrival_airport_2 = arr_airport_record;
+			if (dep_datetime) locals[frm.doctype][frm.doc.name].custom_date_of_travel_2 = dep_datetime;
+			if (arr_datetime) locals[frm.doctype][frm.doc.name].custom_date_of_arrival_2 = arr_datetime;
+		}
+		
+		frappe.show_alert(__("Second flight information filled successfully!"), 3, "green");
+		
+		// Refresh the form to show updated values
+		setTimeout(function() {
+			frm.refresh_field("custom_departure_airport_2");
+			frm.refresh_field("custom_arrival_airport_2");
+			frm.refresh_field("custom_date_of_travel_2");
+			frm.refresh_field("custom_date_of_arrival_2");
+		}, 200);
+	}).catch(function(error) {
+		frappe.show_alert(__("Error creating airport records for second flight. Please check manually."), 5, "red");
+		frappe.log_error(error, "Second Flight Fill Error");
 	});
 }
 
