@@ -127,8 +127,8 @@ def get_accounts_balance(company=None):
     if not result:
         total_balance = sum([get_balance_on(account=acc.name, company=company) for acc in bank_accounts])
         return [{
-            "Account Type": "Bank",
-            "Total Balance": flt(total_balance)
+            "Account": "Bank",
+            "Total": flt(total_balance)
         }]
 
     return result

@@ -92,6 +92,7 @@ def get_cash_balance(company=None):
     if not company:
         company = frappe.defaults.get_user_default("Company") or frappe.get_system_settings("default_company")
 
+    company_currency = frappe.db.get_value("Company", company, "default_currency") or "USD"
     # Get all Cash accounts for the company (non-group)
     cash_accounts = frappe.get_all(
         "Account",
@@ -124,7 +125,6 @@ def get_cash_balance(company=None):
         
         if account_balance != 0:
             # Get company currency as fallback
-            company_currency = frappe.db.get_value("Company", company, "default_currency") or "USD"
             result.append({
                 "Account": acc.account_name or acc.name,
                 "Account Name": acc.name,
@@ -135,8 +135,9 @@ def get_cash_balance(company=None):
     # If no accounts with balance, return total
     if not result:
         return [{
-            "Account Type": "Cash",
-            "Total Balance": total_balance
+            "Account": "Cash",
+            "Total": total_balance,
+            "Currency": company_currency
         }]
     
     return result
