@@ -726,6 +726,17 @@ def create_journal_entry_for_travel_expense(travel_expense):
 		else:
 			remark += " - Unpaid Expense"
 		
+		# Add descriptions from expense items on a new line
+		descriptions = []
+		if travel_expense.expenses:
+			for expense_row in travel_expense.expenses:
+				description = getattr(expense_row, 'description', None)
+				if description and description.strip():
+					descriptions.append(description.strip())
+		
+		if descriptions:
+			remark += "\n" + "\n".join(descriptions)
+		
 		je = frappe.get_doc({
 			"doctype": "Journal Entry",
 			"voucher_type": "Journal Entry",
@@ -1084,6 +1095,17 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			remark += " - Refund"
 		else:
 			remark += " - Paid Expense"
+		
+		# Add descriptions from expense items on a new line
+		descriptions = []
+		if travel_expense.expenses:
+			for expense_row in travel_expense.expenses:
+				description = getattr(expense_row, 'description', None)
+				if description and description.strip():
+					descriptions.append(description.strip())
+		
+		if descriptions:
+			remark += "\n" + "\n".join(descriptions)
 		
 		je = frappe.get_doc({
 			"doctype": "Journal Entry",
