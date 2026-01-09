@@ -2394,7 +2394,7 @@ function add_expense_row(dialog, temp_doc, container) {
 			}, 300);
 		}
 		
-		// Create Cash Account field (for refunds)
+		// Create Cash/Bank Account field (for refunds)
 		frappe.model.with_doctype("Account", function() {
 			try {
 				let cash_account_wrapper = $row.find('.cash-account-wrapper');
@@ -2403,11 +2403,11 @@ function add_expense_row(dialog, temp_doc, container) {
 						fieldtype: "Link",
 						fieldname: "cash_account",
 						options: "Account",
-						label: "Cash Account (for lost amount)",
+						label: "Account (for lost amount)",
 						get_query: function() {
 							return {
 								filters: {
-									account_type: "Cash",
+									account_type: ["in", ["Cash", "Bank"]],
 									is_group: 0,
 									company: dialog.original_frm ? dialog.original_frm.doc.company : null
 								}

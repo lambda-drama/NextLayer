@@ -68,7 +68,7 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 		traveler_name: Traveler Name (optional, will use from original if not provided)
 		transaction_currency: Transaction currency from modal (optional)
 		expense_category: Expense category - "Refund" or "Update" (optional)
-		cash_account: Cash account for lost amount in refunds (optional, will use company default if not provided)
+		cash_account: Cash/Bank account for lost amount in refunds (optional, will use company default if not provided)
 	
 	Returns:
 		dict: Success status and travel expense name
@@ -472,7 +472,10 @@ def create_journal_entry_for_travel_expense(travel_expense):
 				# Try to find any cash account
 				cash_in_hand_account = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0}, "name")
 			if not cash_in_hand_account:
-				frappe.throw(_("Please set Default Cash Account in Company settings for lost amount, or select a Cash Account in the refund modal"))
+				# Try to find any bank account
+				cash_in_hand_account = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
+			if not cash_in_hand_account:
+				frappe.throw(_("Please set Default Cash Account in Company settings for lost amount, or select a Cash/Bank Account in the refund modal"))
 			
 			# Get expense accounts from original expense (to credit the full original amount)
 			# We need to get the expense accounts from the original expense, not from the refund expense
@@ -879,7 +882,10 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				# Try to find any cash account
 				cash_in_hand_account = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0}, "name")
 			if not cash_in_hand_account:
-				frappe.throw(_("Please set Default Cash Account in Company settings for lost amount, or select a Cash Account in the refund modal"))
+				# Try to find any bank account
+				cash_in_hand_account = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
+			if not cash_in_hand_account:
+				frappe.throw(_("Please set Default Cash Account in Company settings for lost amount, or select a Cash/Bank Account in the refund modal"))
 			
 			# Get expense accounts from original expense (to credit the full original amount)
 			# We need to get the expense accounts from the original expense, not from the refund expense
