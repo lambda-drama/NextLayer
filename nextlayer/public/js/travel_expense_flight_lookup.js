@@ -1903,9 +1903,16 @@ function show_additional_expenses_modal(frm) {
 		setTimeout(function() {
 			if (d.fields_dict && d.fields_dict.expense_category) {
 				d.fields_dict.expense_category.$input.on('change', function() {
-					// When category changes, check if Update is selected and auto-fill existing rows
+					// When category changes, check if Update or Refund is selected and auto-fill existing rows
 					let expense_category = d.fields_dict.expense_category.get_value();
-					if (expense_category === "Update" && temp_doc.expenses && temp_doc.expenses.length > 0) {
+					
+					// Update all amount labels and cash account fields
+					d.$wrapper.find('.expense-row').each(function() {
+						update_amount_label($(this), expense_category);
+						update_cash_account_field($(this), expense_category);
+					});
+					
+					if ((expense_category === "Update" || expense_category === "Refund") && temp_doc.expenses && temp_doc.expenses.length > 0) {
 						temp_doc.expenses.forEach(function(row) {
 							let $row_element = d.$wrapper.find(`.expense-row[data-name="${row.name}"]`);
 							if ($row_element.length) {
@@ -2140,7 +2147,7 @@ function add_expense_row(dialog, temp_doc, container) {
 				</div>
 				<div class="col-md-4">
 					<div class="form-group">
-						<label>Amount</label>
+						<label class="amount-label">Amount</label>
 						<input type="number" class="form-control expense-amount" data-field="amount" placeholder="0.00" step="0.01">
 					</div>
 				</div>
@@ -2268,6 +2275,16 @@ function add_expense_row(dialog, temp_doc, container) {
 					</div>
 				</div>
 			</div>
+			<!-- Cash Account (for refunds only) -->
+			<div class="cash-account-field" style="display: none;">
+				<div class="row">
+					<div class="col-md-12">
+						<div class="form-group">
+							<div class="cash-account-wrapper" data-field="cash_account"></div>
+						</div>
+					</div>
+				</div>
+			</div>
 			<!-- Description (always visible, at the bottom) -->
 			<div class="row">
 				<div class="col-md-12">
@@ -2315,11 +2332,17 @@ function add_expense_row(dialog, temp_doc, container) {
 				// Use the selected value directly (it's the name of the Expense Claim Type)
 				toggle_conditional_fields($row, selected_type);
 				
-				// Auto-fill logic when Update is selected
+				// Auto-fill logic when Update or Refund is selected
 				let expense_category = dialog.fields_dict && dialog.fields_dict.expense_category ? 
 					dialog.fields_dict.expense_category.get_value() : "";
 				
-				if (expense_category === "Update") {
+				// Update amount label based on category
+				update_amount_label($row, expense_category);
+				
+				// Show/hide cash account field based on category
+				update_cash_account_field($row, expense_category);
+				
+				if (expense_category === "Update" || expense_category === "Refund") {
 					let selected_type_lower = (selected_type || "").toLowerCase();
 					
 					// Use setTimeout to ensure all fields are created before auto-filling
@@ -2337,6 +2360,7 @@ function add_expense_row(dialog, temp_doc, container) {
 			} else {
 				// Hide all conditional fields if no expense type selected
 				toggle_conditional_fields($row, "");
+				update_cash_account_field($row, "");
 			}
 		}
 		
@@ -2369,6 +2393,49 @@ function add_expense_row(dialog, temp_doc, container) {
 				update_conditional_fields();
 			}, 300);
 		}
+		
+		// Create Cash Account field (for refunds)
+		frappe.model.with_doctype("Account", function() {
+			try {
+				let cash_account_wrapper = $row.find('.cash-account-wrapper');
+				let cash_account_field = frappe.ui.form.make_control({
+					df: {
+						fieldtype: "Link",
+						fieldname: "cash_account",
+						options: "Account",
+						label: "Cash Account (for lost amount)",
+						get_query: function() {
+							return {
+								filters: {
+									account_type: "Cash",
+									is_group: 0,
+									company: dialog.original_frm ? dialog.original_frm.doc.company : null
+								}
+							};
+						}
+					},
+					parent: cash_account_wrapper,
+					render_input: true
+				});
+				cash_account_field.refresh();
+				
+				// Store field reference on row element
+				$row.data('cash_account_field', cash_account_field);
+				
+				cash_account_field.$input.on('change blur', function() {
+					let value = cash_account_field.get_value();
+					// Store in dialog level (shared for all rows in refund)
+					dialog.cash_account = value;
+				});
+				
+				// Update visibility based on category
+				let expense_category = dialog.fields_dict && dialog.fields_dict.expense_category ? 
+					dialog.fields_dict.expense_category.get_value() : "";
+				update_cash_account_field($row, expense_category);
+			} catch(e) {
+				console.warn("Could not create Cash Account field:", e);
+			}
+		});
 	});
 	
 	// Create Hotel Territory link field
@@ -3277,6 +3344,26 @@ function fill_travel_fields_for_modal_row(dialog, $row, row, flights, dep_airpor
 	});
 }
 
+function update_amount_label($row, expense_category) {
+	// Update the amount label based on expense category
+	let $label = $row.find('.amount-label');
+	if (expense_category === "Refund") {
+		$label.text("Refund Amount");
+	} else {
+		$label.text("Amount");
+	}
+}
+
+function update_cash_account_field($row, expense_category) {
+	// Show/hide cash account field based on expense category
+	let $cash_account_field = $row.find('.cash-account-field');
+	if (expense_category === "Refund") {
+		$cash_account_field.show();
+	} else {
+		$cash_account_field.hide();
+	}
+}
+
 function toggle_conditional_fields($row, expense_type) {
 	// Hide all conditional fields first
 	$row.find('.hotel-fields').hide();
@@ -3515,10 +3602,26 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc) {
 	// Show loading
 	frappe.show_alert(__("Creating additional travel expense..."), 3);
 	
-	// Get transaction currency from dialog
+	// Get transaction currency, expense category, and cash account from dialog
 	let transaction_currency = dialog.fields_dict && dialog.fields_dict.transaction_currency ? 
 		dialog.fields_dict.transaction_currency.get_value() : 
 		(original_frm.doc.currency || dialog.company_currency);
+	
+	let expense_category = dialog.fields_dict && dialog.fields_dict.expense_category ? 
+		dialog.fields_dict.expense_category.get_value() : "";
+	
+	// Get cash account from dialog (stored when user selects in any row) or from first row's field
+	let cash_account = dialog.cash_account || null;
+	if (!cash_account) {
+		// Try to get from first expense row's cash account field
+		let first_row = dialog.$wrapper.find('.expense-row').first();
+		if (first_row.length) {
+			let cash_account_field = first_row.data('cash_account_field');
+			if (cash_account_field && typeof cash_account_field.get_value === 'function') {
+				cash_account = cash_account_field.get_value();
+			}
+		}
+	}
 	
 	// Create new travel expense
 	frappe.call({
@@ -3529,6 +3632,8 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc) {
 			company: original_frm.doc.company,
 			traveler_name: original_frm.doc.traveler_name,
 			transaction_currency: transaction_currency,
+			expense_category: expense_category,
+			cash_account: cash_account,
 		},
 		callback: function(r) {
 			if (r.message) {

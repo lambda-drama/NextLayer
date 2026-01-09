@@ -13,6 +13,7 @@
   "travel_group",
   "currency",
   "is_addition",
+  "refund",
   "original_expense",
   "column_break_1",
   "posting_date",
@@ -33,7 +34,6 @@
   "custom_booked_by",
   "custom_travel_type",
   "custom_pnr_number_",
-  "column_break_travel3",
   "section_break_second_flight",
   "custom_departure_airport_2",
   "custom_arrival_airport_2",
@@ -68,6 +68,7 @@
   "is_paid",
   "direct_payment_account",
   "payable_account",
+  "cash_account",
   "section_break_expenses",
   "expenses",
   "section_break_taxes",
@@ -217,10 +218,6 @@
    "fieldname": "custom_pnr_number_",
    "fieldtype": "Data",
    "label": "PNR Number"
-  },
-  {
-   "fieldname": "column_break_travel3",
-   "fieldtype": "Column Break"
   },
   {
    "collapsible": 1,
@@ -391,7 +388,7 @@
    "label": "Payments"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "is_paid",
    "fieldtype": "Check",
    "label": "Is Paid"
@@ -540,6 +537,22 @@
    "fieldname": "is_cancelled",
    "fieldtype": "Check",
    "label": "Is Cancelled",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "refund",
+   "fieldtype": "Check",
+   "label": "Refund"
+  },
+  {
+   "fieldname": "cash_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cash Account",
+   "options": "Account",
    "read_only": 1
   }
  ],
@@ -551,7 +564,7 @@
    "link_fieldname": "custom_travel_expense_ref"
   }
  ],
- "modified": "2026-01-07 01:49:03.916568",
+ "modified": "2026-01-09 18:12:34.067603",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
