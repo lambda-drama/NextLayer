@@ -16,8 +16,11 @@ def get_general_ledger_data(filters):
 
 		filters = _dict(filters)
 
-		# Create cache key for opening entries
-		cache_key = f"gl_data_{filters.get('company')}_{filters.get('from_date')}_{filters.get('to_date')}_{filters.get('party')}_{filters.get('show_opening_entries', 0)}"
+		# Create cache key for opening entries - include all relevant filter parameters
+		party_filter = filters.get('party')
+		if isinstance(party_filter, list):
+			party_filter = '_'.join(sorted(party_filter)) if party_filter else ''
+		cache_key = f"gl_data_{filters.get('company')}_{filters.get('from_date')}_{filters.get('to_date')}_{party_filter}_{filters.get('show_opening_entries', 0)}_{filters.get('currency', '')}_{filters.get('ignore_err', 0)}_{filters.get('ignore_cr_dr_notes', 0)}"
 
 		# Try to get from cache first
 		cached_data = frappe.cache().get_value(cache_key)
@@ -30,6 +33,10 @@ def get_general_ledger_data(filters):
 
 		if not filters.get("from_date") or not filters.get("to_date"):
 			frappe.throw(_("From Date and To Date are required"))
+
+		# Convert party string to array format expected by execute function (consistent with get_permission_aware_gl_data)
+		if filters.get("party") and isinstance(filters.get("party"), str):
+			filters["party"] = [filters.get("party")]
 
 		# Skip company permission check - allow access to all companies for reconciliation
 		filters.setdefault("show_remarks", 1)
@@ -129,7 +136,6 @@ def get_permission_aware_gl_data(filters):
 			columns, all_data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
-		frappe.set_user(original_user)
 		
 		# Filter based on document sharing permissions for display
 		# Run permission checks as the original user to respect sharing permissions
@@ -608,6 +614,79 @@ def get_match_status(voucher_type, voucher_no, company):
 			"success": False,
 			"error": str(e),
 			"message": "Failed to get match status"
+		}
+
+
+@frappe.whitelist()
+def get_voucher_amount(voucher_type, voucher_no):
+	"""Get the amount from a voucher document for intercompany reconciliation"""
+	try:
+		if not frappe.db.exists(voucher_type, voucher_no):
+			return {
+				"success": False,
+				"error": f"Document {voucher_type} {voucher_no} not found"
+			}
+
+		doc = frappe.get_doc(voucher_type, voucher_no)
+		
+		# Get amount based on doctype
+		amount = None
+		debit = 0
+		credit = 0
+		
+		if voucher_type == "Journal Entry":
+			# For Journal Entry, sum up debit and credit from accounts
+			total_debit = sum(entry.debit for entry in doc.accounts if entry.debit)
+			total_credit = sum(entry.credit for entry in doc.accounts if entry.credit)
+			debit = total_debit
+			credit = total_credit
+			# For intercompany, we typically use the larger of the two
+			amount = max(total_debit, total_credit)
+			
+		elif voucher_type in ["Sales Invoice", "Purchase Invoice"]:
+			# For invoices, use grand_total
+			amount = doc.get("grand_total") or doc.get("total") or 0
+			# Determine debit/credit based on invoice type
+			if voucher_type == "Sales Invoice":
+				credit = amount  # Sales Invoice creates credit entry
+			else:
+				debit = amount  # Purchase Invoice creates debit entry
+				
+		elif voucher_type in ["Payment Entry", "Bank Entry"]:
+			# For Payment Entry, use paid_amount or total_allocated_amount
+			amount = doc.get("paid_amount") or doc.get("total_allocated_amount") or doc.get("total_amount") or 0
+			# Payment Entry can be either debit or credit depending on payment type
+			if doc.get("payment_type") == "Pay":
+				debit = amount
+			else:
+				credit = amount
+				
+		elif voucher_type == "Sales Order":
+			amount = doc.get("grand_total") or doc.get("total") or 0
+			credit = amount
+			
+		elif voucher_type == "Purchase Order":
+			amount = doc.get("grand_total") or doc.get("total") or 0
+			debit = amount
+			
+		else:
+			# For other doctypes, try common amount fields
+			amount = doc.get("grand_total") or doc.get("total") or doc.get("amount") or doc.get("total_amount") or 0
+		
+		return {
+			"success": True,
+			"amount": amount or 0,
+			"debit": debit,
+			"credit": credit,
+			"currency": doc.get("currency") or doc.get("company_currency")
+		}
+		
+	except Exception as e:
+		frappe.log_error(f"Get Voucher Amount Error: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"message": f"Failed to get amount for {voucher_type} {voucher_no}"
 		}
 
 
