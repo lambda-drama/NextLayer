@@ -171,9 +171,44 @@ export const useMatchStatus = () => {
     return statusMap
   }, [getMatchStatus])
 
+  const getVoucherAmount = useCallback(async (voucherType: string, voucherNo: string): Promise<{ success: boolean; amount?: number; debit?: number; credit?: number; currency?: string; error?: string }> => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/method/nextlayer.next_layer.api.general_ledger.get_voucher_amount?voucher_type=${encodeURIComponent(voucherType)}&voucher_no=${encodeURIComponent(voucherNo)}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'X-Frappe-CSRF-Token': window.csrf_token || ''
+        },
+        credentials: 'include'
+      })
+      const result = await response.json()
+
+      // Handle Frappe API response structure (wrapped in message object)
+      const responseData = result.message || result
+
+      if (responseData.success) {
+        return responseData
+      } else {
+        const errorMessage = responseData.error || responseData.message || 'Failed to get voucher amount'
+        setError(errorMessage)
+        return { success: false, error: errorMessage }
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+      setError(errorMessage)
+      return { success: false, error: errorMessage }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   return {
     updateMatchStatus,
     getMatchStatus,
+    getVoucherAmount,
     bulkUpdateMatchStatus,
     refreshMatchStatuses,
     loading,
