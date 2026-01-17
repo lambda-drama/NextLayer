@@ -137,13 +137,18 @@ export function useGeneralLedgerData({
       )
 
       const result: APIResponse = await response.json()
-      // console.log("API Response:", result)
+      console.log("[useGeneralLedgerData] API Response received:", {
+        success: result.message?.success,
+        entriesCount: result.message?.data?.entries?.length || 0,
+        filters: filters
+      })
 
       if (!result.message?.success) {
   throw new Error(result.message?.error || result.error || "Failed to fetch data")
 }
 
 const rawEntries = result.message?.data?.entries || []
+      console.log("[useGeneralLedgerData] Raw entries from API:", rawEntries.length, "entries")
 
       // Find the final overall Closing entry (should be the last one in the data)
       const closingEntries = rawEntries.filter((entry: any) =>
@@ -175,12 +180,26 @@ const rawEntries = result.message?.data?.entries || []
       const filteredEntries = rawEntries
         .filter((entry: any) => {
           if (!entry.posting_date || typeof entry.account !== "string") {
+            console.log("[useGeneralLedgerData] Filtered out entry (no posting_date or invalid account):", {
+              voucher: entry.voucher_type && entry.voucher_no ? `${entry.voucher_type}-${entry.voucher_no}` : "N/A",
+              posting_date: entry.posting_date,
+              account: entry.account,
+              accountType: typeof entry.account
+            })
             return false
           }
           // Exclude special summary rows
-          return !entry.account.includes("'Opening'") &&
-                 !entry.account.includes("'Total'") &&
-                 !entry.account.includes("'Closing (Opening + Total)'")
+          const isSpecialRow = entry.account.includes("'Opening'") ||
+                               entry.account.includes("'Total'") ||
+                               entry.account.includes("'Closing (Opening + Total)'")
+          if (isSpecialRow) {
+            console.log("[useGeneralLedgerData] Filtered out special row:", {
+              account: entry.account,
+              voucher: entry.voucher_type && entry.voucher_no ? `${entry.voucher_type}-${entry.voucher_no}` : "N/A"
+            })
+            return false
+          }
+          return true
         })
         .map((entry: any) => ({
           gl_entry: entry.gl_entry,
@@ -197,10 +216,35 @@ const rawEntries = result.message?.data?.entries || []
           cost_center: entry.cost_center,
           project: entry.project,
         }))
+      
+      console.log("[useGeneralLedgerData] After filtering special rows:", filteredEntries.length, "entries")
+      
+      // Debug: Log entries with specific voucher or date
+      if (Array.isArray(filteredEntries)) {
+        filteredEntries.forEach((entry: any) => {
+          if (entry && entry.voucher_no && (entry.voucher_no.includes("002") || entry.posting_date === "2024-02-07" || entry.posting_date === "2024-07-02")) {
+            console.log("[useGeneralLedgerData] Found entry matching search criteria:", {
+              voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+              posting_date: entry.posting_date,
+              account: entry.account,
+              debit: entry.debit,
+              credit: entry.credit,
+              party: entry.party
+            })
+          }
+        })
+      }
 
       // Consolidate entries by voucher (group by voucher_type + voucher_no)
       // This prevents journal entries with multiple GL entries from appearing multiple times
       const consolidatedMap = new Map<string, GLEntry>()
+      
+      if (!Array.isArray(filteredEntries)) {
+        console.error("[useGeneralLedgerData] filteredEntries is not an array:", filteredEntries)
+        setData([])
+        setLoading(false)
+        return
+      }
       
       filteredEntries.forEach((entry: any) => {
         const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
@@ -248,9 +292,29 @@ const rawEntries = result.message?.data?.entries || []
           if (dateCompare !== 0) return dateCompare
           return `${a.voucher_type}-${a.voucher_no}`.localeCompare(`${b.voucher_type}-${b.voucher_no}`)
         })
+      
+      console.log("[useGeneralLedgerData] After consolidation and sorting:", sortedEntries.length, "entries")
+      
+      // Debug: Log consolidated entries with specific voucher or date
+      if (Array.isArray(sortedEntries)) {
+        sortedEntries.forEach((entry) => {
+          if (entry && entry.voucher_no && (entry.voucher_no.includes("002") || entry.posting_date === "2024-02-07" || entry.posting_date === "2024-07-02")) {
+            console.log("[useGeneralLedgerData] Consolidated entry matching search criteria:", {
+              voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+              posting_date: entry.posting_date,
+              account: entry.account,
+              debit: entry.debit,
+              credit: entry.credit,
+              party: entry.party,
+              against: entry.against
+            })
+          }
+        })
+      }
 
       // Calculate running balance
-      const entries: GLEntry[] = sortedEntries.map((entry, index) => {
+      const entries: GLEntry[] = Array.isArray(sortedEntries) ? sortedEntries.map((entry, index) => {
+        if (!entry) return null as any
         let balance = 0
         for (let i = 0; i <= index; i++) {
           const prevEntry = sortedEntries[i]
@@ -262,11 +326,21 @@ const rawEntries = result.message?.data?.entries || []
           ...entry,
           balance
         }
-      })
+      }).filter(entry => entry !== null) : []
 
+      console.log("[useGeneralLedgerData] Final entries set to state:", entries.length, "entries")
+      console.log("[useGeneralLedgerData] Final entries summary:", {
+        totalEntries: entries.length,
+        dateRange: entries.length > 0 ? {
+          earliest: entries[0]?.posting_date,
+          latest: entries[entries.length - 1]?.posting_date
+        } : null,
+        vouchers: entries.slice(0, 10).map(e => `${e.voucher_type}-${e.voucher_no}`)
+      })
+      
       setData(entries)
     } catch (err: any) {
-      console.error("API Error:", err)
+      console.error("[useGeneralLedgerData] API Error:", err)
       setError(err.message || "An error occurred")
     } finally {
       setLoading(false)

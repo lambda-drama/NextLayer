@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Badge } from "./ui/badge"
@@ -9,7 +9,7 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser } from "lucide-react"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -84,11 +84,17 @@ export default function IntercompanyReconciliation() {
   const [manualMatchMode, setManualMatchMode] = useState(false)
   const [selectedForManualMatch, setSelectedForManualMatch] = useState<GLEntry | null>(null)
 
+  // Show matched amount column state
+  const [showMatchedAmountColumn, setShowMatchedAmountColumn] = useState(false)
+  
+  // Cache for fetched voucher amounts (key: "voucher_type-voucher_no")
+  const [voucherAmountCache, setVoucherAmountCache] = useState<Map<string, { amount: number; debit: number; credit: number }>>(new Map())
+
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
   const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
-  const { updateMatchStatus, getMatchStatus, bulkUpdateMatchStatus, refreshMatchStatuses, error: matchError, clearError } = useMatchStatus()
+  const { updateMatchStatus, getMatchStatus, getVoucherAmount, bulkUpdateMatchStatus, refreshMatchStatuses, error: matchError, clearError } = useMatchStatus()
   const { isSystemManagerOrAdmin } = useUserRoles()
 
   const { parties: partiesA, isLoading: partiesALoading, error: partiesAError } = usePermissionAwareParties("Customer")
@@ -893,6 +899,28 @@ export default function IntercompanyReconciliation() {
       return visibleKeysB.has(key)
     })
 
+    console.log("[findMatchingEntries] After permission filtering:", {
+      glDataAWithStatusCount: filteredGlDataAWithStatus.length,
+      glDataBWithStatusCount: filteredGlDataBWithStatus.length
+    })
+    
+    // Debug: Log entries with specific voucher or date in final results
+    if (Array.isArray(filteredGlDataAWithStatus)) {
+      filteredGlDataAWithStatus.forEach(entry => {
+        if (entry && entry.voucher_no && (entry.voucher_no.includes("002") || entry.posting_date === "2024-02-07" || entry.posting_date === "2024-07-02")) {
+          console.log("[findMatchingEntries] Entry in final glDataAWithStatus matching search criteria:", {
+            voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+            posting_date: entry.posting_date,
+            status: entry.status,
+            debit: entry.debit,
+            credit: entry.credit,
+            hasMatchedEntry: !!entry.matchedEntry,
+            hasBackendMatchData: !!entry.backendMatchData
+          })
+        }
+      })
+    }
+    
     return { glDataAWithStatus: filteredGlDataAWithStatus, glDataBWithStatus: filteredGlDataBWithStatus }
   }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled, bypassTotalCalculation])
 
@@ -1424,7 +1452,9 @@ export default function IntercompanyReconciliation() {
       const createMatchedWithObject = (entry: GLEntry) => {
         return {
           voucher_type: entry.voucher_type,
-          voucher_no: entry.voucher_no
+          voucher_no: entry.voucher_no,
+          debit: entry.debit || 0,
+          credit: entry.credit || 0
         }
       }
 
@@ -1675,13 +1705,28 @@ export default function IntercompanyReconciliation() {
       const entryA = selectedEntryForAction
       const entryB = selectedEntryForAction.matchedEntry
 
+      // Create clean matched_with objects with only essential fields including amounts
+      const matchedWithB = {
+        voucher_type: entryB.voucher_type,
+        voucher_no: entryB.voucher_no,
+        debit: entryB.debit || 0,
+        credit: entryB.credit || 0
+      }
+
+      const matchedWithA = {
+        voucher_type: entryA.voucher_type,
+        voucher_no: entryA.voucher_no,
+        debit: entryA.debit || 0,
+        credit: entryA.credit || 0
+      }
+
       // Update both entries to Match status using the hook
       await updateMatchStatus({
         voucher_type: entryA.voucher_type,
         voucher_no: entryA.voucher_no,
         company: companyA,
         status: 'Match',
-        matched_with: entryB
+        matched_with: matchedWithB
       })
 
       await updateMatchStatus({
@@ -1689,7 +1734,7 @@ export default function IntercompanyReconciliation() {
         voucher_no: entryB.voucher_no,
         company: companyB,
         status: 'Match',
-        matched_with: entryA
+        matched_with: matchedWithA
       })
 
       // OPTIMISTIC UPDATE: Update backend match status immediately
@@ -1702,8 +1747,8 @@ export default function IntercompanyReconciliation() {
       statusMap[keyA] = {
         success: true,
         status: 'Match',
-        matched_with: JSON.stringify(entryB),
-        matched_with_parsed: entryB, // This is what the UI uses to display matches
+        matched_with: JSON.stringify(matchedWithB),
+        matched_with_parsed: matchedWithB, // This is what the UI uses to display matches
         matched_by: 'current_user', // This will be set by backend
         matched_on: new Date().toISOString()
       }
@@ -1711,8 +1756,8 @@ export default function IntercompanyReconciliation() {
       statusMap[keyB] = {
         success: true,
         status: 'Match',
-        matched_with: JSON.stringify(entryA),
-        matched_with_parsed: entryA, // This is what the UI uses to display matches
+        matched_with: JSON.stringify(matchedWithA),
+        matched_with_parsed: matchedWithA, // This is what the UI uses to display matches
         matched_by: 'current_user', // This will be set by backend
         matched_on: new Date().toISOString()
       }
@@ -1820,15 +1865,41 @@ export default function IntercompanyReconciliation() {
 
   // Filter entries by status
   const filterEntriesByStatus = (entries: GLEntry[], isSideA: boolean = true) => {
+    console.log(`[filterEntriesByStatus] Starting filter for ${isSideA ? 'Company A' : 'Company B'}:`, {
+      inputEntriesCount: entries.length,
+      statusFilter,
+      debitCreditFilter
+    })
+    
     let filtered = entries
 
     // Apply status filter
     if (statusFilter !== 'All') {
+      const beforeStatusFilter = filtered.length
       filtered = filtered.filter(entry => entry.status === statusFilter)
+      const afterStatusFilter = filtered.length
+      console.log(`[filterEntriesByStatus] After status filter (${statusFilter}):`, {
+        before: beforeStatusFilter,
+        after: afterStatusFilter,
+        removed: beforeStatusFilter - afterStatusFilter
+      })
+      
+      // Debug: Log entries that were filtered out by status
+      entries.forEach(entry => {
+        if (entry.status !== statusFilter && (entry.voucher_no?.includes("002") || entry.posting_date === "2024-02-07" || entry.posting_date === "2024-07-02")) {
+          console.log(`[filterEntriesByStatus] Entry filtered out by status filter:`, {
+            voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+            posting_date: entry.posting_date,
+            status: entry.status,
+            requiredStatus: statusFilter
+          })
+        }
+      })
     }
 
     // Apply debit/credit filter
     if (debitCreditFilter === 'Debit => Credit') {
+      const beforeDebitCreditFilter = filtered.length
       if (isSideA) {
         // Left side (Company A): show only entries with debit != 0
         filtered = filtered.filter(entry => entry.debit !== 0)
@@ -1836,7 +1907,14 @@ export default function IntercompanyReconciliation() {
         // Right side (Company B): show only entries with credit != 0
         filtered = filtered.filter(entry => entry.credit !== 0)
       }
+      const afterDebitCreditFilter = filtered.length
+      console.log(`[filterEntriesByStatus] After debit/credit filter (Debit => Credit):`, {
+        before: beforeDebitCreditFilter,
+        after: afterDebitCreditFilter,
+        removed: beforeDebitCreditFilter - afterDebitCreditFilter
+      })
     } else if (debitCreditFilter === 'Credit => Debit') {
+      const beforeDebitCreditFilter = filtered.length
       if (isSideA) {
         // Left side (Company A): show only entries with credit != 0
         filtered = filtered.filter(entry => entry.credit !== 0)
@@ -1844,7 +1922,32 @@ export default function IntercompanyReconciliation() {
         // Right side (Company B): show only entries with debit != 0
         filtered = filtered.filter(entry => entry.debit !== 0)
       }
+      const afterDebitCreditFilter = filtered.length
+      console.log(`[filterEntriesByStatus] After debit/credit filter (Credit => Debit):`, {
+        before: beforeDebitCreditFilter,
+        after: afterDebitCreditFilter,
+        removed: beforeDebitCreditFilter - afterDebitCreditFilter
+      })
     }
+    
+    console.log(`[filterEntriesByStatus] Final filtered entries:`, filtered.length)
+    
+    // Debug: Log if specific entry is in filtered results
+    if (Array.isArray(filtered)) {
+      filtered.forEach(entry => {
+        if (entry && entry.voucher_no && (entry.voucher_no.includes("002") || entry.posting_date === "2024-02-07" || entry.posting_date === "2024-07-02")) {
+          console.log(`[filterEntriesByStatus] Entry in filtered results:`, {
+            voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+            posting_date: entry.posting_date,
+            status: entry.status,
+            debit: entry.debit,
+            credit: entry.credit
+          })
+        }
+      })
+    }
+    
+    return filtered
     // If debitCreditFilter is 'All', no additional filtering needed
 
     return filtered
@@ -1868,6 +1971,321 @@ export default function IntercompanyReconciliation() {
       default:
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">? Pending</Badge>
     }
+  }
+
+  // Helper function to get matched entry from entry
+  // isSideA: true for Company A (Customer), false for Company B (Supplier)
+  const getMatchedEntry = (entry: any, isSideA: boolean = true): GLEntry | null => {
+    console.log('[getMatchedEntry] Called for entry:', {
+      voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+      isSideA,
+      hasMatchedEntry: !!entry.matchedEntry,
+      hasBackendMatchData: !!entry.backendMatchData?.matched_with_parsed,
+      entryDebit: entry.debit,
+      entryCredit: entry.credit,
+      entryStatus: entry.status
+    })
+
+    // First, use the matchedEntry if it exists (set by findMatchingEntries)
+    // This is the most reliable source since it was found during the matching process
+    if (entry.matchedEntry) {
+      console.log('[getMatchedEntry] Returning entry.matchedEntry:', {
+        voucher: `${entry.matchedEntry.voucher_type}-${entry.matchedEntry.voucher_no}`,
+        debit: entry.matchedEntry.debit,
+        credit: entry.matchedEntry.credit
+      })
+      return entry.matchedEntry
+    }
+    
+    // If no matchedEntry, try to find from backend match data
+    if (entry.backendMatchData?.matched_with_parsed) {
+      const matchedData = entry.backendMatchData.matched_with_parsed
+      const matchesToCheck = Array.isArray(matchedData) ? matchedData : [matchedData]
+      
+      console.log('[getMatchedEntry] Checking backendMatchData.matched_with_parsed:', {
+        isArray: Array.isArray(matchedData),
+        matchesCount: matchesToCheck.length,
+        firstMatch: matchesToCheck[0] ? {
+          voucher: `${matchesToCheck[0].voucher_type}-${matchesToCheck[0].voucher_no}`,
+          debit: matchesToCheck[0].debit,
+          credit: matchesToCheck[0].credit,
+          hasDebit: matchesToCheck[0].debit !== undefined,
+          hasCredit: matchesToCheck[0].credit !== undefined
+        } : null
+      })
+      
+      for (const match of matchesToCheck) {
+        if (match && match.voucher_type && match.voucher_no) {
+          // First try to find the actual entry from glDataB (for Company A) or glDataA (for Company B)
+          const searchIn = isSideA ? glDataB : glDataA
+          const found = searchIn.find(
+            e => e.voucher_type === match.voucher_type && e.voucher_no === match.voucher_no
+          )
+          if (found) {
+            console.log('[getMatchedEntry] Found in GL data:', {
+              voucher: `${found.voucher_type}-${found.voucher_no}`,
+              debit: found.debit,
+              credit: found.credit
+            })
+            return found
+          }
+          
+          // If not found in GL data, but match has debit/credit (full GL entry object), use it directly
+          // This handles cases where the matched entry is not in the current filtered GL data
+          if (match.debit !== undefined || match.credit !== undefined) {
+            console.log('[getMatchedEntry] Using match object directly (not in GL data):', {
+              voucher: `${match.voucher_type}-${match.voucher_no}`,
+              debit: match.debit,
+              credit: match.credit
+            })
+            // Return the match object as a GLEntry (it already has all the GL entry fields)
+            return match as GLEntry
+          }
+        }
+      }
+    }
+    
+    console.log('[getMatchedEntry] Returning null - no match found')
+    return null
+  }
+
+  // Helper function to check if amounts match between entry and matched entry
+  const doAmountsMatch = (entry: any, matchedEntry: GLEntry | null): boolean => {
+    if (!matchedEntry) return false
+    
+    const tolerance = 0.01
+    
+    // For Company A (Customer): debit should match credit, credit should match debit
+    // For Company B (Supplier): debit should match credit, credit should match debit
+    const debitCreditMatch = Math.abs(entry.debit - matchedEntry.credit) < tolerance
+    const creditDebitMatch = Math.abs(entry.credit - matchedEntry.debit) < tolerance
+    
+    return debitCreditMatch || creditDebitMatch
+  }
+
+  // Helper function to get matched amount synchronously (from GL data)
+  const getMatchedAmountSync = (entry: any, matchedEntry: GLEntry | null): number | null => {
+    console.log('[getMatchedAmountSync] Called:', {
+      entryVoucher: `${entry.voucher_type}-${entry.voucher_no}`,
+      entryDebit: entry.debit,
+      entryCredit: entry.credit,
+      hasMatchedEntry: !!matchedEntry,
+      matchedEntryVoucher: matchedEntry ? `${matchedEntry.voucher_type}-${matchedEntry.voucher_no}` : null,
+      matchedEntryDebit: matchedEntry?.debit,
+      matchedEntryCredit: matchedEntry?.credit
+    })
+
+    // If we have a matched entry, get the amount from it
+    if (matchedEntry) {
+      // Show whichever amount exists in the matched entry (debit or credit)
+      // This shows the actual amount from the matched transaction regardless of matching logic
+      const amount = matchedEntry.debit > 0 ? matchedEntry.debit : (matchedEntry.credit > 0 ? matchedEntry.credit : 0)
+      console.log('[getMatchedAmountSync] Returning amount from matched entry (debit or credit, whichever exists):', amount, {
+        matchedDebit: matchedEntry.debit,
+        matchedCredit: matchedEntry.credit,
+        entryDebit: entry.debit,
+        entryCredit: entry.credit
+      })
+      return amount
+      
+      // If entry has no debit or credit, try to get from matched entry
+      if (matchedEntry.debit > 0) {
+        console.log('[getMatchedAmountSync] Entry has no debit/credit, returning matchedEntry.debit:', matchedEntry.debit)
+        return matchedEntry.debit
+      }
+      if (matchedEntry.credit > 0) {
+        console.log('[getMatchedAmountSync] Entry has no debit/credit, returning matchedEntry.credit:', matchedEntry.credit)
+        return matchedEntry.credit
+      }
+      
+      console.log('[getMatchedAmountSync] Returning 0 - matchedEntry has no debit or credit')
+      return 0
+    }
+    
+    // If no matched entry found but we have entry.matchedEntry (shouldn't happen after fix above, but just in case)
+    if (entry.matchedEntry) {
+      console.log('[getMatchedAmountSync] Using entry.matchedEntry as fallback:', {
+        voucher: `${entry.matchedEntry.voucher_type}-${entry.matchedEntry.voucher_no}`,
+        debit: entry.matchedEntry.debit,
+        credit: entry.matchedEntry.credit
+      })
+      if (entry.debit > 0) {
+        const amount = entry.matchedEntry.credit || 0
+        console.log('[getMatchedAmountSync] Fallback: Entry has debit, returning entry.matchedEntry.credit:', amount)
+        return amount
+      }
+      if (entry.credit > 0) {
+        const amount = entry.matchedEntry.debit || 0
+        console.log('[getMatchedAmountSync] Fallback: Entry has credit, returning entry.matchedEntry.debit:', amount)
+        return amount
+      }
+      const amount = entry.matchedEntry.debit || entry.matchedEntry.credit || 0
+      console.log('[getMatchedAmountSync] Fallback: Returning:', amount)
+      return amount
+    }
+    
+    console.log('[getMatchedAmountSync] Returning null - no matched entry found')
+    return null
+  }
+
+  // Component to display matched amount with async fetching
+  const MatchedAmountCell = ({ entry, matchedEntry, currency, party, partyType }: { entry: any; matchedEntry: GLEntry | null; currency: string; party: string; partyType: string }) => {
+    const [amount, setAmount] = useState<number | null>(null)
+    const [isLoading, setIsLoading] = useState(false)
+
+    useEffect(() => {
+      console.log('[MatchedAmountCell] useEffect triggered for entry:', {
+        voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+        entryDebit: entry.debit,
+        entryCredit: entry.credit,
+        entryStatus: entry.status,
+        hasMatchedEntry: !!matchedEntry,
+        hasBackendMatchData: !!entry.backendMatchData?.matched_with_parsed,
+        backendMatchData: entry.backendMatchData
+      })
+
+      // First try synchronous lookup
+      const syncAmount = getMatchedAmountSync(entry, matchedEntry)
+      console.log('[MatchedAmountCell] syncAmount result:', syncAmount)
+      if (syncAmount !== null) {
+        console.log('[MatchedAmountCell] Setting amount from sync lookup:', syncAmount)
+        setAmount(syncAmount)
+        return
+      }
+
+      // If no sync amount, check backend match data (regardless of status, as UI might show Match even if backend shows Mismatch)
+      if (entry.backendMatchData?.matched_with_parsed) {
+        const matchedData = entry.backendMatchData.matched_with_parsed
+        const matchesToCheck = Array.isArray(matchedData) ? matchedData : [matchedData]
+        
+        console.log('[MatchedAmountCell] Checking backendMatchData.matched_with_parsed:', {
+          isArray: Array.isArray(matchedData),
+          matchesCount: matchesToCheck.length,
+          firstMatch: matchesToCheck[0] ? {
+            voucher: `${matchesToCheck[0].voucher_type}-${matchesToCheck[0].voucher_no}`,
+            debit: matchesToCheck[0].debit,
+            credit: matchesToCheck[0].credit,
+            debitType: typeof matchesToCheck[0].debit,
+            creditType: typeof matchesToCheck[0].credit,
+            hasDebit: matchesToCheck[0].debit !== undefined,
+            hasCredit: matchesToCheck[0].credit !== undefined,
+            fullMatch: matchesToCheck[0]
+          } : null
+        })
+        
+        for (const match of matchesToCheck) {
+          if (match && match.voucher_type && match.voucher_no) {
+            // First check if matched_with_parsed already has debit/credit amounts
+            // This works for both new matches (simple object) and old matches (full GL entry object)
+            const hasDebit = match.debit !== undefined
+            const hasCredit = match.credit !== undefined
+            console.log('[MatchedAmountCell] Checking match:', {
+              voucher: `${match.voucher_type}-${match.voucher_no}`,
+              matchDebit: match.debit,
+              matchCredit: match.credit,
+              hasDebit,
+              hasCredit,
+              entryDebit: entry.debit,
+              entryCredit: entry.credit
+            })
+
+            if (hasDebit || hasCredit) {
+              // Show whichever amount exists in the matched entry (debit or credit)
+              // This shows the actual amount from the matched transaction regardless of matching logic
+              const calculatedAmount = match.debit > 0 ? match.debit : (match.credit > 0 ? match.credit : 0)
+              console.log('[MatchedAmountCell] Setting amount from matched_with_parsed (debit or credit, whichever exists):', calculatedAmount, {
+                matchDebit: match.debit,
+                matchCredit: match.credit,
+                entryDebit: entry.debit,
+                entryCredit: entry.credit
+              })
+              setAmount(calculatedAmount)
+              return
+            }
+
+            const cacheKey = `${match.voucher_type}-${match.voucher_no}`
+            
+            console.log('[MatchedAmountCell] Match does not have debit/credit, checking cache:', cacheKey)
+            
+            // Check cache first
+            if (voucherAmountCache.has(cacheKey)) {
+              const cached = voucherAmountCache.get(cacheKey)!
+              console.log('[MatchedAmountCell] Found in cache:', cached)
+              let cachedAmount = 0
+              if (entry.debit > 0) {
+                cachedAmount = cached.credit || cached.amount || 0
+                console.log('[MatchedAmountCell] Using cached credit:', cachedAmount)
+              } else if (entry.credit > 0) {
+                cachedAmount = cached.debit || cached.amount || 0
+                console.log('[MatchedAmountCell] Using cached debit:', cachedAmount)
+              } else {
+                cachedAmount = cached.amount || cached.debit || cached.credit || 0
+                console.log('[MatchedAmountCell] Using cached amount:', cachedAmount)
+              }
+              setAmount(cachedAmount)
+              return
+            }
+            
+            // Fetch from API
+            console.log('[MatchedAmountCell] Not in cache, fetching from API for:', cacheKey)
+            setIsLoading(true)
+            getVoucherAmount(match.voucher_type, match.voucher_no)
+              .then(result => {
+                console.log('[MatchedAmountCell] API result:', result)
+                if (result.success && result.amount !== undefined) {
+                  // Cache the result
+                  setVoucherAmountCache(prev => {
+                    const newMap = new Map(prev)
+                    newMap.set(cacheKey, {
+                      amount: result.amount || 0,
+                      debit: result.debit || 0,
+                      credit: result.credit || 0
+                    })
+                    return newMap
+                  })
+                  
+                  // Set the appropriate amount
+                  let apiAmount = 0
+                  if (entry.debit > 0) {
+                    apiAmount = result.credit || result.amount || 0
+                    console.log('[MatchedAmountCell] Setting amount from API (entry has debit):', apiAmount)
+                  } else if (entry.credit > 0) {
+                    apiAmount = result.debit || result.amount || 0
+                    console.log('[MatchedAmountCell] Setting amount from API (entry has credit):', apiAmount)
+                  } else {
+                    apiAmount = result.amount || 0
+                    console.log('[MatchedAmountCell] Setting amount from API (entry has no debit/credit):', apiAmount)
+                  }
+                  setAmount(apiAmount)
+                } else {
+                  console.log('[MatchedAmountCell] API call failed or no amount:', result)
+                }
+              })
+              .catch(error => {
+                console.error(`[MatchedAmountCell] Error fetching amount for ${match.voucher_type} ${match.voucher_no}:`, error)
+              })
+              .finally(() => {
+                setIsLoading(false)
+              })
+            break
+          }
+        }
+      } else {
+        console.log('[MatchedAmountCell] No backendMatchData.matched_with_parsed found')
+      }
+    }, [entry, matchedEntry, voucherAmountCache, getVoucherAmount])
+
+    console.log('[MatchedAmountCell] Render - amount:', amount, 'isLoading:', isLoading)
+
+    if (isLoading) {
+      return <span className="text-gray-400 text-sm">Loading...</span>
+    }
+
+    if (amount !== null) {
+      return <>{formatCurrency(amount, currency, party, partyType)}</>
+    }
+
+    return <span className="text-gray-400">-</span>
   }
 
   return (
@@ -2806,13 +3224,29 @@ export default function IntercompanyReconciliation() {
                         <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
                         <TableHead className="text-blue-800 text-center">Matched With</TableHead>
+                        {showMatchedAmountColumn && (
+                          <TableHead className="text-blue-800 text-right">Amount ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                        )}
                         <TableHead className="text-blue-800 text-center">Actions</TableHead>
+                        <TableHead className="text-blue-800 text-center w-12">
+                          <button
+                            onClick={() => setShowMatchedAmountColumn(!showMatchedAmountColumn)}
+                            className="p-1 hover:bg-blue-100 rounded transition-colors"
+                            title={showMatchedAmountColumn ? "Hide matched amount column" : "Show matched amount column"}
+                          >
+                            {showMatchedAmountColumn ? (
+                              <Eye className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <EyeOff className="h-4 w-4 text-blue-600" />
+                            )}
+                          </button>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {isTableLoading ? (
                         <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 10 : 9) : (showMatchedAmountColumn ? 9 : 8)} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
                               <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                               <span className="text-gray-600">
@@ -2821,17 +3255,76 @@ export default function IntercompanyReconciliation() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ) : filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center text-gray-500 py-8">
-                            No data found for selected criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).map((entry, index) => {
+                      ) : (() => {
+                        const filteredForTable = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true)
+                        console.log("[Table Render - Company A] Entries to render:", {
+                          totalInFindMatching: findMatchingEntries.glDataAWithStatus.length,
+                          afterFiltering: filteredForTable.length,
+                          statusFilter,
+                          debitCreditFilter,
+                          companyA,
+                          partyA
+                        })
+                        
+                        // Debug: Check if specific entry is in table
+                        if (Array.isArray(filteredForTable)) {
+                          filteredForTable.forEach(entry => {
+                            if (entry && entry.voucher_no && (entry.voucher_no.includes("002") || entry.posting_date === "2024-02-07" || entry.posting_date === "2024-07-02")) {
+                              console.log("[Table Render - Company A] Entry in table:", {
+                                voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+                                posting_date: entry.posting_date,
+                                status: entry.status,
+                                debit: entry.debit,
+                                credit: entry.credit
+                              })
+                            }
+                          })
+                        }
+                        
+                        // Debug: Check if specific entry is NOT in table but should be
+                        if (Array.isArray(findMatchingEntries.glDataAWithStatus)) {
+                          findMatchingEntries.glDataAWithStatus.forEach(entry => {
+                            if (entry && entry.voucher_no && (entry.voucher_no.includes("002") || entry.posting_date === "2024-02-07" || entry.posting_date === "2024-07-02")) {
+                              const isInFiltered = Array.isArray(filteredForTable) && filteredForTable.some(e => e && e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no)
+                              if (!isInFiltered) {
+                                console.log("[Table Render - Company A] Entry NOT in filtered table (filtered out):", {
+                                  voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+                                  posting_date: entry.posting_date,
+                                  status: entry.status,
+                                  debit: entry.debit,
+                                  credit: entry.credit,
+                                  statusFilter,
+                                  debitCreditFilter,
+                                  reason: entry.status !== statusFilter ? `Status mismatch (${entry.status} vs ${statusFilter})` : 
+                                          (debitCreditFilter === 'Debit => Credit' && entry.debit === 0) ? 'Debit is 0' :
+                                          (debitCreditFilter === 'Credit => Debit' && entry.credit === 0) ? 'Credit is 0' : 'Unknown'
+                                })
+                              }
+                            }
+                          })
+                        }
+                        
+                        if (filteredForTable.length === 0) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 10 : 9) : (showMatchedAmountColumn ? 9 : 8)} className="text-center text-gray-500 py-8">
+                                No data found for selected criteria
+                              </TableCell>
+                            </TableRow>
+                          )
+                        }
+                        
+                        return filteredForTable.map((entry, index) => {
                         const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+                        const matchedEntry = getMatchedEntry(entry, true) // true = Company A side
+                        const amountsMatch = doAmountsMatch(entry, matchedEntry)
+                        const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
+                        
                         return (
-                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
+                          <TableRow 
+                            key={entry.gl_entry || index} 
+                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''}`}
+                          >
                             <TableCell>
                               <input
                                 type="checkbox"
@@ -2942,6 +3435,21 @@ export default function IntercompanyReconciliation() {
                                 return <span className="text-gray-400 text-sm">-</span>
                               })()}
                             </TableCell>
+                            {showMatchedAmountColumn && (
+                              <TableCell className="text-right font-medium">
+                                {(entry.status === 'Match' || matchedEntry || entry.matchedEntry) ? (
+                                  <MatchedAmountCell
+                                    entry={entry}
+                                    matchedEntry={matchedEntry}
+                                    currency={getPartyCurrency(partyA, 'Customer')}
+                                    party={partyA}
+                                    partyType="Customer"
+                                  />
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell className="text-center">
                               {(() => {
                                 // Check if entry has a match (frontend or backend)
@@ -3000,10 +3508,11 @@ export default function IntercompanyReconciliation() {
                                 )
                               })()}
                             </TableCell>
+                            <TableCell></TableCell>
                           </TableRow>
                         )
-                      })
-                      )}
+                        })
+                      })()}
 
                       {/* Customer Table Totals Row */}
                       {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length > 0 && (
@@ -3039,7 +3548,7 @@ export default function IntercompanyReconciliation() {
                               'Customer'
                             )}
                           </TableCell>
-                          <TableCell colSpan={3}></TableCell>
+                          <TableCell colSpan={showMatchedAmountColumn ? 4 : 3}></TableCell>
                         </TableRow>
                       )}
                     </TableBody>
@@ -3091,13 +3600,29 @@ export default function IntercompanyReconciliation() {
                         <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
                         <TableHead className="text-blue-800 text-center">Matched With</TableHead>
+                        {showMatchedAmountColumn && (
+                          <TableHead className="text-blue-800 text-right">Amount ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                        )}
                         <TableHead className="text-blue-800 text-center">Actions</TableHead>
+                        <TableHead className="text-blue-800 text-center w-12">
+                          <button
+                            onClick={() => setShowMatchedAmountColumn(!showMatchedAmountColumn)}
+                            className="p-1 hover:bg-blue-100 rounded transition-colors"
+                            title={showMatchedAmountColumn ? "Hide matched amount column" : "Show matched amount column"}
+                          >
+                            {showMatchedAmountColumn ? (
+                              <Eye className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <EyeOff className="h-4 w-4 text-blue-600" />
+                            )}
+                          </button>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {isTableLoading ? (
                         <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 10 : 9) : (showMatchedAmountColumn ? 9 : 8)} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
                               <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                               <span className="text-gray-600">
@@ -3108,15 +3633,22 @@ export default function IntercompanyReconciliation() {
                         </TableRow>
                       ) : filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? 9 : 8} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 10 : 9) : (showMatchedAmountColumn ? 9 : 8)} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
                       ) : (
                         filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).map((entry, index) => {
                         const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+                        const matchedEntry = getMatchedEntry(entry, false) // false = Company B side
+                        const amountsMatch = doAmountsMatch(entry, matchedEntry)
+                        const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
+                        
                         return (
-                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
+                          <TableRow 
+                            key={entry.gl_entry || index} 
+                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''}`}
+                          >
                             <TableCell>
                               <input
                                 type="checkbox"
@@ -3227,6 +3759,21 @@ export default function IntercompanyReconciliation() {
                                 return <span className="text-gray-400 text-sm">-</span>
                               })()}
                             </TableCell>
+                            {showMatchedAmountColumn && (
+                              <TableCell className="text-right font-medium">
+                                {(entry.status === 'Match' || matchedEntry || entry.matchedEntry) ? (
+                                  <MatchedAmountCell
+                                    entry={entry}
+                                    matchedEntry={matchedEntry}
+                                    currency={getPartyCurrency(partyB, partyTypeB)}
+                                    party={partyB}
+                                    partyType={partyTypeB}
+                                  />
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell className="text-center">
                               {(() => {
                                 // Check if entry has a match (frontend or backend)
@@ -3285,6 +3832,7 @@ export default function IntercompanyReconciliation() {
                                 )
                               })()}
                             </TableCell>
+                            <TableCell></TableCell>
                           </TableRow>
                         )
                       })
@@ -3324,7 +3872,7 @@ export default function IntercompanyReconciliation() {
                               partyTypeB
                             )}
                           </TableCell>
-                          <TableCell colSpan={3}></TableCell>
+                          <TableCell colSpan={showMatchedAmountColumn ? 4 : 3}></TableCell>
                         </TableRow>
                       )}
                     </TableBody>
