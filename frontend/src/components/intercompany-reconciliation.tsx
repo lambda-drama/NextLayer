@@ -519,7 +519,10 @@ export default function IntercompanyReconciliation() {
       // Create all API calls for Company A entries
       const companyAPromises = glDataA.map(async (entry) => {
         try {
-          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA)
+          // For Journal Entries, pass party information
+          const party = entry.voucher_type === "Journal Entry" ? partyA : undefined
+          const partyType = entry.voucher_type === "Journal Entry" ? "Customer" : undefined
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA, party, partyType)
           if (result.success) {
             const key = `${entry.voucher_type}-${entry.voucher_no}`
             return { key, result }
@@ -533,7 +536,10 @@ export default function IntercompanyReconciliation() {
       // Create all API calls for Company B entries
       const companyBPromises = glDataB.map(async (entry) => {
         try {
-          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB)
+          // For Journal Entries, pass party information
+          const party = entry.voucher_type === "Journal Entry" ? partyB : undefined
+          const partyType = entry.voucher_type === "Journal Entry" ? partyTypeB : undefined
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB, party, partyType)
           if (result.success) {
             const key = `${entry.voucher_type}-${entry.voucher_no}`
             return { key, result }
@@ -683,8 +689,16 @@ export default function IntercompanyReconciliation() {
 
   // Function to find matching entries between Company A and Company B (on FULL data first)
   const findMatchingEntries = useMemo(() => {
+    console.log("[findMatchingEntries] Starting matching process:", {
+      glDataACount: glDataA.length,
+      glDataBCount: glDataB.length,
+      permissionAwareDataACount: permissionAwareDataA.length,
+      permissionAwareDataBCount: permissionAwareDataB.length
+    })
+    
     // Allow processing if at least one company has data (don't require both)
     if (!glDataA.length && !glDataB.length) {
+      console.log("[findMatchingEntries] No data, returning empty arrays")
       return { glDataAWithStatus: [], glDataBWithStatus: [] }
     }
 
@@ -808,7 +822,7 @@ export default function IntercompanyReconciliation() {
     })
 
     // Second pass: Process Company B entries and find their matches
-    // console.log("Processing Company B entries...")
+    console.log("[findMatchingEntries] Processing Company B entries:", glDataB.length)
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
       // Check if we have backend status for this entry first
       const key = `${entryB.voucher_type}-${entryB.voucher_no}`
@@ -893,20 +907,56 @@ export default function IntercompanyReconciliation() {
     const visibleKeysA = new Set(permissionAwareDataA.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
     const visibleKeysB = new Set(permissionAwareDataB.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
 
+    console.log("[findMatchingEntries] Permission-aware data counts:", {
+      permissionAwareDataA: permissionAwareDataA.length,
+      permissionAwareDataB: permissionAwareDataB.length,
+      visibleKeysA: visibleKeysA.size,
+      visibleKeysB: visibleKeysB.size,
+      glDataAWithStatusBeforeFilter: glDataAWithStatus.length,
+      glDataBWithStatusBeforeFilter: glDataBWithStatus.length
+    })
+
     // Filter the matched entries to only show visible ones
     const filteredGlDataAWithStatus = glDataAWithStatus.filter(entry => {
       const key = `${entry.voucher_type}-${entry.voucher_no}`
-      return visibleKeysA.has(key)
+      const isVisible = visibleKeysA.has(key)
+      if (!isVisible) {
+        console.log("[findMatchingEntries] Entry filtered out by permission (Company A):", {
+          voucher: key,
+          posting_date: entry.posting_date,
+          debit: entry.debit,
+          credit: entry.credit
+        })
+      }
+      return isVisible
     })
 
     const filteredGlDataBWithStatus = glDataBWithStatus.filter(entry => {
       const key = `${entry.voucher_type}-${entry.voucher_no}`
-      return visibleKeysB.has(key)
+      const isVisible = visibleKeysB.has(key)
+      if (!isVisible) {
+        console.log("[findMatchingEntries] Entry filtered out by permission (Company B):", {
+          voucher: key,
+          posting_date: entry.posting_date,
+          debit: entry.debit,
+          credit: entry.credit
+        })
+      }
+      return isVisible
     })
 
     console.log("[findMatchingEntries] After permission filtering:", {
       glDataAWithStatusCount: filteredGlDataAWithStatus.length,
-      glDataBWithStatusCount: filteredGlDataBWithStatus.length
+      glDataBWithStatusCount: filteredGlDataBWithStatus.length,
+      removedFromA: glDataAWithStatus.length - filteredGlDataAWithStatus.length,
+      removedFromB: glDataBWithStatus.length - filteredGlDataBWithStatus.length,
+      totalAfterFilter: filteredGlDataAWithStatus.length + filteredGlDataBWithStatus.length
+    })
+    
+    console.log("[findMatchingEntries] Final result summary:", {
+      glDataAWithStatusCount: filteredGlDataAWithStatus.length,
+      glDataBWithStatusCount: filteredGlDataBWithStatus.length,
+      totalEntries: filteredGlDataAWithStatus.length + filteredGlDataBWithStatus.length
     })
     
     // Debug: Log entries with specific voucher or date in final results
@@ -974,13 +1024,23 @@ export default function IntercompanyReconciliation() {
 
   // Calculate summary statistics for match/mismatch counts
   const summaryStats = useMemo(() => {
+    console.log("[summaryStats] Calculating summary stats:", {
+      glDataAWithStatusCount: findMatchingEntries.glDataAWithStatus.length,
+      glDataBWithStatusCount: findMatchingEntries.glDataBWithStatus.length,
+      glDataACount: glDataA.length,
+      glDataBCount: glDataB.length,
+      hasBackendStatusData
+    })
+    
     if (!findMatchingEntries.glDataAWithStatus.length && !findMatchingEntries.glDataBWithStatus.length) {
+      console.log("[summaryStats] No entries, returning null")
       return null
     }
 
     // Don't calculate stats until we have backend status data to avoid race conditions
     // This prevents showing incorrect totals on first fetch when backend status is still loading
     if (!hasBackendStatusData && (glDataA.length > 0 || glDataB.length > 0)) {
+      console.log("[summaryStats] No backend status data yet, returning null")
       return null
     }
 
@@ -989,7 +1049,13 @@ export default function IntercompanyReconciliation() {
     let mismatchedA = 0
     let pendingA = 0
 
-    findMatchingEntries.glDataAWithStatus.forEach(entry => {
+    console.log("[summaryStats] Counting Company A entries:", findMatchingEntries.glDataAWithStatus.length)
+    findMatchingEntries.glDataAWithStatus.forEach((entry, idx) => {
+      console.log(`[summaryStats] Company A entry ${idx}:`, {
+        voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+        status: entry.status,
+        posting_date: entry.posting_date
+      })
       switch (entry.status) {
         case 'Match':
           matchedA++
@@ -1008,7 +1074,13 @@ export default function IntercompanyReconciliation() {
     let mismatchedB = 0
     let pendingB = 0
 
-    findMatchingEntries.glDataBWithStatus.forEach(entry => {
+    console.log("[summaryStats] Counting Company B entries:", findMatchingEntries.glDataBWithStatus.length)
+    findMatchingEntries.glDataBWithStatus.forEach((entry, idx) => {
+      console.log(`[summaryStats] Company B entry ${idx}:`, {
+        voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+        status: entry.status,
+        posting_date: entry.posting_date
+      })
       switch (entry.status) {
         case 'Match':
           matchedB++
@@ -1021,9 +1093,23 @@ export default function IntercompanyReconciliation() {
           break
       }
     })
-
+    
     const totalA = findMatchingEntries.glDataAWithStatus.length
     const totalB = findMatchingEntries.glDataBWithStatus.length
+    
+    console.log("[summaryStats] Final counts:", {
+      matchedA,
+      mismatchedA,
+      pendingA,
+      matchedB,
+      mismatchedB,
+      pendingB,
+      totalA,
+      totalB,
+      overallTotal: totalA + totalB,
+      overallMatched: matchedA + matchedB,
+      overallMismatched: mismatchedA + mismatchedB
+    })
 
     return {
       companyA: {
@@ -1245,7 +1331,9 @@ export default function IntercompanyReconciliation() {
             voucher_no: entryA.voucher_no,
             company: companyA,
             status: 'Mismatch' as const,
-            matched_with: null
+            matched_with: null,
+            party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
+            party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
           })
         }
 
@@ -1255,7 +1343,9 @@ export default function IntercompanyReconciliation() {
             voucher_no: entryB.voucher_no,
             company: companyB,
             status: 'Mismatch' as const,
-            matched_with: null
+            matched_with: null,
+            party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
+            party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
           })
         }
       }
@@ -1298,7 +1388,9 @@ export default function IntercompanyReconciliation() {
         await refreshMatchStatuses(bulkData.map(entry => ({
           voucher_type: entry.voucher_type,
           voucher_no: entry.voucher_no,
-          company: entry.company
+          company: entry.company,
+          party: entry.party,
+          party_type: entry.party_type
         })))
 
         setSelectedEntries(new Set())
@@ -1454,13 +1546,18 @@ export default function IntercompanyReconciliation() {
       const selectedKeysSet = new Set(Array.from(selectedEntries))
 
       // Helper function to create a clean matched_with object (only essential fields)
-      const createMatchedWithObject = (entry: GLEntry) => {
-        return {
+      const createMatchedWithObject = (entry: GLEntry, company?: string) => {
+        const matchedWith: any = {
           voucher_type: entry.voucher_type,
           voucher_no: entry.voucher_no,
           debit: entry.debit || 0,
           credit: entry.credit || 0
         }
+        // Include company information in matched_with
+        if (company) {
+          matchedWith.company = company
+        }
+        return matchedWith
       }
 
       // Helper function to check if a matched entry is in the selected entries
@@ -1481,11 +1578,11 @@ export default function IntercompanyReconciliation() {
 
           // Priority 1: If entryB is selected at the same index, pair them together (manual selection takes priority)
           if (entryB) {
-            matchedEntry = createMatchedWithObject(entryB)
+            matchedEntry = createMatchedWithObject(entryB, companyB)
           } else {
             // Priority 2: Check if entryA's pre-existing matchedEntry is also in selected entries
             if (entryA.matchedEntry && isMatchedEntrySelected(entryA.matchedEntry)) {
-              matchedEntry = createMatchedWithObject(entryA.matchedEntry)
+              matchedEntry = createMatchedWithObject(entryA.matchedEntry, companyB)
             } else if (automatchEnabled) {
               // Priority 3: Look for a matching entry in Company B that is also selected
               const foundMatch = findMatchingEntries.glDataBWithStatus.find(entryB => {
@@ -1507,7 +1604,7 @@ export default function IntercompanyReconciliation() {
               })
 
               if (foundMatch) {
-                matchedEntry = createMatchedWithObject(foundMatch)
+                matchedEntry = createMatchedWithObject(foundMatch, companyB)
               }
             }
           }
@@ -1517,7 +1614,9 @@ export default function IntercompanyReconciliation() {
             voucher_no: entryA.voucher_no,
             company: companyA,
             status: 'Match' as const,
-            matched_with: matchedEntry || null
+            matched_with: matchedEntry || null,
+            party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
+            party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
           })
         }
 
@@ -1526,11 +1625,11 @@ export default function IntercompanyReconciliation() {
 
           // Priority 1: If entryA is selected at the same index, pair them together (manual selection takes priority)
           if (entryA) {
-            matchedEntry = createMatchedWithObject(entryA)
+            matchedEntry = createMatchedWithObject(entryA, companyA)
           } else {
             // Priority 2: Check if entryB's pre-existing matchedEntry is also in selected entries
             if (entryB.matchedEntry && isMatchedEntrySelected(entryB.matchedEntry)) {
-              matchedEntry = createMatchedWithObject(entryB.matchedEntry)
+              matchedEntry = createMatchedWithObject(entryB.matchedEntry, companyA)
             } else if (automatchEnabled) {
               // Priority 3: Look for a matching entry in Company A that is also selected
               const foundMatch = findMatchingEntries.glDataAWithStatus.find(entryA => {
@@ -1552,7 +1651,7 @@ export default function IntercompanyReconciliation() {
               })
 
               if (foundMatch) {
-                matchedEntry = createMatchedWithObject(foundMatch)
+                matchedEntry = createMatchedWithObject(foundMatch, companyA)
               }
             }
           }
@@ -1562,7 +1661,9 @@ export default function IntercompanyReconciliation() {
             voucher_no: entryB.voucher_no,
             company: companyB,
             status: 'Match' as const,
-            matched_with: matchedEntry || null
+            matched_with: matchedEntry || null,
+            party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
+            party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
           })
         }
       }
@@ -1623,7 +1724,9 @@ export default function IntercompanyReconciliation() {
       const allEntries = [...glDataA, ...glDataB].map(entry => ({
         voucher_type: entry.voucher_type,
         voucher_no: entry.voucher_no,
-        company: glDataA.includes(entry) ? companyA : companyB
+        company: glDataA.includes(entry) ? companyA : companyB,
+        party: entry.voucher_type === "Journal Entry" ? (glDataA.includes(entry) ? partyA : partyB) : undefined,
+        party_type: entry.voucher_type === "Journal Entry" ? (glDataA.includes(entry) ? "Customer" : partyTypeB) : undefined
       }))
 
         const newStatusMap = await refreshMatchStatuses(allEntries)
@@ -1710,19 +1813,21 @@ export default function IntercompanyReconciliation() {
       const entryA = selectedEntryForAction
       const entryB = selectedEntryForAction.matchedEntry
 
-      // Create clean matched_with objects with only essential fields including amounts
+      // Create clean matched_with objects with only essential fields including amounts and company
       const matchedWithB = {
         voucher_type: entryB.voucher_type,
         voucher_no: entryB.voucher_no,
         debit: entryB.debit || 0,
-        credit: entryB.credit || 0
+        credit: entryB.credit || 0,
+        company: companyB
       }
 
       const matchedWithA = {
         voucher_type: entryA.voucher_type,
         voucher_no: entryA.voucher_no,
         debit: entryA.debit || 0,
-        credit: entryA.credit || 0
+        credit: entryA.credit || 0,
+        company: companyA
       }
 
       // Update both entries to Match status using the hook
@@ -1731,7 +1836,9 @@ export default function IntercompanyReconciliation() {
         voucher_no: entryA.voucher_no,
         company: companyA,
         status: 'Match',
-        matched_with: matchedWithB
+        matched_with: matchedWithB,
+        party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
+        party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
       })
 
       await updateMatchStatus({
@@ -1739,7 +1846,9 @@ export default function IntercompanyReconciliation() {
         voucher_no: entryB.voucher_no,
         company: companyB,
         status: 'Match',
-        matched_with: matchedWithA
+        matched_with: matchedWithA,
+        party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
+        party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
       })
 
       // OPTIMISTIC UPDATE: Update backend match status immediately
@@ -1771,6 +1880,32 @@ export default function IntercompanyReconciliation() {
       setHasBackendStatusData(true) // Mark that we have fresh backend data
       setShowIndividualMatchModal(false)
       setSelectedEntryForAction(null)
+
+      // Refresh match statuses from backend to ensure UI is up-to-date (especially for Journal Entries)
+      try {
+        const refreshEntries = [
+          {
+            voucher_type: entryA.voucher_type,
+            voucher_no: entryA.voucher_no,
+            company: companyA,
+            party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
+            party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
+          },
+          {
+            voucher_type: entryB.voucher_type,
+            voucher_no: entryB.voucher_no,
+            company: companyB,
+            party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
+            party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
+          }
+        ]
+        const refreshedStatusMap = await refreshMatchStatuses(refreshEntries)
+        // Merge refreshed statuses into existing status map
+        setBackendMatchStatus(prev => ({ ...prev, ...refreshedStatusMap }))
+      } catch (refreshError) {
+        console.error('Error refreshing match statuses:', refreshError)
+        // Don't fail the operation if refresh fails - optimistic update is already done
+      }
     } catch (error) {
       console.error('Error matching entries:', error)
       alert('Failed to match entries. Please try again.')
@@ -1803,9 +1938,12 @@ export default function IntercompanyReconciliation() {
       const entry = selectedEntryForAction
 
       // Determine which company this entry belongs to
-      const entryCompany = findMatchingEntries.glDataAWithStatus.some(e =>
+      const isCompanyA = findMatchingEntries.glDataAWithStatus.some(e =>
         e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no
-      ) ? companyA : companyB
+      )
+      const entryCompany = isCompanyA ? companyA : companyB
+      const entryParty = entry.voucher_type === "Journal Entry" ? (isCompanyA ? partyA : partyB) : undefined
+      const entryPartyType = entry.voucher_type === "Journal Entry" ? (isCompanyA ? "Customer" : partyTypeB) : undefined
 
       // Update the entry - backend will automatically unmatch the paired transaction
       await updateMatchStatus({
@@ -1813,6 +1951,8 @@ export default function IntercompanyReconciliation() {
         voucher_no: entry.voucher_no,
         company: entryCompany,
         status: 'Mismatch',
+        party: entryParty,
+        party_type: entryPartyType,
         matched_with: null
       })
 
@@ -1860,6 +2000,36 @@ export default function IntercompanyReconciliation() {
       setHasBackendStatusData(true) // Mark that we have fresh backend data
       setShowIndividualUnmatchModal(false)
       setSelectedEntryForAction(null)
+
+      // Refresh match statuses from backend to ensure UI is up-to-date (especially for Journal Entries)
+      try {
+        const refreshEntries = [{
+          voucher_type: entry.voucher_type,
+          voucher_no: entry.voucher_no,
+          company: entryCompany,
+          party: entry.voucher_type === "Journal Entry" ? entryParty : undefined,
+          party_type: entry.voucher_type === "Journal Entry" ? entryPartyType : undefined
+        }]
+        // Also refresh the paired entry if we know about it
+        if (pairedEntry) {
+          const isPairedCompanyA = findMatchingEntries.glDataAWithStatus.some(e =>
+            e.voucher_type === pairedEntry.voucher_type && e.voucher_no === pairedEntry.voucher_no
+          )
+          refreshEntries.push({
+            voucher_type: pairedEntry.voucher_type,
+            voucher_no: pairedEntry.voucher_no,
+            company: isPairedCompanyA ? companyA : companyB,
+            party: pairedEntry.voucher_type === "Journal Entry" ? (isPairedCompanyA ? partyA : partyB) : undefined,
+            party_type: pairedEntry.voucher_type === "Journal Entry" ? (isPairedCompanyA ? "Customer" : partyTypeB) : undefined
+          })
+        }
+        const refreshedStatusMap = await refreshMatchStatuses(refreshEntries)
+        // Merge refreshed statuses into existing status map
+        setBackendMatchStatus(prev => ({ ...prev, ...refreshedStatusMap }))
+      } catch (refreshError) {
+        console.error('Error refreshing match statuses:', refreshError)
+        // Don't fail the operation if refresh fails - optimistic update is already done
+      }
     } catch (error) {
       console.error('Error unmatching entries:', error)
       alert('Failed to unmatch entries. Please try again.')
@@ -1874,6 +2044,19 @@ export default function IntercompanyReconciliation() {
       inputEntriesCount: entries.length,
       statusFilter,
       debitCreditFilter
+    })
+    
+    // Log all input entries for debugging
+    entries.forEach((entry, idx) => {
+      console.log(`[filterEntriesByStatus] Input entry ${idx}:`, {
+        voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+        posting_date: entry.posting_date,
+        status: entry.status,
+        debit: entry.debit,
+        credit: entry.credit,
+        party: entry.party,
+        account: entry.account
+      })
     })
     
     let filtered = entries
@@ -1936,6 +2119,28 @@ export default function IntercompanyReconciliation() {
     }
     
     console.log(`[filterEntriesByStatus] Final filtered entries:`, filtered.length)
+    
+    // Log all final filtered entries
+    filtered.forEach((entry, idx) => {
+      console.log(`[filterEntriesByStatus] Final entry ${idx}:`, {
+        voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+        posting_date: entry.posting_date,
+        status: entry.status,
+        debit: entry.debit,
+        credit: entry.credit,
+        party: entry.party
+      })
+    })
+    
+    // Log entries that were filtered out
+    const filteredOut = entries.filter(entry => !filtered.includes(entry))
+    console.log(`[filterEntriesByStatus] Filtered out ${filteredOut.length} entries:`, filteredOut.map(entry => ({
+      voucher: `${entry.voucher_type}-${entry.voucher_no}`,
+      posting_date: entry.posting_date,
+      status: entry.status,
+      debit: entry.debit,
+      credit: entry.credit
+    })))
     
     // Debug: Log if specific entry is in filtered results
     if (Array.isArray(filtered)) {

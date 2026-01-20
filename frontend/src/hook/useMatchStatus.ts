@@ -6,6 +6,8 @@ export interface MatchStatusData {
   company: string
   status: 'Match' | 'Mismatch' | 'Pending'
   matched_with?: any
+  party?: string  // For Journal Entries
+  party_type?: string  // For Journal Entries (Customer/Supplier)
 }
 
 export interface MatchStatusResponse {
@@ -40,7 +42,9 @@ export const useMatchStatus = () => {
           voucher_no: data.voucher_no,
           company: data.company,
           status: data.status,
-          matched_with: data.matched_with
+          matched_with: data.matched_with,
+          party: data.party,
+          party_type: data.party_type
         }),
         credentials: 'include'
       })
@@ -70,12 +74,16 @@ export const useMatchStatus = () => {
     }
   }, [])
 
-  const getMatchStatus = useCallback(async (voucherType: string, voucherNo: string, company: string): Promise<MatchStatusResponse> => {
+  const getMatchStatus = useCallback(async (voucherType: string, voucherNo: string, company: string, party?: string, partyType?: string): Promise<MatchStatusResponse> => {
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch(`/api/method/nextlayer.next_layer.api.general_ledger.get_match_status?voucher_type=${encodeURIComponent(voucherType)}&voucher_no=${encodeURIComponent(voucherNo)}&company=${encodeURIComponent(company)}`, {
+      let url = `/api/method/nextlayer.next_layer.api.general_ledger.get_match_status?voucher_type=${encodeURIComponent(voucherType)}&voucher_no=${encodeURIComponent(voucherNo)}&company=${encodeURIComponent(company)}`
+      if (party && partyType) {
+        url += `&party=${encodeURIComponent(party)}&party_type=${encodeURIComponent(partyType)}`
+      }
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -123,12 +131,25 @@ export const useMatchStatus = () => {
 
       const batchPromises = batch.map(async (entry) => {
         try {
-          console.log(`Processing entry: ${entry.voucher_type} ${entry.voucher_no}`)
-          await updateMatchStatus(entry)
-          console.log(`Successfully processed: ${entry.voucher_type} ${entry.voucher_no}`)
+          console.log(`[bulkUpdateMatchStatus] Processing entry: ${entry.voucher_type} ${entry.voucher_no}`, {
+            company: entry.company,
+            status: entry.status,
+            party: entry.party,
+            party_type: entry.party_type,
+            has_matched_with: !!entry.matched_with
+          })
+          const result = await updateMatchStatus(entry)
+          console.log(`[bulkUpdateMatchStatus] Successfully processed: ${entry.voucher_type} ${entry.voucher_no}`, result)
           results.success++
         } catch (err) {
-          console.error(`Error processing ${entry.voucher_type} ${entry.voucher_no}:`, err)
+          console.error(`[bulkUpdateMatchStatus] Error processing ${entry.voucher_type} ${entry.voucher_no}:`, err)
+          console.error(`[bulkUpdateMatchStatus] Entry details:`, {
+            voucher_type: entry.voucher_type,
+            voucher_no: entry.voucher_no,
+            company: entry.company,
+            party: entry.party,
+            party_type: entry.party_type
+          })
           results.failed++
           const errorMessage = err instanceof Error ? err.message : 'Unknown error'
           results.errors.push(`${entry.voucher_type} ${entry.voucher_no}: ${errorMessage}`)
@@ -143,7 +164,7 @@ export const useMatchStatus = () => {
     return results
   }, [updateMatchStatus])
 
-  const refreshMatchStatuses = useCallback(async (entries: Array<{ voucher_type: string; voucher_no: string; company: string }>): Promise<{[key: string]: MatchStatusResponse}> => {
+  const refreshMatchStatuses = useCallback(async (entries: Array<{ voucher_type: string; voucher_no: string; company: string; party?: string; party_type?: string }>): Promise<{[key: string]: MatchStatusResponse}> => {
     setLoading(true)
     setError(null)
 
@@ -157,7 +178,8 @@ export const useMatchStatus = () => {
       const batchPromises = batch.map(async (entry) => {
         const key = `${entry.voucher_type}-${entry.voucher_no}`
         try {
-          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, entry.company)
+          // For Journal Entries, pass party information if available
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, entry.company, entry.party, entry.party_type)
           statusMap[key] = result
         } catch (err) {
           statusMap[key] = { success: false, error: 'Failed to fetch status' }
