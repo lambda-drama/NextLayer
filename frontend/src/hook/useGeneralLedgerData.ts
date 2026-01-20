@@ -182,14 +182,24 @@ const rawEntries = result.message?.data?.entries || []
       }
 
       // Filter and process regular GL entries (exclude special rows)
+      console.log("[useGeneralLedgerData] Starting to filter entries. Total raw entries:", rawEntries.length)
+      let filteredCount = 0
+      let skippedNoDate = 0
+      let skippedSpecialRow = 0
+      
       const filteredEntries = rawEntries
         .filter((entry: any) => {
+          const voucherKey = entry.voucher_type && entry.voucher_no ? `${entry.voucher_type}-${entry.voucher_no}` : "N/A"
+          
           if (!entry.posting_date || typeof entry.account !== "string") {
+            skippedNoDate++
             console.log("[useGeneralLedgerData] Filtered out entry (no posting_date or invalid account):", {
-              voucher: entry.voucher_type && entry.voucher_no ? `${entry.voucher_type}-${entry.voucher_no}` : "N/A",
+              voucher: voucherKey,
               posting_date: entry.posting_date,
               account: entry.account,
-              accountType: typeof entry.account
+              accountType: typeof entry.account,
+              debit: entry.debit,
+              credit: entry.credit
             })
             return false
           }
@@ -198,12 +208,24 @@ const rawEntries = result.message?.data?.entries || []
                                entry.account.includes("'Total'") ||
                                entry.account.includes("'Closing (Opening + Total)'")
           if (isSpecialRow) {
+            skippedSpecialRow++
             console.log("[useGeneralLedgerData] Filtered out special row:", {
               account: entry.account,
-              voucher: entry.voucher_type && entry.voucher_no ? `${entry.voucher_type}-${entry.voucher_no}` : "N/A"
+              voucher: voucherKey,
+              posting_date: entry.posting_date
             })
             return false
           }
+          
+          filteredCount++
+          console.log("[useGeneralLedgerData] Including entry:", {
+            voucher: voucherKey,
+            posting_date: entry.posting_date,
+            account: entry.account,
+            debit: entry.debit,
+            credit: entry.credit,
+            party: entry.party
+          })
           return true
         })
         .map((entry: any) => ({
@@ -222,6 +244,7 @@ const rawEntries = result.message?.data?.entries || []
           project: entry.project,
         }))
       
+      console.log("[useGeneralLedgerData] Filter summary: total=", rawEntries.length, ", skipped_no_date=", skippedNoDate, ", skipped_special=", skippedSpecialRow, ", filtered=", filteredCount)
       console.log("[useGeneralLedgerData] After filtering special rows:", filteredEntries.length, "entries")
       
       // Debug: Log entries with specific voucher or date
@@ -251,14 +274,30 @@ const rawEntries = result.message?.data?.entries || []
         return
       }
       
+      console.log("[useGeneralLedgerData] Starting consolidation. Filtered entries count:", filteredEntries.length)
+      let consolidatedCount = 0
+      let aggregatedCount = 0
+      
       filteredEntries.forEach((entry: any) => {
         const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
         
         if (consolidatedMap.has(voucherKey)) {
           // Aggregate debits and credits for the same voucher
+          aggregatedCount++
           const existing = consolidatedMap.get(voucherKey)!
+          const oldDebit = existing.debit
+          const oldCredit = existing.credit
           existing.debit += entry.debit
           existing.credit += entry.credit
+          console.log("[useGeneralLedgerData] Aggregating duplicate voucher:", {
+            voucher: voucherKey,
+            oldDebit,
+            oldCredit,
+            newDebit: existing.debit,
+            newCredit: existing.credit,
+            entryDebit: entry.debit,
+            entryCredit: entry.credit
+          })
           // Keep the first account, or combine if needed
           if (existing.account !== entry.account) {
             // For consolidated view, we can show multiple accounts or just the first
@@ -270,6 +309,7 @@ const rawEntries = result.message?.data?.entries || []
           }
         } else {
           // First entry for this voucher
+          consolidatedCount++
           consolidatedMap.set(voucherKey, {
             gl_entry: entry.gl_entry,
             posting_date: entry.posting_date,
@@ -286,8 +326,17 @@ const rawEntries = result.message?.data?.entries || []
             cost_center: entry.cost_center,
             project: entry.project,
           })
+          console.log("[useGeneralLedgerData] Added new consolidated entry:", {
+            voucher: voucherKey,
+            posting_date: entry.posting_date,
+            debit: entry.debit,
+            credit: entry.credit,
+            party: entry.party
+          })
         }
       })
+      
+      console.log("[useGeneralLedgerData] Consolidation summary: filtered=", filteredEntries.length, ", consolidated=", consolidatedCount, ", aggregated=", aggregatedCount, ", final_map_size=", consolidatedMap.size)
 
       // Convert map to array and sort
       const sortedEntries = Array.from(consolidatedMap.values())
