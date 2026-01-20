@@ -20,7 +20,7 @@ def get_general_ledger_data(filters):
 		party_filter = filters.get('party')
 		if isinstance(party_filter, list):
 			party_filter = '_'.join(sorted(party_filter)) if party_filter else ''
-		cache_key = f"gl_data_{filters.get('company')}_{filters.get('from_date')}_{filters.get('to_date')}_{party_filter}_{filters.get('show_opening_entries', 0)}_{filters.get('currency', '')}_{filters.get('ignore_err', 0)}_{filters.get('ignore_cr_dr_notes', 0)}"
+		cache_key = f"gl_data_{filters.get('company')}_{filters.get('from_date')}_{filters.get('to_date')}_{party_filter}_{filters.get('show_opening_entries', 0)}_{filters.get('hide_opening_invoices', 1)}_{filters.get('currency', '')}_{filters.get('ignore_err', 0)}_{filters.get('ignore_cr_dr_notes', 0)}"
 
 		# Try to get from cache first
 		cached_data = frappe.cache().get_value(cache_key)
@@ -62,14 +62,45 @@ def get_general_ledger_data(filters):
 			columns, data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
+
+		# Filter out opening entries for Sales Invoice and Purchase Invoice (if hide_opening_invoices is enabled)
+		hide_opening_invoices = filters.get('hide_opening_invoices', 1)  # Default to 1 (hide) if not specified
+		filtered_data = []
+		for entry in data:
+			# Skip summary rows
+			if (isinstance(entry.get('account'), str) and
+				('Opening' in entry.get('account', '') or
+				 'Total' in entry.get('account', '') or
+				 'Closing' in entry.get('account', ''))):
+				continue
+
+			if not entry.get('posting_date'):
+				continue
+
+			voucher_type = entry.get('voucher_type', '')
+			voucher_no = entry.get('voucher_no', '')
+
+			# Skip opening entries for Sales Invoice and Purchase Invoice if hide_opening_invoices is enabled
+			if hide_opening_invoices and voucher_type in ["Sales Invoice", "Purchase Invoice"] and voucher_no:
+				try:
+					is_opening = frappe.db.get_value(voucher_type, voucher_no, "is_opening")
+					if is_opening:
+						# Skip this opening entry
+						continue
+				except Exception as e:
+					# If there's an error checking is_opening, log it but continue processing
+					frappe.log_error(f"Error checking is_opening for {voucher_type} {voucher_no}: {str(e)}")
+
+			filtered_data.append(entry)
+
 		# Format the response
 		result = {
 			"success": True,
 			"data": {
 				"columns": columns,
-				"entries": data,
+				"entries": filtered_data,
 				"filters_applied": filters,
-				"total_entries": len(data),
+				"total_entries": len(filtered_data),
 			},
 		}
 
@@ -136,7 +167,7 @@ def get_permission_aware_gl_data(filters):
 			columns, all_data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
-		
+
 		# Filter based on document sharing permissions for display
 		# Run permission checks as the original user to respect sharing permissions
 		visible_entries = []
@@ -149,6 +180,7 @@ def get_permission_aware_gl_data(filters):
 
 		processed_count = 0
 		hidden_count = 0
+		hide_opening_invoices = filters.get('hide_opening_invoices', 1)  # Default to 1 (hide) if not specified
 		for entry in all_data:
 			# Skip summary rows
 			if (isinstance(entry.get('account'), str) and
@@ -163,6 +195,17 @@ def get_permission_aware_gl_data(filters):
 			voucher_type = entry.get('voucher_type', '')
 			voucher_no = entry.get('voucher_no', '')
 			processed_count += 1
+
+			# Skip opening entries for Sales Invoice and Purchase Invoice if hide_opening_invoices is enabled
+			if hide_opening_invoices and voucher_type in ["Sales Invoice", "Purchase Invoice"] and voucher_no:
+				try:
+					is_opening = frappe.db.get_value(voucher_type, voucher_no, "is_opening")
+					if is_opening:
+						# Skip this opening entry
+						continue
+				except Exception as e:
+					# If there's an error checking is_opening, log it but continue processing
+					frappe.log_error(f"Error checking is_opening for {voucher_type} {voucher_no}: {str(e)}")
 
 			# Check if user has permission to view this document (for display purposes)
 			# This check runs as the original user to respect sharing permissions
@@ -459,7 +502,7 @@ def update_match_status():
 		# Get the current document to check if it has a matched_with
 		current_doc = frappe.get_doc(voucher_type, voucher_no)
 		current_matched_with = current_doc.get("intercompany_matched_with")
-		
+
 		# If unmatching (status is Mismatch and matched_with is None), also unmatch the paired transaction
 		if match_status == "Mismatch" and (matched_with is None or matched_with == ""):
 			# Parse the current matched_with to find the paired transaction
@@ -470,22 +513,22 @@ def update_match_status():
 						matched_data = frappe.parse_json(current_matched_with)
 					except:
 						matched_data = current_matched_with
-					
+
 					# Handle both single match (dict) and multiple matches (list)
 					matches_to_unmatch = []
 					if isinstance(matched_data, dict):
 						matches_to_unmatch = [matched_data]
 					elif isinstance(matched_data, list):
 						matches_to_unmatch = matched_data
-					
+
 					# Unmatch each paired transaction
 					for match in matches_to_unmatch:
 						if not isinstance(match, dict):
 							continue
-						
+
 						paired_voucher_type = match.get('voucher_type')
 						paired_voucher_no = match.get('voucher_no')
-						
+
 						if paired_voucher_type and paired_voucher_no:
 							# Check if the paired document exists
 							if frappe.db.exists(paired_voucher_type, paired_voucher_no):
@@ -628,12 +671,12 @@ def get_voucher_amount(voucher_type, voucher_no):
 			}
 
 		doc = frappe.get_doc(voucher_type, voucher_no)
-		
+
 		# Get amount based on doctype
 		amount = None
 		debit = 0
 		credit = 0
-		
+
 		if voucher_type == "Journal Entry":
 			# For Journal Entry, sum up debit and credit from accounts
 			total_debit = sum(entry.debit for entry in doc.accounts if entry.debit)
@@ -642,7 +685,7 @@ def get_voucher_amount(voucher_type, voucher_no):
 			credit = total_credit
 			# For intercompany, we typically use the larger of the two
 			amount = max(total_debit, total_credit)
-			
+
 		elif voucher_type in ["Sales Invoice", "Purchase Invoice"]:
 			# For invoices, use grand_total
 			amount = doc.get("grand_total") or doc.get("total") or 0
@@ -651,7 +694,7 @@ def get_voucher_amount(voucher_type, voucher_no):
 				credit = amount  # Sales Invoice creates credit entry
 			else:
 				debit = amount  # Purchase Invoice creates debit entry
-				
+
 		elif voucher_type in ["Payment Entry", "Bank Entry"]:
 			# For Payment Entry, use paid_amount or total_allocated_amount
 			amount = doc.get("paid_amount") or doc.get("total_allocated_amount") or doc.get("total_amount") or 0
@@ -660,19 +703,19 @@ def get_voucher_amount(voucher_type, voucher_no):
 				debit = amount
 			else:
 				credit = amount
-				
+
 		elif voucher_type == "Sales Order":
 			amount = doc.get("grand_total") or doc.get("total") or 0
 			credit = amount
-			
+
 		elif voucher_type == "Purchase Order":
 			amount = doc.get("grand_total") or doc.get("total") or 0
 			debit = amount
-			
+
 		else:
 			# For other doctypes, try common amount fields
 			amount = doc.get("grand_total") or doc.get("total") or doc.get("amount") or doc.get("total_amount") or 0
-		
+
 		return {
 			"success": True,
 			"amount": amount or 0,
@@ -680,7 +723,7 @@ def get_voucher_amount(voucher_type, voucher_no):
 			"credit": credit,
 			"currency": doc.get("currency") or doc.get("company_currency")
 		}
-		
+
 	except Exception as e:
 		frappe.log_error(f"Get Voucher Amount Error: {str(e)}")
 		return {
@@ -1456,7 +1499,7 @@ def clear_gl_cache(companyA=None, companyB=None, fromDate=None, toDate=None, par
 	"""
 	try:
 		cache = frappe.cache()
-		
+
 		# If specific filters are provided, clear matching cache keys
 		if companyA or companyB or fromDate or toDate or partyA or partyB:
 			# Clear cache for Company A
@@ -1471,7 +1514,7 @@ def clear_gl_cache(companyA=None, companyB=None, fromDate=None, toDate=None, par
 					# Note: This is a best-effort approach since we can't list all cache keys
 					# In practice, cache keys are auto-expired after 5 minutes anyway
 					pass
-			
+
 			# Clear cache for Company B
 			if companyB and fromDate and toDate:
 				if partyB:
@@ -1484,7 +1527,7 @@ def clear_gl_cache(companyA=None, companyB=None, fromDate=None, toDate=None, par
 			# Cache keys are auto-expired after 5 minutes anyway
 			# This is mainly for frontend state clearing
 			pass
-		
+
 		return {
 			"success": True,
 			"message": "Cache cleared successfully"
