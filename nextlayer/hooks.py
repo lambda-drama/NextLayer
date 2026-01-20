@@ -188,6 +188,7 @@ doctype_js = {
 	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
 }
+
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}

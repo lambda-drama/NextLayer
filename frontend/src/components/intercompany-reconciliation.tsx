@@ -40,6 +40,7 @@ export default function IntercompanyReconciliation() {
   const [isAutoFilled, setIsAutoFilled] = useState(false)
   const [automatchEnabled, setAutomatchEnabled] = useState(false)
   const [bypassTotalCalculation, setBypassTotalCalculation] = useState(false)
+  const [hideOpeningInvoices, setHideOpeningInvoices] = useState<boolean>(true)
 
   // State for view checkboxes
   const [customerViewEnabled, setCustomerViewEnabled] = useState<boolean>(true)
@@ -133,6 +134,7 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
+    hideOpeningInvoices,
     shouldLoadData
   })
 
@@ -151,6 +153,7 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
+    hideOpeningInvoices,
     shouldLoadData: shouldLoadData && reloadTrigger >= 0
   })
 
@@ -177,6 +180,7 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
+    hideOpeningInvoices,
     shouldLoadData
   })
 
@@ -194,6 +198,7 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
+    hideOpeningInvoices,
     shouldLoadData
   })
   // Debug log for hidden summary - only log when value changes
@@ -493,7 +498,7 @@ export default function IntercompanyReconciliation() {
     setHasLoadedData(false)
     setBackendMatchStatus({}) // Also clear backend status
     setHasBackendStatusData(false) // Reset backend status fetch flag
-  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries])
+  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries, hideOpeningInvoices])
 
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
@@ -3103,6 +3108,19 @@ export default function IntercompanyReconciliation() {
                       </div> */}
                     </div>
                   )}
+                  {/* Hide Opening Entries Checkbox */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="hide-opening-invoices"
+                        checked={hideOpeningInvoices}
+                        onCheckedChange={(checked) => setHideOpeningInvoices(checked === true)}
+                      />
+                      <label htmlFor="hide-opening-invoices" className="text-sm text-gray-700">
+                        Hide Opening Entries
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button

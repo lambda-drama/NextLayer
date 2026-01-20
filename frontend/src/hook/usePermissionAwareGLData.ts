@@ -10,6 +10,7 @@ interface GLFilters {
   ignoreExchangeRateRevaluation: boolean
   ignoreSystemGeneratedNotes: boolean
   showOpeningEntries: boolean
+  hideOpeningInvoices?: boolean
 }
 
 interface HiddenSummary {
@@ -76,7 +77,8 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
           currency: currentFilters.currency === "all" ? "" : currentFilters.currency,
           ignore_exchange_rate_revaluation: currentFilters.ignoreExchangeRateRevaluation,
           ignore_system_generated_notes: currentFilters.ignoreSystemGeneratedNotes,
-          show_opening_entries: currentFilters.showOpeningEntries
+          show_opening_entries: currentFilters.showOpeningEntries,
+          hide_opening_invoices: currentFilters.hideOpeningInvoices !== undefined ? (currentFilters.hideOpeningInvoices ? 1 : 0) : 1
         }
 
         // console.log("Making API request to:", '/api/method/nextlayer.next_layer.api.general_ledger.get_permission_aware_gl_data')
