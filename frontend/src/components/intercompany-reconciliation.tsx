@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Badge } from "./ui/badge"
@@ -18,7 +18,7 @@ import { usePartiesForAutofill } from "../hook/usePartiesForAutofill"
 import { usePermissionAwareParties } from "../hook/usePermissionAwareParties"
 import { useGeneralLedgerData } from "../hook/useGeneralLedgerData"
 import { usePermissionAwareGLData } from "../hook/usePermissionAwareGLData"
-import { useMatchStatus } from "../hook/useMatchStatus"
+import { useMatchStatus, type MatchStatusData } from "../hook/useMatchStatus"
 import { useUserRoles } from "../hook/useUserRoles"
 import HiddenDocumentsSummary from "./hidden-documents-summary"
 import AdminPasswordDialog from "./admin-password-dialog"
@@ -1518,7 +1518,7 @@ export default function IntercompanyReconciliation() {
 
       // OPTIMISTIC UPDATE: Immediately update UI and close modal
       // First, prepare the bulk data to determine proper pairings
-      const bulkData = []
+      const bulkData: MatchStatusData[] = []
 
       // Separate selected entries by company
       const companyAEntries = []
@@ -1541,10 +1541,6 @@ export default function IntercompanyReconciliation() {
         }
       }
 
-      // Create pairs: match entries from Company A with entries from Company B
-      // Create a set of selected entry keys for quick lookup
-      const selectedKeysSet = new Set(Array.from(selectedEntries))
-
       // Helper function to create a clean matched_with object (only essential fields)
       const createMatchedWithObject = (entry: GLEntry, company?: string) => {
         const matchedWith: any = {
@@ -1560,113 +1556,46 @@ export default function IntercompanyReconciliation() {
         return matchedWith
       }
 
-      // Helper function to check if a matched entry is in the selected entries
-      const isMatchedEntrySelected = (matchedEntry: any): boolean => {
-        if (!matchedEntry) return false
-        const matchedKey = `${matchedEntry.voucher_type}-${matchedEntry.voucher_no}`
-        return selectedKeysSet.has(matchedKey)
-      }
+      const matchedWithForA = (() => {
+        if (!companyBEntries.length) return null
+        if (companyBEntries.length === 1) return createMatchedWithObject(companyBEntries[0], companyB)
+        return companyBEntries.map(e => createMatchedWithObject(e, companyB))
+      })()
 
-      const maxPairs = Math.max(companyAEntries.length, companyBEntries.length)
+      const matchedWithForB = (() => {
+        if (!companyAEntries.length) return null
+        if (companyAEntries.length === 1) return createMatchedWithObject(companyAEntries[0], companyA)
+        return companyAEntries.map(e => createMatchedWithObject(e, companyA))
+      })()
 
-      for (let i = 0; i < maxPairs; i++) {
-        const entryA = companyAEntries[i]
-        const entryB = companyBEntries[i]
+      // Persist group-to-group matches:
+      // - If one side has a single entry, every entry on the other side should reference that single entry.
+      // - If one side has multiple entries, store a JSON list of all opposite entries.
+      companyAEntries.forEach((entryA: any) => {
+        // If entryA already has a selected matchedEntry and we are matching a group, keep group linkage
+        // so many-to-one works (e.g. two payments -> one journal).
+        bulkData.push({
+          voucher_type: entryA.voucher_type,
+          voucher_no: entryA.voucher_no,
+          company: companyA,
+          status: 'Match' as const,
+          matched_with: matchedWithForA,
+          party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
+          party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
+        })
+      })
 
-        if (entryA) {
-          let matchedEntry: any = null
-
-          // Priority 1: If entryB is selected at the same index, pair them together (manual selection takes priority)
-          if (entryB) {
-            matchedEntry = createMatchedWithObject(entryB, companyB)
-          } else {
-            // Priority 2: Check if entryA's pre-existing matchedEntry is also in selected entries
-            if (entryA.matchedEntry && isMatchedEntrySelected(entryA.matchedEntry)) {
-              matchedEntry = createMatchedWithObject(entryA.matchedEntry, companyB)
-            } else if (automatchEnabled) {
-              // Priority 3: Look for a matching entry in Company B that is also selected
-              const foundMatch = findMatchingEntries.glDataBWithStatus.find(entryB => {
-                const entryBKey = `${entryB.voucher_type}-${entryB.voucher_no}`
-                if (!selectedKeysSet.has(entryBKey)) return false // Must be in selected entries
-
-                const dateMatch = entryA.posting_date === entryB.posting_date
-
-                if (bypassTotalCalculation) {
-                  const netTotalA = entryA.credit - entryA.debit
-                  const netTotalB = entryB.credit - entryB.debit
-                  const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
-                  return netTotalMatch && dateMatch
-                } else {
-                  const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-                  const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
-                  return (debitCreditMatch || creditDebitMatch) && dateMatch
-                }
-              })
-
-              if (foundMatch) {
-                matchedEntry = createMatchedWithObject(foundMatch, companyB)
-              }
-            }
-          }
-
-          bulkData.push({
-            voucher_type: entryA.voucher_type,
-            voucher_no: entryA.voucher_no,
-            company: companyA,
-            status: 'Match' as const,
-            matched_with: matchedEntry || null,
-            party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
-            party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
-          })
-        }
-
-        if (entryB) {
-          let matchedEntry: any = null
-
-          // Priority 1: If entryA is selected at the same index, pair them together (manual selection takes priority)
-          if (entryA) {
-            matchedEntry = createMatchedWithObject(entryA, companyA)
-          } else {
-            // Priority 2: Check if entryB's pre-existing matchedEntry is also in selected entries
-            if (entryB.matchedEntry && isMatchedEntrySelected(entryB.matchedEntry)) {
-              matchedEntry = createMatchedWithObject(entryB.matchedEntry, companyA)
-            } else if (automatchEnabled) {
-              // Priority 3: Look for a matching entry in Company A that is also selected
-              const foundMatch = findMatchingEntries.glDataAWithStatus.find(entryA => {
-                const entryAKey = `${entryA.voucher_type}-${entryA.voucher_no}`
-                if (!selectedKeysSet.has(entryAKey)) return false // Must be in selected entries
-
-                const dateMatch = entryA.posting_date === entryB.posting_date
-
-                if (bypassTotalCalculation) {
-                  const netTotalA = entryA.credit - entryA.debit
-                  const netTotalB = entryB.credit - entryB.debit
-                  const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
-                  return netTotalMatch && dateMatch
-                } else {
-                  const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-                  const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
-                  return (debitCreditMatch || creditDebitMatch) && dateMatch
-                }
-              })
-
-              if (foundMatch) {
-                matchedEntry = createMatchedWithObject(foundMatch, companyA)
-              }
-            }
-          }
-
-          bulkData.push({
-            voucher_type: entryB.voucher_type,
-            voucher_no: entryB.voucher_no,
-            company: companyB,
-            status: 'Match' as const,
-            matched_with: matchedEntry || null,
-            party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
-            party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
-          })
-        }
-      }
+      companyBEntries.forEach((entryB: any) => {
+        bulkData.push({
+          voucher_type: entryB.voucher_type,
+          voucher_no: entryB.voucher_no,
+          company: companyB,
+          status: 'Match' as const,
+          matched_with: matchedWithForB,
+          party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
+          party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
+        })
+      })
 
       // Update backend match status immediately for selected entries with proper pairings
       const optimisticStatusMap = { ...backendMatchStatus }
@@ -2012,15 +1941,16 @@ export default function IntercompanyReconciliation() {
         }]
         // Also refresh the paired entry if we know about it
         if (pairedEntry) {
+          const paired = pairedEntry
           const isPairedCompanyA = findMatchingEntries.glDataAWithStatus.some(e =>
-            e.voucher_type === pairedEntry.voucher_type && e.voucher_no === pairedEntry.voucher_no
+            e.voucher_type === paired.voucher_type && e.voucher_no === paired.voucher_no
           )
           refreshEntries.push({
-            voucher_type: pairedEntry.voucher_type,
-            voucher_no: pairedEntry.voucher_no,
+            voucher_type: paired.voucher_type,
+            voucher_no: paired.voucher_no,
             company: isPairedCompanyA ? companyA : companyB,
-            party: pairedEntry.voucher_type === "Journal Entry" ? (isPairedCompanyA ? partyA : partyB) : undefined,
-            party_type: pairedEntry.voucher_type === "Journal Entry" ? (isPairedCompanyA ? "Customer" : partyTypeB) : undefined
+            party: paired.voucher_type === "Journal Entry" ? (isPairedCompanyA ? partyA : partyB) : undefined,
+            party_type: paired.voucher_type === "Journal Entry" ? (isPairedCompanyA ? "Customer" : partyTypeB) : undefined
           })
         }
         const refreshedStatusMap = await refreshMatchStatuses(refreshEntries)
@@ -2289,7 +2219,12 @@ export default function IntercompanyReconciliation() {
     if (matchedEntry) {
       // Show whichever amount exists in the matched entry (debit or credit)
       // This shows the actual amount from the matched transaction regardless of matching logic
-      const amount = matchedEntry.debit > 0 ? matchedEntry.debit : (matchedEntry.credit > 0 ? matchedEntry.credit : 0)
+      const amount =
+        matchedEntry.debit > 0
+          ? matchedEntry.debit
+          : matchedEntry.credit > 0
+            ? matchedEntry.credit
+            : 0
       console.log('[getMatchedAmountSync] Returning amount from matched entry (debit or credit, whichever exists):', amount, {
         matchedDebit: matchedEntry.debit,
         matchedCredit: matchedEntry.credit,
@@ -2297,19 +2232,6 @@ export default function IntercompanyReconciliation() {
         entryCredit: entry.credit
       })
       return amount
-      
-      // If entry has no debit or credit, try to get from matched entry
-      if (matchedEntry.debit > 0) {
-        console.log('[getMatchedAmountSync] Entry has no debit/credit, returning matchedEntry.debit:', matchedEntry.debit)
-        return matchedEntry.debit
-      }
-      if (matchedEntry.credit > 0) {
-        console.log('[getMatchedAmountSync] Entry has no debit/credit, returning matchedEntry.credit:', matchedEntry.credit)
-        return matchedEntry.credit
-      }
-      
-      console.log('[getMatchedAmountSync] Returning 0 - matchedEntry has no debit or credit')
-      return 0
     }
     
     // If no matched entry found but we have entry.matchedEntry (shouldn't happen after fix above, but just in case)

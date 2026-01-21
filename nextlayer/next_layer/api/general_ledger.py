@@ -688,6 +688,7 @@ def update_match_status():
 			if isinstance(matched_with, dict):
 				if "company" not in matched_with:
 					matched_with["company"] = company
+			if isinstance(matched_with, (dict, list)):
 				matched_with_value = frappe.as_json(matched_with)
 
 			# Set matched_by and matched_on
@@ -853,7 +854,7 @@ def update_match_status():
 				matched_with["company"] = company
 
 		matched_with_value = matched_with
-		if isinstance(matched_with, dict):
+		if isinstance(matched_with, (dict, list)):
 			matched_with_value = frappe.as_json(matched_with)
 
 		# Set matched_by and matched_on to None when unmatching
