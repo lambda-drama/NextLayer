@@ -3517,30 +3517,77 @@ export default function IntercompanyReconciliation() {
                                 // First check if we have backend match data with parsed matched entry
                                 if (entry.backendMatchData?.matched_with_parsed) {
                                   const matchedData = entry.backendMatchData.matched_with_parsed
+                                  // Handle both single match (dict) and multiple matches (list)
+                                  const matchesToDisplay = Array.isArray(matchedData) ? matchedData : [matchedData]
+                                  
+                                  if (matchesToDisplay.length === 0) {
+                                    return <span className="text-gray-400 text-sm">-</span>
+                                  }
+                                  
+                                  // If single match, show as before
+                                  if (matchesToDisplay.length === 1) {
+                                    const match = matchesToDisplay[0]
+                                    if (!match || !match.voucher_type || !match.voucher_no) {
+                                      return <span className="text-gray-400 text-sm">-</span>
+                                    }
+                                    return (
+                                      <div className="text-sm">
+                                        <div className="font-medium text-blue-600">
+                                          <a
+                                            href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:underline"
+                                          >
+                                            {match.voucher_type}
+                                          </a>
+                                        </div>
+                                        <div className="text-gray-600">
+                                          <a
+                                            href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:underline"
+                                          >
+                                            {match.voucher_no}
+                                          </a>
+                                        </div>
+                                        <div className="text-xs text-gray-400">
+                                          (Manual Match)
+                                        </div>
+                                      </div>
+                                    )
+                                  }
+                                  
+                                  // If multiple matches, show first one with count
+                                  const firstMatch = matchesToDisplay[0]
+                                  if (!firstMatch || !firstMatch.voucher_type || !firstMatch.voucher_no) {
+                                    return <span className="text-gray-400 text-sm">-</span>
+                                  }
                                   return (
                                     <div className="text-sm">
                                       <div className="font-medium text-blue-600">
                                         <a
-                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="hover:underline"
                                         >
-                                          {matchedData.voucher_type}
+                                          {firstMatch.voucher_type}
                                         </a>
                                       </div>
                                       <div className="text-gray-600">
                                         <a
-                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="hover:underline"
                                         >
-                                          {matchedData.voucher_no}
+                                          {firstMatch.voucher_no}
                                         </a>
                                       </div>
                                       <div className="text-xs text-gray-400">
-                                        (Manual Match)
+                                        (+{matchesToDisplay.length - 1} more) (Manual Match)
                                       </div>
                                     </div>
                                   )
@@ -3841,30 +3888,77 @@ export default function IntercompanyReconciliation() {
                                 // First check if we have backend match data with parsed matched entry
                                 if (entry.backendMatchData?.matched_with_parsed) {
                                   const matchedData = entry.backendMatchData.matched_with_parsed
+                                  // Handle both single match (dict) and multiple matches (list)
+                                  const matchesToDisplay = Array.isArray(matchedData) ? matchedData : [matchedData]
+                                  
+                                  if (matchesToDisplay.length === 0) {
+                                    return <span className="text-gray-400 text-sm">-</span>
+                                  }
+                                  
+                                  // If single match, show as before
+                                  if (matchesToDisplay.length === 1) {
+                                    const match = matchesToDisplay[0]
+                                    if (!match || !match.voucher_type || !match.voucher_no) {
+                                      return <span className="text-gray-400 text-sm">-</span>
+                                    }
+                                    return (
+                                      <div className="text-sm">
+                                        <div className="font-medium text-blue-600">
+                                          <a
+                                            href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:underline"
+                                          >
+                                            {match.voucher_type}
+                                          </a>
+                                        </div>
+                                        <div className="text-gray-600">
+                                          <a
+                                            href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:underline"
+                                          >
+                                            {match.voucher_no}
+                                          </a>
+                                        </div>
+                                        <div className="text-xs text-gray-400">
+                                          (Manual Match)
+                                        </div>
+                                      </div>
+                                    )
+                                  }
+                                  
+                                  // If multiple matches, show first one with count
+                                  const firstMatch = matchesToDisplay[0]
+                                  if (!firstMatch || !firstMatch.voucher_type || !firstMatch.voucher_no) {
+                                    return <span className="text-gray-400 text-sm">-</span>
+                                  }
                                   return (
                                     <div className="text-sm">
                                       <div className="font-medium text-blue-600">
                                         <a
-                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="hover:underline"
                                         >
-                                          {matchedData.voucher_type}
+                                          {firstMatch.voucher_type}
                                         </a>
                                       </div>
                                       <div className="text-gray-600">
                                         <a
-                                          href={`/app/${matchedData.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${matchedData.voucher_no}`}
+                                          href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="hover:underline"
                                         >
-                                          {matchedData.voucher_no}
+                                          {firstMatch.voucher_no}
                                         </a>
                                       </div>
                                       <div className="text-xs text-gray-400">
-                                        (Manual Match)
+                                        (+{matchesToDisplay.length - 1} more) (Manual Match)
                                       </div>
                                     </div>
                                   )
