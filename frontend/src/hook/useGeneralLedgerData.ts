@@ -263,10 +263,6 @@ const rawEntries = result.message?.data?.entries || []
         })
       }
 
-      // Consolidate entries by voucher (group by voucher_type + voucher_no)
-      // This prevents journal entries with multiple GL entries from appearing multiple times
-      const consolidatedMap = new Map<string, GLEntry>()
-      
       if (!Array.isArray(filteredEntries)) {
         console.error("[useGeneralLedgerData] filteredEntries is not an array:", filteredEntries)
         setData([])
@@ -274,72 +270,24 @@ const rawEntries = result.message?.data?.entries || []
         return
       }
       
-      console.log("[useGeneralLedgerData] Starting consolidation. Filtered entries count:", filteredEntries.length)
-      let consolidatedCount = 0
-      let aggregatedCount = 0
-      
-      filteredEntries.forEach((entry: any) => {
-        const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
-        
-        if (consolidatedMap.has(voucherKey)) {
-          // Aggregate debits and credits for the same voucher
-          aggregatedCount++
-          const existing = consolidatedMap.get(voucherKey)!
-          const oldDebit = existing.debit
-          const oldCredit = existing.credit
-          existing.debit += entry.debit
-          existing.credit += entry.credit
-          console.log("[useGeneralLedgerData] Aggregating duplicate voucher:", {
-            voucher: voucherKey,
-            oldDebit,
-            oldCredit,
-            newDebit: existing.debit,
-            newCredit: existing.credit,
-            entryDebit: entry.debit,
-            entryCredit: entry.credit
-          })
-          // Keep the first account, or combine if needed
-          if (existing.account !== entry.account) {
-            // For consolidated view, we can show multiple accounts or just the first
-            // Using the first account is fine for reconciliation purposes
-          }
-          // Combine remarks if different
-          if (entry.remarks && existing.remarks && existing.remarks !== entry.remarks) {
-            existing.remarks = `${existing.remarks}; ${entry.remarks}`
-          }
-        } else {
-          // First entry for this voucher
-          consolidatedCount++
-          consolidatedMap.set(voucherKey, {
-            gl_entry: entry.gl_entry,
-            posting_date: entry.posting_date,
-            account: entry.account,
-            voucher_type: entry.voucher_type,
-            voucher_no: entry.voucher_no,
-            debit: entry.debit,
-            credit: entry.credit,
-            balance: 0, // Will be calculated below
-            against: entry.against,
-            remarks: entry.remarks,
-            party_type: entry.party_type,
-            party: entry.party,
-            cost_center: entry.cost_center,
-            project: entry.project,
-          })
-          console.log("[useGeneralLedgerData] Added new consolidated entry:", {
-            voucher: voucherKey,
-            posting_date: entry.posting_date,
-            debit: entry.debit,
-            credit: entry.credit,
-            party: entry.party
-          })
-        }
-      })
-      
-      console.log("[useGeneralLedgerData] Consolidation summary: filtered=", filteredEntries.length, ", consolidated=", consolidatedCount, ", aggregated=", aggregatedCount, ", final_map_size=", consolidatedMap.size)
-
-      // Convert map to array and sort
-      const sortedEntries = Array.from(consolidatedMap.values())
+      // Don't consolidate - show each GL entry row separately (like in GL report)
+      // This allows journal entries with multiple GL rows (debit and credit) to appear separately
+      const sortedEntries = filteredEntries.map((entry: any) => ({
+        gl_entry: entry.gl_entry,
+        posting_date: entry.posting_date,
+        account: entry.account,
+        voucher_type: entry.voucher_type,
+        voucher_no: entry.voucher_no,
+        debit: parseFloat(entry.debit) || 0,
+        credit: parseFloat(entry.credit) || 0,
+        balance: 0, // Will be calculated below
+        against: entry.against,
+        remarks: entry.remarks,
+        party_type: entry.party_type,
+        party: entry.party,
+        cost_center: entry.cost_center,
+        project: entry.project,
+      }))
         .sort((a, b) => {
           // Sort by posting date, then by voucher
           const dateCompare = new Date(a.posting_date).getTime() - new Date(b.posting_date).getTime()

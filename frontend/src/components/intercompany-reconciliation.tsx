@@ -40,7 +40,6 @@ export default function IntercompanyReconciliation() {
   const [isAutoFilled, setIsAutoFilled] = useState(false)
   const [automatchEnabled, setAutomatchEnabled] = useState(false)
   const [bypassTotalCalculation, setBypassTotalCalculation] = useState(false)
-  const [hideOpeningInvoices, setHideOpeningInvoices] = useState<boolean>(true)
 
   // State for view checkboxes
   const [customerViewEnabled, setCustomerViewEnabled] = useState<boolean>(true)
@@ -91,6 +90,16 @@ export default function IntercompanyReconciliation() {
   // Cache for fetched voucher amounts (key: "voucher_type-voucher_no")
   const [voucherAmountCache, setVoucherAmountCache] = useState<Map<string, { amount: number; debit: number; credit: number }>>(new Map())
 
+  // Helper function to create a unique key for each GL entry row
+  // Uses gl_entry if available, otherwise falls back to voucher+account+debit+credit
+  const getEntryKey = (entry: GLEntry): string => {
+    if (entry.gl_entry) {
+      return entry.gl_entry
+    }
+    // Fallback: use voucher + account + debit + credit to uniquely identify each row
+    return `${entry.voucher_type}-${entry.voucher_no}-${entry.account}-${entry.debit}-${entry.credit}`
+  }
+
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
   const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
@@ -134,7 +143,6 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
-    hideOpeningInvoices,
     shouldLoadData
   })
 
@@ -153,7 +161,6 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
-    hideOpeningInvoices,
     shouldLoadData: shouldLoadData && reloadTrigger >= 0
   })
 
@@ -180,7 +187,6 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
-    hideOpeningInvoices,
     shouldLoadData
   })
 
@@ -198,7 +204,6 @@ export default function IntercompanyReconciliation() {
     ignoreExchangeRateRevaluation,
     ignoreSystemGeneratedNotes,
     showOpeningEntries,
-    hideOpeningInvoices,
     shouldLoadData
   })
   // Debug log for hidden summary - only log when value changes
@@ -498,7 +503,7 @@ export default function IntercompanyReconciliation() {
     setHasLoadedData(false)
     setBackendMatchStatus({}) // Also clear backend status
     setHasBackendStatusData(false) // Reset backend status fetch flag
-  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries, hideOpeningInvoices])
+  }, [companyA, partyA, companyB, partyTypeB, partyB, fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries])
 
     // State for storing backend match status
   const [backendMatchStatus, setBackendMatchStatus] = useState<{[key: string]: any}>({})
@@ -519,12 +524,16 @@ export default function IntercompanyReconciliation() {
       // Create all API calls for Company A entries
       const companyAPromises = glDataA.map(async (entry) => {
         try {
-          // For Journal Entries, pass party information
+          // For Journal Entries, pass party information and gl_entry
           const party = entry.voucher_type === "Journal Entry" ? partyA : undefined
           const partyType = entry.voucher_type === "Journal Entry" ? "Customer" : undefined
-          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA, party, partyType)
+          const glEntry = entry.voucher_type === "Journal Entry" ? entry.gl_entry : undefined
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA, party, partyType, glEntry)
           if (result.success) {
-            const key = `${entry.voucher_type}-${entry.voucher_no}`
+            // Use gl_entry as key for Journal Entries to differentiate debit/credit, otherwise use voucher key
+            const key = entry.voucher_type === "Journal Entry" && entry.gl_entry 
+              ? entry.gl_entry 
+              : `${entry.voucher_type}-${entry.voucher_no}`
             return { key, result }
           }
         } catch (error) {
@@ -536,12 +545,16 @@ export default function IntercompanyReconciliation() {
       // Create all API calls for Company B entries
       const companyBPromises = glDataB.map(async (entry) => {
         try {
-          // For Journal Entries, pass party information
+          // For Journal Entries, pass party information and gl_entry
           const party = entry.voucher_type === "Journal Entry" ? partyB : undefined
           const partyType = entry.voucher_type === "Journal Entry" ? partyTypeB : undefined
-          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB, party, partyType)
+          const glEntry = entry.voucher_type === "Journal Entry" ? entry.gl_entry : undefined
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB, party, partyType, glEntry)
           if (result.success) {
-            const key = `${entry.voucher_type}-${entry.voucher_no}`
+            // Use gl_entry as key for Journal Entries to differentiate debit/credit, otherwise use voucher key
+            const key = entry.voucher_type === "Journal Entry" && entry.gl_entry 
+              ? entry.gl_entry 
+              : `${entry.voucher_type}-${entry.voucher_no}`
             return { key, result }
           }
         } catch (error) {
@@ -738,8 +751,11 @@ export default function IntercompanyReconciliation() {
     // First pass: Process Company A entries and find their matches
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
       // Check if we have backend status for this entry first
-      const key = `${entryA.voucher_type}-${entryA.voucher_no}`
-      const backendStatus = backendMatchStatus[key]
+      // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use voucher key
+      const statusKey = entryA.voucher_type === "Journal Entry" && entryA.gl_entry 
+        ? entryA.gl_entry 
+        : `${entryA.voucher_type}-${entryA.voucher_no}`
+      const backendStatus = backendMatchStatus[statusKey]
 
       // If backend says "Match", try to find the matched entry in current dataset
       let backendMatchedEntry: GLEntry | undefined = undefined
@@ -755,7 +771,7 @@ export default function IntercompanyReconciliation() {
       // Find matching entry in Company B based on automatch setting (only if backend didn't find one)
       // But ensure we don't match with an entry that's already been matched
       const matchingEntry = backendMatchedEntry || glDataB.find(entryB => {
-        const entryBKey = `${entryB.voucher_type}-${entryB.voucher_no}`
+        const entryBKey = getEntryKey(entryB)
 
         // Skip if this entry B has already been matched
         if (matchedEntriesB.has(entryBKey)) {
@@ -792,7 +808,7 @@ export default function IntercompanyReconciliation() {
 
       // If we found a match (from frontend logic), mark it as used
       if (matchingEntry && !backendMatchedEntry) {
-        const entryBKey = `${matchingEntry.voucher_type}-${matchingEntry.voucher_no}`
+        const entryBKey = getEntryKey(matchingEntry)
         matchedEntriesB.add(entryBKey)
       }
 
@@ -825,8 +841,11 @@ export default function IntercompanyReconciliation() {
     console.log("[findMatchingEntries] Processing Company B entries:", glDataB.length)
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
       // Check if we have backend status for this entry first
-      const key = `${entryB.voucher_type}-${entryB.voucher_no}`
-      const backendStatus = backendMatchStatus[key]
+      // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use voucher key
+      const statusKey = entryB.voucher_type === "Journal Entry" && entryB.gl_entry 
+        ? entryB.gl_entry 
+        : `${entryB.voucher_type}-${entryB.voucher_no}`
+      const backendStatus = backendMatchStatus[statusKey]
 
       // If backend says "Match", try to find the matched entry in current dataset
       let backendMatchedEntry: GLEntry | undefined = undefined
@@ -841,7 +860,7 @@ export default function IntercompanyReconciliation() {
 
       // Find matching entry in Company A based on amount AND date equality (only if backend didn't find one)
       const matchingEntry = backendMatchedEntry || glDataA.find(entryA => {
-        const entryAKey = `${entryA.voucher_type}-${entryA.voucher_no}`
+        const entryAKey = getEntryKey(entryA)
 
         // Skip if this entry A has already been matched
         if (matchedEntriesA.has(entryAKey)) {
@@ -873,7 +892,7 @@ export default function IntercompanyReconciliation() {
 
       // If we found a match (from frontend logic), mark it as used
       if (matchingEntry && !backendMatchedEntry) {
-        const entryAKey = `${matchingEntry.voucher_type}-${matchingEntry.voucher_no}`
+        const entryAKey = getEntryKey(matchingEntry)
         matchedEntriesA.add(entryAKey)
       }
 
@@ -903,9 +922,9 @@ export default function IntercompanyReconciliation() {
     })
 
     // Now apply permission filtering to only show visible entries
-    // Create sets of visible voucher keys for quick lookup
-    const visibleKeysA = new Set(permissionAwareDataA.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
-    const visibleKeysB = new Set(permissionAwareDataB.map(entry => `${entry.voucher_type}-${entry.voucher_no}`))
+    // Create sets of visible entry keys for quick lookup (using unique keys)
+    const visibleKeysA = new Set(permissionAwareDataA.map(entry => getEntryKey(entry)))
+    const visibleKeysB = new Set(permissionAwareDataB.map(entry => getEntryKey(entry)))
 
     console.log("[findMatchingEntries] Permission-aware data counts:", {
       permissionAwareDataA: permissionAwareDataA.length,
@@ -918,7 +937,7 @@ export default function IntercompanyReconciliation() {
 
     // Filter the matched entries to only show visible ones
     const filteredGlDataAWithStatus = glDataAWithStatus.filter(entry => {
-      const key = `${entry.voucher_type}-${entry.voucher_no}`
+      const key = getEntryKey(entry)
       const isVisible = visibleKeysA.has(key)
       if (!isVisible) {
         console.log("[findMatchingEntries] Entry filtered out by permission (Company A):", {
@@ -932,7 +951,7 @@ export default function IntercompanyReconciliation() {
     })
 
     const filteredGlDataBWithStatus = glDataBWithStatus.filter(entry => {
-      const key = `${entry.voucher_type}-${entry.voucher_no}`
+      const key = getEntryKey(entry)
       const isVisible = visibleKeysB.has(key)
       if (!isVisible) {
         console.log("[findMatchingEntries] Entry filtered out by permission (Company B):", {
@@ -1039,7 +1058,9 @@ export default function IntercompanyReconciliation() {
 
     // Don't calculate stats until we have backend status data to avoid race conditions
     // This prevents showing incorrect totals on first fetch when backend status is still loading
-    if (!hasBackendStatusData && (glDataA.length > 0 || glDataB.length > 0)) {
+    // Check if we have backend status data OR if backendMatchStatus has entries (data might still be there even if flag was reset)
+    const hasBackendStatus = hasBackendStatusData || Object.keys(backendMatchStatus).length > 0
+    if (!hasBackendStatus && (glDataA.length > 0 || glDataB.length > 0)) {
       console.log("[summaryStats] No backend status data yet, returning null")
       return null
     }
@@ -1131,7 +1152,7 @@ export default function IntercompanyReconciliation() {
         pending: pendingA + pendingB
       }
     }
-  }, [findMatchingEntries, hasBackendStatusData, glDataA, glDataB])
+  }, [findMatchingEntries, hasBackendStatusData, backendMatchStatus, glDataA, glDataB])
 
   const formatCurrency = (amount: number, currencyCode: string = 'USD', partyName?: string, partyType?: string) => {
     // Use selected currency if it's not "all", otherwise use party currency or provided currencyCode
@@ -1194,12 +1215,12 @@ export default function IntercompanyReconciliation() {
     const selectedEntriesList: Array<{ entry: GLEntry; side: 'A' | 'B' }> = []
 
     for (const entryKey of selectedEntriesArray) {
-      // Find the entry in both Company A and Company B data
+      // Find the entry in both Company A and Company B data using unique key
       const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
-        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        getEntryKey(entry) === entryKey
       )
       const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
-        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        getEntryKey(entry) === entryKey
       )
 
       if (entryA) {
@@ -1221,10 +1242,10 @@ export default function IntercompanyReconciliation() {
     // Check if all selected entries have Match status
     for (const entryKey of selectedEntriesArray) {
       const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
-        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        getEntryKey(entry) === entryKey
       )
       const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
-        `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+        getEntryKey(entry) === entryKey
       )
 
       const entry = entryA || entryB
@@ -1249,7 +1270,21 @@ export default function IntercompanyReconciliation() {
       const pairedEntriesSet = new Set<string>()
 
       selectedEntriesArray.forEach(entryKey => {
-        optimisticStatusMap[entryKey] = {
+        // Find the entry to determine the correct status key
+        const entryA = findMatchingEntries.glDataAWithStatus.find(e =>
+          getEntryKey(e) === entryKey
+        )
+        const entryB = findMatchingEntries.glDataBWithStatus.find(e =>
+          getEntryKey(e) === entryKey
+        )
+        
+        const entry = entryA || entryB
+        // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use entryKey
+        const statusKey = entry && entry.voucher_type === "Journal Entry" && entry.gl_entry 
+          ? entry.gl_entry 
+          : entryKey
+        
+        optimisticStatusMap[statusKey] = {
           status: 'Mismatch',
           matched_with: null,
           matched_with_parsed: null, // Clear the parsed match data
@@ -1257,15 +1292,6 @@ export default function IntercompanyReconciliation() {
           matched_on: null
         }
 
-        // Find the entry to check for paired transactions
-        const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
-        )
-        const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
-        )
-
-        const entry = entryA || entryB
         if (entry) {
           // Check for backend matched_with data
           if (entry.backendMatchData?.matched_with_parsed) {
@@ -1317,12 +1343,12 @@ export default function IntercompanyReconciliation() {
           return
         }
 
-        // Find the entry in both Company A and Company B data
+        // Find the entry in both Company A and Company B data using unique key
         const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+          getEntryKey(entry) === entryKey
         )
         const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+          getEntryKey(entry) === entryKey
         )
 
         if (entryA) {
@@ -1333,7 +1359,8 @@ export default function IntercompanyReconciliation() {
             status: 'Mismatch' as const,
             matched_with: null,
             party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
-            party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
+            party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined,
+            gl_entry: entryA.voucher_type === "Journal Entry" ? entryA.gl_entry : undefined
           })
         }
 
@@ -1345,7 +1372,8 @@ export default function IntercompanyReconciliation() {
             status: 'Mismatch' as const,
             matched_with: null,
             party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
-            party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
+            party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined,
+            gl_entry: entryB.voucher_type === "Journal Entry" ? entryB.gl_entry : undefined
           })
         }
       }
@@ -1424,44 +1452,68 @@ export default function IntercompanyReconciliation() {
       const selectedEntriesArray = Array.from(selectedEntries)
       const selectedEntriesA = selectedEntriesArray.filter(entryKey =>
         findMatchingEntries.glDataAWithStatus.some(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+          getEntryKey(entry) === entryKey
         )
       )
       const selectedEntriesB = selectedEntriesArray.filter(entryKey =>
         findMatchingEntries.glDataBWithStatus.some(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+          getEntryKey(entry) === entryKey
         )
       )
 
+      // Get already matched entries (status === 'Match') from both sides
+      const alreadyMatchedA = findMatchingEntries.glDataAWithStatus.filter(entry => {
+        const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
+        const backendStatus = backendMatchStatus[voucherKey]
+        return backendStatus?.status === 'Match'
+      })
+      const alreadyMatchedB = findMatchingEntries.glDataBWithStatus.filter(entry => {
+        const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
+        const backendStatus = backendMatchStatus[voucherKey]
+        return backendStatus?.status === 'Match'
+      })
+
+      // Calculate totals for already matched entries
+      const matchedDebitA = alreadyMatchedA.reduce((sum, entry) => sum + (entry.debit || 0), 0)
+      const matchedCreditA = alreadyMatchedA.reduce((sum, entry) => sum + (entry.credit || 0), 0)
+      const matchedDebitB = alreadyMatchedB.reduce((sum, entry) => sum + (entry.debit || 0), 0)
+      const matchedCreditB = alreadyMatchedB.reduce((sum, entry) => sum + (entry.credit || 0), 0)
+
       // Calculate totals for selected entries from both sides
       const totalDebitLeft = selectedEntriesA.reduce((sum, entryKey) => {
-        const entry = findMatchingEntries.glDataAWithStatus.find(e => `${e.voucher_type}-${e.voucher_no}` === entryKey)
+        const entry = findMatchingEntries.glDataAWithStatus.find(e => getEntryKey(e) === entryKey)
         return sum + (entry?.debit || 0)
       }, 0)
 
       const totalCreditLeft = selectedEntriesA.reduce((sum, entryKey) => {
-        const entry = findMatchingEntries.glDataAWithStatus.find(e => `${e.voucher_type}-${e.voucher_no}` === entryKey)
+        const entry = findMatchingEntries.glDataAWithStatus.find(e => getEntryKey(e) === entryKey)
         return sum + (entry?.credit || 0)
       }, 0)
 
       const totalDebitRight = selectedEntriesB.reduce((sum, entryKey) => {
-        const entry = findMatchingEntries.glDataBWithStatus.find(e => `${e.voucher_type}-${e.voucher_no}` === entryKey)
+        const entry = findMatchingEntries.glDataBWithStatus.find(e => getEntryKey(e) === entryKey)
         return sum + (entry?.debit || 0)
       }, 0)
 
       const totalCreditRight = selectedEntriesB.reduce((sum, entryKey) => {
-        const entry = findMatchingEntries.glDataBWithStatus.find(e => `${e.voucher_type}-${e.voucher_no}` === entryKey)
+        const entry = findMatchingEntries.glDataBWithStatus.find(e => getEntryKey(e) === entryKey)
         return sum + (entry?.credit || 0)
       }, 0)
+
+      // Add already matched totals to current selection totals
+      const totalDebitLeftWithMatched = matchedDebitA + totalDebitLeft
+      const totalCreditLeftWithMatched = matchedCreditA + totalCreditLeft
+      const totalDebitRightWithMatched = matchedDebitB + totalDebitRight
+      const totalCreditRightWithMatched = matchedCreditB + totalCreditRight
 
       // Check if bypass total calculation is enabled
       let validationPassed = false
 
 
       if (bypassTotalCalculation) {
-        // Calculate net totals for both sides
-        const netTotalLeft = totalCreditLeft - totalDebitLeft
-        const netTotalRight = totalCreditRight - totalDebitRight
+        // Calculate net totals for both sides (including already matched entries)
+        const netTotalLeft = totalCreditLeftWithMatched - totalDebitLeftWithMatched
+        const netTotalRight = totalCreditRightWithMatched - totalDebitRightWithMatched
 
         // For bypass mode, compare absolute values of net totals with small tolerance
         // This ensures we match regardless of which side is positive/negative
@@ -1473,6 +1525,14 @@ export default function IntercompanyReconciliation() {
           totalDebitLeft,
           totalCreditRight,
           totalDebitRight,
+          matchedDebitA,
+          matchedCreditA,
+          matchedDebitB,
+          matchedCreditB,
+          totalDebitLeftWithMatched,
+          totalCreditLeftWithMatched,
+          totalDebitRightWithMatched,
+          totalCreditRightWithMatched,
           netTotalLeft,
           netTotalRight,
           absNetTotalLeft: Math.abs(netTotalLeft),
@@ -1483,9 +1543,11 @@ export default function IntercompanyReconciliation() {
         })
         validationPassed = netTotalMatch
       } else {
-        // Original validation logic
-        const debitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
-        const creditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
+        // Validation logic: Check if totals match (including already matched entries)
+        // Total debit on side A (matched + current) should equal total credit on side B (matched + current)
+        // Total credit on side A (matched + current) should equal total debit on side B (matched + current)
+        const debitCreditMatch = Math.abs(totalDebitLeftWithMatched - totalCreditRightWithMatched) < 0.01
+        const creditDebitMatch = Math.abs(totalCreditLeftWithMatched - totalDebitRightWithMatched) < 0.01
         validationPassed = debitCreditMatch && creditDebitMatch
       }
 
@@ -1493,21 +1555,32 @@ export default function IntercompanyReconciliation() {
       // Always validate amounts for manual matching (regardless of automatch setting)
       if (!validationPassed) {
         let errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
+              `Selected Entries:\n` +
               `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
               `${companyA} Total Credit: ${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
               `${companyB} Total Debit: ${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n` +
-              `${companyB} Total Credit: ${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n\n`
+              `${companyB} Total Credit: ${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n\n` +
+              `Already Matched Entries:\n` +
+              `${companyA} Matched Debit: ${formatCurrency(matchedDebitA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+              `${companyA} Matched Credit: ${formatCurrency(matchedCreditA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+              `${companyB} Matched Debit: ${formatCurrency(matchedDebitB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n` +
+              `${companyB} Matched Credit: ${formatCurrency(matchedCreditB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n\n` +
+              `Combined Totals (Matched + Selected):\n` +
+              `${companyA} Total Debit: ${formatCurrency(totalDebitLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+              `${companyA} Total Credit: ${formatCurrency(totalCreditLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+              `${companyB} Total Debit: ${formatCurrency(totalDebitRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n` +
+              `${companyB} Total Credit: ${formatCurrency(totalCreditRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}\n\n`
 
         if (bypassTotalCalculation) {
-          const netTotalLeft = totalCreditLeft - totalDebitLeft
-          const netTotalRight = totalCreditRight - totalDebitRight
+          const netTotalLeft = totalCreditLeftWithMatched - totalDebitLeftWithMatched
+          const netTotalRight = totalCreditRightWithMatched - totalDebitRightWithMatched
           errorMessage += `For matching with bypass total calculation:\n` +
                 `- ${companyA} Net Total (${formatCurrency(netTotalLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Net Total (${formatCurrency(netTotalRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
                 `- Net Total = Credit - Debit`
         } else {
-          errorMessage += `For matching, either:\n` +
-                `- ${companyA} Debit (${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Credit (${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
-                `- ${companyA} Credit (${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Debit (${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})`
+          errorMessage += `For matching, both conditions must be true:\n` +
+                `- ${companyA} Total Debit (${formatCurrency(totalDebitLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Total Credit (${formatCurrency(totalCreditRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
+                `- ${companyA} Total Credit (${formatCurrency(totalCreditLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Total Debit (${formatCurrency(totalDebitRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})`
         }
 
         setValidationErrorMessage(errorMessage)
@@ -1525,12 +1598,12 @@ export default function IntercompanyReconciliation() {
       const companyBEntries = []
 
       for (const entryKey of selectedEntries) {
-        // Find the entry in both Company A and Company B data
+        // Find the entry in both Company A and Company B data using unique key
         const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+          getEntryKey(entry) === entryKey
         )
         const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
-          `${entry.voucher_type}-${entry.voucher_no}` === entryKey
+          getEntryKey(entry) === entryKey
         )
 
         if (entryA) {
@@ -1581,7 +1654,8 @@ export default function IntercompanyReconciliation() {
           status: 'Match' as const,
           matched_with: matchedWithForA,
           party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
-          party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
+          party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined,
+          gl_entry: entryA.voucher_type === "Journal Entry" ? entryA.gl_entry : undefined
         })
       })
 
@@ -1593,14 +1667,18 @@ export default function IntercompanyReconciliation() {
           status: 'Match' as const,
           matched_with: matchedWithForB,
           party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
-          party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
+          party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined,
+          gl_entry: entryB.voucher_type === "Journal Entry" ? entryB.gl_entry : undefined
         })
       })
 
       // Update backend match status immediately for selected entries with proper pairings
       const optimisticStatusMap = { ...backendMatchStatus }
       bulkData.forEach(entry => {
-        const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+        // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use voucher key
+        const entryKey = entry.voucher_type === "Journal Entry" && entry.gl_entry 
+          ? entry.gl_entry 
+          : `${entry.voucher_type}-${entry.voucher_no}`
         optimisticStatusMap[entryKey] = {
           status: 'Match',
           matched_with: entry.matched_with ? JSON.stringify(entry.matched_with) : null,
@@ -1767,7 +1845,8 @@ export default function IntercompanyReconciliation() {
         status: 'Match',
         matched_with: matchedWithB,
         party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
-        party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined
+        party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined,
+        gl_entry: entryA.voucher_type === "Journal Entry" ? entryA.gl_entry : undefined
       })
 
       await updateMatchStatus({
@@ -1777,15 +1856,21 @@ export default function IntercompanyReconciliation() {
         status: 'Match',
         matched_with: matchedWithA,
         party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
-        party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined
+        party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined,
+        gl_entry: entryB.voucher_type === "Journal Entry" ? entryB.gl_entry : undefined
       })
 
       // OPTIMISTIC UPDATE: Update backend match status immediately
       const statusMap = { ...backendMatchStatus }
 
       // Update the status map with new data
-      const keyA = `${entryA.voucher_type}-${entryA.voucher_no}`
-      const keyB = `${entryB.voucher_type}-${entryB.voucher_no}`
+      // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use voucher key
+      const keyA = entryA.voucher_type === "Journal Entry" && entryA.gl_entry 
+        ? entryA.gl_entry 
+        : `${entryA.voucher_type}-${entryA.voucher_no}`
+      const keyB = entryB.voucher_type === "Journal Entry" && entryB.gl_entry 
+        ? entryB.gl_entry 
+        : `${entryB.voucher_type}-${entryB.voucher_no}`
 
       statusMap[keyA] = {
         success: true,
@@ -1882,7 +1967,8 @@ export default function IntercompanyReconciliation() {
         status: 'Mismatch',
         party: entryParty,
         party_type: entryPartyType,
-        matched_with: null
+        matched_with: null,
+        gl_entry: entry.voucher_type === "Journal Entry" ? entry.gl_entry : undefined
       })
 
       // OPTIMISTIC UPDATE: Update backend match status immediately
@@ -3235,19 +3321,6 @@ export default function IntercompanyReconciliation() {
                       </div> */}
                     </div>
                   )}
-                  {/* Hide Opening Entries Checkbox */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="hide-opening-invoices"
-                        checked={hideOpeningInvoices}
-                        onCheckedChange={(checked) => setHideOpeningInvoices(checked === true)}
-                      />
-                      <label htmlFor="hide-opening-invoices" className="text-sm text-gray-700">
-                        Hide Opening Entries
-                      </label>
-                    </div>
-                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -3346,7 +3419,7 @@ export default function IntercompanyReconciliation() {
                             type="checkbox"
                             onChange={(e) => {
                               const isChecked = e.target.checked
-                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
+                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).map(entry => getEntryKey(entry))
                               if (isChecked) {
                                 setSelectedEntries(new Set([...selectedEntries, ...entryKeys]))
                               } else {
@@ -3460,14 +3533,14 @@ export default function IntercompanyReconciliation() {
                         }
                         
                         return filteredForTable.map((entry, index) => {
-                        const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+                        const entryKey = getEntryKey(entry)
                         const matchedEntry = getMatchedEntry(entry, true) // true = Company A side
                         const amountsMatch = doAmountsMatch(entry, matchedEntry)
                         const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
                         
                         return (
                           <TableRow 
-                            key={entry.gl_entry || index} 
+                            key={entryKey} 
                             className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''}`}
                           >
                             <TableCell>
@@ -3769,7 +3842,7 @@ export default function IntercompanyReconciliation() {
                             type="checkbox"
                             onChange={(e) => {
                               const isChecked = e.target.checked
-                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).map(entry => `${entry.voucher_type}-${entry.voucher_no}`)
+                              const entryKeys = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).map(entry => getEntryKey(entry))
                               if (isChecked) {
                                 setSelectedEntries(new Set([...selectedEntries, ...entryKeys]))
                               } else {
@@ -3831,14 +3904,14 @@ export default function IntercompanyReconciliation() {
                         </TableRow>
                       ) : (
                         filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).map((entry, index) => {
-                        const entryKey = `${entry.voucher_type}-${entry.voucher_no}`
+                        const entryKey = getEntryKey(entry)
                         const matchedEntry = getMatchedEntry(entry, false) // false = Company B side
                         const amountsMatch = doAmountsMatch(entry, matchedEntry)
                         const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
                         
                         return (
                           <TableRow 
-                            key={entry.gl_entry || index} 
+                            key={entryKey} 
                             className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''}`}
                           >
                             <TableCell>

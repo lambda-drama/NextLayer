@@ -8,6 +8,7 @@ export interface MatchStatusData {
   matched_with?: any
   party?: string  // For Journal Entries
   party_type?: string  // For Journal Entries (Customer/Supplier)
+  gl_entry?: string  // For Journal Entries - specific GL Entry (debit or credit)
 }
 
 export interface MatchStatusResponse {
@@ -44,7 +45,8 @@ export const useMatchStatus = () => {
           status: data.status,
           matched_with: data.matched_with,
           party: data.party,
-          party_type: data.party_type
+          party_type: data.party_type,
+          gl_entry: data.gl_entry
         }),
         credentials: 'include'
       })
@@ -74,7 +76,7 @@ export const useMatchStatus = () => {
     }
   }, [])
 
-  const getMatchStatus = useCallback(async (voucherType: string, voucherNo: string, company: string, party?: string, partyType?: string): Promise<MatchStatusResponse> => {
+  const getMatchStatus = useCallback(async (voucherType: string, voucherNo: string, company: string, party?: string, partyType?: string, glEntry?: string): Promise<MatchStatusResponse> => {
     setLoading(true)
     setError(null)
 
@@ -82,6 +84,9 @@ export const useMatchStatus = () => {
       let url = `/api/method/nextlayer.next_layer.api.general_ledger.get_match_status?voucher_type=${encodeURIComponent(voucherType)}&voucher_no=${encodeURIComponent(voucherNo)}&company=${encodeURIComponent(company)}`
       if (party && partyType) {
         url += `&party=${encodeURIComponent(party)}&party_type=${encodeURIComponent(partyType)}`
+      }
+      if (glEntry) {
+        url += `&gl_entry=${encodeURIComponent(glEntry)}`
       }
       const response = await fetch(url, {
         method: 'GET',

@@ -108,53 +108,32 @@ export function usePermissionAwareGLData(filters: GLFilters & { shouldLoadData: 
           // console.log("Permission-aware data received:", responseData.data.entries.length, "entries")
           // console.log("Hidden summary:", responseData.data.hidden_summary)
           
-          // Consolidate entries by voucher (group by voucher_type + voucher_no)
-          // This prevents journal entries with multiple GL entries from appearing multiple times
+          // Don't consolidate - show each GL entry row separately (like in GL report)
+          // This allows journal entries with multiple GL rows (debit and credit) to appear separately
           const rawEntries = responseData.data.entries || []
-          const consolidatedMap = new Map<string, any>()
-          
-          rawEntries.forEach((entry: any) => {
-            // Skip special summary rows
-            if (!entry.posting_date || 
-                (typeof entry.account === "string" && 
-                 (entry.account.includes("'Opening'") || 
-                  entry.account.includes("'Total'") || 
-                  entry.account.includes("'Closing (Opening + Total)'")))) {
-              return
-            }
-            
-            const voucherKey = `${entry.voucher_type || ""}-${entry.voucher_no || ""}`
-            
-            if (consolidatedMap.has(voucherKey)) {
-              // Aggregate debits and credits for the same voucher
-              const existing = consolidatedMap.get(voucherKey)!
-              existing.debit = (parseFloat(existing.debit) || 0) + (parseFloat(entry.debit) || 0)
-              existing.credit = (parseFloat(existing.credit) || 0) + (parseFloat(entry.credit) || 0)
-              // Combine remarks if different
-              if (entry.remarks && existing.remarks && existing.remarks !== entry.remarks) {
-                existing.remarks = `${existing.remarks}; ${entry.remarks}`
-              }
-            } else {
-              // First entry for this voucher
-              consolidatedMap.set(voucherKey, {
-                ...entry,
-                debit: parseFloat(entry.debit) || 0,
-                credit: parseFloat(entry.credit) || 0,
-              })
-            }
-          })
-
-          // Convert map to array and sort
-          const consolidatedEntries = Array.from(consolidatedMap.values())
-            .sort((a, b) => {
+          const processedEntries = rawEntries
+            .filter((entry: any) => {
+              // Skip special summary rows
+              return entry.posting_date && 
+                !(typeof entry.account === "string" && 
+                  (entry.account.includes("'Opening'") || 
+                   entry.account.includes("'Total'") || 
+                   entry.account.includes("'Closing (Opening + Total)'")))
+            })
+            .map((entry: any) => ({
+              ...entry,
+              debit: parseFloat(entry.debit) || 0,
+              credit: parseFloat(entry.credit) || 0,
+            }))
+            .sort((a: any, b: any) => {
               const dateCompare = new Date(a.posting_date).getTime() - new Date(b.posting_date).getTime()
               if (dateCompare !== 0) return dateCompare
               return `${a.voucher_type}-${a.voucher_no}`.localeCompare(`${b.voucher_type}-${b.voucher_no}`)
             })
 
-          setData(consolidatedEntries)
+          setData(processedEntries)
           setHiddenSummary(responseData.data.hidden_summary)
-          setTotalVisibleEntries(consolidatedEntries.length)
+          setTotalVisibleEntries(processedEntries.length)
           setTotalHiddenEntries(responseData.data.total_hidden_entries)
         } else {
           setError(responseData.message || responseData.error || 'Failed to fetch GL data')
