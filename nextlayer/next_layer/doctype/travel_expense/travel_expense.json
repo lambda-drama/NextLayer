@@ -128,9 +128,9 @@
   },
   {
    "fieldname": "travel_group",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "label": "Travel Group",
-   "options": "\nManagement\nStaff\nFamily"
+   "options": "Travel Group"
   },
   {
    "fieldname": "flight_no",
@@ -572,7 +572,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-01-10 02:45:01.697119",
+ "modified": "2026-01-24 02:21:17.021015",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
