@@ -40,7 +40,10 @@ def get_general_ledger_data(filters):
 
 		# Skip company permission check - allow access to all companies for reconciliation
 		filters.setdefault("show_remarks", 1)
-		filters.setdefault("group_by", "Group by Voucher (Consolidated)")
+		# Don't set group_by - let it be empty/None so GL report shows individual entries (like when group_by is blank in UI)
+		# Only set if not already provided
+		if "group_by" not in filters:
+			filters["group_by"] = ""
 		filters.setdefault("include_dimensions", 1)
 		filters.setdefault("include_default_book_entries", 1)
 
@@ -63,12 +66,8 @@ def get_general_ledger_data(filters):
 		finally:
 			frappe.set_user(original_user)
 
-		print(f"[get_general_ledger_data] Total entries from GL report: {len(data)}")
-		print(f"[get_general_ledger_data] Filters: company={filters.get('company')}, party={filters.get('party')}, from_date={filters.get('from_date')}, to_date={filters.get('to_date')}")
-
 		# Filter out opening entries for Sales Invoice and Purchase Invoice (if hide_opening_invoices is enabled)
 		hide_opening_invoices = filters.get('hide_opening_invoices', 1)  # Default to 1 (hide) if not specified
-		print(f"[get_general_ledger_data] hide_opening_invoices setting: {hide_opening_invoices}")
 		filtered_data = []
 		skipped_summary = 0
 		skipped_no_date = 0
@@ -89,7 +88,6 @@ def get_general_ledger_data(filters):
 
 			if not posting_date:
 				skipped_no_date += 1
-				print(f"[get_general_ledger_data] Skipped entry (no posting_date): voucher={voucher_type}-{voucher_no}, account={account}")
 				continue
 
 			# Skip opening entries for Sales Invoice and Purchase Invoice if hide_opening_invoices is enabled
@@ -99,20 +97,12 @@ def get_general_ledger_data(filters):
 					# is_opening is stored as "Yes" or "No" in Frappe
 					if is_opening == "Yes":
 						skipped_opening += 1
-						print(f"[get_general_ledger_data] Skipped opening entry: {voucher_type}-{voucher_no}, posting_date={posting_date}, debit={entry.get('debit', 0)}, credit={entry.get('credit', 0)}, is_opening={is_opening}")
 						continue
-					else:
-						print(f"[get_general_ledger_data] Not an opening entry (is_opening={is_opening}): {voucher_type}-{voucher_no}, posting_date={posting_date}")
 				except Exception as e:
 					# If there's an error checking is_opening, log it but continue processing
 					frappe.log_error(f"Error checking is_opening for {voucher_type} {voucher_no}: {str(e)}")
-					print(f"[get_general_ledger_data] Error checking is_opening for {voucher_type}-{voucher_no}: {str(e)}")
 
-			# Log every entry being included
-			print(f"[get_general_ledger_data] Including entry: {voucher_type}-{voucher_no}, posting_date={posting_date}, debit={entry.get('debit', 0)}, credit={entry.get('credit', 0)}, account={account}")
 			filtered_data.append(entry)
-
-		print(f"[get_general_ledger_data] Filtering summary: total={len(data)}, skipped_summary={skipped_summary}, skipped_no_date={skipped_no_date}, skipped_opening={skipped_opening}, final_count={len(filtered_data)}")
 
 		# Format the response
 		result = {
@@ -161,7 +151,10 @@ def get_permission_aware_gl_data(filters):
 
 		# Set default values
 		filters.setdefault("show_remarks", 1)
-		filters.setdefault("group_by", "Group by Voucher (Consolidated)")
+		# Don't set group_by - let it be empty/None so GL report shows individual entries (like when group_by is blank in UI)
+		# Only set if not already provided
+		if "group_by" not in filters:
+			filters["group_by"] = ""
 		filters.setdefault("include_dimensions", 1)
 		filters.setdefault("include_default_book_entries", 1)
 
@@ -538,6 +531,7 @@ def update_match_status():
 		matched_with = data.get("matched_with")
 		party = data.get("party")  # For Journal Entries
 		party_type = data.get("party_type")  # For Journal Entries (Customer/Supplier)
+		gl_entry = data.get("gl_entry")  # For Journal Entries - specific GL Entry (debit or credit)
 
 		if not all([voucher_type, voucher_no, company, match_status]):
 			frappe.throw("Missing required fields: voucher_type, voucher_no, company, status")
@@ -674,12 +668,23 @@ def update_match_status():
 				if "company" not in matched_with:
 					matched_with["company"] = company
 
-			# Find or create child table row for this party
+			# Find or create child table row for this party and gl_entry
+			# For Journal Entries, we need to differentiate between debit and credit GL entries
 			child_table = current_doc.get("custom_intercompany_match_details", [])
 			matching_child_row = None
 
 			for row in child_table:
-				if row.party == party and row.party_type == party_type:
+				# Match by party, party_type, and gl_entry (if provided)
+				party_match = row.party == party and row.party_type == party_type
+				gl_entry_match = True
+				if gl_entry:
+					# If gl_entry is provided, it must match
+					gl_entry_match = row.gl_entry == gl_entry
+				else:
+					# If gl_entry is not provided, only match rows without gl_entry (backward compatibility)
+					gl_entry_match = not row.gl_entry
+				
+				if party_match and gl_entry_match:
 					matching_child_row = row
 					break
 
@@ -701,16 +706,23 @@ def update_match_status():
 				matching_child_row.intercompany_matched_with = matched_with_value if match_status == "Match" else None
 				matching_child_row.intercompany_matched_by = matched_by_value
 				matching_child_row.intercompany_matched_on = matched_on_value
+				# Update gl_entry if provided (in case it wasn't set before)
+				if gl_entry:
+					matching_child_row.gl_entry = gl_entry
 			else:
 				# Create new child table row
-				current_doc.append("custom_intercompany_match_details", {
+				child_row_data = {
 					"party_type": party_type,
 					"party": party,
 					"intercompany_match_status": match_status,
 					"intercompany_matched_with": matched_with_value if match_status == "Match" else None,
 					"intercompany_matched_by": matched_by_value,
 					"intercompany_matched_on": matched_on_value
-				})
+				}
+				# Add gl_entry if provided
+				if gl_entry:
+					child_row_data["gl_entry"] = gl_entry
+				current_doc.append("custom_intercompany_match_details", child_row_data)
 
 			# Save the document with retry logic for concurrency issues
 			max_retries = 3
@@ -727,7 +739,15 @@ def update_match_status():
 						matching_child_row = None
 
 						for row in child_table:
-							if row.party == party and row.party_type == party_type:
+							# Match by party, party_type, and gl_entry (if provided)
+							party_match = row.party == party and row.party_type == party_type
+							gl_entry_match = True
+							if gl_entry:
+								gl_entry_match = row.gl_entry == gl_entry
+							else:
+								gl_entry_match = not row.gl_entry
+							
+							if party_match and gl_entry_match:
 								matching_child_row = row
 								break
 
@@ -737,15 +757,22 @@ def update_match_status():
 							matching_child_row.intercompany_matched_with = matched_with_value if match_status == "Match" else None
 							matching_child_row.intercompany_matched_by = matched_by_value
 							matching_child_row.intercompany_matched_on = matched_on_value
+							# Update gl_entry if provided
+							if gl_entry:
+								matching_child_row.gl_entry = gl_entry
 						else:
-							current_doc.append("custom_intercompany_match_details", {
+							child_row_data = {
 								"party_type": party_type,
 								"party": party,
 								"intercompany_match_status": match_status,
 								"intercompany_matched_with": matched_with_value if match_status == "Match" else None,
 								"intercompany_matched_by": matched_by_value,
 								"intercompany_matched_on": matched_on_value
-							})
+							}
+							# Add gl_entry if provided
+							if gl_entry:
+								child_row_data["gl_entry"] = gl_entry
+							current_doc.append("custom_intercompany_match_details", child_row_data)
 
 					print(f"[update_match_status] Saving Journal Entry {voucher_no} with party {party} (attempt {retry_count + 1})")
 					current_doc.save(ignore_permissions=True)
@@ -916,24 +943,62 @@ def update_match_status():
 
 
 @frappe.whitelist()
-def get_match_status(voucher_type, voucher_no, company, party=None, party_type=None):
+def get_match_status(voucher_type, voucher_no, company, party=None, party_type=None, gl_entry=None):
 	"""Get current match status for a voucher from the original document
-	For Journal Entries, checks the child table 'InterCompany Journal Match Detail' for the specific party
+	For Journal Entries, checks the child table 'InterCompany Journal Match Detail' for the specific party and gl_entry
 	"""
 	try:
 		try:
 			doc = frappe.get_doc(voucher_type, voucher_no)
 
-			# For Journal Entries, check the child table for the specific party
+			# For Journal Entries, check the child table for the specific party and gl_entry
 			if voucher_type == "Journal Entry" and party and party_type:
-				# Look for child table entry matching the party
+				# Look for child table entry matching the party and gl_entry
 				child_table = doc.get("custom_intercompany_match_details", [])
 				matching_child_row = None
+				print(f"[get_match_status] Journal Entry {voucher_no}: Looking for party={party}, party_type={party_type}, gl_entry={gl_entry}")
+				print(f"[get_match_status] Found {len(child_table)} child table rows")
 
 				for row in child_table:
-					if row.party == party and row.party_type == party_type:
-						matching_child_row = row
-						break
+					# Match by party and party_type first
+					party_match = row.party == party and row.party_type == party_type
+					
+					if not party_match:
+						continue
+					
+					# If gl_entry is provided, try to match by gl_entry
+					if gl_entry:
+						# First try exact match with gl_entry
+						if row.gl_entry == gl_entry:
+							matching_child_row = row
+							break
+						# If no gl_entry in row (backward compatibility - old matches), 
+						# and this is the only row for this party, use it
+						# This handles cases where matches were created before gl_entry was added
+						elif not row.gl_entry:
+							# Check if there are other rows for this party with gl_entry set
+							# If not, this is likely the only match for this party, so use it
+							has_other_rows_with_gl_entry = any(
+								r.party == party and r.party_type == party_type and r.gl_entry 
+								for r in child_table if r != row
+							)
+							if not has_other_rows_with_gl_entry:
+								# This is the only row for this party, use it (backward compatibility)
+								matching_child_row = row
+								# Update the row to include gl_entry for future queries
+								if not matching_child_row.gl_entry:
+									matching_child_row.gl_entry = gl_entry
+									try:
+										doc.save(ignore_permissions=True)
+										frappe.db.commit()
+									except:
+										pass  # Don't fail if update doesn't work
+								break
+					else:
+						# If gl_entry is not provided, only match rows without gl_entry (backward compatibility)
+						if not row.gl_entry:
+							matching_child_row = row
+							break
 
 				if matching_child_row:
 					# Found a child table entry for this party
@@ -955,7 +1020,7 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 					# - If they were the same, it wouldn't be an intercompany match
 					status = matching_child_row.get("intercompany_match_status", "Pending")
 
-					print(f"[get_match_status] Journal Entry {voucher_no} party={party} party_type={party_type}: status={status} from child table")
+					print(f"[get_match_status] Journal Entry {voucher_no} party={party} party_type={party_type} gl_entry={gl_entry}: Found matching row with status={status}, row.gl_entry={matching_child_row.get('gl_entry')}")
 
 					return {
 						"success": True,
@@ -967,7 +1032,9 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 						"from_child_table": True
 					}
 				else:
-					# No child table entry for this party, return Mismatch
+					# No child table entry for this party/gl_entry combination
+					print(f"[get_match_status] Journal Entry {voucher_no}: No matching child table row found for party={party}, party_type={party_type}, gl_entry={gl_entry}")
+					print(f"[get_match_status] Available rows: {[(r.party, r.party_type, r.gl_entry, r.intercompany_match_status) for r in child_table]}")
 					return {
 						"success": True,
 						"status": "Mismatch",
