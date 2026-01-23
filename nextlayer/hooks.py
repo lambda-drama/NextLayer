@@ -115,6 +115,10 @@ fixtures = [
                 ]
             ]
         ]
+    },{
+        "doctype":"Travel Group",
+        "filters":[
+        ]
     }
 ]
 
