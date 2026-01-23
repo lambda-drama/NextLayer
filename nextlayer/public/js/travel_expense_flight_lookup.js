@@ -402,6 +402,36 @@ frappe.ui.form.on("Travel Expense", {
 				show_additional_expenses_modal(frm);
 			}, __("Create"));
 			
+			// Check if Journal Entry exists, and show "Create Journal" button if it doesn't
+			// Use check_journal_entry_exists (read-only) to avoid creating journal on refresh
+			frappe.call({
+				method: "nextlayer.next_layer.api.travel_expense_utils.check_journal_entry_exists",
+				args: {
+					travel_expense_name: frm.doc.name
+				},
+				async: false,
+				callback: function(r) {
+					if (r.message) {
+						// If no journal entry exists (or error checking), show Create Journal button
+						if (!r.message.success || !r.message.already_exists) {
+							if (!frm.doc.is_cancelled) {
+								frm.add_custom_button(__("Journal"), function() {
+									create_journal_entry_for_travel_expense(frm);
+								}, __("Create"));
+							}
+						}
+					}
+				},
+				error: function(r) {
+					// On error, still show the button (user can try to create)
+					if (!frm.doc.is_cancelled) {
+						frm.add_custom_button(__("Create Journal"), function() {
+							create_journal_entry_for_travel_expense(frm);
+						}, __("Create"));
+					}
+				}
+			});
+			
 			// Only show Cancel Charges if not already cancelled
 			if (!frm.doc.is_cancelled) {
 				frm.add_custom_button(__("Cancel Charges"), function() {
@@ -3660,6 +3690,77 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc) {
 			});
 		}
 	});
+}
+
+// Create Journal Entry - Create journal entry if it doesn't exist
+function create_journal_entry_for_travel_expense(frm) {
+	if (frm.doc.is_cancelled) {
+		frappe.msgprint({
+			title: __("Cannot Create Journal Entry"),
+			message: __("Cannot create journal entry for a cancelled travel expense."),
+			indicator: "orange"
+		});
+		return;
+	}
+	
+	if (frm.doc.docstatus !== 1) {
+		frappe.msgprint({
+			title: __("Document Not Submitted"),
+			message: __("Please submit the travel expense before creating journal entry."),
+			indicator: "orange"
+		});
+		return;
+	}
+	
+	frappe.confirm(
+		__("Are you sure you want to create a journal entry for this travel expense?"),
+		function() {
+			// Yes - proceed with journal entry creation
+			frappe.call({
+				method: "nextlayer.next_layer.api.travel_expense_utils.check_and_create_journal_entry",
+				args: {
+					travel_expense_name: frm.doc.name
+				},
+				freeze: true,
+				freeze_message: __("Creating journal entry..."),
+				callback: function(r) {
+					if (r.message) {
+						if (r.message.success) {
+							if (r.message.already_exists) {
+								frappe.msgprint({
+									title: __("Journal Entry Already Exists"),
+									message: __("Journal Entry {0} already exists for this travel expense.", [r.message.journal_entry_name || ""]),
+									indicator: "blue"
+								});
+							} else {
+								frappe.show_alert({
+									message: __("Journal Entry {0} created and submitted successfully.", [r.message.journal_entry_name || ""]),
+									indicator: "green"
+								}, 5);
+							}
+							frm.reload_doc();
+						} else {
+							frappe.msgprint({
+								title: __("Error"),
+								message: r.message.error || __("Failed to create journal entry."),
+								indicator: "red"
+							});
+						}
+					}
+				},
+				error: function(r) {
+					frappe.msgprint({
+						title: __("Error"),
+						message: __("An error occurred while creating journal entry."),
+						indicator: "red"
+					});
+				}
+			});
+		},
+		function() {
+			// No - do nothing
+		}
+	);
 }
 
 // Cancel Charges - Create reverse journal entry and mark as cancelled

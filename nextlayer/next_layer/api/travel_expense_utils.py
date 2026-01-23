@@ -815,21 +815,6 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		if hasattr(travel_expense, 'calculate_totals'):
 			travel_expense.calculate_totals()
 		
-		# Get total amount (use company currency amount)
-		total_amount = getattr(travel_expense, 'grand_total_company_currency', None) or getattr(travel_expense, 'total_company_currency', None) or 0
-		
-		if total_amount <= 0:
-			frappe.throw(_("Cannot create journal entry: Travel expense grand total is zero or negative. Please ensure expenses are added and amounts are set."))
-		
-		# Get direct payment account
-		direct_payment_account = travel_expense.direct_payment_account
-		
-		# Get account currencies
-		direct_payment_account_currency = frappe.db.get_value("Account", direct_payment_account, "account_currency") or company_currency
-		
-		# Get posting date
-		posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
-		
 		# Build expense account entries from expenses child table
 		if not travel_expense.expenses:
 			frappe.throw(_("No expenses found. Please add expenses before submitting."))
@@ -839,6 +824,7 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		
 		# Validate all expense rows have expense type and get expense accounts
 		expense_accounts = {}
+		total_expense_amount = 0
 		for expense_row in travel_expense.expenses:
 			expense_type = expense_row.expense_type
 			if not expense_type:
@@ -847,14 +833,71 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			# Get expense account from Expense Claim Type
 			expense_account = get_expense_account_from_expense_type(expense_type, company)
 			
-			# Get amount for this expense (use company currency amount)
-			expense_amount = getattr(expense_row, 'amount_company_currency', None) or expense_row.amount or 0
+			# Get amount for this expense (use company currency amount, fallback to transaction currency)
+			expense_amount = getattr(expense_row, 'amount_company_currency', None)
+			if not expense_amount or expense_amount == 0:
+				# If amount_company_currency is not set or zero, try transaction currency amount
+				transaction_amount = getattr(expense_row, 'amount', None) or 0
+				if transaction_amount and transaction_amount > 0:
+					# Convert transaction currency to company currency
+					transaction_currency = getattr(travel_expense, 'currency', None) or company_currency
+					if transaction_currency != company_currency:
+						try:
+							posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
+							exchange_rate = get_exchange_rate(
+								transaction_currency,
+								company_currency,
+								posting_date,
+								company
+							)
+							expense_amount = transaction_amount * exchange_rate
+						except Exception:
+							expense_amount = transaction_amount
+					else:
+						expense_amount = transaction_amount
+				else:
+					expense_amount = 0
+			
+			# Skip zero amounts
+			if expense_amount <= 0:
+				continue
 			
 			# Group by expense account
 			if expense_account in expense_accounts:
 				expense_accounts[expense_account] += expense_amount
 			else:
 				expense_accounts[expense_account] = expense_amount
+			
+			total_expense_amount += expense_amount
+		
+		# Validate that we have at least one expense account with amount > 0
+		if not expense_accounts or total_expense_amount <= 0:
+			frappe.throw(_("Cannot create journal entry: No valid expense amounts found. Please ensure expenses have amounts set in company currency."))
+		
+		# Get total amount (use company currency amount)
+		# Use calculated total_expense_amount or fallback to grand_total_company_currency
+		total_amount = total_expense_amount
+		grand_total = getattr(travel_expense, 'grand_total_company_currency', None) or getattr(travel_expense, 'total_company_currency', None) or 0
+		
+		# If grand_total includes taxes, use it; otherwise use sum of expenses
+		if grand_total > 0:
+			total_amount = grand_total
+		
+		if total_amount <= 0:
+			frappe.throw(_("Cannot create journal entry: Travel expense grand total is zero or negative ({0}). Please ensure expenses are added and amounts are set correctly.").format(total_amount))
+		
+		# Get direct payment account
+		direct_payment_account = travel_expense.direct_payment_account
+		
+		# Get account currencies
+		account_currency_value = frappe.db.get_value("Account", direct_payment_account, "account_currency")
+		direct_payment_account_currency = account_currency_value if account_currency_value else company_currency
+		
+		# Log currency info for debugging
+		frappe.logger().debug(f"Travel Expense {travel_expense.name}: Company currency={company_currency}, Payment account={direct_payment_account}, Account currency={direct_payment_account_currency}, Total amount={total_amount}")
+		
+		# Get posting date
+		posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
 		
 		# Build journal entry accounts list
 		je_accounts = []
@@ -1012,6 +1055,12 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			# Normal expense (not refund) - original logic
 			# 1. Debit Expense Account(s)
 			for expense_account, amount in expense_accounts.items():
+				# Validate amount is not zero
+				if amount <= 0:
+					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero or negative amount ({1}). Please check expense amounts.").format(
+						expense_account, amount
+					))
+				
 				expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
 				
 				# Calculate base amount
@@ -1028,6 +1077,12 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 						expense_base_amount = amount * exchange_rate
 					except Exception:
 						expense_base_amount = amount
+				
+				# Validate base amount is not zero
+				if expense_base_amount <= 0:
+					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero base amount after currency conversion. Amount: {1}, Base Amount: {2}").format(
+						expense_account, amount, expense_base_amount
+					))
 				
 				# Get cost center and project from first expense row, or from main form
 				cost_center = travel_expense.cost_center
@@ -1050,26 +1105,108 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				})
 		
 			# 2. Credit Direct Payment Account
-			if direct_payment_account_currency == company_currency:
+			# Calculate sum of all debit amounts to ensure credit matches
+			total_debit_amount = sum(expense_accounts.values())
+			
+			# Use total_debit_amount if total_amount is zero or doesn't match
+			if total_amount <= 0 or abs(total_amount - total_debit_amount) > 0.01:
+				total_amount = total_debit_amount
+			
+			if total_amount <= 0:
+				frappe.throw(_("Cannot create journal entry: Total amount is zero. Please ensure expenses have valid amounts."))
+			
+			# Check if currencies are actually the same (even if account_currency is None, it defaults to company currency)
+			if direct_payment_account_currency == company_currency or not account_currency_value:
+				# Same currency or account currency not set (defaults to company currency)
 				payment_base_amount = total_amount
 				payment_amount = total_amount
+				frappe.logger().debug(f"Using same currency: payment_amount={payment_amount}, payment_base_amount={payment_base_amount}")
 			else:
 				# Direct payment account is in different currency
+				payment_exchange_rate = None
 				try:
-					# Get exchange rate from company currency to payment account currency
+					# First, try to get exchange rate from company currency to payment account currency
 					payment_exchange_rate = get_exchange_rate(
 						company_currency,
 						direct_payment_account_currency,
 						posting_date,
 						company
 					)
+					
+					frappe.logger().debug(f"Exchange rate lookup (direct): from={company_currency}, to={direct_payment_account_currency}, date={posting_date}, rate={payment_exchange_rate}")
+					
+					# If direct rate is not found or is zero, try reverse rate
+					if payment_exchange_rate is None or payment_exchange_rate <= 0:
+						frappe.logger().debug(f"Direct exchange rate not found or invalid ({payment_exchange_rate}), trying reverse rate...")
+						
+						try:
+							# Try to get reverse exchange rate (from payment account currency to company currency)
+							reverse_rate = get_exchange_rate(
+								direct_payment_account_currency,
+								company_currency,
+								posting_date,
+								company
+							)
+							
+							frappe.logger().debug(f"Exchange rate lookup (reverse): from={direct_payment_account_currency}, to={company_currency}, date={posting_date}, rate={reverse_rate}")
+							
+							# If reverse rate is valid, calculate inverse
+							if reverse_rate and reverse_rate > 0:
+								payment_exchange_rate = 1.0 / reverse_rate
+								frappe.logger().debug(f"Using inverse of reverse rate: {reverse_rate} -> {payment_exchange_rate}")
+							else:
+								payment_exchange_rate = None
+						except Exception as reverse_error:
+							frappe.logger().debug(f"Reverse exchange rate lookup also failed: {str(reverse_error)}")
+							payment_exchange_rate = None
+					
+					# Validate exchange rate is valid
+					if payment_exchange_rate is None:
+						frappe.throw(_("Exchange rate not found from {0} to {1} (or reverse) for date {2}. Please set up exchange rate in Currency Exchange.").format(
+							company_currency,
+							direct_payment_account_currency,
+							posting_date
+						))
+					
+					if payment_exchange_rate <= 0:
+						frappe.throw(_("Invalid exchange rate ({0}) from {1} to {2} for date {3}. Exchange rate must be greater than zero. Please set up exchange rate in Currency Exchange.").format(
+							payment_exchange_rate,
+							company_currency,
+							direct_payment_account_currency,
+							posting_date
+						))
+					
 					payment_amount = total_amount * payment_exchange_rate
 					# Base amount is in company currency
 					payment_base_amount = total_amount
-				except Exception:
-					# If exchange rate not found, use same amount
-					payment_amount = total_amount
-					payment_base_amount = total_amount
+					
+					frappe.logger().debug(f"Currency conversion: total_amount={total_amount}, exchange_rate={payment_exchange_rate}, payment_amount={payment_amount}")
+					
+					# Validate calculated payment amount is not zero
+					if payment_amount <= 0:
+						frappe.throw(_("Cannot create journal entry: Payment amount is zero after currency conversion. Total amount: {0}, Exchange rate: {1}, Payment amount: {2}. Please check exchange rate setup.").format(
+							total_amount, payment_exchange_rate, payment_amount
+						))
+					
+				except frappe.ValidationError:
+					# Re-raise validation errors
+					raise
+				except Exception as e:
+					# If exchange rate lookup fails, throw error with details
+					error_msg = str(e)
+					frappe.logger().error(f"Exchange rate lookup failed: {error_msg}")
+					frappe.throw(_("Cannot create journal entry: Failed to get exchange rate from {0} to {1} for date {2}. Error: {3}. Please set up exchange rate in Currency Exchange.").format(
+						company_currency,
+						direct_payment_account_currency,
+						posting_date,
+						error_msg
+					))
+			
+			# Validate credit amount is not zero (final check)
+			if payment_amount <= 0 or payment_base_amount <= 0:
+				frappe.throw(_("Cannot create journal entry: Credit amount is zero. Total amount: {0}, Payment amount: {1}, Payment base amount: {2}, Account currency: {3}, Company currency: {4}").format(
+					total_amount, payment_amount, payment_base_amount, direct_payment_account_currency, company_currency
+				))
 			
 			je_accounts.append({
 				"account": direct_payment_account,
@@ -1259,6 +1396,155 @@ def cancel_travel_expense_charges(travel_expense_name):
 		
 	except Exception as e:
 		frappe.log_error(f"Error cancelling travel expense charges: {str(e)}", "Travel Expense Utils Error")
+		return {
+			"success": False,
+			"error": str(e)
+		}
+
+
+@frappe.whitelist()
+def check_journal_entry_exists(travel_expense_name):
+	"""
+	Check if a Journal Entry exists for the Travel Expense (read-only check).
+	This is used to determine if the "Create Journal" button should be shown.
+	
+	Args:
+		travel_expense_name: Name of the Travel Expense document
+	
+	Returns:
+		dict: Success status and whether journal entry exists
+	"""
+	try:
+		# Check if Journal Entry already exists
+		existing_je = frappe.db.sql("""
+			SELECT name, docstatus
+			FROM `tabJournal Entry`
+			WHERE EXISTS (
+				SELECT 1 FROM `tabJournal Entry Account`
+				WHERE parent = `tabJournal Entry`.name
+				AND custom_travel_expense_ref = %s
+			)
+			ORDER BY creation DESC
+			LIMIT 1
+		""", (travel_expense_name,), as_dict=True)
+		
+		if existing_je:
+			je_name = existing_je[0].name
+			je_status = "Submitted" if existing_je[0].docstatus == 1 else "Draft"
+			return {
+				"success": True,
+				"journal_entry_name": je_name,
+				"already_exists": True,
+				"status": je_status
+			}
+		else:
+			return {
+				"success": True,
+				"already_exists": False
+			}
+		
+	except Exception as e:
+		frappe.log_error(f"Error checking journal entry: {str(e)}", "Travel Expense Utils Error")
+		return {
+			"success": False,
+			"error": str(e),
+			"already_exists": False
+		}
+
+
+@frappe.whitelist()
+def check_and_create_journal_entry(travel_expense_name):
+	"""
+	Check if a Journal Entry exists for the Travel Expense, and create one if it doesn't.
+	This is useful when journal entry creation failed during submission.
+	
+	Args:
+		travel_expense_name: Name of the Travel Expense document
+	
+	Returns:
+		dict: Success status and journal entry name (if created) or existing journal entry name
+	"""
+	try:
+		# Reload document from database to ensure fresh data
+		frappe.db.commit()  # Ensure any pending changes are saved
+		travel_expense = frappe.get_doc("Travel Expense", travel_expense_name)
+		
+		# Check if document is submitted
+		if travel_expense.docstatus != 1:
+			return {
+				"success": False,
+				"error": "Travel expense must be submitted before creating journal entry."
+			}
+		
+		# Check if already cancelled
+		if travel_expense.is_cancelled:
+			return {
+				"success": False,
+				"error": "Cannot create journal entry for a cancelled travel expense."
+			}
+		
+		# Recalculate totals to ensure they are up to date
+		if hasattr(travel_expense, 'calculate_totals'):
+			travel_expense.calculate_totals()
+			# Save totals to ensure they're persisted
+			travel_expense.db_set('grand_total_company_currency', travel_expense.grand_total_company_currency)
+			travel_expense.db_set('total_company_currency', travel_expense.total_company_currency)
+			# Reload to get fresh data
+			travel_expense.reload()
+		
+		# Validate totals before proceeding
+		total_amount = getattr(travel_expense, 'grand_total_company_currency', None) or getattr(travel_expense, 'total_company_currency', None) or 0
+		if total_amount <= 0:
+			return {
+				"success": False,
+				"error": f"Cannot create journal entry: Travel expense grand total is zero or negative ({total_amount}). Please ensure expenses are added and amounts are set correctly."
+			}
+		
+		# Check if Journal Entry already exists
+		existing_je = frappe.db.sql("""
+			SELECT name, docstatus
+			FROM `tabJournal Entry`
+			WHERE EXISTS (
+				SELECT 1 FROM `tabJournal Entry Account`
+				WHERE parent = `tabJournal Entry`.name
+				AND custom_travel_expense_ref = %s
+			)
+			ORDER BY creation DESC
+			LIMIT 1
+		""", (travel_expense_name,), as_dict=True)
+		
+		if existing_je:
+			je_name = existing_je[0].name
+			je_status = "Submitted" if existing_je[0].docstatus == 1 else "Draft"
+			return {
+				"success": True,
+				"journal_entry_name": je_name,
+				"message": f"Journal Entry {je_name} already exists ({je_status}).",
+				"already_exists": True
+			}
+		
+		# No Journal Entry exists, create one
+		# Use the same logic as on_submit based on is_paid status
+		if travel_expense.is_paid:
+			journal_entry_name = create_journal_entry_for_paid_travel_expense(travel_expense)
+		else:
+			journal_entry_name = create_journal_entry_for_travel_expense(travel_expense)
+		
+		if journal_entry_name:
+			return {
+				"success": True,
+				"journal_entry_name": journal_entry_name,
+				"message": f"Journal Entry {journal_entry_name} has been created and submitted.",
+				"already_exists": False
+			}
+		else:
+			return {
+				"success": False,
+				"error": "Failed to create journal entry."
+			}
+		
+	except Exception as e:
+		frappe.log_error(f"Error checking/creating journal entry: {str(e)}", "Travel Expense Utils Error")
 		return {
 			"success": False,
 			"error": str(e)
