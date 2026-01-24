@@ -9,7 +9,7 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff } from "lucide-react"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff, ArrowUpDown } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -52,6 +52,7 @@ export default function IntercompanyReconciliation() {
   // Status filtering and matching
   const [statusFilter, setStatusFilter] = useState<string>("Mismatch")
   const [debitCreditFilter, setDebitCreditFilter] = useState<string>("All")
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null) // null = no sort, 'asc' = ascending, 'desc' = descending
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set())
   const [showMatchModal, setShowMatchModal] = useState(false)
   const [showValidationError, setShowValidationError] = useState(false)
@@ -2445,9 +2446,36 @@ export default function IntercompanyReconciliation() {
       })
     }
     
-    return filtered
-    // If debitCreditFilter is 'All', no additional filtering needed
-
+    // Apply sorting if sortOrder is set
+    if (sortOrder) {
+      filtered = [...filtered].sort((a, b) => {
+        // Get the amount for each entry (debit or credit, whichever is non-zero)
+        const amountA = a.debit > 0 ? a.debit : (a.credit > 0 ? a.credit : 0)
+        const amountB = b.debit > 0 ? b.debit : (b.credit > 0 ? b.credit : 0)
+        
+        if (sortOrder === 'asc') {
+          return amountA - amountB
+        } else {
+          return amountB - amountA
+        }
+      })
+    }
+    
+    // Apply sorting if sortOrder is set
+    if (sortOrder) {
+      filtered = [...filtered].sort((a, b) => {
+        // Get the amount for each entry (debit or credit, whichever is non-zero)
+        const amountA = a.debit > 0 ? a.debit : (a.credit > 0 ? a.credit : 0)
+        const amountB = b.debit > 0 ? b.debit : (b.credit > 0 ? b.credit : 0)
+        
+        if (sortOrder === 'asc') {
+          return amountA - amountB
+        } else {
+          return amountB - amountA
+        }
+      })
+    }
+    
     return filtered
   }
 
@@ -3528,6 +3556,33 @@ export default function IntercompanyReconciliation() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
+                  {/* Sort Buttons */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Sort by Amount</label>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        onClick={() => {
+                          if (sortOrder === null || sortOrder === 'desc') {
+                            setSortOrder('asc')
+                          } else {
+                            setSortOrder('desc')
+                          }
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className={`border-blue-200 ${sortOrder === 'asc' ? 'bg-blue-100 text-blue-700 border-blue-400' : sortOrder === 'desc' ? 'bg-blue-100 text-blue-700 border-blue-400' : 'hover:bg-blue-50'}`}
+                        title={sortOrder === 'asc' ? 'Currently: Ascending (click for Descending)' : sortOrder === 'desc' ? 'Currently: Descending (click for Ascending)' : 'Click to sort ascending'}
+                      >
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                      {sortOrder && (
+                        <span className="text-xs text-gray-500 ml-1">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Filter by Status</label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
