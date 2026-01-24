@@ -196,6 +196,8 @@ def send_whatsapp_message(
 	attach_document=False,
 	custom_attachment=None,
 	file_name=None,
+	print_format=None,
+	letter_head=None,
 ):
 	"""
 	Standalone function to send WhatsApp messages
@@ -211,6 +213,8 @@ def send_whatsapp_message(
 	    attach_document (bool): Whether to attach document PDF
 	    custom_attachment (str): Custom file URL or path
 	    file_name (str): Name for the attachment
+	    print_format (str): Print format name for PDF generation
+	    letter_head (str): Letter head name for PDF generation
 
 	Returns:
 	    dict: Response with success status and message details
@@ -237,6 +241,8 @@ def send_whatsapp_message(
 				reference_doctype,
 				reference_name,
 				attach_document,
+				print_format,
+				letter_head,
 			)
 		elif message_type == "template":
 			return send_template_message(
@@ -250,6 +256,8 @@ def send_whatsapp_message(
 				attach_document,
 				custom_attachment,
 				file_name,
+				print_format,
+				letter_head,
 			)
 		else:
 			return {
@@ -270,13 +278,15 @@ def send_text_message(
 	reference_doctype=None,
 	reference_name=None,
 	attach_document=False,
+	print_format=None,
+	letter_head=None,
 ):
 	"""Send a simple text message with optional document attachment"""
 
 	# If we need to attach a document, we need to send as a document message
 	if attach_document and reference_doctype and reference_name:
 		# Get document URL
-		document_url = get_document_attachment_url(reference_doctype, reference_name)
+		document_url = get_document_attachment_url(reference_doctype, reference_name, print_format, letter_head)
 
 		if document_url:
 			data = {
@@ -328,6 +338,8 @@ def send_template_message(
 	attach_document=False,
 	custom_attachment=None,
 	file_name=None,
+	print_format=None,
+	letter_head=None,
 ):
 	"""Send a template message"""
 	# Get template details
@@ -382,7 +394,7 @@ def send_template_message(
 
 	# Handle attachments
 	if attach_document and reference_doctype and reference_name:
-		url = get_document_attachment_url(reference_doctype, reference_name)
+		url = get_document_attachment_url(reference_doctype, reference_name, print_format, letter_head)
 		if url:
 			data["template"]["components"].append(
 				{
@@ -710,13 +722,15 @@ def format_phone_number(number):
 	return number
 
 
-def get_document_attachment_url(doctype, docname):
+def get_document_attachment_url(doctype, docname, print_format=None, letter_head=None):
 	"""Get PDF attachment URL for a document"""
 	try:
 		site_url = frappe.utils.get_url()
 		# For testing purposes, use the static PDF URL
 		if doctype == "Sales Invoice":
-			pdf_ = generate_and_attach_invoice_pdf(docname)
+			# Use provided print_format or default to "Standard"
+			pdf_format = print_format or "Standard"
+			pdf_ = generate_and_attach_invoice_pdf(docname, print_format=pdf_format, letter_head=letter_head)
 
 			# # Check if we're using a local URL
 			if "127.0.0.1" in site_url or "localhost" in site_url:
@@ -729,21 +743,30 @@ def get_document_attachment_url(doctype, docname):
 		key = doc.get_document_share_key()
 		frappe.db.commit()
 
-		print_format = "Standard"
-		doctype_meta = frappe.get_doc("DocType", doctype)
-		if doctype_meta.custom:
-			if doctype_meta.default_print_format:
-				print_format = doctype_meta.default_print_format
+		# Use provided print_format or determine default
+		if print_format:
+			pdf_print_format = print_format
 		else:
-			default_print_format = frappe.db.get_value(
-				"Property Setter",
-				filters={"doc_type": doctype, "property": "default_print_format"},
-				fieldname="value",
-			)
-			print_format = default_print_format if default_print_format else print_format
+			pdf_print_format = "Standard"
+			doctype_meta = frappe.get_doc("DocType", doctype)
+			if doctype_meta.custom:
+				if doctype_meta.default_print_format:
+					pdf_print_format = doctype_meta.default_print_format
+			else:
+				default_print_format = frappe.db.get_value(
+					"Property Setter",
+					filters={"doc_type": doctype, "property": "default_print_format"},
+					fieldname="value",
+				)
+				pdf_print_format = default_print_format if default_print_format else pdf_print_format
 
-		link = get_pdf_link(doctype, docname, print_format=print_format)
+		link = get_pdf_link(doctype, docname, print_format=pdf_print_format)
 		site_url = frappe.utils.get_url()
+		
+		# Append letter head as URL parameter if provided
+		if letter_head:
+			separator = "&" if "?" in link else "?"
+			link = f"{link}{separator}letterhead={letter_head}"
 
 		# Check if we're using a local URL
 		if "127.0.0.1" in site_url or "localhost" in site_url:
@@ -1590,13 +1613,13 @@ def test_template_with_parameters(template_name, phone_number, parameters=None):
 		}
 
 
-def generate_and_attach_invoice_pdf(invoice_name, print_format="Standard", lang="en"):
+def generate_and_attach_invoice_pdf(invoice_name, print_format="Standard", lang="en", letter_head=None):
 	"""
 	Generate PDF for a Sales Invoice, attach it, and return full URL
 	"""
 	try:
-		# Generate PDF content
-		pdf_content = frappe.get_print("Sales Invoice", invoice_name, print_format, as_pdf=True)
+		# Generate PDF content with letter head if provided
+		pdf_content = frappe.get_print("Sales Invoice", invoice_name, print_format, as_pdf=True, letterhead=letter_head)
 
 		# Create File record in /files
 		filedoc = frappe.get_doc(
