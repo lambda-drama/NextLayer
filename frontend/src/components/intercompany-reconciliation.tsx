@@ -40,6 +40,8 @@ export default function IntercompanyReconciliation() {
   const [isAutoFilled, setIsAutoFilled] = useState(false)
   const [automatchEnabled, setAutomatchEnabled] = useState(false)
   const [bypassTotalCalculation, setBypassTotalCalculation] = useState(false)
+  const [pairMatchingEnabled, setPairMatchingEnabled] = useState(false)
+  const [pairMatchingSecondEntryKey, setPairMatchingSecondEntryKey] = useState<string | null>(null)
 
   // State for view checkboxes
   const [customerViewEnabled, setCustomerViewEnabled] = useState<boolean>(true)
@@ -337,6 +339,15 @@ export default function IntercompanyReconciliation() {
 
   const handleBypassTotalCalculationChange = (checked: boolean) => {
     setBypassTotalCalculation(checked)
+  }
+
+  const handlePairMatchingChange = (checked: boolean) => {
+    setPairMatchingEnabled(checked)
+    // Clear selections and second entry tracking when disabling pair matching
+    if (!checked) {
+      setSelectedEntries(new Set())
+      setPairMatchingSecondEntryKey(null)
+    }
   }
 
   const handlePartyBChange = (value: string) => {
@@ -1277,6 +1288,40 @@ export default function IntercompanyReconciliation() {
       newSelected.delete(entryKey)
     }
     setSelectedEntries(newSelected)
+
+    // Pair Matching logic: If enabled and we have exactly 2 selections (one on each side), open bulk match modal
+    if (pairMatchingEnabled && isSelected && newSelected.size === 2) {
+      const selectedEntriesArray = Array.from(newSelected)
+      
+      // Find which entries are selected and which side they're on
+      let entryA: GLEntry | undefined
+      let entryB: GLEntry | undefined
+      
+      for (const key of selectedEntriesArray) {
+        const foundA = findMatchingEntries.glDataAWithStatus.find(entry =>
+          getEntryKey(entry) === key
+        )
+        const foundB = findMatchingEntries.glDataBWithStatus.find(entry =>
+          getEntryKey(entry) === key
+        )
+        
+        if (foundA) {
+          entryA = foundA
+        }
+        if (foundB) {
+          entryB = foundB
+        }
+      }
+
+      // Check if we have exactly one entry on Table A and one on Table B
+      if (entryA && entryB) {
+        // We have one entry on Table A and one on Table B - open bulk match modal
+        // The bulk match modal will use the selected entries and apply all validation logic
+        // Store the second entry key (the one that just triggered the modal) for cancel handling
+        setPairMatchingSecondEntryKey(entryKey)
+        setShowMatchModal(true)
+      }
+    }
   }
 
   // Get selected entries for bulk modal display (shows all selected, not just matched ones)
@@ -1910,6 +1955,10 @@ export default function IntercompanyReconciliation() {
       setSelectedEntries(new Set())
       setShowMatchModal(false)
       setIsProcessing(false)
+      // Clear pair matching second entry key if pair matching was enabled
+      if (pairMatchingEnabled) {
+        setPairMatchingSecondEntryKey(null)
+      }
 
       // Perform API call in background
       try {
@@ -3648,6 +3697,20 @@ export default function IntercompanyReconciliation() {
                       </div> */}
                     </div>
                   )}
+
+                  {/* Pair Matching Checkbox */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="pair-matching"
+                        checked={pairMatchingEnabled}
+                        onCheckedChange={handlePairMatchingChange}
+                      />
+                      <label htmlFor="pair-matching" className="text-sm text-gray-700">
+                        Pair Matching
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -4656,6 +4719,11 @@ export default function IntercompanyReconciliation() {
                       setShowMatchModal(false)
                       setIsProcessing(false)
                       setProcessingSuccess(false)
+                      // Clear selections if pair matching is enabled (to allow selecting next pair)
+                      if (pairMatchingEnabled) {
+                        setSelectedEntries(new Set())
+                        setPairMatchingSecondEntryKey(null)
+                      }
                     }}
                     className="bg-green-600 hover:bg-green-700"
                   >
@@ -4675,6 +4743,14 @@ export default function IntercompanyReconciliation() {
                       onClick={() => {
                         // console.log("Modal cancelled, closing modal")
                         setShowMatchModal(false)
+                        // If pair matching is enabled, only clear the second entry (the one that triggered the modal)
+                        // Keep the first entry selected so user can try selecting a different second entry
+                        if (pairMatchingEnabled && pairMatchingSecondEntryKey) {
+                          const newSelected = new Set(selectedEntries)
+                          newSelected.delete(pairMatchingSecondEntryKey)
+                          setSelectedEntries(newSelected)
+                          setPairMatchingSecondEntryKey(null)
+                        }
                       }}
                       variant="outline"
                       disabled={isProcessing}
