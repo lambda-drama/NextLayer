@@ -56,7 +56,6 @@ interface UseGLDataOptions {
   ignoreExchangeRateRevaluation?: boolean
   ignoreSystemGeneratedNotes?: boolean
   showOpeningEntries?: boolean
-  hideOpeningInvoices?: boolean
   shouldLoadData?: boolean
 }
 
@@ -70,7 +69,6 @@ export function useGeneralLedgerData({
   ignoreExchangeRateRevaluation,
   ignoreSystemGeneratedNotes,
   showOpeningEntries,
-  hideOpeningInvoices = true,
   shouldLoadData = true,
 }: UseGLDataOptions) {
   const [data, setData] = useState<GLEntry[]>([])
@@ -85,7 +83,6 @@ export function useGeneralLedgerData({
   const ignoreExchangeRateRevaluationRef = useRef(ignoreExchangeRateRevaluation)
   const ignoreSystemGeneratedNotesRef = useRef(ignoreSystemGeneratedNotes)
   const showOpeningEntriesRef = useRef(showOpeningEntries)
-  const hideOpeningInvoicesRef = useRef(hideOpeningInvoices)
 
   // Update refs when values change
   useEffect(() => {
@@ -95,8 +92,7 @@ export function useGeneralLedgerData({
     ignoreExchangeRateRevaluationRef.current = ignoreExchangeRateRevaluation
     ignoreSystemGeneratedNotesRef.current = ignoreSystemGeneratedNotes
     showOpeningEntriesRef.current = showOpeningEntries
-    hideOpeningInvoicesRef.current = hideOpeningInvoices
-  }, [fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries, hideOpeningInvoices])
+  }, [fromDate, toDate, currency, ignoreExchangeRateRevaluation, ignoreSystemGeneratedNotes, showOpeningEntries])
 
   const fetchGLData = useCallback(async () => {
     if (!shouldLoadData || !company || !partyType || !party) {
@@ -121,7 +117,6 @@ export function useGeneralLedgerData({
       ...(ignoreExchangeRateRevaluationRef.current && { ignore_err: 1 }),
       ...(ignoreSystemGeneratedNotesRef.current && { ignore_cr_dr_notes: 1 }),
       ...(showOpeningEntriesRef.current && { show_opening_entries: 1 }),
-      ...(hideOpeningInvoicesRef.current !== undefined && { hide_opening_invoices: hideOpeningInvoicesRef.current ? 1 : 0 }),
     }
 
     try {

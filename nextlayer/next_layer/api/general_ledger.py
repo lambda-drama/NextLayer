@@ -20,7 +20,7 @@ def get_general_ledger_data(filters):
 		party_filter = filters.get('party')
 		if isinstance(party_filter, list):
 			party_filter = '_'.join(sorted(party_filter)) if party_filter else ''
-		cache_key = f"gl_data_{filters.get('company')}_{filters.get('from_date')}_{filters.get('to_date')}_{party_filter}_{filters.get('show_opening_entries', 0)}_{filters.get('hide_opening_invoices', 1)}_{filters.get('currency', '')}_{filters.get('ignore_err', 0)}_{filters.get('ignore_cr_dr_notes', 0)}"
+		cache_key = f"gl_data_{filters.get('company')}_{filters.get('from_date')}_{filters.get('to_date')}_{party_filter}_{filters.get('show_opening_entries', 0)}_{filters.get('currency', '')}_{filters.get('ignore_err', 0)}_{filters.get('ignore_cr_dr_notes', 0)}"
 
 		# Try to get from cache first
 		cached_data = frappe.cache().get_value(cache_key)
@@ -66,12 +66,10 @@ def get_general_ledger_data(filters):
 		finally:
 			frappe.set_user(original_user)
 
-		# Filter out opening entries for Sales Invoice and Purchase Invoice (if hide_opening_invoices is enabled)
-		hide_opening_invoices = filters.get('hide_opening_invoices', 1)  # Default to 1 (hide) if not specified
+		# Filter data - show_opening_entries is handled by the standard GL report
 		filtered_data = []
 		skipped_summary = 0
 		skipped_no_date = 0
-		skipped_opening = 0
 		for entry in data:
 			voucher_type = entry.get('voucher_type', '')
 			voucher_no = entry.get('voucher_no', '')
@@ -89,18 +87,6 @@ def get_general_ledger_data(filters):
 			if not posting_date:
 				skipped_no_date += 1
 				continue
-
-			# Skip opening entries for Sales Invoice and Purchase Invoice if hide_opening_invoices is enabled
-			if hide_opening_invoices and voucher_type in ["Sales Invoice", "Purchase Invoice"] and voucher_no:
-				try:
-					is_opening = frappe.db.get_value(voucher_type, voucher_no, "is_opening")
-					# is_opening is stored as "Yes" or "No" in Frappe
-					if is_opening == "Yes":
-						skipped_opening += 1
-						continue
-				except Exception as e:
-					# If there's an error checking is_opening, log it but continue processing
-					frappe.log_error(f"Error checking is_opening for {voucher_type} {voucher_no}: {str(e)}")
 
 			filtered_data.append(entry)
 
@@ -201,8 +187,7 @@ def get_permission_aware_gl_data(filters):
 		skipped_no_date = 0
 		skipped_opening = 0
 		skipped_permission = 0
-		hide_opening_invoices = filters.get('hide_opening_invoices', 1)  # Default to 1 (hide) if not specified
-		print(f"[get_permission_aware_gl_data] hide_opening_invoices setting: {hide_opening_invoices}")
+		# show_opening_entries is handled by the standard GL report
 		for entry in all_data:
 			voucher_type = entry.get('voucher_type', '')
 			voucher_no = entry.get('voucher_no', '')
@@ -223,22 +208,6 @@ def get_permission_aware_gl_data(filters):
 				continue
 
 			processed_count += 1
-
-			# Skip opening entries for Sales Invoice and Purchase Invoice if hide_opening_invoices is enabled
-			if hide_opening_invoices and voucher_type in ["Sales Invoice", "Purchase Invoice"] and voucher_no:
-				try:
-					is_opening = frappe.db.get_value(voucher_type, voucher_no, "is_opening")
-					# is_opening is stored as "Yes" or "No" in Frappe
-					if is_opening == "Yes":
-						skipped_opening += 1
-						print(f"[get_permission_aware_gl_data] Skipped opening entry: {voucher_type}-{voucher_no}, posting_date={posting_date}, debit={entry.get('debit', 0)}, credit={entry.get('credit', 0)}, is_opening={is_opening}")
-						continue
-					else:
-						print(f"[get_permission_aware_gl_data] Not an opening entry (is_opening={is_opening}): {voucher_type}-{voucher_no}, posting_date={posting_date}")
-				except Exception as e:
-					# If there's an error checking is_opening, log it but continue processing
-					frappe.log_error(f"Error checking is_opening for {voucher_type} {voucher_no}: {str(e)}")
-					print(f"[get_permission_aware_gl_data] Error checking is_opening for {voucher_type}-{voucher_no}: {str(e)}")
 
 			# Check if user has permission to view this document (for display purposes)
 			# This check runs as the original user to respect sharing permissions
