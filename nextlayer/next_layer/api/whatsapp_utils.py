@@ -13,6 +13,178 @@ from frappe.utils import get_url
 
 
 @frappe.whitelist()
+def send_whatsapp_from_chat(chat_name):
+	"""
+	Send WhatsApp message from an existing WhatsApp Chat document
+	
+	Args:
+		chat_name (str): Name of the WhatsApp Chat document
+	
+	Returns:
+		dict: Response with success status and message details
+	"""
+	try:
+		chat_doc = frappe.get_doc("WhatsApp Chat", chat_name)
+		
+		# Validate that this is an outgoing message
+		if chat_doc.type != "Outgoing":
+			return {"success": False, "error": "Can only send outgoing messages"}
+		
+		# Validate required fields
+		if not chat_doc.to:
+			return {"success": False, "error": "Recipient phone number (TO) is required"}
+		
+		# Get WhatsApp settings
+		settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+		if not settings.enabled:
+			return {"success": False, "error": "WhatsApp is not enabled"}
+
+		token = settings.get_password("token")
+		if not token:
+			return {"success": False, "error": "WhatsApp token not configured"}
+
+		# Format phone number
+		formatted_number = format_phone_number(chat_doc.to)
+		
+		# Prepare message data based on type
+		if chat_doc.use_template and chat_doc.template:
+			if not chat_doc.template:
+				return {"success": False, "error": "Template is required when using template"}
+			
+			# Get template details
+			template = frappe.get_doc("WhatsApp Message Templates", chat_doc.template)
+			
+			# Parse template parameters if provided
+			template_parameters = None
+			if chat_doc.template_parameters:
+				try:
+					template_parameters = json.loads(chat_doc.template_parameters)
+				except:
+					template_parameters = [chat_doc.template_parameters]
+			
+			# Build template message data
+			data = {
+				"messaging_product": "whatsapp",
+				"to": formatted_number,
+				"type": "template",
+				"template": {
+					"name": template.actual_name or template.template_name,
+					"language": {"code": template.language_code},
+					"components": [],
+				},
+			}
+			
+			# Add reply context if this is a reply (Note: Templates typically don't support replies, but we'll add it if needed)
+			# WhatsApp API doesn't support replying with templates, so we skip context for templates
+			
+			# Add body parameters if provided
+			if template_parameters:
+				parameters = []
+				for param in template_parameters:
+					param_text = str(param).strip()
+					if param_text:
+						parameters.append({"type": "text", "text": param_text})
+				
+				if parameters:
+					data["template"]["components"].append({"type": "body", "parameters": parameters})
+			
+			# Handle attachments
+			if chat_doc.attach:
+				url = get_custom_attachment_url(chat_doc.attach)
+				if url:
+					data["template"]["components"].append({
+						"type": "header",
+						"parameters": [{
+							"type": "document",
+							"document": {
+								"link": url,
+								"filename": chat_doc.attach.split("/").pop() or "attachment.pdf",
+							},
+						}],
+					})
+			
+			# Make API call
+			result = make_whatsapp_api_call(
+				data,
+				settings,
+				token,
+				chat_doc.reference_doctype,
+				chat_doc.reference_name,
+				"Template",
+				chat_doc.template,
+				template_parameters,
+				update_existing_chat=chat_doc  # Pass existing chat doc to update instead of creating new
+			)
+		else:
+			if not chat_doc.message:
+				return {"success": False, "error": "Message content is required"}
+			
+			# Build text message data
+			data = {
+				"messaging_product": "whatsapp",
+				"to": formatted_number,
+				"type": "text",
+				"text": {"preview_url": True, "body": chat_doc.message},
+			}
+			
+			# Add reply context if this is a reply
+			if chat_doc.is_reply and chat_doc.reply_to_message_id:
+				data["context"] = {
+					"message_id": chat_doc.reply_to_message_id
+				}
+			
+			# Handle document attachment
+			if chat_doc.attach:
+				url = get_custom_attachment_url(chat_doc.attach)
+				if url:
+					data = {
+						"messaging_product": "whatsapp",
+						"to": formatted_number,
+						"type": "document",
+						"document": {
+							"link": url,
+							"filename": chat_doc.attach.split("/").pop() or "document.pdf",
+							"caption": chat_doc.message,
+						},
+					}
+					# Add reply context for document messages too
+					if chat_doc.is_reply and chat_doc.reply_to_message_id:
+						data["context"] = {
+							"message_id": chat_doc.reply_to_message_id
+						}
+			
+			# Make API call
+			result = make_whatsapp_api_call(
+				data,
+				settings,
+				token,
+				chat_doc.reference_doctype,
+				chat_doc.reference_name,
+				"Manual",
+				None,
+				None,
+				update_existing_chat=chat_doc  # Pass existing chat doc to update instead of creating new
+			)
+		
+		# Update the chat document with results
+		if result.get("success"):
+			chat_doc.message_id = result.get("message_id")
+			chat_doc.status = "Success"
+			chat_doc.save(ignore_permissions=True)
+			frappe.db.commit()
+		else:
+			chat_doc.status = "Failed"
+			chat_doc.save(ignore_permissions=True)
+			frappe.db.commit()
+		
+		return result
+		
+	except Exception as e:
+		frappe.log_error(f"Error sending WhatsApp from chat: {str(e)}\nTraceback: {frappe.get_traceback()}", "WhatsApp Send from Chat")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
 def send_whatsapp_message(
 	to_number,
 	message_type="text",
@@ -265,6 +437,7 @@ def make_whatsapp_api_call(
 	message_type="Manual",
 	template_name=None,
 	template_parameters=None,
+	update_existing_chat=None,  # Optional: WhatsApp Chat document to update instead of creating new
 ):
 	"""Make the actual API call to WhatsApp"""
 	headers = {"authorization": f"Bearer {token}", "content-type": "application/json"}
@@ -312,41 +485,69 @@ def make_whatsapp_api_call(
 
 		frappe.logger().debug(f"WhatsApp API Response: {json.dumps(response, indent=2)}")
 
-		# Create WhatsApp message record
-		message_doc = frappe.new_doc("WhatsApp Chat")
-		message_doc.type = "Outgoing"
-		message_doc.to = data["to"]
-		message_doc.message_type = message_type
-		message_doc.content_type = "text"
-		message_doc.status = "Success"
+		# If updating existing chat document, update it instead of creating new
+		if update_existing_chat:
+			chat_doc = update_existing_chat
+			chat_doc.message_type = message_type
+			chat_doc.content_type = data.get("type", "text")
+			
+			if message_type == "Template":
+				chat_doc.template = template_name
+				chat_doc.use_template = 1
+				if template_parameters:
+					chat_doc.template_parameters = json.dumps(template_parameters)
+				chat_doc.message = str(data.get("template", ""))
+			elif data.get("type") == "document":
+				chat_doc.content_type = "document"
+				chat_doc.message = data.get("document", {}).get("caption", "Document sent")
+			else:
+				chat_doc.message = data.get("text", {}).get("body", "")
 
-		if message_type == "Template":
-			message_doc.template = template_name
-			message_doc.use_template = 1
-			if template_parameters:
-				message_doc.template_parameters = json.dumps(template_parameters)
-			message_doc.message = str(data["template"])
-		elif data.get("type") == "document":
-			# Handle document messages
-			message_doc.content_type = "document"
-			message_doc.message = data["document"].get("caption", "Document sent")
+			if "messages" in response:
+				chat_doc.message_id = response["messages"][0]["id"]
+			
+			# Don't save here - let the caller save after checking success
+			return {
+				"success": True,
+				"message_id": response.get("messages", [{}])[0].get("id"),
+				"whatsapp_message_name": chat_doc.name,
+			}
 		else:
-			message_doc.message = data["text"]["body"]
+			# Create new WhatsApp message record (original behavior)
+			message_doc = frappe.new_doc("WhatsApp Chat")
+			message_doc.type = "Outgoing"
+			message_doc.to = data["to"]
+			message_doc.message_type = message_type
+			message_doc.content_type = "text"
+			message_doc.status = "Success"
 
-		if reference_doctype and reference_name:
-			message_doc.reference_doctype = reference_doctype
-			message_doc.reference_name = reference_name
+			if message_type == "Template":
+				message_doc.template = template_name
+				message_doc.use_template = 1
+				if template_parameters:
+					message_doc.template_parameters = json.dumps(template_parameters)
+				message_doc.message = str(data["template"])
+			elif data.get("type") == "document":
+				# Handle document messages
+				message_doc.content_type = "document"
+				message_doc.message = data["document"].get("caption", "Document sent")
+			else:
+				message_doc.message = data["text"]["body"]
 
-		if "messages" in response:
-			message_doc.message_id = response["messages"][0]["id"]
+			if reference_doctype and reference_name:
+				message_doc.reference_doctype = reference_doctype
+				message_doc.reference_name = reference_name
 
-		message_doc.insert(ignore_permissions=True)
+			if "messages" in response:
+				message_doc.message_id = response["messages"][0]["id"]
 
-		return {
-			"success": True,
-			"message_id": response.get("messages", [{}])[0].get("id"),
-			"whatsapp_message_name": message_doc.name,
-		}
+			message_doc.insert(ignore_permissions=True)
+
+			return {
+				"success": True,
+				"message_id": response.get("messages", [{}])[0].get("id"),
+				"whatsapp_message_name": message_doc.name,
+			}
 
 	except Exception as e:
 		error_message = str(e)
