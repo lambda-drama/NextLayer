@@ -154,7 +154,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-13 00:04:46.503062",
+ "modified": "2026-01-24 18:31:31.726141",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Message Templates",
@@ -178,5 +178,18 @@
  "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [
+  {
+   "color": "Red",
+   "title": "REJECTED"
+  },
+  {
+   "color": "Green",
+   "title": "APPROVED"
+  },
+  {
+   "color": "Gray",
+   "title": "PENDING"
+  }
+ ]
 }

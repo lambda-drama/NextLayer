@@ -348,11 +348,37 @@ function show_whatsapp_send_modal(frm) {
 										depends_on: 'eval:doc.template'
 									},
 									{
-										label: __('Parameters'),
+										label: __('Parameter 1 (Customer Name)'),
+										fieldname: 'param1',
+										fieldtype: 'Data',
+										depends_on: 'eval:doc.template',
+										default: frm.doc.customer_name || frm.doc.customer,
+										read_only: 1,
+										description: __('Auto-filled: Customer Name')
+									},
+									{
+										fieldtype: 'Column Break',
+										depends_on: 'eval:doc.template'
+									},
+									{
+										label: __('Parameter 2 (Invoice Number)'),
+										fieldname: 'param2',
+										fieldtype: 'Data',
+										depends_on: 'eval:doc.template',
+										default: frm.doc.name,
+										read_only: 1,
+										description: __('Auto-filled: Invoice Number')
+									},
+									{
+										fieldtype: 'Section Break',
+										depends_on: 'eval:doc.template'
+									},
+									{
+										label: __('Additional Parameters'),
 										fieldname: 'template_parameters',
 										fieldtype: 'Small Text',
 										depends_on: 'eval:doc.template',
-										description: __('Enter parameters separated by commas (e.g., param1, param2, param3)')
+										description: __('Enter additional parameters separated by commas (e.g., param3, param4). Parameters 1 and 2 are auto-filled above.')
 									}
 								],
 								primary_action_label: __('Send'),
@@ -364,10 +390,22 @@ function show_whatsapp_send_modal(frm) {
 										return;
 									}
 									
-									// Parse template parameters if provided
-									let template_parameters = null;
-									if (values.template_parameters) {
-										template_parameters = values.template_parameters.split(',').map(p => p.trim()).filter(p => p);
+									// Build template parameters array
+									// Parameter 1: Customer Name, Parameter 2: Invoice Number
+									let template_parameters = [];
+									if (values.template) {
+										// Always include customer name as first parameter
+										template_parameters.push(frm.doc.customer_name || frm.doc.customer || '');
+										// Always include invoice number as second parameter
+										template_parameters.push(frm.doc.name || '');
+										
+										// Add additional parameters if provided
+										if (values.template_parameters) {
+											let additional_params = values.template_parameters.split(',').map(p => p.trim()).filter(p => p);
+											template_parameters = template_parameters.concat(additional_params);
+										}
+									} else {
+										template_parameters = null;
 									}
 									
 									// Show loading indicator
