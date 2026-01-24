@@ -544,6 +544,11 @@ def update_match_status():
 		current_doc = frappe.get_doc(voucher_type, voucher_no)
 
 		# For Journal Entries, handle child table updates
+		# Note: party and party_type are required for Journal Entries
+		if voucher_type == "Journal Entry":
+			if not party or not party_type:
+				frappe.throw(f"For Journal Entry {voucher_no}, party and party_type are required. Received party={party}, party_type={party_type}")
+		
 		if voucher_type == "Journal Entry" and party and party_type:
 			# If unmatching, also handle paired transaction unmatch for Journal Entries
 			if match_status == "Mismatch" and (matched_with is None or matched_with == ""):
@@ -958,6 +963,8 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 				matching_child_row = None
 				print(f"[get_match_status] Journal Entry {voucher_no}: Looking for party={party}, party_type={party_type}, gl_entry={gl_entry}")
 				print(f"[get_match_status] Found {len(child_table)} child table rows")
+				if gl_entry:
+					print(f"[get_match_status] Searching for gl_entry: {gl_entry}")
 
 				for row in child_table:
 					# Match by party and party_type first
@@ -966,11 +973,14 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 					if not party_match:
 						continue
 					
+					print(f"[get_match_status] Found matching party row: party={row.party}, party_type={row.party_type}, gl_entry={row.gl_entry}, status={row.intercompany_match_status}")
+					
 					# If gl_entry is provided, try to match by gl_entry
 					if gl_entry:
 						# First try exact match with gl_entry
 						if row.gl_entry == gl_entry:
 							matching_child_row = row
+							print(f"[get_match_status] Exact gl_entry match found: {gl_entry}")
 							break
 						# If no gl_entry in row (backward compatibility - old matches), 
 						# and this is the only row for this party, use it
@@ -985,15 +995,19 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 							if not has_other_rows_with_gl_entry:
 								# This is the only row for this party, use it (backward compatibility)
 								matching_child_row = row
+								print(f"[get_match_status] Using row without gl_entry (backward compatibility): party={party}, party_type={party_type}")
 								# Update the row to include gl_entry for future queries
 								if not matching_child_row.gl_entry:
 									matching_child_row.gl_entry = gl_entry
 									try:
 										doc.save(ignore_permissions=True)
 										frappe.db.commit()
+										print(f"[get_match_status] Updated row with gl_entry: {gl_entry}")
 									except:
 										pass  # Don't fail if update doesn't work
 								break
+						else:
+							print(f"[get_match_status] gl_entry mismatch: row.gl_entry={row.gl_entry}, requested={gl_entry}")
 					else:
 						# If gl_entry is not provided, only match rows without gl_entry (backward compatibility)
 						if not row.gl_entry:
