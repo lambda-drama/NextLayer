@@ -169,7 +169,7 @@ export const useMatchStatus = () => {
     return results
   }, [updateMatchStatus])
 
-  const refreshMatchStatuses = useCallback(async (entries: Array<{ voucher_type: string; voucher_no: string; company: string; party?: string; party_type?: string }>): Promise<{[key: string]: MatchStatusResponse}> => {
+  const refreshMatchStatuses = useCallback(async (entries: Array<{ voucher_type: string; voucher_no: string; company: string; party?: string; party_type?: string; gl_entry?: string }>): Promise<{[key: string]: MatchStatusResponse}> => {
     setLoading(true)
     setError(null)
 
@@ -181,10 +181,13 @@ export const useMatchStatus = () => {
       const batch = entries.slice(i, i + batchSize)
 
       const batchPromises = batch.map(async (entry) => {
-        const key = `${entry.voucher_type}-${entry.voucher_no}`
+        // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use voucher key
+        const key = entry.voucher_type === "Journal Entry" && entry.gl_entry 
+          ? entry.gl_entry 
+          : `${entry.voucher_type}-${entry.voucher_no}`
         try {
-          // For Journal Entries, pass party information if available
-          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, entry.company, entry.party, entry.party_type)
+          // For Journal Entries, pass party information and gl_entry if available
+          const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, entry.company, entry.party, entry.party_type, entry.gl_entry)
           statusMap[key] = result
         } catch (err) {
           statusMap[key] = { success: false, error: 'Failed to fetch status' }

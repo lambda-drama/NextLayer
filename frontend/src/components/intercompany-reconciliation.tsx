@@ -549,12 +549,44 @@ export default function IntercompanyReconciliation() {
           const party = entry.voucher_type === "Journal Entry" ? partyB : undefined
           const partyType = entry.voucher_type === "Journal Entry" ? partyTypeB : undefined
           const glEntry = entry.voucher_type === "Journal Entry" ? entry.gl_entry : undefined
+          
+          // Debug logging for Journal Entries
+          if (entry.voucher_type === "Journal Entry") {
+            console.log(`[fetchMatchStatus] Fetching status for Company B Journal Entry ${entry.voucher_no}:`, {
+              gl_entry: glEntry,
+              party,
+              partyType,
+              voucher_no: entry.voucher_no
+            })
+          }
+          
           const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyB, party, partyType, glEntry)
+          
+          // Debug logging for Journal Entries with Match status
+          if (entry.voucher_type === "Journal Entry" && result.success && result.status === 'Match') {
+            console.log(`[fetchMatchStatus] Company B Journal Entry ${entry.voucher_no} returned Match status:`, {
+              gl_entry: glEntry,
+              result,
+              party,
+              partyType
+            })
+          }
+          
           if (result.success) {
             // Use gl_entry as key for Journal Entries to differentiate debit/credit, otherwise use voucher key
             const key = entry.voucher_type === "Journal Entry" && entry.gl_entry 
               ? entry.gl_entry 
               : `${entry.voucher_type}-${entry.voucher_no}`
+            
+            // Debug logging for key assignment
+            if (entry.voucher_type === "Journal Entry" && result.status === 'Match') {
+              console.log(`[fetchMatchStatus] Storing Match status with key:`, {
+                key,
+                gl_entry: entry.gl_entry,
+                result
+              })
+            }
+            
             return { key, result }
           }
         } catch (error) {
@@ -816,6 +848,14 @@ export default function IntercompanyReconciliation() {
       let status: 'Match' | 'Mismatch' | 'Pending'
       if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
         status = backendStatus.status
+        // Debug logging for Journal Entries that should be matched
+        if (entryA.voucher_type === "Journal Entry" && status === 'Match') {
+          console.log(`[findMatchingEntries] Company A Journal Entry ${entryA.voucher_no} (gl_entry: ${entryA.gl_entry}) has Match status from backend:`, {
+            statusKey,
+            backendStatus,
+            gl_entry: entryA.gl_entry
+          })
+        }
       } else {
         // If backend status is null/undefined or doesn't exist, check if there's a frontend match
         // Only show Match if auto-match is enabled AND there's actually a matching entry
@@ -823,6 +863,16 @@ export default function IntercompanyReconciliation() {
           status = 'Match'
         } else {
           status = 'Mismatch'
+        }
+        // Debug logging for Journal Entries that should be matched but backend status wasn't found
+        if (entryA.voucher_type === "Journal Entry") {
+          console.log(`[findMatchingEntries] Company A Journal Entry ${entryA.voucher_no} (gl_entry: ${entryA.gl_entry}) - backend status not found:`, {
+            statusKey,
+            backendStatus,
+            availableKeys: Object.keys(backendMatchStatus).filter(k => k.includes(entryA.voucher_no) || k === entryA.gl_entry),
+            gl_entry: entryA.gl_entry,
+            partyA
+          })
         }
       }
 
@@ -900,6 +950,14 @@ export default function IntercompanyReconciliation() {
       let status: 'Match' | 'Mismatch' | 'Pending'
       if (backendStatus && backendStatus.status && backendStatus.status !== null && backendStatus.status !== undefined) {
         status = backendStatus.status
+        // Debug logging for Journal Entries that should be matched
+        if (entryB.voucher_type === "Journal Entry" && status === 'Match') {
+          console.log(`[findMatchingEntries] Company B Journal Entry ${entryB.voucher_no} (gl_entry: ${entryB.gl_entry}) has Match status from backend:`, {
+            statusKey,
+            backendStatus,
+            gl_entry: entryB.gl_entry
+          })
+        }
       } else {
         // If backend status is null/undefined or doesn't exist, check if there's a frontend match
         // Only show Match if auto-match is enabled AND there's actually a matching entry
@@ -907,6 +965,17 @@ export default function IntercompanyReconciliation() {
           status = 'Match'
         } else {
           status = 'Mismatch'
+        }
+        // Debug logging for Journal Entries that should be matched but backend status wasn't found
+        if (entryB.voucher_type === "Journal Entry") {
+          console.log(`[findMatchingEntries] Company B Journal Entry ${entryB.voucher_no} (gl_entry: ${entryB.gl_entry}) - backend status not found:`, {
+            statusKey,
+            backendStatus,
+            availableKeys: Object.keys(backendMatchStatus).filter(k => k.includes(entryB.voucher_no) || k === entryB.gl_entry),
+            gl_entry: entryB.gl_entry,
+            partyB,
+            partyTypeB
+          })
         }
       }
 
@@ -1249,13 +1318,32 @@ export default function IntercompanyReconciliation() {
       )
 
       const entry = entryA || entryB
-      if (entry && entry.status !== 'Match') {
+      if (!entry) {
+        return false
+      }
+
+      // Determine the status key (use gl_entry for Journal Entries, otherwise use entryKey)
+      const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry 
+        ? entry.gl_entry 
+        : entryKey
+      
+      // Check backend status directly from backendMatchStatus map
+      const backendStatusData = backendMatchStatus[statusKey]
+      
+      // Check both entry.status and backendMatchStatus to ensure we catch all matched entries
+      const entryStatus = entry.status
+      const backendStatus = backendStatusData?.status || entry.backendMatchData?.status
+      
+      // Entry is matched if status is 'Match' (check backend status first as it's the source of truth)
+      const isMatched = backendStatus === 'Match' || entryStatus === 'Match'
+      
+      if (!isMatched) {
         return false
       }
     }
 
     return true
-  }, [selectedEntries, findMatchingEntries])
+  }, [selectedEntries, findMatchingEntries, backendMatchStatus])
 
   // Handle bulk unmatching
   const handleBulkUnmatch = async () => {
@@ -1413,13 +1501,57 @@ export default function IntercompanyReconciliation() {
 
         // Refresh match statuses
         // console.log("Refreshing match statuses after unmatch...")
-        await refreshMatchStatuses(bulkData.map(entry => ({
-          voucher_type: entry.voucher_type,
-          voucher_no: entry.voucher_no,
-          company: entry.company,
-          party: entry.party,
-          party_type: entry.party_type
-        })))
+        // Get the original entries to include gl_entry for Journal Entries
+        const refreshEntries = bulkData.map(entry => {
+          // Find the original entry to get gl_entry
+          // Company A entries are in glDataAWithStatus, Company B entries are in glDataBWithStatus
+          // Determine which array to search based on company
+          const searchArray = entry.company === companyA 
+            ? findMatchingEntries.glDataAWithStatus 
+            : findMatchingEntries.glDataBWithStatus
+          
+          const originalEntry = searchArray.find(e =>
+            e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no
+          )
+          
+          return {
+            voucher_type: entry.voucher_type,
+            voucher_no: entry.voucher_no,
+            company: entry.company, // This comes from bulkData which has company
+            party: entry.party,
+            party_type: entry.party_type,
+            gl_entry: originalEntry?.voucher_type === "Journal Entry" ? originalEntry.gl_entry : undefined
+          }
+        })
+        
+        const refreshedStatusMap = await refreshMatchStatuses(refreshEntries)
+        
+        // Update backendMatchStatus with refreshed data
+        setBackendMatchStatus(prev => {
+          const updated = { ...prev }
+          Object.keys(refreshedStatusMap).forEach(key => {
+            const result = refreshedStatusMap[key]
+            if (result.success && result.status) {
+              updated[key] = {
+                status: result.status as 'Match' | 'Mismatch' | 'Pending',
+                matched_with: result.matched_with || null,
+                matched_with_parsed: result.matched_with_parsed || null,
+                matched_by: result.matched_by || null,
+                matched_on: result.matched_on || null
+              }
+            } else {
+              // If status fetch failed, set to Mismatch
+              updated[key] = {
+                status: 'Mismatch',
+                matched_with: null,
+                matched_with_parsed: null,
+                matched_by: null,
+                matched_on: null
+              }
+            }
+          })
+          return updated
+        })
 
         setSelectedEntries(new Set())
         // console.log("Bulk unmatch process completed successfully")
@@ -1462,14 +1594,19 @@ export default function IntercompanyReconciliation() {
       )
 
       // Get already matched entries (status === 'Match') from both sides
+      // For Journal Entries, use gl_entry as key; for others, use voucher_type-voucher_no
       const alreadyMatchedA = findMatchingEntries.glDataAWithStatus.filter(entry => {
-        const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
-        const backendStatus = backendMatchStatus[voucherKey]
+        const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+          ? entry.gl_entry
+          : `${entry.voucher_type}-${entry.voucher_no}`
+        const backendStatus = backendMatchStatus[statusKey]
         return backendStatus?.status === 'Match'
       })
       const alreadyMatchedB = findMatchingEntries.glDataBWithStatus.filter(entry => {
-        const voucherKey = `${entry.voucher_type}-${entry.voucher_no}`
-        const backendStatus = backendMatchStatus[voucherKey]
+        const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+          ? entry.gl_entry
+          : `${entry.voucher_type}-${entry.voucher_no}`
+        const backendStatus = backendMatchStatus[statusKey]
         return backendStatus?.status === 'Match'
       })
 
@@ -1544,11 +1681,51 @@ export default function IntercompanyReconciliation() {
         validationPassed = netTotalMatch
       } else {
         // Validation logic: Check if totals match (including already matched entries)
-        // Total debit on side A (matched + current) should equal total credit on side B (matched + current)
-        // Total credit on side A (matched + current) should equal total debit on side B (matched + current)
+        // TWO conditions must be met:
+        // 1. Selected entries must balance on their own (Credit A = Debit B OR Debit A = Credit B)
+        // 2. Combined totals (matched + selected) must also balance (BOTH debit=credit AND credit=debit)
+        
+        // Check if selected entries balance on their own
+        const selectedDebitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
+        const selectedCreditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
+        const selectedEntriesBalance = selectedDebitCreditMatch || selectedCreditDebitMatch
+        
+        // Check combined totals (matched + selected) - BOTH conditions must be true
         const debitCreditMatch = Math.abs(totalDebitLeftWithMatched - totalCreditRightWithMatched) < 0.01
         const creditDebitMatch = Math.abs(totalCreditLeftWithMatched - totalDebitRightWithMatched) < 0.01
-        validationPassed = debitCreditMatch && creditDebitMatch
+        const combinedTotalsBalance = debitCreditMatch && creditDebitMatch
+        
+        // Check if there are already matched entries
+        const hasAlreadyMatched = matchedDebitA > 0 || matchedCreditA > 0 || matchedDebitB > 0 || matchedCreditB > 0
+        
+        // Validation passes if:
+        // - Selected entries balance on their own, AND
+        // - Combined totals also balance (both debit=credit AND credit=debit)
+        // This ensures that when adding new matches to existing matches, everything balances correctly
+        validationPassed = selectedEntriesBalance && combinedTotalsBalance
+        
+        console.log("Bulk match validation:", {
+          selectedDebitCreditMatch,
+          selectedCreditDebitMatch,
+          selectedEntriesBalance,
+          debitCreditMatch,
+          creditDebitMatch,
+          combinedTotalsBalance,
+          hasAlreadyMatched,
+          validationPassed,
+          totalDebitLeft,
+          totalCreditLeft,
+          totalDebitRight,
+          totalCreditRight,
+          matchedDebitA,
+          matchedCreditA,
+          matchedDebitB,
+          matchedCreditB,
+          totalDebitLeftWithMatched,
+          totalCreditLeftWithMatched,
+          totalDebitRightWithMatched,
+          totalCreditRightWithMatched
+        })
       }
 
 
@@ -1578,9 +1755,15 @@ export default function IntercompanyReconciliation() {
                 `- ${companyA} Net Total (${formatCurrency(netTotalLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Net Total (${formatCurrency(netTotalRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
                 `- Net Total = Credit - Debit`
         } else {
-          errorMessage += `For matching, both conditions must be true:\n` +
-                `- ${companyA} Total Debit (${formatCurrency(totalDebitLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Total Credit (${formatCurrency(totalCreditRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
-                `- ${companyA} Total Credit (${formatCurrency(totalCreditLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Total Debit (${formatCurrency(totalDebitRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})`
+          errorMessage += `For matching, TWO conditions must be met:\n\n` +
+                `1. Selected entries must balance on their own:\n` +
+                `   - ${companyA} Selected Debit (${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Selected Credit (${formatCurrency(totalCreditRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
+                `   OR\n` +
+                `   - ${companyA} Selected Credit (${formatCurrency(totalCreditLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Selected Debit (${formatCurrency(totalDebitRight, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n\n` +
+                `2. Combined totals (matched + selected) must balance (BOTH conditions must be true):\n` +
+                `   - ${companyA} Total Debit (${formatCurrency(totalDebitLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Total Credit (${formatCurrency(totalCreditRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})\n` +
+                `   AND\n` +
+                `   - ${companyA} Total Credit (${formatCurrency(totalCreditLeftWithMatched, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}) should equal ${companyB} Total Debit (${formatCurrency(totalDebitRightWithMatched, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})`
         }
 
         setValidationErrorMessage(errorMessage)
@@ -1647,28 +1830,60 @@ export default function IntercompanyReconciliation() {
       companyAEntries.forEach((entryA: any) => {
         // If entryA already has a selected matchedEntry and we are matching a group, keep group linkage
         // so many-to-one works (e.g. two payments -> one journal).
+        const isJournalEntry = entryA.voucher_type === "Journal Entry"
+        
+        // Validate that party and gl_entry are set for Journal Entries
+        if (isJournalEntry) {
+          if (!partyA) {
+            const errorMsg = `Cannot match Journal Entry ${entryA.voucher_no}: Party A is not set. Please select a party for Company A.`
+            console.error(`[handleBulkMatch] ${errorMsg}`)
+            throw new Error(errorMsg)
+          }
+          if (!entryA.gl_entry) {
+            const errorMsg = `Cannot match Journal Entry ${entryA.voucher_no}: GL Entry is missing. This entry may not have been loaded correctly.`
+            console.error(`[handleBulkMatch] ${errorMsg}`, entryA)
+            throw new Error(errorMsg)
+          }
+        }
+        
         bulkData.push({
           voucher_type: entryA.voucher_type,
           voucher_no: entryA.voucher_no,
           company: companyA,
           status: 'Match' as const,
           matched_with: matchedWithForA,
-          party: entryA.voucher_type === "Journal Entry" ? partyA : undefined,
-          party_type: entryA.voucher_type === "Journal Entry" ? "Customer" : undefined,
-          gl_entry: entryA.voucher_type === "Journal Entry" ? entryA.gl_entry : undefined
+          party: isJournalEntry ? partyA : undefined,
+          party_type: isJournalEntry ? "Customer" : undefined,
+          gl_entry: isJournalEntry ? entryA.gl_entry : undefined
         })
       })
 
       companyBEntries.forEach((entryB: any) => {
+        const isJournalEntry = entryB.voucher_type === "Journal Entry"
+        
+        // Validate that party and gl_entry are set for Journal Entries
+        if (isJournalEntry) {
+          if (!partyB) {
+            const errorMsg = `Cannot match Journal Entry ${entryB.voucher_no}: Party B is not set. Please select a party for Company B.`
+            console.error(`[handleBulkMatch] ${errorMsg}`)
+            throw new Error(errorMsg)
+          }
+          if (!entryB.gl_entry) {
+            const errorMsg = `Cannot match Journal Entry ${entryB.voucher_no}: GL Entry is missing. This entry may not have been loaded correctly.`
+            console.error(`[handleBulkMatch] ${errorMsg}`, entryB)
+            throw new Error(errorMsg)
+          }
+        }
+        
         bulkData.push({
           voucher_type: entryB.voucher_type,
           voucher_no: entryB.voucher_no,
           company: companyB,
           status: 'Match' as const,
           matched_with: matchedWithForB,
-          party: entryB.voucher_type === "Journal Entry" ? partyB : undefined,
-          party_type: entryB.voucher_type === "Journal Entry" ? partyTypeB : undefined,
-          gl_entry: entryB.voucher_type === "Journal Entry" ? entryB.gl_entry : undefined
+          party: isJournalEntry ? partyB : undefined,
+          party_type: isJournalEntry ? partyTypeB : undefined,
+          gl_entry: isJournalEntry ? entryB.gl_entry : undefined
         })
       })
 
@@ -1728,16 +1943,30 @@ export default function IntercompanyReconciliation() {
       }
 
 
-      const allEntries = [...glDataA, ...glDataB].map(entry => ({
-        voucher_type: entry.voucher_type,
-        voucher_no: entry.voucher_no,
-        company: glDataA.includes(entry) ? companyA : companyB,
-        party: entry.voucher_type === "Journal Entry" ? (glDataA.includes(entry) ? partyA : partyB) : undefined,
-        party_type: entry.voucher_type === "Journal Entry" ? (glDataA.includes(entry) ? "Customer" : partyTypeB) : undefined
-      }))
+      // Refresh match statuses only for the entries that were matched
+      // This preserves existing statuses for other entries
+      const refreshEntries = bulkData.map(entry => {
+        const foundEntry = findMatchingEntries.glDataAWithStatus.find(e => 
+          e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no
+        ) || findMatchingEntries.glDataBWithStatus.find(e => 
+          e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no
+        )
+        
+        if (!foundEntry) return null
+        
+        return {
+          voucher_type: foundEntry.voucher_type,
+          voucher_no: foundEntry.voucher_no,
+          company: entry.company,
+          party: entry.party,
+          party_type: entry.party_type,
+          gl_entry: foundEntry.voucher_type === "Journal Entry" ? foundEntry.gl_entry : undefined
+        }
+      }).filter(Boolean) as Array<{ voucher_type: string; voucher_no: string; company: string; party?: string; party_type?: string; gl_entry?: string }>
 
-        const newStatusMap = await refreshMatchStatuses(allEntries)
-        setBackendMatchStatus(newStatusMap)
+      const newStatusMap = await refreshMatchStatuses(refreshEntries)
+      // Merge with existing status map to preserve other entries' statuses
+      setBackendMatchStatus(prev => ({ ...prev, ...newStatusMap }))
       } catch (apiError) {
         console.error("API Error in background:", apiError)
         // Revert optimistic update on API error
@@ -1751,8 +1980,25 @@ export default function IntercompanyReconciliation() {
 
     } catch (error) {
       console.error('Error in bulk matching:', error)
-      alert('Failed to perform bulk matching. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to perform bulk matching. Please try again.'
+      alert(errorMessage)
       setIsProcessing(false)
+      setShowMatchModal(false)
+      // Revert optimistic update on error
+      setBackendMatchStatus(prev => {
+        const reverted = { ...prev }
+        Array.from(selectedEntries).forEach(entryKey => {
+          // Find the entry to determine the correct status key
+          const entryA = findMatchingEntries.glDataAWithStatus.find(e => getEntryKey(e) === entryKey)
+          const entryB = findMatchingEntries.glDataBWithStatus.find(e => getEntryKey(e) === entryKey)
+          const entry = entryA || entryB
+          const statusKey = entry && entry.voucher_type === "Journal Entry" && entry.gl_entry 
+            ? entry.gl_entry 
+            : entryKey
+          delete reverted[statusKey]
+        })
+        return reverted
+      })
       // console.log("Bulk match process failed, processing state reset")
     }
   }
@@ -2080,7 +2326,33 @@ export default function IntercompanyReconciliation() {
     // Apply status filter
     if (statusFilter !== 'All') {
       const beforeStatusFilter = filtered.length
-      filtered = filtered.filter(entry => entry.status === statusFilter)
+      filtered = filtered.filter(entry => {
+        // Check entry.status first (set by findMatchingEntries)
+        const entryStatus = entry.status
+        
+        // Also check backendMatchStatus directly as a fallback (for Journal Entries especially)
+        const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+          ? entry.gl_entry
+          : `${entry.voucher_type}-${entry.voucher_no}`
+        const backendStatusData = backendMatchStatus[statusKey]
+        const backendStatus = backendStatusData?.status || entry.backendMatchData?.status
+        
+        // Entry matches filter if either entry.status or backendStatus matches
+        const matchesFilter = entryStatus === statusFilter || backendStatus === statusFilter
+        
+        // Debug logging for Journal Entries that should be matched
+        if (entry.voucher_type === "Journal Entry" && statusFilter === 'Match' && !matchesFilter) {
+          console.log(`[filterEntriesByStatus] Journal Entry ${entry.voucher_no} (gl_entry: ${entry.gl_entry}) filtered out:`, {
+            entryStatus,
+            backendStatus,
+            statusKey,
+            backendStatusData,
+            statusFilter
+          })
+        }
+        
+        return matchesFilter
+      })
       const afterStatusFilter = filtered.length
       console.log(`[filterEntriesByStatus] After status filter (${statusFilter}):`, {
         before: beforeStatusFilter,
