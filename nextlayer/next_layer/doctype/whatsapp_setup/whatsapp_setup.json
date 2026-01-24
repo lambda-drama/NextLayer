@@ -15,7 +15,9 @@
   "phone_id",
   "business_id",
   "app_id",
-  "webhook_verify_token"
+  "webhook_verify_token",
+  "section_break_templates",
+  "template_details"
  ],
  "fields": [
   {
@@ -74,6 +76,17 @@
    "fieldname": "webhook_verify_token",
    "fieldtype": "Data",
    "label": "Webhook Verify Token"
+  },
+  {
+   "fieldname": "section_break_templates",
+   "fieldtype": "Section Break",
+   "label": "Default Templates"
+  },
+  {
+   "fieldname": "template_details",
+   "fieldtype": "Table",
+   "label": "Template Details",
+   "options": "WhatsApp Setup Template Details"
   }
  ],
  "index_web_pages_for_search": 1,

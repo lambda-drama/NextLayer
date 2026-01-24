@@ -212,6 +212,72 @@ def get_whatsapp_templates():
 
 
 @frappe.whitelist()
+def get_default_template_for_doctype(doctype):
+	"""
+	Get default WhatsApp template for a doctype from WhatsApp Setup
+	"""
+	try:
+		setup = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+		if setup.template_details:
+			for row in setup.template_details:
+				if row.reference_doctype == doctype:
+					return row.whatsapp_template
+		return None
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Default Template Failed")
+		return None
+
+
+@frappe.whitelist()
+def send_invoice_via_whatsapp_with_template(invoice_name, mobile_no, template_name=None, template_parameters=None):
+	"""
+	Send Sales Invoice via WhatsApp with template support
+	"""
+	try:
+		invoice = frappe.get_doc("Sales Invoice", invoice_name)
+		
+		# If template is provided, send template message
+		if template_name:
+			result = send_whatsapp_message(
+				to_number=mobile_no,
+				message_type="template",
+				template_name=template_name,
+				template_parameters=template_parameters,
+				reference_doctype="Sales Invoice",
+				reference_name=invoice_name,
+				attach_document=True,
+			)
+		else:
+			# Send text message with PDF
+			customer_name = invoice.customer_name or invoice.customer
+			message = f"Hello {customer_name}, your invoice {invoice_name} is ready! Thank you for shopping with us."
+			
+			result = send_whatsapp_message(
+				to_number=mobile_no,
+				message_type="text",
+				message_content=message,
+				reference_doctype="Sales Invoice",
+				reference_name=invoice_name,
+				attach_document=True,
+			)
+		
+		if result.get("success"):
+			return {
+				"status": "success",
+				"recipient": mobile_no,
+				"invoice": invoice_name,
+				"message_id": result.get("message_id"),
+				"timestamp": now(),
+			}
+		else:
+			frappe.throw(f"Failed to send WhatsApp message: {result.get('error')}")
+			
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Send Invoice WhatsApp Failed")
+		frappe.throw(f"Failed to send WhatsApp message: {e!s}")
+
+
+@frappe.whitelist()
 def get_whatsapp_template(template_name):
 	"""
 	Get a specific WhatsApp template by name

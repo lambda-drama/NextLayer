@@ -275,6 +275,154 @@ function show_invoice_settings_modal(frm, doctype) {
 	settings_dialog.show();
 }
 
+// Function to show WhatsApp send modal
+function show_whatsapp_send_modal(frm) {
+	// Get customer phone number
+	let customer_mobile = '';
+	let default_template = null;
+	
+	// Fetch customer details and default template
+	frappe.call({
+		method: 'frappe.client.get',
+		args: {
+			doctype: 'Customer',
+			name: frm.doc.customer
+		},
+		callback: function(r) {
+			if (r.message) {
+				customer_mobile = r.message.mobile_no || r.message.custom_mobile_no || '';
+			}
+			
+			// Get default template for Sales Invoice
+			frappe.call({
+				method: 'nextlayer.next_layer.api.whatsapp.get_default_template_for_doctype',
+				args: {
+					doctype: 'Sales Invoice'
+				},
+				callback: function(template_r) {
+					if (template_r.message) {
+						default_template = template_r.message;
+					}
+					
+					// Get all templates for dropdown
+					frappe.call({
+						method: 'nextlayer.next_layer.api.whatsapp.get_whatsapp_templates',
+						callback: function(templates_r) {
+							let templates = templates_r.message || [];
+							
+							// Create modal dialog
+							let whatsapp_dialog = new frappe.ui.Dialog({
+								title: __('Send Invoice via WhatsApp'),
+								fields: [
+									{
+										label: __('Phone Number'),
+										fieldname: 'mobile_no',
+										fieldtype: 'Data',
+										default: customer_mobile,
+										reqd: 1,
+										description: __('Enter phone number with country code (e.g., 1234567890)')
+									},
+									{
+										fieldtype: 'Column Break'
+									},
+									{
+										label: __('WhatsApp Template'),
+										fieldname: 'template',
+										fieldtype: 'Link',
+										options: 'WhatsApp Message Templates',
+										default: default_template,
+										get_query: function() {
+											return {
+												filters: {
+													status: 'Approved'
+												}
+											};
+										},
+										description: __('Optional: Select a template. If not selected, a text message will be sent.')
+									},
+									{
+										fieldtype: 'Section Break',
+										label: __('Template Parameters'),
+										collapsible: 1,
+										collapsed: 1,
+										depends_on: 'eval:doc.template'
+									},
+									{
+										label: __('Parameters'),
+										fieldname: 'template_parameters',
+										fieldtype: 'Small Text',
+										depends_on: 'eval:doc.template',
+										description: __('Enter parameters separated by commas (e.g., param1, param2, param3)')
+									}
+								],
+								primary_action_label: __('Send'),
+								primary_action: function() {
+									let values = whatsapp_dialog.get_values();
+									
+									if (!values.mobile_no) {
+										frappe.msgprint(__('Please enter a phone number'));
+										return;
+									}
+									
+									// Parse template parameters if provided
+									let template_parameters = null;
+									if (values.template_parameters) {
+										template_parameters = values.template_parameters.split(',').map(p => p.trim()).filter(p => p);
+									}
+									
+									// Show loading indicator
+									frappe.show_progress(__('Sending'), 50, __('Sending invoice via WhatsApp...'));
+									
+									// Send WhatsApp message
+									frappe.call({
+										method: 'nextlayer.next_layer.api.whatsapp.send_invoice_via_whatsapp_with_template',
+										args: {
+											invoice_name: frm.doc.name,
+											mobile_no: values.mobile_no,
+											template_name: values.template || null,
+											template_parameters: template_parameters
+										},
+										callback: function(send_r) {
+											frappe.hide_progress();
+											
+											if (send_r.message && send_r.message.status === 'success') {
+												frappe.show_alert({
+													message: __('Invoice sent successfully via WhatsApp'),
+													indicator: 'green'
+												}, 5);
+												whatsapp_dialog.hide();
+												frm.reload_doc();
+											} else {
+												frappe.msgprint({
+													title: __('Error'),
+													message: send_r.message && send_r.message.error 
+														? send_r.message.error 
+														: __('Failed to send WhatsApp message'),
+													indicator: 'red'
+												});
+											}
+										},
+										error: function(error_r) {
+											frappe.hide_progress();
+											frappe.msgprint({
+												title: __('Error'),
+												message: error_r.message || __('Failed to send WhatsApp message'),
+												indicator: 'red'
+											});
+										}
+									});
+								}
+							});
+							
+							whatsapp_dialog.show();
+						}
+					});
+				}
+			});
+		}
+	});
+}
+
 frappe.ui.form.on("Sales Invoice", {
 	validate: function(frm) {
 		if (frm.doc.customer && (!frm.doc.custom_invoice_no || !frm.doc.custom_invoice_no.startsWith("GLI-"))) {
@@ -497,6 +645,13 @@ frappe.ui.form.on("Sales Invoice", {
 				});
 				dialog.show();
 			}, __('Get Items From'));
+		}
+		
+		// Add WhatsApp button group (only for submitted invoices)
+		if (frm.doc.docstatus === 1 && frm.doc.customer) {
+			frm.add_custom_button(__('Send'), function() {
+				show_whatsapp_send_modal(frm);
+			}, __('WhatsApp'));
 		}
 	}
 });
