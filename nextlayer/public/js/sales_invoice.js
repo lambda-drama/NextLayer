@@ -342,6 +342,101 @@ function show_whatsapp_send_modal(frm) {
 									},
 									{
 										fieldtype: 'Section Break',
+										label: __('PDF Settings')
+									},
+									{
+										label: __('Print Format'),
+										fieldname: 'print_format',
+										fieldtype: 'Link',
+										options: 'Print Format',
+										default: 'Standard',
+										get_query: function() {
+											return {
+												filters: {
+													doc_type: 'Sales Invoice',
+													disabled: 0
+												}
+											};
+										},
+										description: __('Select the print format for the PDF attachment')
+									},
+									{
+										fieldtype: 'Column Break'
+									},
+									{
+										label: __('Letter Head'),
+										fieldname: 'letter_head',
+										fieldtype: 'Link',
+										options: 'Letter Head',
+										get_query: function() {
+											return {
+												filters: {
+													disabled: 0
+												}
+											};
+										},
+										description: __('Select the letter head for the PDF')
+									},
+									{
+										label: __('Preview PDF'),
+										fieldname: 'preview_pdf',
+										fieldtype: 'Button',
+										click: function() {
+											let values = whatsapp_dialog.get_values();
+											let selected_print_format = values.print_format || 'Standard';
+											let selected_letter_head = values.letter_head || null;
+											
+											if (!selected_print_format) {
+												frappe.msgprint({
+													title: __('Error'),
+													message: __('Please select a print format first'),
+													indicator: 'red'
+												});
+												return;
+											}
+											
+											// Show loading in preview area
+											let preview_area = whatsapp_dialog.$wrapper.find('.pdf-preview-container');
+											if (preview_area.length === 0) {
+												// Create preview area if it doesn't exist
+												preview_area = $('<div class="pdf-preview-container" style="margin-top: 20px; border: 1px solid #d1d5db; border-radius: 4px; padding: 15px; background: #f9fafb; max-height: 700px; overflow: auto;"></div>');
+												whatsapp_dialog.$wrapper.find('.modal-body').append(preview_area);
+											}
+											
+											preview_area.show().html('<div style="text-align: center; padding: 40px;"><i class="fa fa-spinner fa-spin fa-2x"></i><br><br>Loading PDF preview...</div>');
+											
+											// Get PDF preview URL
+											frappe.call({
+												method: 'nextlayer.next_layer.api.whatsapp.get_invoice_pdf_preview_url',
+												args: {
+													invoice_name: frm.doc.name,
+													print_format: selected_print_format,
+													letter_head: selected_letter_head
+												},
+												callback: function(preview_r) {
+													if (preview_r.message) {
+														// Display PDF in iframe
+														preview_area.html(`
+															<div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+																<strong style="font-size: 14px;">PDF Preview: ${selected_print_format}</strong>
+																<button class="btn btn-sm btn-secondary" onclick="window.open('${preview_r.message}', '_blank')">
+																	<i class="fa fa-external-link"></i> Open in New Tab
+																</button>
+															</div>
+															<iframe src="${preview_r.message}" style="width: 100%; height: 600px; border: 1px solid #d1d5db; border-radius: 4px; background: white;"></iframe>
+														`);
+													} else {
+														preview_area.html('<div class="alert alert-danger">Failed to generate PDF preview</div>');
+													}
+												},
+												error: function(error_r) {
+													preview_area.html(`<div class="alert alert-danger">Error: ${error_r.message || 'Failed to generate PDF preview'}</div>`);
+												}
+											});
+										}
+									},
+									{
+										fieldtype: 'Section Break',
 										label: __('Template Parameters'),
 										collapsible: 1,
 										collapsed: 1,
@@ -368,17 +463,6 @@ function show_whatsapp_send_modal(frm) {
 										default: frm.doc.name,
 										read_only: 1,
 										description: __('Auto-filled: Invoice Number')
-									},
-									{
-										fieldtype: 'Section Break',
-										depends_on: 'eval:doc.template'
-									},
-									{
-										label: __('Additional Parameters'),
-										fieldname: 'template_parameters',
-										fieldtype: 'Small Text',
-										depends_on: 'eval:doc.template',
-										description: __('Enter additional parameters separated by commas (e.g., param3, param4). Parameters 1 and 2 are auto-filled above.')
 									}
 								],
 								primary_action_label: __('Send'),
@@ -398,12 +482,6 @@ function show_whatsapp_send_modal(frm) {
 										template_parameters.push(frm.doc.customer_name || frm.doc.customer || '');
 										// Always include invoice number as second parameter
 										template_parameters.push(frm.doc.name || '');
-										
-										// Add additional parameters if provided
-										if (values.template_parameters) {
-											let additional_params = values.template_parameters.split(',').map(p => p.trim()).filter(p => p);
-											template_parameters = template_parameters.concat(additional_params);
-										}
 									} else {
 										template_parameters = null;
 									}
@@ -418,7 +496,9 @@ function show_whatsapp_send_modal(frm) {
 											invoice_name: frm.doc.name,
 											mobile_no: values.mobile_no,
 											template_name: values.template || null,
-											template_parameters: template_parameters
+											template_parameters: template_parameters,
+											print_format: values.print_format || 'Standard',
+											letter_head: values.letter_head || null
 										},
 										callback: function(send_r) {
 											frappe.hide_progress();
@@ -460,6 +540,7 @@ function show_whatsapp_send_modal(frm) {
 		}
 	});
 }
+
 
 frappe.ui.form.on("Sales Invoice", {
 	validate: function(frm) {

@@ -229,7 +229,7 @@ def get_default_template_for_doctype(doctype):
 
 
 @frappe.whitelist()
-def send_invoice_via_whatsapp_with_template(invoice_name, mobile_no, template_name=None, template_parameters=None):
+def send_invoice_via_whatsapp_with_template(invoice_name, mobile_no, template_name=None, template_parameters=None, print_format="Standard", letter_head=None):
 	"""
 	Send Sales Invoice via WhatsApp with template support
 	"""
@@ -246,6 +246,8 @@ def send_invoice_via_whatsapp_with_template(invoice_name, mobile_no, template_na
 				reference_doctype="Sales Invoice",
 				reference_name=invoice_name,
 				attach_document=True,
+				print_format=print_format,
+				letter_head=letter_head,
 			)
 		else:
 			# Send text message with PDF
@@ -259,6 +261,8 @@ def send_invoice_via_whatsapp_with_template(invoice_name, mobile_no, template_na
 				reference_doctype="Sales Invoice",
 				reference_name=invoice_name,
 				attach_document=True,
+				print_format=print_format,
+				letter_head=letter_head,
 			)
 		
 		if result.get("success"):
@@ -275,6 +279,49 @@ def send_invoice_via_whatsapp_with_template(invoice_name, mobile_no, template_na
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Send Invoice WhatsApp Failed")
 		frappe.throw(f"Failed to send WhatsApp message: {e!s}")
+
+
+@frappe.whitelist()
+def get_print_formats_for_doctype(doctype):
+	"""
+	Get all available print formats for a doctype
+	"""
+	try:
+		print_formats = frappe.get_all(
+			"Print Format",
+			filters={"doc_type": doctype, "disabled": 0},
+			fields=["name", "print_format_name"],
+			order_by="name"
+		)
+		return [{"value": pf["name"], "label": pf["print_format_name"] or pf["name"]} for pf in print_formats]
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Print Formats Failed")
+		return []
+
+
+@frappe.whitelist()
+def get_invoice_pdf_preview_url(invoice_name, print_format="Standard", letter_head=None):
+	"""
+	Get PDF preview URL for Sales Invoice with specified print format and letter head
+	"""
+	try:
+		invoice = frappe.get_doc("Sales Invoice", invoice_name)
+		key = invoice.get_document_share_key()
+		frappe.db.commit()
+		
+		from frappe.desk.form.utils import get_pdf_link
+		site_url = frappe.utils.get_url()
+		link = get_pdf_link("Sales Invoice", invoice_name, print_format=print_format)
+		
+		# Append letter head as URL parameter if provided
+		if letter_head:
+			separator = "&" if "?" in link else "?"
+			link = f"{link}{separator}letterhead={letter_head}"
+		
+		return f"{site_url}{link}&key={key}"
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Invoice PDF Preview Failed")
+		frappe.throw(f"Failed to get PDF preview: {e!s}")
 
 
 @frappe.whitelist()
