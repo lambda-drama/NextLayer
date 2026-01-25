@@ -1900,6 +1900,41 @@ def bulk_cleanup_cancelled_payment_entries():
 
 
 @frappe.whitelist()
+def get_intercompany_matching_tolerance():
+	"""
+	Get the intercompany matching tolerance value from Inter Company Reconciliation Settings.
+	Returns default value of 0.01 if settings don't exist or value is not set.
+	"""
+	try:
+		if frappe.db.exists("Inter Company Reconciliation Settings", "Inter Company Reconciliation Settings"):
+			tolerance = frappe.get_cached_value(
+				"Inter Company Reconciliation Settings",
+				"Inter Company Reconciliation Settings",
+				"intercompany_matching_tolerance"
+			)
+			# Return tolerance if it exists and is a valid number, otherwise return default
+			if tolerance is not None and tolerance >= 0:
+				print("Tolerance fetched from settings:", tolerance)
+				return {
+					"success": True,
+					"tolerance": float(tolerance)
+				}
+		
+		# Default tolerance if settings don't exist or value is invalid
+		return {
+			"success": True,
+			"tolerance": 0.01
+		}
+	except Exception as e:
+		frappe.log_error(f"Error getting intercompany matching tolerance: {str(e)}")
+		# Return default tolerance on error
+		return {
+			"success": True,
+			"tolerance": 0.01
+		}
+
+
+@frappe.whitelist()
 def clear_gl_cache(companyA=None, companyB=None, fromDate=None, toDate=None, partyA=None, partyB=None):
 	"""
 	Clear General Ledger cache for intercompany reconciliation.

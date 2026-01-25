@@ -93,6 +93,9 @@ export default function IntercompanyReconciliation() {
   // Cache for fetched voucher amounts (key: "voucher_type-voucher_no")
   const [voucherAmountCache, setVoucherAmountCache] = useState<Map<string, { amount: number; debit: number; credit: number }>>(new Map())
 
+  // Intercompany matching tolerance from settings
+  const [matchingTolerance, setMatchingTolerance] = useState<number>(0.01) // Default tolerance
+
   // Helper function to create a unique key for each GL entry row
   // Uses gl_entry if available, otherwise falls back to voucher+account+debit+credit
   const getEntryKey = (entry: GLEntry): string => {
@@ -241,6 +244,31 @@ export default function IntercompanyReconciliation() {
       }
     }
   }, [companyB, partyB, displayPartiesB, companyA, partyA])
+
+  // Fetch intercompany matching tolerance from settings on component mount
+  useEffect(() => {
+    const fetchMatchingTolerance = async () => {
+      try {
+        const response = await fetch('/api/method/nextlayer.next_layer.api.general_ledger.get_intercompany_matching_tolerance', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-Frappe-CSRF-Token': window.csrf_token || ''
+          },
+          credentials: 'include'
+        })
+        const result = await response.json()
+        const responseData = result.message || result
+        if (responseData.success && responseData.tolerance !== undefined) {
+          setMatchingTolerance(responseData.tolerance)
+        }
+      } catch (error) {
+        console.error('Error fetching matching tolerance:', error)
+        // Keep default tolerance of 0.01 on error
+      }
+    }
+    fetchMatchingTolerance()
+  }, [])
 
   // Helper function to find corresponding company for intercompany transactions
   const findCorrespondingCompany = (selectedCompany: string): string | null => {
@@ -836,14 +864,14 @@ export default function IntercompanyReconciliation() {
           const netTotalA = entryA.credit - entryA.debit
           const netTotalB = entryB.credit - entryB.debit
 
-          // Check if absolute values of net totals match with small tolerance
-          const netTotalMatch = Math.abs(Math.abs(netTotalA) - Math.abs(netTotalB)) < 0.01
+          // Check if absolute values of net totals match with configured tolerance
+          const netTotalMatch = Math.abs(Math.abs(netTotalA) - Math.abs(netTotalB)) < matchingTolerance
 
           return netTotalMatch && dateMatch
         } else {
           // Original logic: Check if amounts match (debit on one side should equal credit on other side)
-          const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-          const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+          const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < matchingTolerance
+          const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < matchingTolerance
 
           // Return true only if amounts match AND dates match
           return (debitCreditMatch || creditDebitMatch) && dateMatch
@@ -938,14 +966,14 @@ export default function IntercompanyReconciliation() {
           const netTotalA = entryA.credit - entryA.debit
           const netTotalB = entryB.credit - entryB.debit
 
-          // Check if absolute values of net totals match with small tolerance
-          const netTotalMatch = Math.abs(Math.abs(netTotalA) - Math.abs(netTotalB)) < 0.01
+          // Check if absolute values of net totals match with configured tolerance
+          const netTotalMatch = Math.abs(Math.abs(netTotalA) - Math.abs(netTotalB)) < matchingTolerance
 
           return netTotalMatch && dateMatch
         } else {
           // Original logic: Check if amounts match (debit on one side should equal credit on other side)
-          const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < 0.01
-          const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < 0.01
+          const debitCreditMatch = Math.abs(entryA.debit - entryB.credit) < matchingTolerance
+          const creditDebitMatch = Math.abs(entryA.credit - entryB.debit) < matchingTolerance
 
           // Return true only if amounts match AND dates match
           return (debitCreditMatch || creditDebitMatch) && dateMatch
@@ -1077,7 +1105,7 @@ export default function IntercompanyReconciliation() {
     }
     
     return { glDataAWithStatus: filteredGlDataAWithStatus, glDataBWithStatus: filteredGlDataBWithStatus }
-  }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled, bypassTotalCalculation])
+  }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled, bypassTotalCalculation, matchingTolerance])
 
   // Updated reconciliation analysis using reconciliationTotals
   const reconciliationAnalysis = useMemo(() => {
@@ -1096,7 +1124,7 @@ export default function IntercompanyReconciliation() {
       // Calculate net totals for both companies
       const netTotalA = totalCreditA - totalDebitA
       const netTotalB = totalCreditB - totalDebitB
-      const netTotalMatch = Math.abs(netTotalA - netTotalB) < 0.01
+      const netTotalMatch = Math.abs(netTotalA - netTotalB) < matchingTolerance
 
       // For bypass mode, we consider it reconciled if net totals match
       debitCreditMatch = netTotalMatch
@@ -1104,8 +1132,8 @@ export default function IntercompanyReconciliation() {
       isFullyReconciled = netTotalMatch
     } else {
       // Original logic
-      debitCreditMatch = Math.abs(totalDebitA - totalCreditB) < 0.01
-      creditDebitMatch = Math.abs(totalCreditA - totalDebitB) < 0.01
+      debitCreditMatch = Math.abs(totalDebitA - totalCreditB) < matchingTolerance
+      creditDebitMatch = Math.abs(totalCreditA - totalDebitB) < matchingTolerance
       isFullyReconciled = debitCreditMatch && creditDebitMatch
     }
 
@@ -1120,7 +1148,7 @@ export default function IntercompanyReconciliation() {
       balanceA: totalsA.balance,
       balanceB: totalsB.balance,
     }
-  }, [totalsA, totalsB, bypassTotalCalculation])
+  }, [totalsA, totalsB, bypassTotalCalculation, matchingTolerance])
 
   // Calculate summary statistics for match/mismatch counts
   const summaryStats = useMemo(() => {
@@ -1698,9 +1726,9 @@ export default function IntercompanyReconciliation() {
         const netTotalLeft = totalCreditLeftWithMatched - totalDebitLeftWithMatched
         const netTotalRight = totalCreditRightWithMatched - totalDebitRightWithMatched
 
-        // For bypass mode, compare absolute values of net totals with small tolerance
+        // For bypass mode, compare absolute values of net totals with configured tolerance
         // This ensures we match regardless of which side is positive/negative
-        const netTotalMatch = Math.abs(Math.abs(netTotalLeft) - Math.abs(netTotalRight)) < 0.01
+        const netTotalMatch = Math.abs(Math.abs(netTotalLeft) - Math.abs(netTotalRight)) < matchingTolerance
 
         console.log("Validating bulk match with bypass total calculation...", {
           bypassTotalCalculation,
@@ -1732,13 +1760,13 @@ export default function IntercompanyReconciliation() {
         // 2. Combined totals (matched + selected) must also balance (BOTH debit=credit AND credit=debit)
         
         // Check if selected entries balance on their own
-        const selectedDebitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < 0.01
-        const selectedCreditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < 0.01
+        const selectedDebitCreditMatch = Math.abs(totalDebitLeft - totalCreditRight) < matchingTolerance
+        const selectedCreditDebitMatch = Math.abs(totalCreditLeft - totalDebitRight) < matchingTolerance
         const selectedEntriesBalance = selectedDebitCreditMatch || selectedCreditDebitMatch
         
         // Check combined totals (matched + selected) - BOTH conditions must be true
-        const debitCreditMatch = Math.abs(totalDebitLeftWithMatched - totalCreditRightWithMatched) < 0.01
-        const creditDebitMatch = Math.abs(totalCreditLeftWithMatched - totalDebitRightWithMatched) < 0.01
+        const debitCreditMatch = Math.abs(totalDebitLeftWithMatched - totalCreditRightWithMatched) < matchingTolerance
+        const creditDebitMatch = Math.abs(totalCreditLeftWithMatched - totalDebitRightWithMatched) < matchingTolerance
         const combinedTotalsBalance = debitCreditMatch && creditDebitMatch
         
         // Check if there are already matched entries
@@ -2628,12 +2656,10 @@ export default function IntercompanyReconciliation() {
   const doAmountsMatch = (entry: any, matchedEntry: GLEntry | null): boolean => {
     if (!matchedEntry) return false
     
-    const tolerance = 0.01
-    
     // For Company A (Customer): debit should match credit, credit should match debit
     // For Company B (Supplier): debit should match credit, credit should match debit
-    const debitCreditMatch = Math.abs(entry.debit - matchedEntry.credit) < tolerance
-    const creditDebitMatch = Math.abs(entry.credit - matchedEntry.debit) < tolerance
+    const debitCreditMatch = Math.abs(entry.debit - matchedEntry.credit) < matchingTolerance
+    const creditDebitMatch = Math.abs(entry.credit - matchedEntry.debit) < matchingTolerance
     
     return debitCreditMatch || creditDebitMatch
   }

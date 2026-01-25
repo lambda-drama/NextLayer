@@ -563,7 +563,6 @@ frappe.ui.form.on("Sales Invoice", {
 			});
 		}
 		// Auto-fetch advances from Sales Order if invoice is created from an order
-		// This runs before Python validate, so advances are pulled early
 		if (frm.doc.docstatus == 0) {
 			// Check if Sales Invoice is created from a Sales Order
 			let sales_order = frm.doc.sales_order;
