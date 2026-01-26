@@ -23,6 +23,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Intercompany Matched By",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -32,6 +33,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Intercompany Matched On",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -41,6 +43,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Intercompany Match Status",
+   "no_copy": 1,
    "options": "\nPending\nMatch\nMismatch",
    "read_only": 1
   },
@@ -55,6 +58,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Intercompany Matched With",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -65,6 +69,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Party",
+   "no_copy": 1,
    "options": "party_type",
    "read_only": 1
   },
@@ -76,27 +81,29 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Party Type",
+   "no_copy": 1,
    "options": "DocType",
    "read_only": 1
   },
   {
    "allow_on_submit": 1,
+   "description": "The specific GL Entry (debit or credit) that was matched",
    "fieldname": "gl_entry",
    "fieldtype": "Link",
    "ignore_user_permissions": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "GL Entry",
+   "no_copy": 1,
    "options": "GL Entry",
-   "read_only": 1,
-   "description": "The specific GL Entry (debit or credit) that was matched"
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-21 02:14:24.689768",
+ "modified": "2026-01-26 22:18:43.776035",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "InterCompany Journal Match Detail",

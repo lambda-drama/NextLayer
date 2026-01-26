@@ -1433,11 +1433,26 @@ def clear_intercompany_fields_before_submit(doc, method=None):
 	Clear intercompany matching fields before submission.
 	This prevents old intercompany match data from being carried over when cancelling and amending documents.
 
+	For Journal Entries, also clears all rows in the 'custom_intercompany_match_details' child table
+	to prevent old match data from being carried forward when amending a cancelled document.
+
 	Args:
 		doc: The document being submitted
 		method: The method name (for hook compatibility)
 	"""
 	try:
+		# Handle Journal Entries with child table - clear all child table rows
+		if doc.doctype == "Journal Entry":
+			child_table = doc.get("custom_intercompany_match_details", [])
+			if child_table:
+				# Clear all rows from the child table
+				doc.set("custom_intercompany_match_details", [])
+				frappe.logger().info(
+					f"Cleared all intercompany match detail rows before submission for Journal Entry {doc.name}"
+				)
+			return
+
+		# For other document types, clear top-level fields
 		# Check if the document has intercompany fields
 		if not hasattr(doc, 'intercompany_match_status'):
 			return
@@ -1476,11 +1491,108 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 	This function checks if the document has intercompany matches and removes
 	the corresponding matches from the matched documents.
 
+	For Journal Entries, checks the child table 'custom_intercompany_match_details'
+	instead of top-level fields.
+
 	Args:
 		doc: The document being cancelled
 		method: The method name (for hook compatibility)
 	"""
 	try:
+		# Handle Journal Entries with child table
+		if doc.doctype == "Journal Entry":
+			# Check if child table exists and has matched entries
+			child_table = doc.get("custom_intercompany_match_details", [])
+			if not child_table:
+				return
+			
+			# Find all matched rows in the child table
+			matched_rows = [row for row in child_table if row.intercompany_match_status == 'Match' and row.intercompany_matched_with]
+			
+			if not matched_rows:
+				return
+			
+			# Process each matched row
+			for matched_row in matched_rows:
+				try:
+					# Parse the matched_with data
+					try:
+						matched_data = frappe.parse_json(matched_row.intercompany_matched_with)
+					except:
+						matched_data = matched_row.intercompany_matched_with
+					
+					if not isinstance(matched_data, dict):
+						continue
+					
+					voucher_type = matched_data.get('voucher_type')
+					voucher_no = matched_data.get('voucher_no')
+					matched_company = matched_data.get('company')
+					
+					if not voucher_type or not voucher_no:
+						continue
+					
+					# Check if the matched document still exists
+					if not frappe.db.exists(voucher_type, voucher_no):
+						frappe.logger().info(f"Matched document {voucher_type} {voucher_no} no longer exists, skipping cleanup")
+						continue
+					
+					# Get the matched document
+					matched_doc = frappe.get_doc(voucher_type, voucher_no)
+					
+					# If the matched document is also a Journal Entry, update its child table
+					if voucher_type == "Journal Entry":
+						matched_child_table = matched_doc.get("custom_intercompany_match_details", [])
+						
+						# Find the child table row in the matched Journal Entry that points back to this cancelled Journal Entry
+						for matched_child_row in matched_child_table:
+							if matched_child_row.intercompany_matched_with:
+								try:
+									matched_child_matched_data = frappe.parse_json(matched_child_row.intercompany_matched_with)
+									if isinstance(matched_child_matched_data, dict):
+										# Check if this row's matched_with points back to the cancelled Journal Entry
+										if (matched_child_matched_data.get('voucher_type') == doc.doctype and
+											matched_child_matched_data.get('voucher_no') == doc.name):
+											# Update the specific child table row
+											frappe.db.set_value(
+												"InterCompany Journal Match Detail",
+												matched_child_row.name,
+												{
+													'intercompany_match_status': 'Mismatch',
+													'intercompany_matched_with': None,
+													'intercompany_matched_by': None,
+													'intercompany_matched_on': None
+												}
+											)
+											frappe.logger().info(f"Unmatched child table row in Journal Entry {voucher_no} (party={matched_child_row.party}, gl_entry={matched_child_row.gl_entry})")
+											break
+								except:
+									continue
+					else:
+						# For non-Journal Entry documents, update top-level fields
+						if (hasattr(matched_doc, 'intercompany_match_status') and
+							hasattr(matched_doc, 'intercompany_matched_with') and
+							matched_doc.intercompany_match_status == 'Match' and
+							matched_doc.intercompany_matched_with):
+							frappe.db.set_value(
+								voucher_type,
+								voucher_no,
+								{
+									'intercompany_match_status': 'Mismatch',
+									'intercompany_matched_with': None,
+									'intercompany_matched_by': None,
+									'intercompany_matched_on': None
+								}
+							)
+							frappe.logger().info(f"Unmatched {voucher_type} {voucher_no} on cancel of Journal Entry {doc.name}")
+				
+				except Exception as e:
+					frappe.logger().error(f"Error cleaning up match for child table row in Journal Entry {doc.name}: {str(e)}")
+					continue
+			
+			frappe.db.commit()
+			return
+		
+		# Handle other document types (Payment Entry, Sales Invoice, Purchase Invoice) with top-level fields
 		if not hasattr(doc, 'intercompany_match_status') or not hasattr(doc, 'intercompany_matched_with'):
 			return
 
@@ -1520,28 +1632,59 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 			try:
 				# Get the matched document
 				matched_doc = frappe.get_doc(voucher_type, voucher_no)
-				# frappe.throw(str(matched_doc))
-				# Check if this document also has matches
-				if (hasattr(matched_doc, 'intercompany_match_status') and
-					hasattr(matched_doc, 'intercompany_matched_with') and
-					matched_doc.intercompany_match_status == 'Match' and
-					matched_doc.intercompany_matched_with):
-
-						# No more matches, reset to pending
-					frappe.db.set_value(
-						voucher_type,
-						voucher_no,
-						{
-							'intercompany_match_status': 'Mismatch',
-							'intercompany_matched_with': None,
-							'intercompany_matched_by': None,
-							'intercompany_matched_on': None
-						}
-					)
+				
+				# If the matched document is a Journal Entry, update its child table
+				if voucher_type == "Journal Entry":
+					matched_child_table = matched_doc.get("custom_intercompany_match_details", [])
+					
+					# Find the child table row that points back to this cancelled document
+					for matched_child_row in matched_child_table:
+						if matched_child_row.intercompany_matched_with:
+							try:
+								matched_child_matched_data = frappe.parse_json(matched_child_row.intercompany_matched_with)
+								if isinstance(matched_child_matched_data, dict):
+									# Check if this row's matched_with points back to the cancelled document
+									if (matched_child_matched_data.get('voucher_type') == doc.doctype and
+										matched_child_matched_data.get('voucher_no') == doc.name):
+										# Update the specific child table row
+										frappe.db.set_value(
+											"InterCompany Journal Match Detail",
+											matched_child_row.name,
+											{
+												'intercompany_match_status': 'Mismatch',
+												'intercompany_matched_with': None,
+												'intercompany_matched_by': None,
+												'intercompany_matched_on': None
+											}
+										)
+										frappe.logger().info(f"Unmatched child table row in Journal Entry {voucher_no} (party={matched_child_row.party}, gl_entry={matched_child_row.gl_entry}) on cancel of {doc.doctype} {doc.name}")
+										break
+							except:
+								continue
+				else:
+					# For non-Journal Entry documents, check if this document also has matches
+					if (hasattr(matched_doc, 'intercompany_match_status') and
+						hasattr(matched_doc, 'intercompany_matched_with') and
+						matched_doc.intercompany_match_status == 'Match' and
+						matched_doc.intercompany_matched_with):
+						# No more matches, reset to mismatch
+						frappe.db.set_value(
+							voucher_type,
+							voucher_no,
+							{
+								'intercompany_match_status': 'Mismatch',
+								'intercompany_matched_with': None,
+								'intercompany_matched_by': None,
+								'intercompany_matched_on': None
+							}
+						)
+						frappe.logger().info(f"Unmatched {voucher_type} {voucher_no} on cancel of {doc.doctype} {doc.name}")
 
 			except Exception as e:
 				frappe.logger().error(f"Error cleaning up match for {voucher_type} {voucher_no}: {str(e)}")
 				continue
+		
+		frappe.db.commit()
 	except Exception as e:
 		frappe.logger().error(f"Error in cleanup_intercompany_matches_on_cancel for {doc.doctype} {doc.name}: {str(e)}")
 		# Don't raise the exception to prevent cancellation failure
