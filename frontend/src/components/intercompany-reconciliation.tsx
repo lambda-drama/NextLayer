@@ -106,6 +106,30 @@ export default function IntercompanyReconciliation() {
     return `${entry.voucher_type}-${entry.voucher_no}-${entry.account}-${entry.debit}-${entry.credit}`
   }
 
+  // Helper function to check if a match is internal (same company)
+  const isInternalMatch = (entry: GLEntry, matchedWith: any, entryCompany: string): boolean => {
+    if (!matchedWith) return false
+    
+    // Handle both single match (object) and multiple matches (array)
+    const matchesToCheck = Array.isArray(matchedWith) ? matchedWith : [matchedWith]
+    
+    for (const match of matchesToCheck) {
+      if (!match || typeof match !== 'object') continue
+      
+      // Check if is_internal_match flag is set
+      if (match.is_internal_match === true) {
+        return true
+      }
+      
+      // Check if company matches (same company = internal match)
+      if (match.company && match.company === entryCompany) {
+        return true
+      }
+    }
+    
+    return false
+  }
+
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
   const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
@@ -1108,13 +1132,57 @@ export default function IntercompanyReconciliation() {
   }, [glDataA, glDataB, permissionAwareDataA, permissionAwareDataB, backendMatchStatus, automatchEnabled, bypassTotalCalculation, matchingTolerance])
 
   // Updated reconciliation analysis using reconciliationTotals
+  // Exclude internal matches from totals (they cancel each other out)
   const reconciliationAnalysis = useMemo(() => {
     if (!totalsA || !totalsB) return null
 
-    const totalDebitA = totalsA.totalDebit
-    const totalCreditA = totalsA.totalCredit
-    const totalDebitB = totalsB.totalDebit
-    const totalCreditB = totalsB.totalCredit
+    // Calculate totals excluding internal matches
+    let totalDebitA = 0
+    let totalCreditA = 0
+    let totalDebitB = 0
+    let totalCreditB = 0
+
+    // Sum up entries from Company A, excluding internal matches
+    findMatchingEntries.glDataAWithStatus.forEach(entry => {
+      const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+        ? entry.gl_entry
+        : `${entry.voucher_type}-${entry.voucher_no}`
+      const backendStatus = backendMatchStatus[statusKey]
+      
+      // Only include if not an internal match
+      if (backendStatus?.status === 'Match') {
+        const matchedWith = backendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+        if (!isInternalMatch(entry, matchedWith, companyA)) {
+          totalDebitA += entry.debit || 0
+          totalCreditA += entry.credit || 0
+        }
+      } else {
+        // Include unmatched entries
+        totalDebitA += entry.debit || 0
+        totalCreditA += entry.credit || 0
+      }
+    })
+
+    // Sum up entries from Company B, excluding internal matches
+    findMatchingEntries.glDataBWithStatus.forEach(entry => {
+      const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+        ? entry.gl_entry
+        : `${entry.voucher_type}-${entry.voucher_no}`
+      const backendStatus = backendMatchStatus[statusKey]
+      
+      // Only include if not an internal match
+      if (backendStatus?.status === 'Match') {
+        const matchedWith = backendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+        if (!isInternalMatch(entry, matchedWith, companyB)) {
+          totalDebitB += entry.debit || 0
+          totalCreditB += entry.credit || 0
+        }
+      } else {
+        // Include unmatched entries
+        totalDebitB += entry.debit || 0
+        totalCreditB += entry.credit || 0
+      }
+    })
 
     let debitCreditMatch = false
     let creditDebitMatch = false
@@ -1145,10 +1213,10 @@ export default function IntercompanyReconciliation() {
       debitCreditMatch,
       creditDebitMatch,
       isFullyReconciled,
-      balanceA: totalsA.balance,
-      balanceB: totalsB.balance,
+      balanceA: totalCreditA - totalDebitA,
+      balanceB: totalCreditB - totalDebitB,
     }
-  }, [totalsA, totalsB, bypassTotalCalculation, matchingTolerance])
+  }, [findMatchingEntries, backendMatchStatus, companyA, companyB, bypassTotalCalculation, matchingTolerance])
 
   // Calculate summary statistics for match/mismatch counts
   const summaryStats = useMemo(() => {
@@ -1668,27 +1736,62 @@ export default function IntercompanyReconciliation() {
       )
 
       // Get already matched entries (status === 'Match') from both sides
+      // EXCLUDE internal matches from totals (they cancel each other out)
       // For Journal Entries, use gl_entry as key; for others, use voucher_type-voucher_no
       const alreadyMatchedA = findMatchingEntries.glDataAWithStatus.filter(entry => {
         const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
           ? entry.gl_entry
           : `${entry.voucher_type}-${entry.voucher_no}`
         const backendStatus = backendMatchStatus[statusKey]
-        return backendStatus?.status === 'Match'
+        if (backendStatus?.status !== 'Match') return false
+        
+        // Exclude internal matches from totals
+        const matchedWith = backendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+        return !isInternalMatch(entry, matchedWith, companyA)
       })
       const alreadyMatchedB = findMatchingEntries.glDataBWithStatus.filter(entry => {
         const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
           ? entry.gl_entry
           : `${entry.voucher_type}-${entry.voucher_no}`
         const backendStatus = backendMatchStatus[statusKey]
-        return backendStatus?.status === 'Match'
+        if (backendStatus?.status !== 'Match') return false
+        
+        // Exclude internal matches from totals
+        const matchedWith = backendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+        return !isInternalMatch(entry, matchedWith, companyB)
       })
 
-      // Calculate totals for already matched entries
+      // Calculate totals for already matched entries (excluding internal matches)
       const matchedDebitA = alreadyMatchedA.reduce((sum, entry) => sum + (entry.debit || 0), 0)
       const matchedCreditA = alreadyMatchedA.reduce((sum, entry) => sum + (entry.credit || 0), 0)
       const matchedDebitB = alreadyMatchedB.reduce((sum, entry) => sum + (entry.debit || 0), 0)
       const matchedCreditB = alreadyMatchedB.reduce((sum, entry) => sum + (entry.credit || 0), 0)
+
+      // Separate selected entries by company to check if this is an internal match
+      // This needs to be done early to determine if we're doing an internal match
+      const companyAEntries = []
+      const companyBEntries = []
+
+      for (const entryKey of selectedEntries) {
+        // Find the entry in both Company A and Company B data using unique key
+        const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
+          getEntryKey(entry) === entryKey
+        )
+        const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
+          getEntryKey(entry) === entryKey
+        )
+
+        if (entryA) {
+          companyAEntries.push(entryA)
+        }
+        if (entryB) {
+          companyBEntries.push(entryB)
+        }
+      }
+
+      // Check if this is an internal match (all entries on same side)
+      const allEntriesSameCompany = companyAEntries.length > 0 && companyBEntries.length === 0 ||
+                                     companyAEntries.length === 0 && companyBEntries.length > 0
 
       // Calculate totals for selected entries from both sides
       const totalDebitLeft = selectedEntriesA.reduce((sum, entryKey) => {
@@ -1720,8 +1823,47 @@ export default function IntercompanyReconciliation() {
       // Check if bypass total calculation is enabled
       let validationPassed = false
 
-
-      if (bypassTotalCalculation) {
+      // If internal match (same company), validate amounts match (debit = credit) FIRST and skip intercompany validation
+      if (allEntriesSameCompany) {
+        const allSelectedEntries = companyAEntries.length > 0 ? companyAEntries : companyBEntries
+        const selectedCompany = companyAEntries.length > 0 ? companyA : companyB
+        
+        // For internal matches, we need exactly 2 entries with opposite debit/credit and same amount
+        if (allSelectedEntries.length !== 2) {
+          setValidationErrorMessage(
+            `Internal matching requires exactly 2 entries on the same side (${selectedCompany}). ` +
+            `Please select 2 entries that are reversals of each other (one with debit, one with credit, same amount).`
+          )
+          setShowValidationError(true)
+          setIsProcessing(false)
+          return
+        }
+        
+        const entry1 = allSelectedEntries[0]
+        const entry2 = allSelectedEntries[1]
+        
+        // Check if amounts match (one debit, one credit, same amount)
+        const amountMatch = (
+          (Math.abs(entry1.debit - entry2.credit) < matchingTolerance && entry1.debit > 0 && entry2.credit > 0) ||
+          (Math.abs(entry1.credit - entry2.debit) < matchingTolerance && entry1.credit > 0 && entry2.debit > 0)
+        )
+        
+        if (!amountMatch) {
+          setValidationErrorMessage(
+            `Internal matching requires entries with opposite debit/credit and same amount.\n\n` +
+            `Entry 1: Debit=${formatCurrency(entry1.debit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}, Credit=${formatCurrency(entry1.credit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+            `Entry 2: Debit=${formatCurrency(entry2.debit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}, Credit=${formatCurrency(entry2.credit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n\n` +
+            `One entry should have debit matching the other's credit (within tolerance).`
+          )
+          setShowValidationError(true)
+          setIsProcessing(false)
+          return
+        }
+        
+        // Internal matches pass validation - they don't need to balance with the other company
+        // Skip the intercompany validation below
+        validationPassed = true
+      } else if (bypassTotalCalculation) {
         // Calculate net totals for both sides (including already matched entries)
         const netTotalLeft = totalCreditLeftWithMatched - totalDebitLeftWithMatched
         const netTotalRight = totalCreditRightWithMatched - totalDebitRightWithMatched
@@ -1753,7 +1895,7 @@ export default function IntercompanyReconciliation() {
           validationPassed: netTotalMatch
         })
         validationPassed = netTotalMatch
-      } else {
+      } else if (!allEntriesSameCompany) {
         // Validation logic: Check if totals match (including already matched entries)
         // TWO conditions must be met:
         // 1. Selected entries must balance on their own (Credit A = Debit B OR Debit A = Credit B)
@@ -1804,7 +1946,8 @@ export default function IntercompanyReconciliation() {
 
 
       // Always validate amounts for manual matching (regardless of automatch setting)
-      if (!validationPassed) {
+      // Skip this check for internal matches - they're already validated above
+      if (!validationPassed && !allEntriesSameCompany) {
         let errorMessage = `Cannot match selected entries because amounts don't balance:\n\n` +
               `Selected Entries:\n` +
               `${companyA} Total Debit: ${formatCurrency(totalDebitLeft, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
@@ -1850,29 +1993,11 @@ export default function IntercompanyReconciliation() {
       // First, prepare the bulk data to determine proper pairings
       const bulkData: MatchStatusData[] = []
 
-      // Separate selected entries by company
-      const companyAEntries = []
-      const companyBEntries = []
-
-      for (const entryKey of selectedEntries) {
-        // Find the entry in both Company A and Company B data using unique key
-        const entryA = findMatchingEntries.glDataAWithStatus.find(entry =>
-          getEntryKey(entry) === entryKey
-        )
-        const entryB = findMatchingEntries.glDataBWithStatus.find(entry =>
-          getEntryKey(entry) === entryKey
-        )
-
-        if (entryA) {
-          companyAEntries.push(entryA)
-        }
-        if (entryB) {
-          companyBEntries.push(entryB)
-        }
-      }
+      // companyAEntries and companyBEntries are already populated above
+      // allEntriesSameCompany is already determined above
 
       // Helper function to create a clean matched_with object (only essential fields)
-      const createMatchedWithObject = (entry: GLEntry, company?: string) => {
+      const createMatchedWithObject = (entry: GLEntry, company?: string, isInternal: boolean = false) => {
         const matchedWith: any = {
           voucher_type: entry.voucher_type,
           voucher_no: entry.voucher_no,
@@ -1883,25 +2008,55 @@ export default function IntercompanyReconciliation() {
         if (company) {
           matchedWith.company = company
         }
+        // Mark as internal match if same company
+        if (isInternal) {
+          matchedWith.is_internal_match = true
+          matchedWith.match_type = "internal_reversal"
+        }
         return matchedWith
       }
 
+      // Determine if this is an internal match (all entries on same side)
+      // allEntriesSameCompany is already defined above
+      const isInternalMatchCase = allEntriesSameCompany
+
       const matchedWithForA = (() => {
+        if (isInternalMatchCase && companyAEntries.length > 0) {
+          // Internal match: match entries within Company A
+          if (companyAEntries.length === 1) return null
+          // For internal matches, each entry references the other(s)
+          if (companyAEntries.length === 2) {
+            // Match entry 0 with entry 1
+            return createMatchedWithObject(companyAEntries[1], companyA, true)
+          }
+          return companyAEntries.slice(1).map(e => createMatchedWithObject(e, companyA, true))
+        }
         if (!companyBEntries.length) return null
-        if (companyBEntries.length === 1) return createMatchedWithObject(companyBEntries[0], companyB)
-        return companyBEntries.map(e => createMatchedWithObject(e, companyB))
+        if (companyBEntries.length === 1) return createMatchedWithObject(companyBEntries[0], companyB, false)
+        return companyBEntries.map(e => createMatchedWithObject(e, companyB, false))
       })()
 
       const matchedWithForB = (() => {
+        if (isInternalMatchCase && companyBEntries.length > 0) {
+          // Internal match: match entries within Company B
+          if (companyBEntries.length === 1) return null
+          // For internal matches, each entry references the other(s)
+          if (companyBEntries.length === 2) {
+            // Match entry 0 with entry 1
+            return createMatchedWithObject(companyBEntries[1], companyB, true)
+          }
+          return companyBEntries.slice(1).map(e => createMatchedWithObject(e, companyB, true))
+        }
         if (!companyAEntries.length) return null
-        if (companyAEntries.length === 1) return createMatchedWithObject(companyAEntries[0], companyA)
-        return companyAEntries.map(e => createMatchedWithObject(e, companyA))
+        if (companyAEntries.length === 1) return createMatchedWithObject(companyAEntries[0], companyA, false)
+        return companyAEntries.map(e => createMatchedWithObject(e, companyA, false))
       })()
 
       // Persist group-to-group matches:
       // - If one side has a single entry, every entry on the other side should reference that single entry.
       // - If one side has multiple entries, store a JSON list of all opposite entries.
-      companyAEntries.forEach((entryA: any) => {
+      // - For internal matches, each entry references the other entry(s) on the same side.
+      companyAEntries.forEach((entryA: any, index: number) => {
         // If entryA already has a selected matchedEntry and we are matching a group, keep group linkage
         // so many-to-one works (e.g. two payments -> one journal).
         const isJournalEntry = entryA.voucher_type === "Journal Entry"
@@ -1920,19 +2075,30 @@ export default function IntercompanyReconciliation() {
           }
         }
         
+        // For internal matches, determine which entry to reference
+        let matchedWithForThisEntry = matchedWithForA
+        if (isInternalMatchCase && companyAEntries.length === 2) {
+          // For 2-entry internal match, entry 0 references entry 1, entry 1 references entry 0
+          if (index === 0) {
+            matchedWithForThisEntry = createMatchedWithObject(companyAEntries[1], companyA, true)
+          } else {
+            matchedWithForThisEntry = createMatchedWithObject(companyAEntries[0], companyA, true)
+          }
+        }
+        
         bulkData.push({
           voucher_type: entryA.voucher_type,
           voucher_no: entryA.voucher_no,
           company: companyA,
           status: 'Match' as const,
-          matched_with: matchedWithForA,
+          matched_with: matchedWithForThisEntry,
           party: isJournalEntry ? partyA : undefined,
           party_type: isJournalEntry ? "Customer" : undefined,
           gl_entry: isJournalEntry ? entryA.gl_entry : undefined
         })
       })
 
-      companyBEntries.forEach((entryB: any) => {
+      companyBEntries.forEach((entryB: any, index: number) => {
         const isJournalEntry = entryB.voucher_type === "Journal Entry"
         
         // Validate that party and gl_entry are set for Journal Entries
@@ -1949,12 +2115,23 @@ export default function IntercompanyReconciliation() {
           }
         }
         
+        // For internal matches, determine which entry to reference
+        let matchedWithForThisEntry = matchedWithForB
+        if (isInternalMatchCase && companyBEntries.length === 2) {
+          // For 2-entry internal match, entry 0 references entry 1, entry 1 references entry 0
+          if (index === 0) {
+            matchedWithForThisEntry = createMatchedWithObject(companyBEntries[1], companyB, true)
+          } else {
+            matchedWithForThisEntry = createMatchedWithObject(companyBEntries[0], companyB, true)
+          }
+        }
+        
         bulkData.push({
           voucher_type: entryB.voucher_type,
           voucher_no: entryB.voucher_no,
           company: companyB,
           status: 'Match' as const,
-          matched_with: matchedWithForB,
+          matched_with: matchedWithForThisEntry,
           party: isJournalEntry ? partyB : undefined,
           party_type: isJournalEntry ? partyTypeB : undefined,
           gl_entry: isJournalEntry ? entryB.gl_entry : undefined
@@ -2120,7 +2297,37 @@ export default function IntercompanyReconciliation() {
         setManualMatchMode(false)
         setSelectedForManualMatch(null)
       } else {
-        // Different entry selected - show confirmation dialog
+        // Different entry selected - validate if it's a valid match
+        // Check if both entries are on the same side (internal match) or different sides (intercompany match)
+        const entryAIsCompanyA = findMatchingEntries.glDataAWithStatus.some(e =>
+          e.voucher_type === selectedForManualMatch.voucher_type && e.voucher_no === selectedForManualMatch.voucher_no
+        )
+        const entryBIsCompanyA = findMatchingEntries.glDataAWithStatus.some(e =>
+          e.voucher_type === entry.voucher_type && e.voucher_no === entry.voucher_no
+        )
+        const isInternalMatch = entryAIsCompanyA && entryBIsCompanyA || (!entryAIsCompanyA && !entryBIsCompanyA)
+        
+        // For internal matches, validate amounts match (debit = credit)
+        if (isInternalMatch) {
+          const amountMatch = (
+            (Math.abs(selectedForManualMatch.debit - entry.credit) < matchingTolerance && selectedForManualMatch.debit > 0 && entry.credit > 0) ||
+            (Math.abs(selectedForManualMatch.credit - entry.debit) < matchingTolerance && selectedForManualMatch.credit > 0 && entry.debit > 0)
+          )
+          
+          if (!amountMatch) {
+            alert(
+              `Internal matching requires entries with opposite debit/credit and same amount.\n\n` +
+              `Entry 1: Debit=${formatCurrency(selectedForManualMatch.debit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}, Credit=${formatCurrency(selectedForManualMatch.credit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n` +
+              `Entry 2: Debit=${formatCurrency(entry.debit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}, Credit=${formatCurrency(entry.credit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}\n\n` +
+              `One entry should have debit matching the other's credit (within tolerance).`
+            )
+            setManualMatchMode(false)
+            setSelectedForManualMatch(null)
+            return
+          }
+        }
+        
+        // Show confirmation dialog
         setSelectedEntryForAction({ ...selectedForManualMatch, matchedEntry: entry })
         setShowIndividualMatchModal(true)
         setManualMatchMode(false)
@@ -2144,13 +2351,26 @@ export default function IntercompanyReconciliation() {
       const entryA = selectedEntryForAction
       const entryB = selectedEntryForAction.matchedEntry
 
+      // Determine if this is an internal match (same company)
+      const entryAIsCompanyA = findMatchingEntries.glDataAWithStatus.some(e =>
+        e.voucher_type === entryA.voucher_type && e.voucher_no === entryA.voucher_no
+      )
+      const entryBIsCompanyA = findMatchingEntries.glDataAWithStatus.some(e =>
+        e.voucher_type === entryB.voucher_type && e.voucher_no === entryB.voucher_no
+      )
+      const isInternalMatch = entryAIsCompanyA && entryBIsCompanyA || 
+                              (!entryAIsCompanyA && !entryBIsCompanyA)
+      const entryACompany = entryAIsCompanyA ? companyA : companyB
+      const entryBCompany = entryBIsCompanyA ? companyA : companyB
+
       // Create clean matched_with objects with only essential fields including amounts and company
       const matchedWithB = {
         voucher_type: entryB.voucher_type,
         voucher_no: entryB.voucher_no,
         debit: entryB.debit || 0,
         credit: entryB.credit || 0,
-        company: companyB
+        company: entryBCompany,
+        ...(isInternalMatch ? { is_internal_match: true, match_type: "internal_reversal" } : {})
       }
 
       const matchedWithA = {
@@ -2158,7 +2378,8 @@ export default function IntercompanyReconciliation() {
         voucher_no: entryA.voucher_no,
         debit: entryA.debit || 0,
         credit: entryA.credit || 0,
-        company: companyA
+        company: entryACompany,
+        ...(isInternalMatch ? { is_internal_match: true, match_type: "internal_reversal" } : {})
       }
 
       // Update both entries to Match status using the hook
@@ -2617,10 +2838,16 @@ export default function IntercompanyReconciliation() {
         } : null
       })
       
+      const entryCompany = isSideA ? companyA : companyB
+      
       for (const match of matchesToCheck) {
         if (match && match.voucher_type && match.voucher_no) {
-          // First try to find the actual entry from glDataB (for Company A) or glDataA (for Company B)
-          const searchIn = isSideA ? glDataB : glDataA
+          // Check if this is an internal match - if so, search in the same side's data
+          const isInternal = isInternalMatch(entry, match, entryCompany)
+          const searchIn = isInternal 
+            ? (isSideA ? glDataA : glDataB)  // For internal matches, search same side
+            : (isSideA ? glDataB : glDataA)  // For intercompany matches, search opposite side
+          
           const found = searchIn.find(
             e => e.voucher_type === match.voucher_type && e.voucher_no === match.voucher_no
           )
@@ -2628,7 +2855,8 @@ export default function IntercompanyReconciliation() {
             console.log('[getMatchedEntry] Found in GL data:', {
               voucher: `${found.voucher_type}-${found.voucher_no}`,
               debit: found.debit,
-              credit: found.credit
+              credit: found.credit,
+              isInternal
             })
             return found
           }
@@ -2639,7 +2867,8 @@ export default function IntercompanyReconciliation() {
             console.log('[getMatchedEntry] Using match object directly (not in GL data):', {
               voucher: `${match.voucher_type}-${match.voucher_no}`,
               debit: match.debit,
-              credit: match.credit
+              credit: match.credit,
+              isInternal
             })
             // Return the match object as a GLEntry (it already has all the GL entry fields)
             return match as GLEntry
@@ -3954,10 +4183,19 @@ export default function IntercompanyReconciliation() {
                         const amountsMatch = doAmountsMatch(entry, matchedEntry)
                         const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
                         
+                        // Check if this is an internal match
+                        const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                          ? entry.gl_entry
+                          : `${entry.voucher_type}-${entry.voucher_no}`
+                        const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                        const entryMatchedWith = entryBackendStatus?.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                        const entryCompany = companyA // This is Company A side
+                        const isInternalMatchEntry = entry.status === 'Match' && isInternalMatch(entry, entryMatchedWith, entryCompany)
+                        
                         return (
                           <TableRow 
                             key={entryKey} 
-                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''}`}
+                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''} ${isInternalMatchEntry ? 'border-l-4 border-green-600 bg-green-50' : ''}`}
                           >
                             <TableCell>
                               <input
@@ -4000,6 +4238,9 @@ export default function IntercompanyReconciliation() {
                             </TableCell>
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
+                              {isInternalMatchEntry && (
+                                <div className="text-xs text-green-700 font-medium mt-1">(Internal)</div>
+                              )}
                             </TableCell>
                             <TableCell className="text-center">
                               {(() => {
@@ -4195,7 +4436,7 @@ export default function IntercompanyReconciliation() {
                         })
                       })()}
 
-                      {/* Customer Table Totals Row */}
+                      {/* Customer Table Totals Row - Exclude internal matches from totals */}
                       {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length > 0 && (
                         <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
                           <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
@@ -4204,7 +4445,20 @@ export default function IntercompanyReconciliation() {
                           {debitCreditFilter !== 'Credit => Debit' && (
                             <TableCell className="text-right font-bold text-beveren-700">
                               {formatCurrency(
-                                filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => sum + entry.debit, 0),
+                                filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
+                                  // Exclude internal matches from totals
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                    ? entry.gl_entry
+                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                  if (entryBackendStatus?.status === 'Match') {
+                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                    if (isInternalMatch(entry, entryMatchedWith, companyA)) {
+                                      return sum // Skip internal matches
+                                    }
+                                  }
+                                  return sum + (entry.debit || 0)
+                                }, 0),
                                 getPartyCurrency(partyA, 'Customer'),
                                 partyA,
                                 'Customer'
@@ -4214,7 +4468,20 @@ export default function IntercompanyReconciliation() {
                           {debitCreditFilter !== 'Debit => Credit' && (
                             <TableCell className="text-right font-bold text-beveren-700">
                               {formatCurrency(
-                                filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => sum + entry.credit, 0),
+                                filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
+                                  // Exclude internal matches from totals
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                    ? entry.gl_entry
+                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                  if (entryBackendStatus?.status === 'Match') {
+                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                    if (isInternalMatch(entry, entryMatchedWith, companyA)) {
+                                      return sum // Skip internal matches
+                                    }
+                                  }
+                                  return sum + (entry.credit || 0)
+                                }, 0),
                                 getPartyCurrency(partyA, 'Customer'),
                                 partyA,
                                 'Customer'
@@ -4223,7 +4490,20 @@ export default function IntercompanyReconciliation() {
                           )}
                           <TableCell className="text-right font-bold text-beveren-800">
                             {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => sum + entry.balance, 0),
+                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
+                                // Exclude internal matches from totals
+                                const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                  ? entry.gl_entry
+                                  : `${entry.voucher_type}-${entry.voucher_no}`
+                                const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                if (entryBackendStatus?.status === 'Match') {
+                                  const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                  if (isInternalMatch(entry, entryMatchedWith, companyA)) {
+                                    return sum // Skip internal matches
+                                  }
+                                }
+                                return sum + (entry.balance || 0)
+                              }, 0),
                               getPartyCurrency(partyA, 'Customer'),
                               partyA,
                               'Customer'
@@ -4325,10 +4605,19 @@ export default function IntercompanyReconciliation() {
                         const amountsMatch = doAmountsMatch(entry, matchedEntry)
                         const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
                         
+                        // Check if this is an internal match
+                        const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                          ? entry.gl_entry
+                          : `${entry.voucher_type}-${entry.voucher_no}`
+                        const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                        const entryMatchedWith = entryBackendStatus?.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                        const entryCompany = companyB // This is Company B side
+                        const isInternalMatchEntry = entry.status === 'Match' && isInternalMatch(entry, entryMatchedWith, entryCompany)
+                        
                         return (
                           <TableRow 
                             key={entryKey} 
-                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''}`}
+                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''} ${isInternalMatchEntry ? 'border-l-4 border-green-600 bg-green-50' : ''}`}
                           >
                             <TableCell>
                               <input
@@ -4371,6 +4660,9 @@ export default function IntercompanyReconciliation() {
                             </TableCell>
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
+                              {isInternalMatchEntry && (
+                                <div className="text-xs text-green-700 font-medium mt-1">(Internal)</div>
+                              )}
                             </TableCell>
                             <TableCell className="text-center">
                               {(() => {
@@ -4566,7 +4858,7 @@ export default function IntercompanyReconciliation() {
                       })
                       )}
 
-                      {/* Supplier Table Totals Row */}
+                      {/* Supplier Table Totals Row - Exclude internal matches from totals */}
                       {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).length > 0 && (
                         <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
                           <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
@@ -4575,7 +4867,20 @@ export default function IntercompanyReconciliation() {
                           {debitCreditFilter !== 'Debit => Credit' && (
                             <TableCell className="text-right font-bold text-beveren-700">
                               {formatCurrency(
-                                filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => sum + entry.debit, 0),
+                                filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
+                                  // Exclude internal matches from totals
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                    ? entry.gl_entry
+                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                  if (entryBackendStatus?.status === 'Match') {
+                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                    if (isInternalMatch(entry, entryMatchedWith, companyB)) {
+                                      return sum // Skip internal matches
+                                    }
+                                  }
+                                  return sum + (entry.debit || 0)
+                                }, 0),
                                 getPartyCurrency(partyB, partyTypeB),
                                 partyB,
                                 partyTypeB
@@ -4585,7 +4890,20 @@ export default function IntercompanyReconciliation() {
                           {debitCreditFilter !== 'Credit => Debit' && (
                             <TableCell className="text-right font-bold text-beveren-700">
                               {formatCurrency(
-                                filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => sum + entry.credit, 0),
+                                filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
+                                  // Exclude internal matches from totals
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                    ? entry.gl_entry
+                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                  if (entryBackendStatus?.status === 'Match') {
+                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                    if (isInternalMatch(entry, entryMatchedWith, companyB)) {
+                                      return sum // Skip internal matches
+                                    }
+                                  }
+                                  return sum + (entry.credit || 0)
+                                }, 0),
                                 getPartyCurrency(partyB, partyTypeB),
                                 partyB,
                                 partyTypeB
@@ -4594,7 +4912,20 @@ export default function IntercompanyReconciliation() {
                           )}
                           <TableCell className="text-right font-bold text-beveren-800">
                             {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => sum + entry.balance, 0),
+                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
+                                // Exclude internal matches from totals
+                                const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                  ? entry.gl_entry
+                                  : `${entry.voucher_type}-${entry.voucher_no}`
+                                const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                if (entryBackendStatus?.status === 'Match') {
+                                  const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                  if (isInternalMatch(entry, entryMatchedWith, companyB)) {
+                                    return sum // Skip internal matches
+                                  }
+                                }
+                                return sum + (entry.balance || 0)
+                              }, 0),
                               getPartyCurrency(partyB, partyTypeB),
                               partyB,
                               partyTypeB
