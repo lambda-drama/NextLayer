@@ -641,6 +641,8 @@ def update_match_status():
 			if matched_with and isinstance(matched_with, dict):
 				if "company" not in matched_with:
 					matched_with["company"] = company
+				# Preserve is_internal_match flag if present
+				# This flag indicates entries matched within the same company (internal reversals)
 
 			# Find or create child table row for this party and gl_entry
 			# For Journal Entries, we need to differentiate between debit and credit GL entries
@@ -848,11 +850,8 @@ def update_match_status():
 		if matched_with and isinstance(matched_with, dict):
 			if "company" not in matched_with:
 				matched_with["company"] = company
-
-		# Ensure matched_with includes company information
-		if matched_with and isinstance(matched_with, dict):
-			if "company" not in matched_with:
-				matched_with["company"] = company
+			# Preserve is_internal_match flag if present
+			# This flag indicates entries matched within the same company (internal reversals)
 
 		matched_with_value = matched_with
 		if isinstance(matched_with, (dict, list)):

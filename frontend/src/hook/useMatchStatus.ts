@@ -129,18 +129,33 @@ export const useMatchStatus = () => {
       errors: [] as string[]
     }
 
-    // Process entries in batches to avoid overwhelming the server
-    const batchSize = 5
-    for (let i = 0; i < entries.length; i += batchSize) {
-      const batch = entries.slice(i, i + batchSize)
+    // For Journal Entries, group by voucher_no to process entries from the same Journal Entry sequentially
+    // This prevents conflicts when updating the same Journal Entry multiple times (e.g., internal matches)
+    const journalEntryGroups = new Map<string, MatchStatusData[]>()
+    const nonJournalEntries: MatchStatusData[] = []
 
-      const batchPromises = batch.map(async (entry) => {
+    entries.forEach(entry => {
+      if (entry.voucher_type === "Journal Entry" && entry.voucher_no) {
+        const key = entry.voucher_no
+        if (!journalEntryGroups.has(key)) {
+          journalEntryGroups.set(key, [])
+        }
+        journalEntryGroups.get(key)!.push(entry)
+      } else {
+        nonJournalEntries.push(entry)
+      }
+    })
+
+    // Process Journal Entry groups sequentially (entries from same Journal Entry)
+    for (const [voucherNo, groupEntries] of journalEntryGroups.entries()) {
+      for (const entry of groupEntries) {
         try {
-          console.log(`[bulkUpdateMatchStatus] Processing entry: ${entry.voucher_type} ${entry.voucher_no}`, {
+          console.log(`[bulkUpdateMatchStatus] Processing Journal Entry: ${entry.voucher_type} ${entry.voucher_no}`, {
             company: entry.company,
             status: entry.status,
             party: entry.party,
             party_type: entry.party_type,
+            gl_entry: entry.gl_entry,
             has_matched_with: !!entry.matched_with
           })
           const result = await updateMatchStatus(entry)
@@ -153,7 +168,37 @@ export const useMatchStatus = () => {
             voucher_no: entry.voucher_no,
             company: entry.company,
             party: entry.party,
-            party_type: entry.party_type
+            party_type: entry.party_type,
+            gl_entry: entry.gl_entry
+          })
+          results.failed++
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+          results.errors.push(`${entry.voucher_type} ${entry.voucher_no}: ${errorMessage}`)
+        }
+      }
+    }
+
+    // Process non-Journal Entry documents in batches (can be parallel)
+    const batchSize = 5
+    for (let i = 0; i < nonJournalEntries.length; i += batchSize) {
+      const batch = nonJournalEntries.slice(i, i + batchSize)
+
+      const batchPromises = batch.map(async (entry) => {
+        try {
+          console.log(`[bulkUpdateMatchStatus] Processing entry: ${entry.voucher_type} ${entry.voucher_no}`, {
+            company: entry.company,
+            status: entry.status,
+            has_matched_with: !!entry.matched_with
+          })
+          const result = await updateMatchStatus(entry)
+          console.log(`[bulkUpdateMatchStatus] Successfully processed: ${entry.voucher_type} ${entry.voucher_no}`, result)
+          results.success++
+        } catch (err) {
+          console.error(`[bulkUpdateMatchStatus] Error processing ${entry.voucher_type} ${entry.voucher_no}:`, err)
+          console.error(`[bulkUpdateMatchStatus] Entry details:`, {
+            voucher_type: entry.voucher_type,
+            voucher_no: entry.voucher_no,
+            company: entry.company
           })
           results.failed++
           const errorMessage = err instanceof Error ? err.message : 'Unknown error'
