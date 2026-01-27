@@ -4490,20 +4490,22 @@ export default function IntercompanyReconciliation() {
                           )}
                           <TableCell className="text-right font-bold text-beveren-800">
                             {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
-                                // Exclude internal matches from totals
-                                const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                  ? entry.gl_entry
-                                  : `${entry.voucher_type}-${entry.voucher_no}`
-                                const entryBackendStatus = backendMatchStatus[entryStatusKey]
-                                if (entryBackendStatus?.status === 'Match') {
-                                  const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
-                                  if (isInternalMatch(entry, entryMatchedWith, companyA)) {
-                                    return sum // Skip internal matches
+                              (() => {
+                                // Balance total = last transaction's balance (running balance at bottom), not sum of column
+                                const filtered = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).filter(entry => {
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                    ? entry.gl_entry
+                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                  if (entryBackendStatus?.status === 'Match') {
+                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                    if (isInternalMatch(entry, entryMatchedWith, companyA)) return false
                                   }
-                                }
-                                return sum + (entry.balance || 0)
-                              }, 0),
+                                  return true
+                                })
+                                const last = filtered[filtered.length - 1]
+                                return last ? (last.balance ?? 0) : 0
+                              })(),
                               getPartyCurrency(partyA, 'Customer'),
                               partyA,
                               'Customer'
@@ -4912,20 +4914,22 @@ export default function IntercompanyReconciliation() {
                           )}
                           <TableCell className="text-right font-bold text-beveren-800">
                             {formatCurrency(
-                              filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
-                                // Exclude internal matches from totals
-                                const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                  ? entry.gl_entry
-                                  : `${entry.voucher_type}-${entry.voucher_no}`
-                                const entryBackendStatus = backendMatchStatus[entryStatusKey]
-                                if (entryBackendStatus?.status === 'Match') {
-                                  const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
-                                  if (isInternalMatch(entry, entryMatchedWith, companyB)) {
-                                    return sum // Skip internal matches
+                              (() => {
+                                // Balance total = last transaction's balance (running balance at bottom), not sum of column
+                                const filtered = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).filter(entry => {
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                    ? entry.gl_entry
+                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                  if (entryBackendStatus?.status === 'Match') {
+                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                    if (isInternalMatch(entry, entryMatchedWith, companyB)) return false
                                   }
-                                }
-                                return sum + (entry.balance || 0)
-                              }, 0),
+                                  return true
+                                })
+                                const last = filtered[filtered.length - 1]
+                                return last ? (last.balance ?? 0) : 0
+                              })(),
                               getPartyCurrency(partyB, partyTypeB),
                               partyB,
                               partyTypeB
