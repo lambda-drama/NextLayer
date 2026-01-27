@@ -517,7 +517,7 @@ def update_match_status():
 		if voucher_type == "Journal Entry":
 			if not party or not party_type:
 				frappe.throw(f"For Journal Entry {voucher_no}, party and party_type are required. Received party={party}, party_type={party_type}")
-		
+
 		if voucher_type == "Journal Entry" and party and party_type:
 			# If unmatching, also handle paired transaction unmatch for Journal Entries
 			if match_status == "Mismatch" and (matched_with is None or matched_with == ""):
@@ -644,6 +644,14 @@ def update_match_status():
 				# Preserve is_internal_match flag if present
 				# This flag indicates entries matched within the same company (internal reversals)
 
+			# When matching a Journal Entry, print all GL entries on the voucher for visibility
+			if voucher_type == "Journal Entry" and match_status == "Match":
+				gl_entries = frappe.get_all(
+					"GL Entry",
+					filters={"voucher_type": voucher_type, "voucher_no": voucher_no},
+					pluck="name"
+				)
+
 			# Find or create child table row for this party and gl_entry
 			# For Journal Entries, we need to differentiate between debit and credit GL entries
 			child_table = current_doc.get("custom_intercompany_match_details", [])
@@ -659,10 +667,23 @@ def update_match_status():
 				else:
 					# If gl_entry is not provided, only match rows without gl_entry (backward compatibility)
 					gl_entry_match = not row.gl_entry
-				
+
 				if party_match and gl_entry_match:
 					matching_child_row = row
 					break
+
+			# When matching: if no row found by (party, party_type, gl_entry), reuse existing row with same
+			# (party, party_type) and update its gl_entry. Avoids creating a second line when the existing
+			# row had a missing/invalid gl_entry (e.g. e178330462 no longer exists).
+			if matching_child_row is None and match_status == "Match" and gl_entry:
+				for row in child_table:
+					if row.party == party and row.party_type == party_type:
+						matching_child_row = row
+						frappe.logger().info(
+							f"[update_match_status] Journal Entry {voucher_no}: reusing party/party_type row, "
+							f"updating gl_entry from {row.get('gl_entry')} to {gl_entry}"
+						)
+						break
 
 			# Prepare matched_with value (include company if not present)
 			matched_with_value = matched_with
@@ -722,10 +743,17 @@ def update_match_status():
 								gl_entry_match = row.gl_entry == gl_entry
 							else:
 								gl_entry_match = not row.gl_entry
-							
+
 							if party_match and gl_entry_match:
 								matching_child_row = row
 								break
+
+						# Same fallback when matching: reuse party/party_type row and update gl_entry
+						if matching_child_row is None and match_status == "Match" and gl_entry:
+							for row in child_table:
+								if row.party == party and row.party_type == party_type:
+									matching_child_row = row
+									break
 
 						# Update or create the row
 						if matching_child_row:
@@ -937,12 +965,12 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 				for row in child_table:
 					# Match by party and party_type first
 					party_match = row.party == party and row.party_type == party_type
-					
+
 					if not party_match:
 						continue
-					
+
 					print(f"[get_match_status] Found matching party row: party={row.party}, party_type={row.party_type}, gl_entry={row.gl_entry}, status={row.intercompany_match_status}")
-					
+
 					# If gl_entry is provided, try to match by gl_entry
 					if gl_entry:
 						# First try exact match with gl_entry
@@ -950,14 +978,14 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 							matching_child_row = row
 							print(f"[get_match_status] Exact gl_entry match found: {gl_entry}")
 							break
-						# If no gl_entry in row (backward compatibility - old matches), 
+						# If no gl_entry in row (backward compatibility - old matches),
 						# and this is the only row for this party, use it
 						# This handles cases where matches were created before gl_entry was added
 						elif not row.gl_entry:
 							# Check if there are other rows for this party with gl_entry set
 							# If not, this is likely the only match for this party, so use it
 							has_other_rows_with_gl_entry = any(
-								r.party == party and r.party_type == party_type and r.gl_entry 
+								r.party == party and r.party_type == party_type and r.gl_entry
 								for r in child_table if r != row
 							)
 							if not has_other_rows_with_gl_entry:
@@ -1504,13 +1532,13 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 			child_table = doc.get("custom_intercompany_match_details", [])
 			if not child_table:
 				return
-			
+
 			# Find all matched rows in the child table
 			matched_rows = [row for row in child_table if row.intercompany_match_status == 'Match' and row.intercompany_matched_with]
-			
+
 			if not matched_rows:
 				return
-			
+
 			# Process each matched row
 			for matched_row in matched_rows:
 				try:
@@ -1519,29 +1547,29 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 						matched_data = frappe.parse_json(matched_row.intercompany_matched_with)
 					except:
 						matched_data = matched_row.intercompany_matched_with
-					
+
 					if not isinstance(matched_data, dict):
 						continue
-					
+
 					voucher_type = matched_data.get('voucher_type')
 					voucher_no = matched_data.get('voucher_no')
 					matched_company = matched_data.get('company')
-					
+
 					if not voucher_type or not voucher_no:
 						continue
-					
+
 					# Check if the matched document still exists
 					if not frappe.db.exists(voucher_type, voucher_no):
 						frappe.logger().info(f"Matched document {voucher_type} {voucher_no} no longer exists, skipping cleanup")
 						continue
-					
+
 					# Get the matched document
 					matched_doc = frappe.get_doc(voucher_type, voucher_no)
-					
+
 					# If the matched document is also a Journal Entry, update its child table
 					if voucher_type == "Journal Entry":
 						matched_child_table = matched_doc.get("custom_intercompany_match_details", [])
-						
+
 						# Find the child table row in the matched Journal Entry that points back to this cancelled Journal Entry
 						for matched_child_row in matched_child_table:
 							if matched_child_row.intercompany_matched_with:
@@ -1583,14 +1611,14 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 								}
 							)
 							frappe.logger().info(f"Unmatched {voucher_type} {voucher_no} on cancel of Journal Entry {doc.name}")
-				
+
 				except Exception as e:
 					frappe.logger().error(f"Error cleaning up match for child table row in Journal Entry {doc.name}: {str(e)}")
 					continue
-			
+
 			frappe.db.commit()
 			return
-		
+
 		# Handle other document types (Payment Entry, Sales Invoice, Purchase Invoice) with top-level fields
 		if not hasattr(doc, 'intercompany_match_status') or not hasattr(doc, 'intercompany_matched_with'):
 			return
@@ -1631,11 +1659,11 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 			try:
 				# Get the matched document
 				matched_doc = frappe.get_doc(voucher_type, voucher_no)
-				
+
 				# If the matched document is a Journal Entry, update its child table
 				if voucher_type == "Journal Entry":
 					matched_child_table = matched_doc.get("custom_intercompany_match_details", [])
-					
+
 					# Find the child table row that points back to this cancelled document
 					for matched_child_row in matched_child_table:
 						if matched_child_row.intercompany_matched_with:
@@ -1682,7 +1710,7 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 			except Exception as e:
 				frappe.logger().error(f"Error cleaning up match for {voucher_type} {voucher_no}: {str(e)}")
 				continue
-		
+
 		frappe.db.commit()
 	except Exception as e:
 		frappe.logger().error(f"Error in cleanup_intercompany_matches_on_cancel for {doc.doctype} {doc.name}: {str(e)}")
@@ -2061,7 +2089,7 @@ def get_intercompany_matching_tolerance():
 					"success": True,
 					"tolerance": float(tolerance)
 				}
-		
+
 		# Default tolerance if settings don't exist or value is invalid
 		return {
 			"success": True,
