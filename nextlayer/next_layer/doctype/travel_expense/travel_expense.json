@@ -69,6 +69,22 @@
   "direct_payment_account",
   "payable_account",
   "cash_account",
+  "section_break_visa_details_erp",
+  "visa_member_name",
+  "visa_no",
+  "visa_issue_date",
+  "column_break_kprb",
+  "visa_valid_until",
+  "visa_country",
+  "visa_type",
+  "section_break_resident_details",
+  "resident_employee_name",
+  "resident_id_no",
+  "resident_issue_date",
+  "column_break_iexq",
+  "resident_expiry_date",
+  "resident_nationality",
+  "resident_company",
   "section_break_expenses",
   "expenses",
   "section_break_taxes",
@@ -414,6 +430,82 @@
    "options": "Account"
   },
   {
+   "collapsible": 1,
+   "fieldname": "section_break_resident_details",
+   "fieldtype": "Section Break",
+   "label": "Resident Details"
+  },
+  {
+   "fieldname": "resident_employee_name",
+   "fieldtype": "Link",
+   "label": "Employee Name",
+   "options": "Member"
+  },
+  {
+   "fieldname": "resident_id_no",
+   "fieldtype": "Data",
+   "label": "ID No"
+  },
+  {
+   "fieldname": "resident_issue_date",
+   "fieldtype": "Date",
+   "label": "Issue Date"
+  },
+  {
+   "fieldname": "resident_expiry_date",
+   "fieldtype": "Date",
+   "label": "Expiry Date"
+  },
+  {
+   "fieldname": "resident_nationality",
+   "fieldtype": "Link",
+   "label": "Nationality",
+   "options": "Country"
+  },
+  {
+   "fieldname": "resident_company",
+   "fieldtype": "Data",
+   "label": "Company"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_visa_details_erp",
+   "fieldtype": "Section Break",
+   "label": "Visa Details"
+  },
+  {
+   "fieldname": "visa_member_name",
+   "fieldtype": "Link",
+   "label": "Member Name",
+   "options": "Member"
+  },
+  {
+   "fieldname": "visa_no",
+   "fieldtype": "Data",
+   "label": "Visa No"
+  },
+  {
+   "fieldname": "visa_issue_date",
+   "fieldtype": "Date",
+   "label": "Issue Date"
+  },
+  {
+   "fieldname": "visa_valid_until",
+   "fieldtype": "Date",
+   "label": "Valid Until"
+  },
+  {
+   "fieldname": "visa_country",
+   "fieldtype": "Link",
+   "label": "Visa applied for Country",
+   "options": "Country"
+  },
+  {
+   "fieldname": "visa_type",
+   "fieldtype": "Data",
+   "label": "Type of Visa"
+  },
+  {
    "fieldname": "section_break_expenses",
    "fieldtype": "Section Break",
    "label": "Expenses"
@@ -570,6 +662,14 @@
    "label": "Cash Account",
    "options": "Account",
    "read_only": 1
+  },
+  {
+   "fieldname": "column_break_iexq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_kprb",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -584,7 +684,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-01-28 20:48:01.548683",
+ "modified": "2026-01-29 00:48:31.934265",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
