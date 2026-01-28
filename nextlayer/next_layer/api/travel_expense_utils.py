@@ -59,19 +59,20 @@ def get_expense_account_from_expense_type(expense_type, company):
 @frappe.whitelist()
 def create_additional_travel_expense(original_travel_expense, expense_items, company=None, traveler_name=None, transaction_currency=None, expense_category=None, cash_account=None):
 	"""
-	Create a new Travel Expense as an additional expense linked to the original
-	
+	Add Refund or Additional expense rows to the same Travel Expense (More Information table).
+	Does not create a new Travel Expense document.
+
 	Args:
 		original_travel_expense: Name of the original Travel Expense
 		expense_items: List of travel expense detail items
 		company: Company (optional, will use from original if not provided)
-		traveler_name: Traveler Name (optional, will use from original if not provided)
+		traveler_name: Traveler Name (optional, unused; kept for API compatibility)
 		transaction_currency: Transaction currency from modal (optional)
-		expense_category: Expense category - "Refund" or "Update" (optional)
-		cash_account: Cash/Bank account for lost amount in refunds (optional, will use company default if not provided)
-	
+		expense_category: "Refund" or "Additional" (optional)
+		cash_account: Cash/Bank account for lost amount in refunds (optional; kept for API compatibility)
+
 	Returns:
-		dict: Success status and travel expense name
+		dict: Success status and travel expense name (same as original)
 	"""
 	try:
 		# Parse expense_items if it's a JSON string
@@ -79,7 +80,7 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 			import json
 			expense_items = json.loads(expense_items)
 		
-		# Get original travel expense
+		# Get original travel expense (do not create a new one)
 		original_te = frappe.get_doc("Travel Expense", original_travel_expense)
 		
 		# Get company currency
@@ -89,251 +90,85 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 		if not transaction_currency:
 			transaction_currency = getattr(original_te, 'currency', None) or company_currency
 		
-		# Determine if this is a refund
-		is_refund = expense_category == "Refund"
+		# entry_type for More Information: "Refund" or "Additional"
+		entry_type = "Refund" if expense_category == "Refund" else "Additional"
 		
-		# Create new travel expense - copy all relevant fields from original
-		new_te_data = {
-			"doctype": "Travel Expense",
-			"traveler_name": traveler_name or original_te.traveler_name,
-			"company": company or original_te.company,
-			"currency": transaction_currency,  # Set transaction currency
-			"is_addition": 1,
-			"refund": 1 if is_refund else 0,  # Set refund field
-			"travel_group": original_te.travel_group,
-			"posting_date": frappe.utils.today(),
-			"original_expense": original_te.name,
-		}
+		# Ensure more_information table exists on the doc
+		if not hasattr(original_te, 'more_information') or original_te.more_information is None:
+			original_te.more_information = []
 		
-		# Copy travel details from original (flight information)
-		if hasattr(original_te, 'flight_no') and original_te.flight_no:
-			new_te_data["flight_no"] = original_te.flight_no
-		if hasattr(original_te, 'flight_no_2') and original_te.flight_no_2:
-			new_te_data["flight_no_2"] = original_te.flight_no_2
-		if hasattr(original_te, 'custom_departure_airport') and original_te.custom_departure_airport:
-			new_te_data["custom_departure_airport"] = original_te.custom_departure_airport
-		if hasattr(original_te, 'custom_arrival_airport') and original_te.custom_arrival_airport:
-			new_te_data["custom_arrival_airport"] = original_te.custom_arrival_airport
-		if hasattr(original_te, 'custom_airlines') and original_te.custom_airlines:
-			new_te_data["custom_airlines"] = original_te.custom_airlines
-		if hasattr(original_te, 'custom_date_of_travel') and original_te.custom_date_of_travel:
-			new_te_data["custom_date_of_travel"] = original_te.custom_date_of_travel
-		if hasattr(original_te, 'custom_date_of_arrival') and original_te.custom_date_of_arrival:
-			new_te_data["custom_date_of_arrival"] = original_te.custom_date_of_arrival
-		if hasattr(original_te, 'custom_date_of_purchase') and original_te.custom_date_of_purchase:
-			new_te_data["custom_date_of_purchase"] = original_te.custom_date_of_purchase
-		if hasattr(original_te, 'custom_booked_by') and original_te.custom_booked_by:
-			new_te_data["custom_booked_by"] = original_te.custom_booked_by
-		if hasattr(original_te, 'custom_travel_type') and original_te.custom_travel_type:
-			new_te_data["custom_travel_type"] = original_te.custom_travel_type
-		if hasattr(original_te, 'custom_pnr_number_') and original_te.custom_pnr_number_:
-			new_te_data["custom_pnr_number_"] = original_te.custom_pnr_number_
-		if hasattr(original_te, 'custom_departure_airport_2') and original_te.custom_departure_airport_2:
-			new_te_data["custom_departure_airport_2"] = original_te.custom_departure_airport_2
-		if hasattr(original_te, 'custom_arrival_airport_2') and original_te.custom_arrival_airport_2:
-			new_te_data["custom_arrival_airport_2"] = original_te.custom_arrival_airport_2
-		if hasattr(original_te, 'custom_date_of_travel_2') and original_te.custom_date_of_travel_2:
-			new_te_data["custom_date_of_travel_2"] = original_te.custom_date_of_travel_2
-		if hasattr(original_te, 'custom_date_of_arrival_2') and original_te.custom_date_of_arrival_2:
-			new_te_data["custom_date_of_arrival_2"] = original_te.custom_date_of_arrival_2
+		def safe_get(data, key, default=None):
+			if isinstance(data, dict):
+				return data.get(key, default)
+			if hasattr(data, key):
+				return getattr(data, key, default)
+			return default
 		
-		# Copy hotel details from original
-		if hasattr(original_te, 'hotel_checkin_date') and original_te.hotel_checkin_date:
-			new_te_data["hotel_checkin_date"] = original_te.hotel_checkin_date
-		if hasattr(original_te, 'hotel_checkout_date') and original_te.hotel_checkout_date:
-			new_te_data["hotel_checkout_date"] = original_te.hotel_checkout_date
-		if hasattr(original_te, 'custom_hotel_name') and original_te.custom_hotel_name:
-			new_te_data["custom_hotel_name"] = original_te.custom_hotel_name
-		if hasattr(original_te, 'hotel_territory') and original_te.hotel_territory:
-			new_te_data["hotel_territory"] = original_te.hotel_territory
-		if hasattr(original_te, 'hotel_location') and original_te.hotel_location:
-			new_te_data["hotel_location"] = original_te.hotel_location
-		if hasattr(original_te, 'hotel_city') and original_te.hotel_city:
-			new_te_data["hotel_city"] = original_te.hotel_city
-		if hasattr(original_te, 'hotel_country') and original_te.hotel_country:
-			new_te_data["hotel_country"] = original_te.hotel_country
-		if hasattr(original_te, 'rate_per_day') and original_te.rate_per_day:
-			new_te_data["rate_per_day"] = original_te.rate_per_day
-		if hasattr(original_te, 'total_nights') and original_te.total_nights:
-			new_te_data["total_nights"] = original_te.total_nights
-		if hasattr(original_te, 'purpose') and original_te.purpose:
-			new_te_data["purpose"] = original_te.purpose
-		if hasattr(original_te, 'in_transit') and original_te.in_transit:
-			new_te_data["in_transit"] = original_te.in_transit
-		
-		# Copy mandatory accounting dimension fields from original
-		# Use getattr to safely get field values even if they don't exist
-		company_group = getattr(original_te, 'company_group', None)
-		if company_group:
-			new_te_data["company_group"] = company_group
-		
-		branch = getattr(original_te, 'branch', None)
-		if branch:
-			new_te_data["branch"] = branch
-		
-		marka = getattr(original_te, 'marka', None)
-		if marka:
-			new_te_data["marka"] = marka
-		
-		# Copy other common fields that might be needed
-		payable_account = getattr(original_te, 'payable_account', None)
-		if payable_account:
-			new_te_data["payable_account"] = payable_account
-		
-		# Copy direct_payment_account from original (especially important for refunds)
-		direct_payment_account = getattr(original_te, 'direct_payment_account', None)
-		if direct_payment_account:
-			new_te_data["direct_payment_account"] = direct_payment_account
-		
-		# Copy is_paid status from original (for refunds, we need to know if original was paid)
-		is_paid = getattr(original_te, 'is_paid', 0)
-		if is_paid:
-			new_te_data["is_paid"] = is_paid
-		
-		cost_center = getattr(original_te, 'cost_center', None)
-		if cost_center:
-			new_te_data["cost_center"] = cost_center
-		
-		project = getattr(original_te, 'project', None)
-		if project:
-			new_te_data["project"] = project
-		
-		# Create new travel expense
-		new_te = frappe.get_doc(new_te_data)
-		
-		# Add expense items
+		# Add each expense item as a row in More Information only
 		for item in expense_items:
-			# Ensure item is a dict - handle different input formats
 			if isinstance(item, str):
 				import json
 				try:
 					item = json.loads(item)
-				except:
+				except Exception:
 					item = {}
 			elif not isinstance(item, dict):
-				# Try to convert to dict if it's not already
 				try:
-					if hasattr(item, '__dict__'):
-						item = dict(item)
-					elif hasattr(item, 'keys'):
-						item = dict(item)
-					else:
-						item = {}
-				except:
+					item = dict(item) if (hasattr(item, '__dict__') or hasattr(item, 'keys')) else {}
+				except Exception:
 					item = {}
 			
-			# Helper function to safely get values
-			def safe_get(data, key, default=None):
-				if isinstance(data, dict):
-					return data.get(key, default)
-				elif hasattr(data, key):
-					return getattr(data, key, default)
-				return default
-			
-			# Get amount and amount_company_currency from item
 			amount = safe_get(item, "amount", 0)
 			amount_company_currency = safe_get(item, "amount_company_currency")
 			
-			expense_detail = {
+			# Convert to company currency if needed
+			if amount and transaction_currency != company_currency and not amount_company_currency:
+				try:
+					transaction_date = safe_get(item, "expense_date") or original_te.posting_date or frappe.utils.today()
+					exchange_rate = get_exchange_rate(
+						transaction_currency,
+						company_currency,
+						transaction_date,
+						original_te.company
+					)
+					amount_company_currency = amount * exchange_rate
+				except Exception as e:
+					frappe.log_error(f"Error converting amount for more_information: {str(e)}", "Travel Expense Currency Conversion")
+					amount_company_currency = amount
+			elif amount and (not amount_company_currency or transaction_currency == company_currency):
+				amount_company_currency = amount_company_currency or amount
+			
+			row = {
+				"entry_type": entry_type,
+				"journal_created": 0,
 				"expense_type": safe_get(item, "expense_type"),
 				"expense_date": safe_get(item, "expense_date") or frappe.utils.today(),
 				"amount": amount,
-				"amount_company_currency": amount_company_currency,  # Set company currency amount if provided
-				"sanctioned_amount": safe_get(item, "sanctioned_amount") or amount,
+				"amount_company_currency": amount_company_currency,
+				"description": safe_get(item, "description"),
 				"cost_center": safe_get(item, "cost_center"),
 				"project": safe_get(item, "project"),
-				"company": safe_get(item, "company") or new_te.company,
-				"description": safe_get(item, "description"),
-				# PRN Number
-				"custom_prn_number": safe_get(item, "custom_prn_number") or "",
-				# Hotel fields
-				"hotel_checkin_date": safe_get(item, "hotel_checkin_date"),
-				"hotel_checkout_date": safe_get(item, "hotel_checkout_date"),
-				"purpose": safe_get(item, "purpose"),
-				"hotel_territory": safe_get(item, "hotel_territory"),
-				"hotel_location": safe_get(item, "hotel_location"),
-				"hotel_city": safe_get(item, "hotel_city"),
-				"hotel_country": safe_get(item, "hotel_country"),
-				"custom_hotel_name": safe_get(item, "custom_hotel_name"),
-				"total_nights": safe_get(item, "total_nights"),
-				"rate_per_day": safe_get(item, "rate_per_day"),
-				# Travel custom fields
-				"custom_flight_no": safe_get(item, "custom_flight_no"),
-				"custom_date_of_purchase": safe_get(item, "custom_date_of_purchase"),
-				"custom_travel_type": safe_get(item, "custom_travel_type"),
-				"custom_booked_by": safe_get(item, "custom_booked_by"),
-				"custom_departure_airport": safe_get(item, "custom_departure_airport"),
-				"custom_arrival_airport": safe_get(item, "custom_arrival_airport"),
-				"custom_airlines": safe_get(item, "custom_airlines"),
-				"custom_date_of_travel": safe_get(item, "custom_date_of_travel"),
-				"custom_date_of_arrival": safe_get(item, "custom_date_of_arrival"),
 			}
-			
-			# Remove None values (but keep empty strings and 0)
-			expense_detail = {k: v for k, v in expense_detail.items() if v is not None}
-			
-			# Append the expense detail
-			new_te.append("expenses", expense_detail)
+			# Remove None values so defaults apply where needed
+			row = {k: v for k, v in row.items() if v is not None}
+			original_te.append("more_information", row)
 		
-		# Insert and save
-		new_te.insert(ignore_permissions=True)
+		# Save the same document (no new Travel Expense)
+		# Use flags to ignore validate_update_after_submit for submitted docs
+		if not hasattr(original_te, "flags"):
+			original_te.flags = frappe._dict()
+		original_te.flags.ignore_validate_update_after_submit = True
+		original_te.save(ignore_permissions=True)
+		frappe.db.commit()
 		
-		# Recalculate totals first
-		new_te.calculate_totals()
-		
-		# Note: Amounts from modal are in transaction currency, need to convert to company currency
-		if new_te.expenses:
-			company_currency = frappe.get_cached_value("Company", new_te.company, "default_currency")
-			transaction_currency = getattr(new_te, 'currency', None) or company_currency
-			
-			if transaction_currency != company_currency:
-				# Different currencies - convert amounts from transaction currency to company currency
-				for expense in new_te.expenses:
-					if expense.amount:
-						# if not expense.amount_company_currency:
-						try:
-							transaction_date = expense.expense_date or new_te.posting_date or frappe.utils.today()
-							exchange_rate = get_exchange_rate(
-								transaction_currency,
-								company_currency,
-								transaction_date,
-								new_te.company
-							)
-							
-							# expense.amount is in transaction currency, convert to company currency
-							expense.amount_company_currency = expense.amount * exchange_rate
-							
-						except Exception as e:
-							# If conversion fails, use same amount and log error
-							frappe.log_error(f"Error converting amount for expense: {str(e)}", "Travel Expense Currency Conversion")
-							expense.amount_company_currency = expense.amount
-				
-			else:
-				# Same currency, set amount_company_currency = amount
-				for expense in new_te.expenses:
-					if expense.amount and not expense.amount_company_currency:
-						expense.amount_company_currency = expense.amount
-		
-		# Store cash account for refunds (if provided) - use frappe.local to pass to journal entry
-		if is_refund and cash_account:
-			# Store in frappe.local so journal entry functions can access it
-			if not hasattr(frappe.local, 'travel_expense_cash_accounts'):
-				frappe.local.travel_expense_cash_accounts = {}
-			frappe.local.travel_expense_cash_accounts[new_te.name] = cash_account
-		
-		# Recalculate totals again after setting amount_company_currency
-		new_te.calculate_totals()
-		new_te.save(ignore_permissions=True)
-		
-		# Reload the document to avoid timestamp mismatch
-		new_te.reload()
-		
-		new_te.submit()
+		# Create journal entries for the new More Information rows (same as refund/additional used to)
+		original_te.reload()
+		create_journal_entries_for_more_information(original_te)
 		frappe.db.commit()
 		
 		return {
 			"success": True,
-			"travel_expense_name": new_te.name,
+			"travel_expense_name": original_te.name,
 		}
 		
 	except Exception as e:
@@ -347,6 +182,385 @@ def create_additional_travel_expense(original_travel_expense, expense_items, com
 			"success": False,
 			"error": str(e),
 		}
+
+
+def create_journal_entries_for_more_information(travel_expense):
+	"""
+	Create Journal Entries for Travel Expense More Information rows where journal_created = 0.
+	- Refund: Use original vs refund logic (credit original expense, debit payment/payable, debit expense for lost amount).
+	- Additional: Debit expense account, Credit payment/payable account (same as normal expense JE).
+	"""
+	if not getattr(travel_expense, "more_information", None):
+		return
+	company = travel_expense.company
+	company_currency = frappe.get_cached_value("Company", company, "default_currency")
+	posting_date_base = getattr(travel_expense, "posting_date", None) or frappe.utils.today()
+	traveler = getattr(travel_expense, "traveler_name", None)
+	is_paid = getattr(travel_expense, "is_paid", 0)
+	direct_payment_account = getattr(travel_expense, "direct_payment_account", None)
+	payable_account = getattr(travel_expense, "payable_account", None) or frappe.db.get_value("Company", company, "default_payable_account")
+	# Split rows: refunds vs additionals
+	refund_rows = []
+	additional_rows = []
+	for row in travel_expense.more_information:
+		if getattr(row, "journal_created", 0):
+			continue
+		entry_type = (getattr(row, "entry_type", None) or "Additional").strip()
+		if entry_type == "Refund":
+			refund_rows.append(row)
+		else:
+			additional_rows.append(row)
+
+	# Handle Additional rows: one JE per row (same as normal expense logic)
+	for row in additional_rows:
+		expense_type = getattr(row, "expense_type", None)
+		if not expense_type:
+			frappe.log_error(f"More Information row missing expense_type (parent={travel_expense.name})", "Travel Expense More Information JE")
+			continue
+		amount = getattr(row, "amount_company_currency", None) or getattr(row, "amount", None) or 0
+		if not amount or amount <= 0:
+			frappe.db.set_value(
+				"Travel Expense More Information", row.name,
+				{"journal_created": 1, "journal_entry": None}
+			)
+			continue
+
+		expense_account = get_expense_account_from_expense_type(expense_type, company)
+		cost_center = getattr(row, "cost_center", None) or getattr(travel_expense, "cost_center", None)
+		project = getattr(row, "project", None) or getattr(travel_expense, "project", None)
+		posting_date = getattr(row, "expense_date", None) or posting_date_base
+
+		expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+		if expense_account_currency == company_currency:
+			expense_base = amount
+		else:
+			try:
+				expense_base = amount * get_exchange_rate(expense_account_currency, company_currency, posting_date, company)
+			except Exception:
+				expense_base = amount
+
+		je_accounts = [{
+			"account": expense_account,
+			"debit_in_account_currency": amount,
+			"debit": expense_base,
+			"cost_center": cost_center,
+			"project": project,
+			"custom_travel_expense_ref": travel_expense.name,
+		}]
+
+		# Credit side: direct payment (if paid) or payable (if unpaid)
+		if is_paid and direct_payment_account:
+			pay_account = direct_payment_account
+			pay_currency = frappe.db.get_value("Account", pay_account, "account_currency") or company_currency
+		else:
+			pay_account = payable_account
+			pay_currency = frappe.db.get_value("Account", pay_account, "account_currency") or company_currency
+
+		if not pay_account:
+			frappe.throw(_("Payable Account or Direct Payment Account is required for Travel Expense {0}.").format(travel_expense.name))
+
+		if pay_currency == company_currency:
+			pay_base = amount
+			pay_amount = amount
+		else:
+			try:
+				pay_amount = amount * get_exchange_rate(company_currency, pay_currency, posting_date, company)
+				pay_base = amount
+			except Exception:
+				pay_amount = amount
+				pay_base = amount
+
+		acc_entry = {
+			"account": pay_account,
+			"credit_in_account_currency": pay_amount,
+			"credit": pay_base,
+			"cost_center": cost_center,
+			"project": project,
+			"custom_travel_expense_ref": travel_expense.name,
+		}
+		if not is_paid and pay_account == payable_account and traveler:
+			acc_entry["party_type"] = "Member"
+			acc_entry["party"] = traveler
+		je_accounts.append(acc_entry)
+
+		remark = f"Travel Expense {travel_expense.name} - More Information (Additional)"
+		if getattr(row, "description", None) and str(row.description).strip():
+			remark += "\n" + str(row.description).strip()
+
+		account_currencies = {expense_account_currency, pay_currency}
+		is_multi_currency = any(c != company_currency for c in account_currencies)
+
+		je = frappe.get_doc({
+			"doctype": "Journal Entry",
+			"voucher_type": "Journal Entry",
+			"company": company,
+			"posting_date": posting_date,
+			"multi_currency": 1 if is_multi_currency else 0,
+			"user_remark": remark,
+			"accounts": je_accounts,
+		})
+
+		if is_multi_currency:
+			je.currency = expense_account_currency if expense_account_currency != company_currency else pay_currency
+			try:
+				je.exchange_rate = get_exchange_rate(je.currency, company_currency, posting_date, company)
+			except Exception:
+				je.exchange_rate = 1
+
+		if getattr(travel_expense, "company_group", None):
+			je.company_group = travel_expense.company_group
+		if getattr(travel_expense, "branch", None):
+			je.branch = travel_expense.branch
+
+		je.insert(ignore_permissions=True)
+		je.submit()
+		frappe.db.set_value(
+			"Travel Expense More Information", row.name,
+			{"journal_created": 1, "journal_entry": je.name}
+		)
+
+	# Handle Refund rows: single JE using original vs refund logic (3 lines)
+	if refund_rows:
+		# Total refund amount for this batch
+		refund_amount = 0
+		for row in refund_rows:
+			amt = getattr(row, "amount_company_currency", None) or getattr(row, "amount", None) or 0
+			if amt and amt > 0:
+				refund_amount += amt
+
+		if refund_amount > 0:
+			je_name = create_refund_journal_for_travel_expense(travel_expense, refund_amount)
+			if je_name:
+				for row in refund_rows:
+					frappe.db.set_value(
+						"Travel Expense More Information", row.name,
+						{"journal_created": 1, "journal_entry": je_name}
+					)
+
+
+def create_refund_journal_for_travel_expense(original_te, refund_amount):
+	"""
+	Create a refund Journal Entry for a Travel Expense using the original vs refund logic:
+	1) Credit original expense accounts for the full original amount
+	2) Debit payment/payable for refund_amount
+	3) Debit expense accounts for lost_amount (original_total - refund_amount), pro‑rated
+	"""
+	if refund_amount <= 0:
+		return None
+
+	company = original_te.company
+	company_doc = frappe.get_doc("Company", company)
+	company_currency = company_doc.default_currency
+
+	# Original totals and expense accounts from original Travel Expense
+	original_total = getattr(original_te, "grand_total_company_currency", None) or getattr(original_te, "total_company_currency", None) or 0
+	if original_total <= 0:
+		frappe.throw(_("Cannot create refund journal: original travel expense total is zero or negative."))
+
+	lost_amount = original_total - refund_amount
+	if lost_amount < 0:
+		frappe.throw(_("Refund amount cannot exceed original expense amount"))
+
+	posting_date = getattr(original_te, "posting_date", None) or frappe.utils.today()
+
+	# Build original expense accounts (same as old refund logic)
+	original_expense_accounts = {}
+	if original_te.expenses:
+		for expense_row in original_te.expenses:
+			expense_type = expense_row.expense_type
+			if not expense_type:
+				continue
+			expense_account = get_expense_account_from_expense_type(expense_type, company)
+			expense_amt = getattr(expense_row, "amount_company_currency", None) or expense_row.amount or 0
+			if expense_amt <= 0:
+				continue
+			if expense_account in original_expense_accounts:
+				original_expense_accounts[expense_account] += expense_amt
+			else:
+				original_expense_accounts[expense_account] = expense_amt
+
+	if not original_expense_accounts:
+		frappe.throw(_("Cannot create refund journal: no expense accounts found on original travel expense."))
+
+	traveler = getattr(original_te, "traveler_name", None)
+	payable_account = getattr(original_te, "payable_account", None) or frappe.db.get_value("Company", company, "default_payable_account")
+	payable_account_currency = frappe.db.get_value("Account", payable_account, "account_currency") or company_currency if payable_account else company_currency
+
+	je_accounts = []
+
+	# 1. Credit Expense Account(s) - reverse the FULL original expense amount
+	for expense_account, original_amt in original_expense_accounts.items():
+		expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+		if expense_account_currency == company_currency:
+			expense_base = original_amt
+		else:
+			try:
+				exchange_rate = get_exchange_rate(expense_account_currency, company_currency, posting_date, company)
+				expense_base = original_amt * exchange_rate
+			except Exception:
+				expense_base = original_amt
+
+		cost_center = getattr(original_te, "cost_center", None)
+		project = getattr(original_te, "project", None)
+		if original_te.expenses and len(original_te.expenses) > 0:
+			first_row = original_te.expenses[0]
+			if first_row.cost_center:
+				cost_center = first_row.cost_center
+			if first_row.project:
+				project = first_row.project
+
+		je_accounts.append({
+			"account": expense_account,
+			"credit_in_account_currency": original_amt,
+			"credit": expense_base,
+			"cost_center": cost_center,
+			"project": project,
+			"custom_travel_expense_ref": original_te.name,
+		})
+
+	# 2. Debit payment / payable for refund_amount
+	original_is_paid = getattr(original_te, "is_paid", 0)
+	original_payment_account = None
+	if original_is_paid and getattr(original_te, "direct_payment_account", None):
+		original_payment_account = original_te.direct_payment_account
+	else:
+		original_payment_account = company_doc.default_bank_account or company_doc.default_cash_account
+	if not original_payment_account:
+		original_payment_account = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
+	if not original_payment_account:
+		original_payment_account = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0}, "name")
+
+	if original_is_paid:
+		# Refund back to bank/cash
+		if not original_payment_account:
+			frappe.throw(_("Please set Default Bank Account or Default Cash Account in Company settings"))
+		payment_account_currency = frappe.db.get_value("Account", original_payment_account, "account_currency") or company_currency
+		if payment_account_currency == company_currency:
+			payment_base = refund_amount
+			payment_amt = refund_amount
+		else:
+			try:
+				ex_rate = get_exchange_rate(company_currency, payment_account_currency, posting_date, company)
+				payment_amt = refund_amount * ex_rate
+				payment_base = refund_amount
+			except Exception:
+				payment_amt = refund_amount
+				payment_base = refund_amount
+
+		je_accounts.append({
+			"account": original_payment_account,
+			"debit_in_account_currency": payment_amt,
+			"debit": payment_base,
+			"cost_center": original_te.cost_center,
+			"project": original_te.project,
+			"custom_travel_expense_ref": original_te.name,
+		})
+	else:
+		# Refund reduces payable
+		if not payable_account:
+			frappe.throw(_("Please set Payable Account in Travel Expense or Company settings"))
+		if payable_account_currency == company_currency:
+			payable_base = refund_amount
+			payable_amt = refund_amount
+		else:
+			try:
+				ex_rate = get_exchange_rate(company_currency, payable_account_currency, posting_date, company)
+				payable_amt = refund_amount * ex_rate
+				payable_base = refund_amount
+			except Exception:
+				payable_amt = refund_amount
+				payable_base = refund_amount
+
+		acc = {
+			"account": payable_account,
+			"debit_in_account_currency": payable_amt,
+			"debit": payable_base,
+			"cost_center": original_te.cost_center,
+			"project": original_te.project,
+			"custom_travel_expense_ref": original_te.name,
+		}
+		if traveler:
+			acc["party_type"] = "Member"
+			acc["party"] = traveler
+		je_accounts.append(acc)
+
+	# 3. Debit Expense Account(s) for lost amount (if any), pro‑rated
+	if lost_amount > 0 and original_total > 0:
+		for expense_account, original_amt in original_expense_accounts.items():
+			if not expense_account or original_amt <= 0:
+				continue
+			account_lost_amount = lost_amount * (original_amt / original_total)
+			expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+			if expense_account_currency == company_currency:
+				expense_base = account_lost_amount
+			else:
+				try:
+					ex_rate = get_exchange_rate(expense_account_currency, company_currency, posting_date, company)
+					expense_base = account_lost_amount * ex_rate
+				except Exception:
+					expense_base = account_lost_amount
+
+			cost_center = original_te.cost_center
+			project = original_te.project
+			if original_te.expenses and len(original_te.expenses) > 0:
+				first_row = original_te.expenses[0]
+				if first_row.cost_center:
+					cost_center = first_row.cost_center
+				if first_row.project:
+					project = first_row.project
+
+			je_accounts.append({
+				"account": expense_account,
+				"debit_in_account_currency": account_lost_amount,
+				"debit": expense_base,
+				"cost_center": cost_center,
+				"project": project,
+				"custom_travel_expense_ref": original_te.name,
+			})
+
+	# Multi‑currency determination (reuse pattern from main JE logic)
+	account_currencies = set()
+	for acc in original_expense_accounts.keys():
+		if not acc:
+			continue
+		curr = frappe.db.get_value("Account", acc, "account_currency") or company_currency
+		account_currencies.add(curr)
+	if payable_account:
+		curr = frappe.db.get_value("Account", payable_account, "account_currency") or company_currency
+		account_currencies.add(curr)
+	if original_payment_account:
+		curr = frappe.db.get_value("Account", original_payment_account, "account_currency") or company_currency
+		account_currencies.add(curr)
+	is_multi_currency = any(curr != company_currency for curr in account_currencies)
+
+	remark = f"Travel Expense {original_te.name} - Refund"
+
+	je = frappe.get_doc({
+		"doctype": "Journal Entry",
+		"voucher_type": "Journal Entry",
+		"company": company,
+		"posting_date": posting_date,
+		"multi_currency": 1 if is_multi_currency else 0,
+		"user_remark": remark,
+		"accounts": je_accounts,
+	})
+
+	if is_multi_currency:
+		primary_currency = company_currency
+		try:
+			je.exchange_rate = get_exchange_rate(primary_currency, company_currency, posting_date, company)
+		except Exception:
+			je.exchange_rate = 1
+
+	if getattr(original_te, "company_group", None):
+		je.company_group = original_te.company_group
+	if getattr(original_te, "branch", None):
+		je.branch = original_te.branch
+
+	je.insert(ignore_permissions=True)
+	je.submit()
+
+	return je.name
 
 
 def create_journal_entry_for_travel_expense(travel_expense):
@@ -1574,6 +1788,11 @@ def check_and_create_journal_entry(travel_expense_name):
 		frappe.db.commit()  # Ensure any pending changes are saved
 		travel_expense = frappe.get_doc("Travel Expense", travel_expense_name)
 		
+		# Create journal entries for any More Information rows not yet journaled
+		create_journal_entries_for_more_information(travel_expense)
+		frappe.db.commit()
+		travel_expense.reload()
+		
 		# Check if document is submitted
 		if travel_expense.docstatus != 1:
 			return {
@@ -1654,4 +1873,157 @@ def check_and_create_journal_entry(travel_expense_name):
 			"success": False,
 			"error": str(e)
 		}
+
+
+def clear_more_information_on_je_cancel(je_name):
+	"""
+	When a Journal Entry is cancelled, reset Travel Expense More Information rows
+	that were linked to it: set journal_created = 0 and journal_entry = None.
+	"""
+	if not je_name:
+		return
+	rows = frappe.db.get_all(
+		"Travel Expense More Information",
+		filters={"journal_entry": je_name},
+		pluck="name",
+	)
+	for row_name in rows:
+		frappe.db.set_value(
+			"Travel Expense More Information",
+			row_name,
+			{"journal_created": 0, "journal_entry": None},
+		)
+
+
+@frappe.whitelist()
+def create_journal_for_more_information_row(travel_expense_name, row_name):
+	"""
+	Create the Journal Entry for a single More Information row (when user clicks Create Journal on that row).
+	Respects entry_type: Additional = normal expense JE; Refund = 3-line refund JE for that row's amount.
+	Returns dict with success and journal_entry_name or error.
+	"""
+	try:
+		travel_expense = frappe.get_doc("Travel Expense", travel_expense_name)
+		row = None
+		for r in (travel_expense.more_information or []):
+			if r.name == row_name:
+				row = r
+				break
+		if not row:
+			return {"success": False, "error": _("Row not found in More Information.")}
+		if getattr(row, "journal_created", 0):
+			return {"success": False, "error": _("Journal already created for this row.")}
+
+		entry_type = (getattr(row, "entry_type", None) or "Additional").strip()
+		amount = getattr(row, "amount_company_currency", None) or getattr(row, "amount", None) or 0
+		if not amount or amount <= 0:
+			return {"success": False, "error": _("Row amount must be greater than zero.")}
+
+		if entry_type == "Refund":
+			je_name = create_refund_journal_for_travel_expense(travel_expense, amount)
+			if je_name:
+				frappe.db.set_value(
+					"Travel Expense More Information", row_name,
+					{"journal_created": 1, "journal_entry": je_name},
+				)
+		else:
+			# Additional: create one JE for this row (reuse same logic as batch Additional)
+			_create_single_additional_je_for_row(travel_expense, row)
+			je_name = frappe.db.get_value("Travel Expense More Information", row_name, "journal_entry")
+
+		if je_name:
+			return {"success": True, "journal_entry_name": je_name}
+		return {"success": False, "error": _("Failed to create journal entry.")}
+	except Exception as e:
+		frappe.log_error(str(e), "Travel Expense More Information Create Journal")
+		return {"success": False, "error": str(e)}
+
+
+def _create_single_additional_je_for_row(travel_expense, row):
+	"""Create one Additional JE for a single More Information row and set journal_created + journal_entry."""
+	company = travel_expense.company
+	company_currency = frappe.get_cached_value("Company", company, "default_currency")
+	posting_date_base = getattr(travel_expense, "posting_date", None) or frappe.utils.today()
+	traveler = getattr(travel_expense, "traveler_name", None)
+	is_paid = getattr(travel_expense, "is_paid", 0)
+	direct_payment_account = getattr(travel_expense, "direct_payment_account", None)
+	payable_account = getattr(travel_expense, "payable_account", None) or frappe.db.get_value("Company", company, "default_payable_account")
+
+	expense_type = getattr(row, "expense_type", None)
+	if not expense_type:
+		frappe.throw(_("Expense Type is required for this row."))
+	amount = getattr(row, "amount_company_currency", None) or getattr(row, "amount", None) or 0
+	if not amount or amount <= 0:
+		frappe.throw(_("Amount must be greater than zero."))
+
+	expense_account = get_expense_account_from_expense_type(expense_type, company)
+	cost_center = getattr(row, "cost_center", None) or getattr(travel_expense, "cost_center", None)
+	project = getattr(row, "project", None) or getattr(travel_expense, "project", None)
+	posting_date = getattr(row, "expense_date", None) or posting_date_base
+
+	expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+	if expense_account_currency == company_currency:
+		expense_base = amount
+	else:
+		try:
+			expense_base = amount * get_exchange_rate(expense_account_currency, company_currency, posting_date, company)
+		except Exception:
+			expense_base = amount
+
+	je_accounts = [{
+		"account": expense_account,
+		"debit_in_account_currency": amount,
+		"debit": expense_base,
+		"cost_center": cost_center,
+		"project": project,
+		"custom_travel_expense_ref": travel_expense.name,
+	}]
+
+	if is_paid and direct_payment_account:
+		pay_account = direct_payment_account
+		pay_currency = frappe.db.get_value("Account", pay_account, "account_currency") or company_currency
+	else:
+		pay_account = payable_account
+		pay_currency = frappe.db.get_value("Account", pay_account, "account_currency") or company_currency
+	if not pay_account:
+		frappe.throw(_("Payable Account or Direct Payment Account is required for Travel Expense."))
+	pay_base = pay_amount = amount
+	if pay_currency != company_currency:
+		try:
+			pay_amount = amount * get_exchange_rate(company_currency, pay_currency, posting_date, company)
+		except Exception:
+			pass
+	acc_entry = {"account": pay_account, "credit_in_account_currency": pay_amount, "credit": pay_base, "cost_center": cost_center, "project": project, "custom_travel_expense_ref": travel_expense.name}
+	if not is_paid and pay_account == payable_account and traveler:
+		acc_entry["party_type"] = "Member"
+		acc_entry["party"] = traveler
+	je_accounts.append(acc_entry)
+
+	remark = f"Travel Expense {travel_expense.name} - More Information (Additional)"
+	if getattr(row, "description", None) and str(row.description).strip():
+		remark += "\n" + str(row.description).strip()
+	account_currencies = {expense_account_currency, pay_currency}
+	is_multi_currency = any(c != company_currency for c in account_currencies)
+	je = frappe.get_doc({
+		"doctype": "Journal Entry",
+		"voucher_type": "Journal Entry",
+		"company": company,
+		"posting_date": posting_date,
+		"multi_currency": 1 if is_multi_currency else 0,
+		"user_remark": remark,
+		"accounts": je_accounts,
+	})
+	if is_multi_currency:
+		je.currency = expense_account_currency if expense_account_currency != company_currency else pay_currency
+		try:
+			je.exchange_rate = get_exchange_rate(je.currency, company_currency, posting_date, company)
+		except Exception:
+			je.exchange_rate = 1
+	if getattr(travel_expense, "company_group", None):
+		je.company_group = travel_expense.company_group
+	if getattr(travel_expense, "branch", None):
+		je.branch = travel_expense.branch
+	je.insert(ignore_permissions=True)
+	je.submit()
+	frappe.db.set_value("Travel Expense More Information", row.name, {"journal_created": 1, "journal_entry": je.name})
 

@@ -1528,6 +1528,13 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 	try:
 		# Handle Journal Entries with child table
 		if doc.doctype == "Journal Entry":
+			# Clear Travel Expense More Information links when this JE is cancelled
+			try:
+				from nextlayer.next_layer.api.travel_expense_utils import clear_more_information_on_je_cancel
+				clear_more_information_on_je_cancel(doc.name)
+			except Exception as e:
+				frappe.logger().warning(f"Could not clear More Information on JE cancel: {e}")
+
 			# Check if child table exists and has matched entries
 			child_table = doc.get("custom_intercompany_match_details", [])
 			if not child_table:
