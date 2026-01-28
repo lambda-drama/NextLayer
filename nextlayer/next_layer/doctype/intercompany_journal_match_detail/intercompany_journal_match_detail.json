@@ -89,13 +89,12 @@
    "allow_on_submit": 1,
    "description": "The specific GL Entry (debit or credit) that was matched",
    "fieldname": "gl_entry",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "ignore_user_permissions": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "GL Entry",
    "no_copy": 1,
-   "options": "GL Entry",
    "read_only": 1
   }
  ],
@@ -103,7 +102,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-26 22:18:43.776035",
+ "modified": "2026-01-29 02:49:12.807149",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "InterCompany Journal Match Detail",

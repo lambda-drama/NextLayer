@@ -4084,8 +4084,10 @@ export default function IntercompanyReconciliation() {
                         {debitCreditFilter !== 'Debit => Credit' && (
                           <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         <TableHead className="text-blue-800 text-right">IR Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                        {showMatchedAmountColumn && (
+                          <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                        )}
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
                         <TableHead className="text-blue-800 text-center">Matched With</TableHead>
                         {showMatchedAmountColumn && (
@@ -4096,7 +4098,7 @@ export default function IntercompanyReconciliation() {
                           <button
                             onClick={() => setShowMatchedAmountColumn(!showMatchedAmountColumn)}
                             className="p-1 hover:bg-blue-100 rounded transition-colors"
-                            title={showMatchedAmountColumn ? "Hide matched amount column" : "Show matched amount column"}
+                            title={showMatchedAmountColumn ? "Hide extra columns" : "Show extra columns"}
                           >
                             {showMatchedAmountColumn ? (
                               <Eye className="h-4 w-4 text-blue-600" />
@@ -4110,7 +4112,7 @@ export default function IntercompanyReconciliation() {
                     <TableBody>
                       {isTableLoading ? (
                         <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 10 : 9) : (showMatchedAmountColumn ? 9 : 8)} className="text-center py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
                               <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                               <span className="text-gray-600">
@@ -4171,7 +4173,7 @@ export default function IntercompanyReconciliation() {
                         if (filteredForTable.length === 0) {
                           return (
                             <TableRow>
-                              <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 11 : 10) : (showMatchedAmountColumn ? 10 : 9)} className="text-center text-gray-500 py-8">
+                              <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center text-gray-500 py-8">
                                 No data found for selected criteria
                               </TableCell>
                             </TableRow>
@@ -4180,13 +4182,13 @@ export default function IntercompanyReconciliation() {
                         
                         // Calculate IR Balance (running balance) for Table A
                         let irBalanceA = 0
-                        const entriesWithIRBalanceA = filteredForTable.map((entry, idx) => {
+                        const entriesWithIRBalanceA = filteredForTable.map((entry) => {
                           // IR Balance = Previous IR Balance + Debit - Credit
                           irBalanceA = irBalanceA + (entry.debit || 0) - (entry.credit || 0)
                           return { ...entry, ir_balance: irBalanceA }
                         })
                         
-                        return entriesWithIRBalanceA.map((entry, index) => {
+                        return entriesWithIRBalanceA.map((entry) => {
                         const entryKey = getEntryKey(entry)
                         const matchedEntry = getMatchedEntry(entry, true) // true = Company A side
                         const amountsMatch = doAmountsMatch(entry, matchedEntry)
@@ -4242,12 +4244,14 @@ export default function IntercompanyReconciliation() {
                                 {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
                               </TableCell>
                             )}
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(entry.balance, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
-                            </TableCell>
                             <TableCell className="text-right font-medium text-purple-600">
                               {formatCurrency(entry.ir_balance || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                             </TableCell>
+                            {showMatchedAmountColumn && (
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(entry.balance, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
+                              </TableCell>
+                            )}
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
                               {isInternalMatchEntry && (
@@ -4500,29 +4504,6 @@ export default function IntercompanyReconciliation() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-right font-bold text-beveren-800">
-                            {formatCurrency(
-                              (() => {
-                                // Balance total = last transaction's balance (running balance at bottom), not sum of column
-                                const filtered = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).filter(entry => {
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
-                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
-                                  if (entryBackendStatus?.status === 'Match') {
-                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
-                                    if (isInternalMatch(entry, entryMatchedWith, companyA)) return false
-                                  }
-                                  return true
-                                })
-                                const last = filtered[filtered.length - 1]
-                                return last ? (last.balance ?? 0) : 0
-                              })(),
-                              getPartyCurrency(partyA, 'Customer'),
-                              partyA,
-                              'Customer'
-                            )}
-                          </TableCell>
                           <TableCell className="text-right font-bold text-purple-800">
                             {formatCurrency(
                               (() => {
@@ -4550,7 +4531,32 @@ export default function IntercompanyReconciliation() {
                               'Customer'
                             )}
                           </TableCell>
-                          <TableCell colSpan={showMatchedAmountColumn ? 4 : 3}></TableCell>
+                          {showMatchedAmountColumn && (
+                            <TableCell className="text-right font-bold text-beveren-800">
+                              {formatCurrency(
+                                (() => {
+                                  // Balance total = last transaction's balance (running balance at bottom), not sum of column
+                                  const filtered = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).filter(entry => {
+                                    const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                      ? entry.gl_entry
+                                      : `${entry.voucher_type}-${entry.voucher_no}`
+                                    const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                    if (entryBackendStatus?.status === 'Match') {
+                                      const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                      if (isInternalMatch(entry, entryMatchedWith, companyA)) return false
+                                    }
+                                    return true
+                                  })
+                                  const last = filtered[filtered.length - 1]
+                                  return last ? (last.balance ?? 0) : 0
+                                })(),
+                                getPartyCurrency(partyA, 'Customer'),
+                                partyA,
+                                'Customer'
+                              )}
+                            </TableCell>
+                          )}
+                          <TableCell colSpan={showMatchedAmountColumn ? 5 : 4}></TableCell>
                         </TableRow>
                       )}
                     </TableBody>
@@ -4599,8 +4605,10 @@ export default function IntercompanyReconciliation() {
                         {debitCreditFilter !== 'Credit => Debit' && (
                           <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         <TableHead className="text-blue-800 text-right">IR Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                        {showMatchedAmountColumn && (
+                          <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                        )}
                         <TableHead className="text-blue-800 text-center">Status</TableHead>
                         <TableHead className="text-blue-800 text-center">Matched With</TableHead>
                         {showMatchedAmountColumn && (
@@ -4611,7 +4619,7 @@ export default function IntercompanyReconciliation() {
                           <button
                             onClick={() => setShowMatchedAmountColumn(!showMatchedAmountColumn)}
                             className="p-1 hover:bg-blue-100 rounded transition-colors"
-                            title={showMatchedAmountColumn ? "Hide matched amount column" : "Show matched amount column"}
+                            title={showMatchedAmountColumn ? "Hide extra columns" : "Show extra columns"}
                           >
                             {showMatchedAmountColumn ? (
                               <Eye className="h-4 w-4 text-blue-600" />
@@ -4625,7 +4633,7 @@ export default function IntercompanyReconciliation() {
                     <TableBody>
                       {isTableLoading ? (
                         <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 11 : 10) : (showMatchedAmountColumn ? 10 : 9)} className="text-center py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
                               <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                               <span className="text-gray-600">
@@ -4636,7 +4644,7 @@ export default function IntercompanyReconciliation() {
                         </TableRow>
                       ) : filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 11 : 10) : (showMatchedAmountColumn ? 10 : 9)} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center text-gray-500 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
@@ -4644,13 +4652,13 @@ export default function IntercompanyReconciliation() {
                         const filteredForTableB = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false)
                         // Calculate IR Balance (running balance) for Table B
                         let irBalanceB = 0
-                        const entriesWithIRBalanceB = filteredForTableB.map((entry, idx) => {
+                        const entriesWithIRBalanceB = filteredForTableB.map((entry) => {
                           // IR Balance = Previous IR Balance + Debit - Credit
                           irBalanceB = irBalanceB + (entry.debit || 0) - (entry.credit || 0)
                           return { ...entry, ir_balance: irBalanceB }
                         })
                         
-                        return entriesWithIRBalanceB.map((entry, index) => {
+                        return entriesWithIRBalanceB.map((entry) => {
                         const entryKey = getEntryKey(entry)
                         const matchedEntry = getMatchedEntry(entry, false) // false = Company B side
                         const amountsMatch = doAmountsMatch(entry, matchedEntry)
@@ -4706,12 +4714,14 @@ export default function IntercompanyReconciliation() {
                                 {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
                               </TableCell>
                             )}
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(entry.balance, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
-                            </TableCell>
                             <TableCell className="text-right font-medium text-purple-600">
                               {formatCurrency(entry.ir_balance || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                             </TableCell>
+                            {showMatchedAmountColumn && (
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(entry.balance, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
+                              </TableCell>
+                            )}
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
                               {isInternalMatchEntry && (
@@ -4964,29 +4974,6 @@ export default function IntercompanyReconciliation() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-right font-bold text-beveren-800">
-                            {formatCurrency(
-                              (() => {
-                                // Balance total = last transaction's balance (running balance at bottom), not sum of column
-                                const filtered = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).filter(entry => {
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
-                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
-                                  if (entryBackendStatus?.status === 'Match') {
-                                    const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
-                                    if (isInternalMatch(entry, entryMatchedWith, companyB)) return false
-                                  }
-                                  return true
-                                })
-                                const last = filtered[filtered.length - 1]
-                                return last ? (last.balance ?? 0) : 0
-                              })(),
-                              getPartyCurrency(partyB, partyTypeB),
-                              partyB,
-                              partyTypeB
-                            )}
-                          </TableCell>
                           <TableCell className="text-right font-bold text-purple-800">
                             {formatCurrency(
                               (() => {
@@ -5014,7 +5001,32 @@ export default function IntercompanyReconciliation() {
                               partyTypeB
                             )}
                           </TableCell>
-                          <TableCell colSpan={showMatchedAmountColumn ? 4 : 3}></TableCell>
+                          {showMatchedAmountColumn && (
+                            <TableCell className="text-right font-bold text-beveren-800">
+                              {formatCurrency(
+                                (() => {
+                                  // Balance total = last transaction's balance (running balance at bottom), not sum of column
+                                  const filtered = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).filter(entry => {
+                                    const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+                                      ? entry.gl_entry
+                                      : `${entry.voucher_type}-${entry.voucher_no}`
+                                    const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                    if (entryBackendStatus?.status === 'Match') {
+                                      const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
+                                      if (isInternalMatch(entry, entryMatchedWith, companyB)) return false
+                                    }
+                                    return true
+                                  })
+                                  const last = filtered[filtered.length - 1]
+                                  return last ? (last.balance ?? 0) : 0
+                                })(),
+                                getPartyCurrency(partyB, partyTypeB),
+                                partyB,
+                                partyTypeB
+                              )}
+                            </TableCell>
+                          )}
+                          <TableCell colSpan={showMatchedAmountColumn ? 5 : 4}></TableCell>
                         </TableRow>
                       )}
                     </TableBody>
