@@ -2305,16 +2305,6 @@ function add_expense_row(dialog, temp_doc, container) {
 					</div>
 				</div>
 			</div>
-			<!-- Cash Account (for refunds only) -->
-			<div class="cash-account-field" style="display: none;">
-				<div class="row">
-					<div class="col-md-12">
-						<div class="form-group">
-							<div class="cash-account-wrapper" data-field="cash_account"></div>
-						</div>
-					</div>
-				</div>
-			</div>
 			<!-- Description (always visible, at the bottom) -->
 			<div class="row">
 				<div class="col-md-12">
@@ -2424,48 +2414,8 @@ function add_expense_row(dialog, temp_doc, container) {
 			}, 300);
 		}
 		
-		// Create Cash/Bank Account field (for refunds)
-		frappe.model.with_doctype("Account", function() {
-			try {
-				let cash_account_wrapper = $row.find('.cash-account-wrapper');
-				let cash_account_field = frappe.ui.form.make_control({
-					df: {
-						fieldtype: "Link",
-						fieldname: "cash_account",
-						options: "Account",
-						label: "Account (for lost amount)",
-						get_query: function() {
-							return {
-								filters: {
-									account_type: ["in", ["Cash", "Bank"]],
-									is_group: 0,
-									company: dialog.original_frm ? dialog.original_frm.doc.company : null
-								}
-							};
-						}
-					},
-					parent: cash_account_wrapper,
-					render_input: true
-				});
-				cash_account_field.refresh();
-				
-				// Store field reference on row element
-				$row.data('cash_account_field', cash_account_field);
-				
-				cash_account_field.$input.on('change blur', function() {
-					let value = cash_account_field.get_value();
-					// Store in dialog level (shared for all rows in refund)
-					dialog.cash_account = value;
-				});
-				
-				// Update visibility based on category
-				let expense_category = dialog.fields_dict && dialog.fields_dict.expense_category ? 
-					dialog.fields_dict.expense_category.get_value() : "";
-				update_cash_account_field($row, expense_category);
-			} catch(e) {
-				console.warn("Could not create Cash Account field:", e);
-			}
-		});
+		// Removed per new design: lost amount will use expense type accounts, 
+		// so we no longer show a separate Cash/Bank Account selector here.
 	});
 	
 	// Create Hotel Territory link field

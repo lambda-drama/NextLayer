@@ -461,10 +461,18 @@ def create_journal_entry_for_travel_expense(travel_expense):
 			
 			# Try to get from travel expense custom field (if user selected in modal)
 			if not cash_in_hand_account:
+				# Safe getattr – may not exist on all sites
 				cash_in_hand_account = getattr(travel_expense, 'custom_cash_account', None)
 			if not cash_in_hand_account:
-				# Try to get from database (in case it was set but not loaded)
-				cash_in_hand_account = frappe.db.get_value("Travel Expense", travel_expense.name, "custom_cash_account")
+				# Try to get from database (in case it was set but not loaded),
+				# but only if the column exists to avoid SQL errors.
+				try:
+					if frappe.db.has_column("Travel Expense", "custom_cash_account"):
+						cash_in_hand_account = frappe.db.get_value(
+							"Travel Expense", travel_expense.name, "custom_cash_account"
+						)
+				except Exception:
+					cash_in_hand_account = None
 			if not cash_in_hand_account:
 				# Fall back to company default
 				cash_in_hand_account = frappe.db.get_value("Company", company, "default_cash_account")
@@ -608,34 +616,52 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"custom_travel_expense_ref": travel_expense.name,
 				})
 			
-			# 3. Debit Cash in Hand Account - lost amount (if any)
-			if lost_amount > 0:
-				cash_account_currency = frappe.db.get_value("Account", cash_in_hand_account, "account_currency") or company_currency
-				if cash_account_currency == company_currency:
-					cash_base_amount = lost_amount
-					cash_amount = lost_amount
-				else:
-					try:
-						cash_exchange_rate = get_exchange_rate(
-							company_currency,
-							cash_account_currency,
-							posting_date,
-							company
-						)
-						cash_amount = lost_amount * cash_exchange_rate
-						cash_base_amount = lost_amount
-					except Exception:
-						cash_amount = lost_amount
-						cash_base_amount = lost_amount
-				
-				je_accounts.append({
-					"account": cash_in_hand_account,
-					"debit_in_account_currency": cash_amount,
-					"debit": cash_base_amount,
-					"cost_center": travel_expense.cost_center,
-					"project": travel_expense.project,
-					"custom_travel_expense_ref": travel_expense.name,
-				})
+			# 3. Debit Expense Account(s) for lost amount (if any)
+			# Lost amount should hit the same expense accounts defined on the Expense Claim Type
+			# (pro-rated based on the original amounts per account).
+			if lost_amount > 0 and original_total > 0:
+				for expense_account, original_amount in original_expense_accounts.items():
+					if not expense_account or original_amount <= 0:
+						continue
+
+					# Pro-rate lost amount based on original share of each expense account
+					account_lost_amount = lost_amount * (original_amount / original_total)
+
+					expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+
+					# Calculate base amount
+					if expense_account_currency == company_currency:
+						expense_base_amount = account_lost_amount
+					else:
+						try:
+							exchange_rate = get_exchange_rate(
+								expense_account_currency,
+								company_currency,
+								posting_date,
+								company
+							)
+							expense_base_amount = account_lost_amount * exchange_rate
+						except Exception:
+							expense_base_amount = account_lost_amount
+
+					# Get cost center and project from first expense row, or from main form
+					cost_center = travel_expense.cost_center
+					project = travel_expense.project
+					if travel_expense.expenses and len(travel_expense.expenses) > 0:
+						first_expense_row = travel_expense.expenses[0]
+						if first_expense_row.cost_center:
+							cost_center = first_expense_row.cost_center
+						if first_expense_row.project:
+							project = first_expense_row.project
+
+					je_accounts.append({
+						"account": expense_account,
+						"debit_in_account_currency": account_lost_amount,
+						"debit": expense_base_amount,
+						"cost_center": cost_center,
+						"project": project,
+						"custom_travel_expense_ref": travel_expense.name,
+					})
 		else:
 			# Normal expense (not refund) - original logic
 			# 1. Debit Expense Account(s)
@@ -711,13 +737,43 @@ def create_journal_entry_for_travel_expense(travel_expense):
 			})
 		
 		# Determine if multi-currency
-		# Get first expense account for multi-currency check
-		first_expense_account = list(expense_accounts.keys())[0] if expense_accounts else None
-		expense_account_currency = frappe.db.get_value("Account", first_expense_account, "account_currency") or company_currency if first_expense_account else company_currency
-		is_multi_currency = (
-			expense_account_currency != company_currency or 
-			payable_account_currency != company_currency
-		)
+		# Consider all accounts used in this JE (including refund-specific accounts)
+		account_currencies = set()
+
+		# Expense side accounts:
+		if is_refund:
+			# Refund uses original_expense_accounts (from original expense)
+			original_expense_accounts = locals().get("original_expense_accounts") or {}
+			source_accounts = original_expense_accounts.keys()
+		else:
+			source_accounts = expense_accounts.keys()
+
+		for acc in source_accounts:
+			if not acc:
+				continue
+			curr = frappe.db.get_value("Account", acc, "account_currency") or company_currency
+			account_currencies.add(curr)
+
+		# Payable account (used for normal unpaid expenses and unpaid refunds)
+		if not is_refund or (is_refund and not getattr(locals().get("original_te", None), "is_paid", 0)):
+			if payable_account:
+				curr = frappe.db.get_value("Account", payable_account, "account_currency") or company_currency
+				account_currencies.add(curr)
+
+		# Original payment account (used when original expense was paid and we're refunding)
+		if is_refund:
+			original_payment_account = locals().get("original_payment_account")
+			if original_payment_account:
+				curr = frappe.db.get_value("Account", original_payment_account, "account_currency") or company_currency
+				account_currencies.add(curr)
+
+			# Cash-in-hand account for lost amount (if any)
+			cash_in_hand_account = locals().get("cash_in_hand_account")
+			if cash_in_hand_account:
+				curr = frappe.db.get_value("Account", cash_in_hand_account, "account_currency") or company_currency
+				account_currencies.add(curr)
+
+		is_multi_currency = any(curr != company_currency for curr in account_currencies)
 		
 		# Create Journal Entry
 		remark = f"Travel Expense {travel_expense.name}"
@@ -925,10 +981,18 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			
 			# Try to get from travel expense custom field (if user selected in modal)
 			if not cash_in_hand_account:
+				# Safe getattr – may not exist on all sites
 				cash_in_hand_account = getattr(travel_expense, 'custom_cash_account', None)
 			if not cash_in_hand_account:
-				# Try to get from database (in case it was set but not loaded)
-				cash_in_hand_account = frappe.db.get_value("Travel Expense", travel_expense.name, "custom_cash_account")
+				# Try to get from database (in case it was set but not loaded),
+				# but only if the column exists to avoid SQL errors.
+				try:
+					if frappe.db.has_column("Travel Expense", "custom_cash_account"):
+						cash_in_hand_account = frappe.db.get_value(
+							"Travel Expense", travel_expense.name, "custom_cash_account"
+						)
+				except Exception:
+					cash_in_hand_account = None
 			if not cash_in_hand_account:
 				# Fall back to company default
 				cash_in_hand_account = frappe.db.get_value("Company", company, "default_cash_account")
@@ -1023,34 +1087,52 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				"custom_travel_expense_ref": travel_expense.name,
 			})
 			
-			# 3. Debit Cash in Hand Account - lost amount (if any)
-			if lost_amount > 0:
-				cash_account_currency = frappe.db.get_value("Account", cash_in_hand_account, "account_currency") or company_currency
-				if cash_account_currency == company_currency:
-					cash_base_amount = lost_amount
-					cash_amount = lost_amount
-				else:
-					try:
-						cash_exchange_rate = get_exchange_rate(
-							company_currency,
-							cash_account_currency,
-							posting_date,
-							company
-						)
-						cash_amount = lost_amount * cash_exchange_rate
-						cash_base_amount = lost_amount
-					except Exception:
-						cash_amount = lost_amount
-						cash_base_amount = lost_amount
-				
-				je_accounts.append({
-					"account": cash_in_hand_account,
-					"debit_in_account_currency": cash_amount,
-					"debit": cash_base_amount,
-					"cost_center": travel_expense.cost_center,
-					"project": travel_expense.project,
-					"custom_travel_expense_ref": travel_expense.name,
-				})
+			# 3. Debit Expense Account(s) for lost amount (if any)
+			# Lost amount should hit the same expense accounts defined on the Expense Claim Type
+			# (pro-rated based on the original amounts per account).
+			if lost_amount > 0 and original_total > 0:
+				for expense_account, original_amount in original_expense_accounts.items():
+					if not expense_account or original_amount <= 0:
+						continue
+
+					# Pro-rate lost amount based on original share of each expense account
+					account_lost_amount = lost_amount * (original_amount / original_total)
+
+					expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+
+					# Calculate base amount
+					if expense_account_currency == company_currency:
+						expense_base_amount = account_lost_amount
+					else:
+						try:
+							exchange_rate = get_exchange_rate(
+								expense_account_currency,
+								company_currency,
+								posting_date,
+								company
+							)
+							expense_base_amount = account_lost_amount * exchange_rate
+						except Exception:
+							expense_base_amount = account_lost_amount
+
+					# Get cost center and project from first expense row, or from main form
+					cost_center = travel_expense.cost_center
+					project = travel_expense.project
+					if travel_expense.expenses and len(travel_expense.expenses) > 0:
+						first_expense_row = travel_expense.expenses[0]
+						if first_expense_row.cost_center:
+							cost_center = first_expense_row.cost_center
+						if first_expense_row.project:
+							project = first_expense_row.project
+
+					je_accounts.append({
+						"account": expense_account,
+						"debit_in_account_currency": account_lost_amount,
+						"debit": expense_base_amount,
+						"cost_center": cost_center,
+						"project": project,
+						"custom_travel_expense_ref": travel_expense.name,
+					})
 		else:
 			# Normal expense (not refund) - original logic
 			# 1. Debit Expense Account(s)
@@ -1218,13 +1300,36 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 			})
 		
 		# Determine if multi-currency
-		# Get first expense account for multi-currency check
-		first_expense_account = list(expense_accounts.keys())[0] if expense_accounts else None
-		expense_account_currency = frappe.db.get_value("Account", first_expense_account, "account_currency") or company_currency if first_expense_account else company_currency
-		is_multi_currency = (
-			expense_account_currency != company_currency or 
-			direct_payment_account_currency != company_currency
-		)
+		# Consider all accounts used in this JE (including refund-specific accounts)
+		account_currencies = set()
+
+		# Expense side accounts:
+		if is_refund:
+			# Refund uses original_expense_accounts (from original expense)
+			original_expense_accounts = locals().get("original_expense_accounts") or {}
+			source_accounts = original_expense_accounts.keys()
+		else:
+			source_accounts = expense_accounts.keys()
+
+		for acc in source_accounts:
+			if not acc:
+				continue
+			curr = frappe.db.get_value("Account", acc, "account_currency") or company_currency
+			account_currencies.add(curr)
+
+		# Direct payment account (always used in paid flow)
+		if direct_payment_account:
+			curr = frappe.db.get_value("Account", direct_payment_account, "account_currency") or company_currency
+			account_currencies.add(curr)
+
+		# Cash-in-hand account for lost amount (if any, in refund flow)
+		if is_refund:
+			cash_in_hand_account = locals().get("cash_in_hand_account")
+			if cash_in_hand_account:
+				curr = frappe.db.get_value("Account", cash_in_hand_account, "account_currency") or company_currency
+				account_currencies.add(curr)
+
+		is_multi_currency = any(curr != company_currency for curr in account_currencies)
 		
 		# Create Journal Entry
 		remark = f"Travel Expense {travel_expense.name}"
