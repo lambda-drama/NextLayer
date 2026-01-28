@@ -539,6 +539,37 @@ frappe.ui.form.on("Travel Expense Detail", {
 	}
 });
 
+// More Information: Create Journal button (per row when journal_created is 0)
+frappe.ui.form.on("Travel Expense More Information", "create_journal_btn", function(frm, cdt, cdn) {
+	if (!frm.doc.name || frm.doc.docstatus !== 1) {
+		frappe.msgprint({ title: __("Not Allowed"), message: __("Travel Expense must be submitted first."), indicator: "orange" });
+		return;
+	}
+	let row = locals[cdt] && locals[cdt][cdn];
+	if (!row || row.journal_created) {
+		return;
+	}
+	frappe.call({
+		method: "nextlayer.next_layer.api.travel_expense_utils.create_journal_for_more_information_row",
+		args: { travel_expense_name: frm.doc.name, row_name: cdn },
+		callback: function(r) {
+			if (r.message && r.message.success) {
+				frappe.show_alert(__("Journal Entry {0} created.", [r.message.journal_entry_name]), 5, "green");
+				frm.reload_doc();
+			} else {
+				frappe.msgprint({
+					title: __("Error"),
+					message: r.message && r.message.error ? r.message.error : __("Failed to create journal entry."),
+					indicator: "red"
+				});
+			}
+		},
+		error: function() {
+			frappe.msgprint({ title: __("Error"), message: __("Failed to create journal entry."), indicator: "red" });
+		}
+	});
+});
+
 // Handle taxes and charges child table
 frappe.ui.form.on("Sales Taxes and Charges", {
 	tax_amount: function(frm, cdt, cdn) {
@@ -3618,11 +3649,10 @@ function create_additional_travel_expense(original_frm, dialog, temp_doc) {
 		callback: function(r) {
 			if (r.message) {
 				if (r.message.success) {
-					frappe.show_alert(__("Additional travel expense created successfully!"), 5, "green");
+					frappe.show_alert(__("Added to More Information on this Travel Expense."), 5, "green");
 					dialog.hide();
-					
-					// Open the new travel expense
-					frappe.set_route("Form", "Travel Expense", r.message.travel_expense_name);
+					// Stay on the same Travel Expense and refresh so More Information tab shows new rows
+					original_frm.reload_doc();
 				} else {
 					frappe.msgprint({
 						title: __("Error"),
