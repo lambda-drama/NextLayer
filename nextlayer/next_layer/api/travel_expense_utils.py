@@ -1092,53 +1092,74 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		# Check if this is a refund
 		is_refund = getattr(travel_expense, 'refund', 0)
 		
-		# Validate all expense rows have expense type and get expense accounts
-		expense_accounts = {}
+		# Get posting date and transaction currency once (used for amounts and exchange)
+		posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
+		transaction_currency = getattr(travel_expense, 'currency', None) or company_currency
+
+		# Validate all expense rows have expense type and get expense accounts.
+		# Store both company-currency amount (for JE base/debit) and account-currency amount (for debit_in_account_currency)
+		# so that e.g. Visa (USD) is debited with 68 USD, not 249.65 AED.
+		expense_accounts = {}  # account -> {"company_currency": x, "account_currency": y}
 		total_expense_amount = 0
 		for expense_row in travel_expense.expenses:
 			expense_type = expense_row.expense_type
 			if not expense_type:
 				frappe.throw(_("Expense Type is required for all expense rows"))
 			
-			# Get expense account from Expense Claim Type
+			# Get expense account from Expense Claim Type and its currency
 			expense_account = get_expense_account_from_expense_type(expense_type, company)
-			
-			# Get amount for this expense (use company currency amount, fallback to transaction currency)
-			expense_amount = getattr(expense_row, 'amount_company_currency', None)
-			if not expense_amount or expense_amount == 0:
-				# If amount_company_currency is not set or zero, try transaction currency amount
+			expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+
+			# Company-currency amount (for JE base amount)
+			amount_company = getattr(expense_row, 'amount_company_currency', None)
+			if not amount_company or amount_company == 0:
 				transaction_amount = getattr(expense_row, 'amount', None) or 0
 				if transaction_amount and transaction_amount > 0:
-					# Convert transaction currency to company currency
-					transaction_currency = getattr(travel_expense, 'currency', None) or company_currency
 					if transaction_currency != company_currency:
 						try:
-							posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
 							exchange_rate = get_exchange_rate(
 								transaction_currency,
 								company_currency,
 								posting_date,
 								company
 							)
-							expense_amount = transaction_amount * exchange_rate
+							amount_company = transaction_amount * exchange_rate
 						except Exception:
-							expense_amount = transaction_amount
+							amount_company = transaction_amount
 					else:
-						expense_amount = transaction_amount
+						amount_company = transaction_amount
 				else:
-					expense_amount = 0
+					amount_company = 0
 			
-			# Skip zero amounts
-			if expense_amount <= 0:
+			if amount_company <= 0:
 				continue
-			
-			# Group by expense account
-			if expense_account in expense_accounts:
-				expense_accounts[expense_account] += expense_amount
+
+			# Amount in expense account currency (for debit_in_account_currency)
+			if expense_account_currency == company_currency:
+				amount_in_account_currency = amount_company
+			elif expense_account_currency == transaction_currency:
+				amount_in_account_currency = getattr(expense_row, 'amount', None) or 0
+				if not amount_in_account_currency and amount_company:
+					try:
+						rate = get_exchange_rate(company_currency, transaction_currency, posting_date, company)
+						amount_in_account_currency = amount_company / rate
+					except Exception:
+						amount_in_account_currency = amount_company
 			else:
-				expense_accounts[expense_account] = expense_amount
+				try:
+					rate = get_exchange_rate(company_currency, expense_account_currency, posting_date, company)
+					amount_in_account_currency = amount_company / rate
+				except Exception:
+					amount_in_account_currency = amount_company
 			
-			total_expense_amount += expense_amount
+			# Group by expense account (sum both currencies)
+			if expense_account in expense_accounts:
+				expense_accounts[expense_account]["company_currency"] += amount_company
+				expense_accounts[expense_account]["account_currency"] += amount_in_account_currency
+			else:
+				expense_accounts[expense_account] = {"company_currency": amount_company, "account_currency": amount_in_account_currency}
+			
+			total_expense_amount += amount_company
 		
 		# Validate that we have at least one expense account with amount > 0
 		if not expense_accounts or total_expense_amount <= 0:
@@ -1165,9 +1186,6 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		
 		# Log currency info for debugging
 		frappe.logger().debug(f"Travel Expense {travel_expense.name}: Company currency={company_currency}, Payment account={direct_payment_account}, Account currency={direct_payment_account_currency}, Total amount={total_amount}")
-		
-		# Get posting date
-		posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
 		
 		# Build journal entry accounts list
 		je_accounts = []
@@ -1350,34 +1368,24 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		else:
 			# Normal expense (not refund) - original logic
 			# 1. Debit Expense Account(s)
-			for expense_account, amount in expense_accounts.items():
+			for expense_account, amounts in expense_accounts.items():
+				amount_company = amounts["company_currency"]
+				amount_in_account_currency = amounts["account_currency"]
 				# Validate amount is not zero
-				if amount <= 0:
+				if amount_company <= 0:
 					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero or negative amount ({1}). Please check expense amounts.").format(
-						expense_account, amount
+						expense_account, amount_company
 					))
 				
 				expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
 				
-				# Calculate base amount
-				if expense_account_currency == company_currency:
-					expense_base_amount = amount
-				else:
-					try:
-						exchange_rate = get_exchange_rate(
-							expense_account_currency,
-							company_currency,
-							posting_date,
-							company
-						)
-						expense_base_amount = amount * exchange_rate
-					except Exception:
-						expense_base_amount = amount
+				# Base amount is always in company currency (for JE totals)
+				expense_base_amount = amount_company
 				
 				# Validate base amount is not zero
 				if expense_base_amount <= 0:
-					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero base amount after currency conversion. Amount: {1}, Base Amount: {2}").format(
-						expense_account, amount, expense_base_amount
+					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero base amount. Company amount: {1}.").format(
+						expense_account, amount_company
 					))
 				
 				# Get cost center and project from first expense row, or from main form
@@ -1393,7 +1401,7 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				
 				je_accounts.append({
 					"account": expense_account,
-					"debit_in_account_currency": amount,
+					"debit_in_account_currency": amount_in_account_currency,
 					"debit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
@@ -1401,8 +1409,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				})
 		
 			# 2. Credit Direct Payment Account
-			# Calculate sum of all debit amounts to ensure credit matches
-			total_debit_amount = sum(expense_accounts.values())
+			# Calculate sum of all debit base amounts (company currency) to ensure credit matches
+			total_debit_amount = sum(amt["company_currency"] for amt in expense_accounts.values())
 			
 			# Use total_debit_amount if total_amount is zero or doesn't match
 			if total_amount <= 0 or abs(total_amount - total_debit_amount) > 0.01:
