@@ -125,6 +125,9 @@ fixtures = [
 
 
 doc_events = {
+    "Repost Accounting Ledger": {
+        "on_submit": "nextlayer.next_layer.controllers.sales_shipment.recreate_sales_shipment_cost_gl_after_repost_submit",
+    },
     "Sales Order": {
         "before_save": "nextlayer.next_layer.controllers.sales_order.before_save",
     },
