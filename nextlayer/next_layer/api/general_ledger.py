@@ -310,11 +310,12 @@ def get_all_companies_for_ui():
 	Data access is still controlled by permissions in other APIs
 	"""
 	try:
-		# First try to get companies
+		# First try to get companies (ignore permissions so Intercompany Ledger Summary can show all)
 		companies = frappe.get_all(
 			"Company",
 			fields=["name", "default_currency"],
-			order_by="name"
+			order_by="name",
+			ignore_permissions=True
 		)
 
 		# If no companies found, return empty array

@@ -430,9 +430,9 @@ export default function InterCompanyLedgerSummary() {
                     <SelectValue placeholder="Select Company" />
                   </SelectTrigger>
                   <SelectContent className="bg-blue-200">
-                    {permissionAwareCompanies.map((companyItem) => (
+                    {(allCompanies?.length ? allCompanies : companies).map((companyItem) => (
                       <SelectItem key={companyItem.name} value={companyItem.name}>
-                        {companyItem.company_name}
+                        {companyItem.company_name ?? companyItem.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -119,6 +119,34 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
             # "currency": currency if currency != "all" else None
         }
 
+        # Intercompany Ledger Summary: ignore user permissions and fetch everything
+        original_user = frappe.session.user
+        try:
+            frappe.set_user("Administrator")
+            return _get_customer_ledger_summary_impl(company, from_date, to_date, show_intercompany_only, filters)
+        finally:
+            frappe.set_user(original_user)
+
+    except Exception as e:
+        frappe.log_error(f"Error in get_customer_ledger_summary: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "entries": [],
+            "totals": {
+                "totalOpeningBalance": 0,
+                "totalInvoicedAmount": 0,
+                "totalPaidAmount": 0,
+                "totalDebit": 0,
+                "totalCredit": 0,
+                "totalClosingBalance": 0
+            }
+        }
+
+
+def _get_customer_ledger_summary_impl(company, from_date, to_date, show_intercompany_only, filters):
+    """Implementation of customer ledger summary (runs as Administrator)."""
+    try:
         # Add intercompany filter if needed
         if show_intercompany_only:
             # Get intercompany customers
@@ -263,9 +291,35 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
             "ignore_err":filters.get("ignore_exchange_rate_revaluation", 0),
         }
 
-        # Add intercompany filter if needed
+        # Intercompany Ledger Summary: ignore user permissions and fetch everything
+        original_user = frappe.session.user
+        try:
+            frappe.set_user("Administrator")
+            return _get_supplier_ledger_summary_impl(company, from_date, to_date, show_intercompany_only, report_filters)
+        finally:
+            frappe.set_user(original_user)
+
+    except Exception as e:
+        frappe.log_error(f"Error in get_supplier_ledger_summary: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "entries": [],
+            "totals": {
+                "totalOpeningBalance": 0,
+                "totalInvoicedAmount": 0,
+                "totalPaidAmount": 0,
+                "totalDebit": 0,
+                "totalCredit": 0,
+                "totalClosingBalance": 0
+            }
+        }
+
+
+def _get_supplier_ledger_summary_impl(company, from_date, to_date, show_intercompany_only, report_filters):
+    """Implementation of supplier ledger summary (runs as Administrator)."""
+    try:
         if show_intercompany_only:
-            # Get intercompany suppliers
             intercompany_suppliers = frappe.get_all(
                 "Supplier",
                 filters={"is_internal_supplier": 1, "disabled": 0},
@@ -285,10 +339,7 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
                     "message": "No intercompany suppliers found"
                 }
 
-        # Execute the supplier ledger summary report
         columns, data = supplier_ledger_execute(report_filters)
-
-        # Extract party names from the data for currency determination
         party_names = []
         for row in data:
             if isinstance(row, dict):
@@ -296,7 +347,6 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
                 if party_name and party_name not in party_names:
                     party_names.append(party_name)
 
-        # Process the report data
         entries = []
         totals = {
             "totalOpeningBalance": 0,
@@ -306,13 +356,10 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
             "totalCredit": 0,
             "totalClosingBalance": 0
         }
-
-        # Get representative party currency for display
         representative_currency = get_representative_party_currency(company, "Supplier", party_names)
 
         for row in data:
             if isinstance(row, dict):
-                # Filter intercompany suppliers if needed
                 if show_intercompany_only:
                     supplier_name = row.get("party") or row.get("supplier")
                     if supplier_name:
@@ -333,8 +380,6 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
                     "currency": representative_currency
                 }
                 entries.append(entry)
-
-                # Calculate totals
                 totals["totalOpeningBalance"] += entry["opening_balance"]
                 totals["totalInvoicedAmount"] += entry["invoiced_amount"]
                 totals["totalPaidAmount"] += entry["paid_amount"]
@@ -347,9 +392,8 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
             "totals": totals,
             "success": True
         }
-
     except Exception as e:
-        frappe.log_error(f"Error in get_supplier_ledger_summary: {str(e)}")
+        frappe.log_error(f"Error in _get_supplier_ledger_summary_impl: {str(e)}")
         return {
             "success": False,
             "error": str(e),
@@ -483,12 +527,11 @@ def get_gl_closing_amounts(filters: Dict) -> Dict:
                 from frappe import _dict
                 gl_filters = _dict(gl_filters)
 
-                # Run with elevated permissions to bypass all restrictions
+                # Intercompany Ledger Summary: run as Administrator to bypass all restrictions
                 original_user = frappe.session.user
                 try:
-                    # frappe.set_user("Administrator")
+                    frappe.set_user("Administrator")
                     columns, data = execute(gl_filters)
-
                 finally:
                     frappe.set_user(original_user)
 
@@ -573,86 +616,13 @@ def get_intransit_invoice_totals(filters: Dict) -> Dict:
                 "message": "No parties provided"
             }
 
-        # Determine which doctype and fields to use
-        if party_type == "Supplier":
-            # For Supplier side: Check Sales Invoices
-            # The party (supplier company) is the company on the invoice
-            # The company selected at top is the customer on the invoice
-            invoice_type = "Sales Invoice"
-            party_field = "company"  # The party becomes the company on the invoice
-            company_field = "customer"  # The top company becomes the customer
-        else:  # Customer
-            # For Customer side: Check Purchase Invoices
-            # The party (customer company) is the company on the invoice
-            # The company selected at top is the supplier on the invoice
-            invoice_type = "Purchase Invoice"
-            party_field = "company"  # The party becomes the company on the invoice
-            company_field = "supplier"  # The top company becomes the supplier
-
-        intransit_totals = {}
-
-        for party in parties:
-            try:
-                # Build filters for invoices
-                # The party becomes the company on the invoice
-                # The top company becomes the customer/supplier on the invoice
-                invoice_filters = {
-                    party_field: party,  # Party is the company on the invoice
-                    company_field: company,  # Top company is customer/supplier on the invoice
-                    "docstatus": 1,  # Only submitted invoices
-                    "custom_actual_arrival_date": ["in", [None, ""]]  # In-transit (date is None/empty)
-                }
-                # Add date filters if provided
-                if from_date:
-                    invoice_filters["posting_date"] = [">=", from_date]
-                if to_date:
-                    if "posting_date" in invoice_filters:
-                        invoice_filters["posting_date"] = [invoice_filters["posting_date"], "<=", to_date]
-                    else:
-                        invoice_filters["posting_date"] = ["<=", to_date]
-
-                # Get all invoices first, then filter for None custom_actual_arrival_date
-                # Frappe filters don't handle None well, so we get all and filter in Python
-                base_filters = {
-                    party_field: party,  # Party is the company on the invoice
-                    company_field: company,  # Top company is customer/supplier on the invoice
-                    "docstatus": 1
-                }
-                
-                # Properly construct date filters for Frappe
-                if from_date and to_date:
-                    base_filters["posting_date"] = ["between", [from_date, to_date]]
-                elif from_date:
-                    base_filters["posting_date"] = [">=", from_date]
-                elif to_date:
-                    base_filters["posting_date"] = ["<=", to_date]
-                
-                # Get invoices matching the base filters
-                all_invoices = frappe.get_all(
-                    invoice_type,
-                    filters=base_filters,
-                    fields=["name", "grand_total", "currency", "base_grand_total", "custom_actual_arrival_date"]
-                )
-                
-                # Filter for in-transit invoices (custom_actual_arrival_date is None or empty)
-                invoices = [
-                    inv for inv in all_invoices 
-                    if not inv.get("custom_actual_arrival_date") or inv.get("custom_actual_arrival_date") == ""
-                ]
-
-                # Calculate total in company currency (base_grand_total)
-                total_intransit = sum(flt(inv.get("grand_total", 0)) for inv in invoices)
-
-                intransit_totals[party] = total_intransit
-                print("In-transit total for party", party, ":", total_intransit, "invoices found:", invoices)
-            except Exception as e:
-                print(f"Error processing party {party} for in-transit invoices: {str(e)}")
-                intransit_totals[party] = 0
-
-        return {
-            "success": True,
-            "intransit_totals": intransit_totals
-        }
+        # Intercompany Ledger Summary: ignore user permissions and fetch everything
+        original_user = frappe.session.user
+        try:
+            frappe.set_user("Administrator")
+            return _get_intransit_invoice_totals_impl(company, party_type, parties, from_date, to_date)
+        finally:
+            frappe.set_user(original_user)
 
     except Exception as e:
         frappe.log_error(f"In-Transit Invoice Totals Error: {str(e)}")
@@ -662,3 +632,51 @@ def get_intransit_invoice_totals(filters: Dict) -> Dict:
             "message": _("Failed to fetch in-transit invoice totals"),
             "intransit_totals": {}
         }
+
+
+def _get_intransit_invoice_totals_impl(company, party_type, parties, from_date, to_date):
+    """Implementation of in-transit invoice totals (runs as Administrator)."""
+    if party_type == "Supplier":
+        invoice_type = "Sales Invoice"
+        party_field = "company"
+        company_field = "customer"
+    else:
+        invoice_type = "Purchase Invoice"
+        party_field = "company"
+        company_field = "supplier"
+
+    intransit_totals = {}
+    for party in parties:
+        try:
+            base_filters = {
+                party_field: party,
+                company_field: company,
+                "docstatus": 1
+            }
+            if from_date and to_date:
+                base_filters["posting_date"] = ["between", [from_date, to_date]]
+            elif from_date:
+                base_filters["posting_date"] = [">=", from_date]
+            elif to_date:
+                base_filters["posting_date"] = ["<=", to_date]
+
+            all_invoices = frappe.get_all(
+                invoice_type,
+                filters=base_filters,
+                fields=["name", "grand_total", "currency", "base_grand_total", "custom_actual_arrival_date"]
+            )
+            invoices = [
+                inv for inv in all_invoices
+                if not inv.get("custom_actual_arrival_date") or inv.get("custom_actual_arrival_date") == ""
+            ]
+            total_intransit = sum(flt(inv.get("grand_total", 0)) for inv in invoices)
+            intransit_totals[party] = total_intransit
+            print("In-transit total for party", party, ":", total_intransit, "invoices found:", len(invoices))
+        except Exception as e:
+            print(f"Error processing party {party} for in-transit invoices: {str(e)}")
+            intransit_totals[party] = 0
+
+    return {
+        "success": True,
+        "intransit_totals": intransit_totals
+    }
