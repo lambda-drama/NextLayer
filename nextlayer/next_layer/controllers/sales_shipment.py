@@ -1,5 +1,7 @@
 
 
+import time
+
 import frappe
 from frappe import _
 from frappe.utils import flt
@@ -125,11 +127,22 @@ def delete_gl_entries(doc):
     Uses remarks field to identify entries, since multiple Sales Shipment Cost
     documents can reference the same Sales Invoice.
     """
+    # Safety: never delete when doc.name is missing or blank. Otherwise the LIKE pattern
+    # would become "Sales Shipment Cost - %" and wipe ALL Sales Shipment Cost
+    # GL entries for that invoice (all documents), not just this one.
+    doc_name = (getattr(doc, "name", None) or "").strip()
+    if not doc_name:
+        frappe.log_error(
+            message="delete_gl_entries skipped: doc.name is missing or empty. Refusing to delete to avoid wiping all Sales Shipment Cost GL entries for the voucher.",
+            title="Sales Shipment Cost GL Delete Skipped",
+        )
+        return
+
     # Get the sales invoice from the first purchase receipt row
     sales_invoice = None
     if doc.purchase_receipts and len(doc.purchase_receipts) > 0:
         sales_invoice = doc.purchase_receipts[0].receipt_document
-    
+
     if sales_invoice:
         # Delete by remarks field which contains the Sales Shipment Cost document name
         # This ensures we only delete GL entries created by THIS specific document
@@ -138,16 +151,16 @@ def delete_gl_entries(doc):
             WHERE voucher_type = %s
             AND voucher_no = %s
             AND remarks LIKE %s
-        """, ("Sales Invoice", sales_invoice, f"Sales Shipment Cost - {doc.name}%"))
+        """, ("Sales Invoice", sales_invoice, f"Sales Shipment Cost - {doc_name}%"))
     else:
         # Fallback: if no sales invoice, delete by doctype and name (though this shouldn't happen)
         frappe.db.sql("""
             DELETE FROM `tabGL Entry`
             WHERE voucher_type=%s AND voucher_no=%s
-        """, (doc.doctype, doc.name))
-    
+        """, (doc.doctype, doc_name))
+
     # Mark GL as not posted after successful deletion
-    frappe.db.set_value("Sales Shipment Cost", doc.name, "gl_posted", 0)
+    frappe.db.set_value("Sales Shipment Cost", doc_name, "gl_posted", 0)
     frappe.db.commit()
 
 @frappe.whitelist()
@@ -179,6 +192,106 @@ def check_gl_entries_exist(docname):
     exists = gl_entries[0].count > 0 if gl_entries else False
     
     return {"exists": exists}
+
+def get_sales_shipment_cost_names_for_sales_invoice(sales_invoice_name):
+    """
+    Return list of submitted Sales Shipment Cost document names that are linked
+    to the given Sales Invoice (via their purchase_receipts child table).
+    """
+    if not sales_invoice_name:
+        return []
+    meta = frappe.get_meta("Sales Shipment Cost")
+    purchase_receipts_field = meta.get_field("purchase_receipts")
+    if not purchase_receipts_field or not purchase_receipts_field.options:
+        return []
+    child_doctype = purchase_receipts_field.options
+    rows = frappe.get_all(
+        child_doctype,
+        filters={
+            "receipt_document_type": "Sales Invoice",
+            "receipt_document": sales_invoice_name,
+        },
+        fields=["parent"],
+        pluck="parent",
+    )
+    if not rows:
+        return []
+    # Only return submitted Sales Shipment Cost docs
+    submitted = frappe.get_all(
+        "Sales Shipment Cost",
+        filters={"name": ["in", list(set(rows))], "docstatus": 1},
+        pluck="name",
+    )
+    return submitted
+
+
+def recreate_sales_shipment_cost_gl_for_sales_invoice(sales_invoice_name):
+    """
+    After Repost Accounting Ledger has run for a Sales Invoice, recreate the
+    Sales Shipment Cost GL entries for that invoice (they are stored with
+    voucher_type=Sales Invoice, voucher_no=si_name and get cancelled/deleted
+    by the repost). For each linked Sales Shipment Cost doc: delete its GL
+    entries then make them again.
+    """
+    for ssc_name in get_sales_shipment_cost_names_for_sales_invoice(sales_invoice_name):
+        try:
+            doc = frappe.get_doc("Sales Shipment Cost", ssc_name)
+            delete_gl_entries(doc)
+            _make_gl_entries(doc)
+        except Exception as e:
+            frappe.log_error(
+                message=f"Recreate Sales Shipment Cost GL for SI {sales_invoice_name}, SSC {ssc_name}: {e}",
+                title="Recreate Sales Shipment Cost GL",
+            )
+            raise
+
+
+def recreate_sales_shipment_cost_gl_for_repost_doc(account_repost_doc):
+    """
+    Recreate Sales Shipment Cost GL for every Sales Invoice in the given
+    Repost Accounting Ledger doc. Called after repost has run (from on_submit
+    hook for sync case, or from enqueued job with delay for async case).
+    """
+    repost_doc = frappe.get_doc("Repost Accounting Ledger", account_repost_doc)
+    if repost_doc.docstatus != 1:
+        return
+    for x in repost_doc.vouchers:
+        if x.voucher_type == "Sales Invoice" and x.voucher_no:
+            recreate_sales_shipment_cost_gl_for_sales_invoice(x.voucher_no)
+
+
+def _recreate_sales_shipment_cost_gl_for_repost_doc_after_delay(account_repost_doc, delay_seconds=90):
+    """
+    Sleep then recreate SSC GL. Used when repost runs in background so our step
+    runs after the repost job has had time to complete.
+    """
+    time.sleep(delay_seconds)
+    recreate_sales_shipment_cost_gl_for_repost_doc(account_repost_doc)
+
+
+def recreate_sales_shipment_cost_gl_after_repost_submit(doc, method=None):
+    """
+    Doc event: after Repost Accounting Ledger is submitted. Recreates Sales
+    Shipment Cost GL for all Sales Invoices in the repost.
+    - When repost runs synchronously (<=5 vouchers), the repost has already
+      completed when this runs, so we run our step immediately.
+    - When repost runs in background (>5 vouchers), we enqueue our step with
+      a 90s sleep so it runs after the repost job completes.
+    """
+    if not doc.vouchers:
+        return
+    if len(doc.vouchers) > 5:
+        frappe.enqueue(
+            method="nextlayer.next_layer.controllers.sales_shipment._recreate_sales_shipment_cost_gl_for_repost_doc_after_delay",
+            queue="default",
+            timeout=400,
+            account_repost_doc=doc.name,
+            delay_seconds=90,
+            enqueue_after_commit=True,
+        )
+    else:
+        recreate_sales_shipment_cost_gl_for_repost_doc(doc.name)
+
 
 @frappe.whitelist()
 def repost_gl_entries(docname):
