@@ -273,6 +273,15 @@ function show_print_info_modal(item_code, barcode_data) {
 				fieldname: 'unique_code',
 				fieldtype: 'Data',
 				reqd: 1,
+			},
+			{
+				label: __('Country'),
+				fieldname: 'country',
+				fieldtype: 'Link',
+				options: 'Country',
+				reqd: 1,
+				default: 'India',
+				description: __('Shown as "Made in [Country]" on the label.')
 			}
 		],
 		primary_action_label: __('Print'),
@@ -281,6 +290,7 @@ function show_print_info_modal(item_code, barcode_data) {
 			barcode_data.marka = values.marka;
 			barcode_data.machine_no = values.machine_no;
 			barcode_data.unique_code = values.unique_code;
+			barcode_data.country = values.country;
 
 			// Close dialog and proceed with printing
 			dialog.hide();
@@ -448,7 +458,7 @@ function create_print_html(item_data, barcode_data) {
 						${image_html}
 					</div>
 
-					<div class="footer" style="font-size:17px">Made in India</div>
+					<div class="footer" style="font-size:17px">Made in ${barcode_data.country || 'India'}</div>
 				</div>
 			</div>
 		</body>
