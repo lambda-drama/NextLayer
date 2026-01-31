@@ -44,14 +44,15 @@
   "section_break_hotel",
   "hotel_checkin_date",
   "hotel_checkout_date",
+  "hotel_days",
   "custom_hotel_name",
-  "column_break_hotel1",
   "hotel_territory",
+  "column_break_hotel1",
   "hotel_location",
-  "hotel_city",
-  "column_break_hotel2",
   "hotel_country",
+  "hotel_city",
   "rate_per_day",
+  "column_break_hotel2",
   "total_nights",
   "purpose",
   "section_break_visa_details_erp",
@@ -294,6 +295,13 @@
    "fieldname": "hotel_checkout_date",
    "fieldtype": "Date",
    "label": "Check-out Date"
+  },
+  {
+   "depends_on": "eval:[\"Hotel\", \"All\"].includes(doc.expense_category)",
+   "fieldname": "hotel_days",
+   "fieldtype": "Int",
+   "label": "Days",
+   "read_only": 1
   },
   {
    "fieldname": "custom_hotel_name",
@@ -696,7 +704,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-01-31 13:27:31.618611",
+ "modified": "2026-01-31 14:56:19.333184",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",

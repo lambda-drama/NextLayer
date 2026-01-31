@@ -335,7 +335,7 @@ frappe.ui.form.on("Travel Expense", {
 					});
 				}
 				if (row.expense_type === "Hotel") {
-					let hotel_fields = ["hotel_checkin_date", "hotel_checkout_date", "custom_hotel_name", "hotel_territory", "hotel_location", "hotel_city", "hotel_country", "rate_per_day", "purpose"];
+					let hotel_fields = ["hotel_checkin_date", "hotel_checkout_date", "hotel_days", "custom_hotel_name", "hotel_territory", "hotel_location", "hotel_city", "hotel_country", "rate_per_day", "purpose"];
 					hotel_fields.forEach(function(f) {
 						let v = frm.doc[f];
 						if (v !== undefined && v !== null && v !== "" && (!row[f] || row[f] === "")) {
@@ -363,7 +363,27 @@ frappe.ui.form.on("Travel Expense", {
 	refresh: function(frm) {
 		// Calculate totals on refresh
 		calculate_totals(frm);
-		
+		// Set hotel_days (Days) from checkin/checkout when Hotel section has dates
+		if (frm.doc.expense_category === "Hotel" && frm.doc.hotel_checkin_date && frm.doc.hotel_checkout_date) {
+			let checkin = new Date(frm.doc.hotel_checkin_date);
+			let checkout = new Date(frm.doc.hotel_checkout_date);
+			if (checkout >= checkin) {
+				let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+				frm.set_value("hotel_days", days);
+				frm.refresh_field("hotel_days");
+			}
+		}
+		// Accounting Details: collapsible but start collapsed (Frappe keeps it open when it has mandatory fields)
+		if (frm.layout && frm.layout.sections && !frm._accounting_section_collapsed_set) {
+			for (let i = 0; i < frm.layout.sections.length; i++) {
+				let section = frm.layout.sections[i];
+				if (section.df && section.df.fieldname === "section_break_accounting") {
+					section.collapse(true);
+					frm._accounting_section_collapsed_set = true;
+					break;
+				}
+			}
+		}
 		// Add event listeners to expenses child table
 		if (frm.fields_dict.expenses && frm.fields_dict.expenses.grid) {
 			frm.fields_dict.expenses.grid.wrapper.on('change', function() {
@@ -453,6 +473,30 @@ frappe.ui.form.on("Travel Expense", {
 
 // Handle flight lookup from child table (Travel Expense Detail)
 frappe.ui.form.on("Travel Expense Detail", {
+	hotel_checkin_date: function(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		if (!row || !row.expense_type || !row.expense_type.toLowerCase().includes("hotel")) return;
+		if (row.hotel_checkin_date && row.hotel_checkout_date) {
+			let checkin = new Date(row.hotel_checkin_date);
+			let checkout = new Date(row.hotel_checkout_date);
+			if (checkout >= checkin) {
+				let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+				frappe.model.set_value(cdt, cdn, "hotel_days", days);
+			}
+		}
+	},
+	hotel_checkout_date: function(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		if (!row || !row.expense_type || !row.expense_type.toLowerCase().includes("hotel")) return;
+		if (row.hotel_checkin_date && row.hotel_checkout_date) {
+			let checkin = new Date(row.hotel_checkin_date);
+			let checkout = new Date(row.hotel_checkout_date);
+			if (checkout >= checkin) {
+				let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+				frappe.model.set_value(cdt, cdn, "hotel_days", days);
+			}
+		}
+	},
 	cost_center: function(frm, cdt, cdn) {
 		// Set company filter for cost_center in child table
 		frm.set_query("cost_center", "expenses", function() {
@@ -1656,13 +1700,15 @@ function compute_hotel_amount_and_push(frm) {
 	let checkin = new Date(frm.doc.hotel_checkin_date);
 	let checkout = new Date(frm.doc.hotel_checkout_date);
 	if (checkout < checkin) return;
-	let total_nights = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+	let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
 	let rate = parseFloat(frm.doc.rate_per_day) || 0;
-	if (rate <= 0) return;
-	let amount = rate * total_nights;
-	frm.set_value("total_nights", total_nights);
-	frm.set_value("travel_amount", amount);
+	frm.set_value("hotel_days", days);
+	frm.set_value("total_nights", days);
+	frm.refresh_field("hotel_days");
 	frm.refresh_field("total_nights");
+	if (rate <= 0) return;
+	let amount = rate * days;
+	frm.set_value("travel_amount", amount);
 	frm.refresh_field("travel_amount");
 	convert_and_update_amount(frm);
 }
