@@ -465,6 +465,23 @@ def get_intercompany_parties(
 
 
 @frappe.whitelist()
+def get_intercompany_reconciliation_settings() -> Dict:
+    """
+    Get Inter Company Reconciliation Settings (single doc) for the Intercompany Ledger Summary UI.
+    Returns allow_offset_match so the frontend can treat offset cases as Match with In-Transit
+    when |party_balance| + |gl_closing| ≈ in_transit_total.
+    """
+    try:
+        if frappe.db.exists("Inter Company Reconciliation Settings", "Inter Company Reconciliation Settings"):
+            doc = frappe.get_single("Inter Company Reconciliation Settings")
+            return {"success": True, "allow_offset_match": bool(doc.get("allow_offset_match"))}
+        return {"success": True, "allow_offset_match": False}
+    except Exception as e:
+        frappe.log_error(f"get_intercompany_reconciliation_settings: {str(e)}")
+        return {"success": False, "allow_offset_match": False, "error": str(e)}
+
+
+@frappe.whitelist()
 def get_gl_closing_amounts(filters: Dict) -> Dict:
 
     try:
