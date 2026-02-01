@@ -278,7 +278,7 @@ export default function InterCompanyLedgerSummary() {
       // Check if the difference equals the intransit total (within tolerance)
       // This takes priority so entries with intransit match are not counted as regular "Match"
       if (Math.abs(absDifference - absIntransitTotal) < tolerance) {
-        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
+        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: false }
       }
     }
 
@@ -295,7 +295,7 @@ export default function InterCompanyLedgerSummary() {
       // difference = |party_balance| - |gl_closing|, so |party_balance| + |gl_closing| = difference + 2*|gl_closing|
       const offsetSum = difference + 2 * Math.abs(glClosing)
       if (Math.abs(offsetSum - absIntransitTotal) <= tolerance) {
-        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
+        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: true }
       }
     }
 
@@ -948,12 +948,17 @@ export default function InterCompanyLedgerSummary() {
                         const showIntransitTotal = status.text === 'Match' ? '-' :
                           (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
+                        // Only when allow offset is ticked AND this row matched via offset rule: show in-transit in Difference column
+                        const showDifference = status.text === 'Match with In-Transit' && status.isOffsetMatch === true && intransitTotal != null
+                          ? intransitTotal
+                          : difference
+
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(showDifference, entry.currency, company)}</TableCell>
                             <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
@@ -1003,12 +1008,17 @@ export default function InterCompanyLedgerSummary() {
                         const showIntransitTotal = status.text === 'Match' ? '-' :
                           (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
+                        // Only when allow offset is ticked AND this row matched via offset rule: show in-transit in Difference column
+                        const showDifference = status.text === 'Match with In-Transit' && status.isOffsetMatch === true && intransitTotal != null
+                          ? intransitTotal
+                          : difference
+
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(showDifference, entry.currency, company)}</TableCell>
                             <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
