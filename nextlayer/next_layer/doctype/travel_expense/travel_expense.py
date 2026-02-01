@@ -66,10 +66,28 @@ class TravelExpense(Document):
 		# Calculate grand total
 		self.grand_total = flt(total) + flt(total_taxes_and_charges)
 		self.grand_total_company_currency = flt(total_company_currency) + flt(total_taxes_and_charges_company_currency)
+
+	def _validate_attachment_if_enforced(self):
+		"""If NextLayer Settings has enforce_attachment_on_travel_expense, ensure at least one attachment exists."""
+		try:
+			settings = frappe.get_single("NextLayer Settings")
+		except Exception:
+			return
+		if not getattr(settings, "enforce_attachment_on_travel_expense", False):
+			return
+		has_attachment = frappe.db.exists(
+			"File",
+			{"attached_to_doctype": "Travel Expense", "attached_to_name": self.name},
+		)
+		if not has_attachment:
+			frappe.throw(
+				_("At least one attachment is required to submit this Travel Expense. Please attach a file and try again.")
+			)
 	
 	def on_submit(self):
 		"""Create Expense Claim and Journal Entry when Travel Expense is submitted"""
-		
+		self._validate_attachment_if_enforced()
+
 		# Create journal entry based on is_paid status
 		if self.is_paid:
 			# When is_paid is ticked, create journal entry with expense and payment entries
