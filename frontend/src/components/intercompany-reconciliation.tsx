@@ -594,9 +594,8 @@ export default function IntercompanyReconciliation() {
           const glEntry = entry.voucher_type === "Journal Entry" ? entry.gl_entry : undefined
           const result = await getMatchStatus(entry.voucher_type, entry.voucher_no, companyA, party, partyType, glEntry)
           if (result.success) {
-            // Use gl_entry as key for Journal Entries to differentiate debit/credit, otherwise use voucher key
-            const key = entry.voucher_type === "Journal Entry" && entry.gl_entry 
-              ? entry.gl_entry 
+            const key = entry.voucher_type === "Journal Entry" && entry.gl_entry
+              ? entry.gl_entry
               : `${entry.voucher_type}-${entry.voucher_no}`
             return { key, result }
           }
@@ -637,20 +636,9 @@ export default function IntercompanyReconciliation() {
           }
           
           if (result.success) {
-            // Use gl_entry as key for Journal Entries to differentiate debit/credit, otherwise use voucher key
-            const key = entry.voucher_type === "Journal Entry" && entry.gl_entry 
-              ? entry.gl_entry 
+            const key = entry.voucher_type === "Journal Entry" && entry.gl_entry
+              ? entry.gl_entry
               : `${entry.voucher_type}-${entry.voucher_no}`
-            
-            // Debug logging for key assignment
-            if (entry.voucher_type === "Journal Entry" && result.status === 'Match') {
-              console.log(`[fetchMatchStatus] Storing Match status with key:`, {
-                key,
-                gl_entry: entry.gl_entry,
-                result
-              })
-            }
-            
             return { key, result }
           }
         } catch (error) {
@@ -846,10 +834,8 @@ export default function IntercompanyReconciliation() {
 
     // First pass: Process Company A entries and find their matches
     const glDataAWithStatus: GLEntry[] = glDataA.map(entryA => {
-      // Check if we have backend status for this entry first
-      // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use voucher key
-      const statusKey = entryA.voucher_type === "Journal Entry" && entryA.gl_entry 
-        ? entryA.gl_entry 
+      const statusKey = entryA.voucher_type === "Journal Entry" && entryA.gl_entry
+        ? entryA.gl_entry
         : `${entryA.voucher_type}-${entryA.voucher_no}`
       const backendStatus = backendMatchStatus[statusKey]
 
@@ -954,10 +940,8 @@ export default function IntercompanyReconciliation() {
     // Second pass: Process Company B entries and find their matches
     console.log("[findMatchingEntries] Processing Company B entries:", glDataB.length)
     const glDataBWithStatus: GLEntry[] = glDataB.map(entryB => {
-      // Check if we have backend status for this entry first
-      // For Journal Entries, use gl_entry as key to differentiate debit/credit, otherwise use voucher key
-      const statusKey = entryB.voucher_type === "Journal Entry" && entryB.gl_entry 
-        ? entryB.gl_entry 
+      const statusKey = entryB.voucher_type === "Journal Entry" && entryB.gl_entry
+        ? entryB.gl_entry
         : `${entryB.voucher_type}-${entryB.voucher_no}`
       const backendStatus = backendMatchStatus[statusKey]
 
@@ -1464,12 +1448,9 @@ export default function IntercompanyReconciliation() {
         return false
       }
 
-      // Determine the status key (use gl_entry for Journal Entries, otherwise use entryKey)
-      const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry 
-        ? entry.gl_entry 
-        : entryKey
-      
-      // Check backend status directly from backendMatchStatus map
+      const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
+        ? entry.gl_entry
+        : `${entry.voucher_type}-${entry.voucher_no}`
       const backendStatusData = backendMatchStatus[statusKey]
       
       // Check both entry.status and backendMatchStatus to ensure we catch all matched entries
@@ -1744,8 +1725,6 @@ export default function IntercompanyReconciliation() {
           : `${entry.voucher_type}-${entry.voucher_no}`
         const backendStatus = backendMatchStatus[statusKey]
         if (backendStatus?.status !== 'Match') return false
-        
-        // Exclude internal matches from totals
         const matchedWith = backendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
         return !isInternalMatch(entry, matchedWith, companyA)
       })
@@ -1755,8 +1734,6 @@ export default function IntercompanyReconciliation() {
           : `${entry.voucher_type}-${entry.voucher_no}`
         const backendStatus = backendMatchStatus[statusKey]
         if (backendStatus?.status !== 'Match') return false
-        
-        // Exclude internal matches from totals
         const matchedWith = backendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
         return !isInternalMatch(entry, matchedWith, companyB)
       })
@@ -2626,16 +2603,13 @@ export default function IntercompanyReconciliation() {
     if (statusFilter !== 'All') {
       const beforeStatusFilter = filtered.length
       filtered = filtered.filter(entry => {
-        // Check entry.status first (set by findMatchingEntries)
         const entryStatus = entry.status
-        
-        // Also check backendMatchStatus directly as a fallback (for Journal Entries especially)
         const statusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
           ? entry.gl_entry
           : `${entry.voucher_type}-${entry.voucher_no}`
         const backendStatusData = backendMatchStatus[statusKey]
-        const backendStatus = backendStatusData?.status || entry.backendMatchData?.status
-        
+        const backendStatus = backendStatusData?.status ?? entry.backendMatchData?.status
+
         // Entry matches filter if either entry.status or backendStatus matches
         const matchesFilter = entryStatus === statusFilter || backendStatus === statusFilter
         
@@ -2644,7 +2618,6 @@ export default function IntercompanyReconciliation() {
           console.log(`[filterEntriesByStatus] Journal Entry ${entry.voucher_no} (gl_entry: ${entry.gl_entry}) filtered out:`, {
             entryStatus,
             backendStatus,
-            statusKey,
             backendStatusData,
             statusFilter
           })
@@ -4195,9 +4168,7 @@ export default function IntercompanyReconciliation() {
                         const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
                         
                         // Check if this is an internal match
-                        const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                          ? entry.gl_entry
-                          : `${entry.voucher_type}-${entry.voucher_no}`
+                        const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                         const entryBackendStatus = backendMatchStatus[entryStatusKey]
                         const entryMatchedWith = entryBackendStatus?.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
                         const entryCompany = companyA // This is Company A side
@@ -4463,9 +4434,7 @@ export default function IntercompanyReconciliation() {
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                                   const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                   if (entryBackendStatus?.status === 'Match') {
                                     const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
@@ -4486,9 +4455,7 @@ export default function IntercompanyReconciliation() {
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                                   const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                   if (entryBackendStatus?.status === 'Match') {
                                     const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
@@ -4509,9 +4476,7 @@ export default function IntercompanyReconciliation() {
                               (() => {
                                 // IR Balance total = last transaction's IR Balance (running balance at bottom)
                                 const filtered = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).filter(entry => {
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                                   const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                   if (entryBackendStatus?.status === 'Match') {
                                     const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
@@ -4537,10 +4502,8 @@ export default function IntercompanyReconciliation() {
                                 (() => {
                                   // Balance total = last transaction's balance (running balance at bottom), not sum of column
                                   const filtered = filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).filter(entry => {
-                                    const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                      ? entry.gl_entry
-                                      : `${entry.voucher_type}-${entry.voucher_no}`
-                                    const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                    const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                     if (entryBackendStatus?.status === 'Match') {
                                       const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
                                       if (isInternalMatch(entry, entryMatchedWith, companyA)) return false
@@ -4665,9 +4628,7 @@ export default function IntercompanyReconciliation() {
                         const isMatchButAmountsDontMatch = entry.status === 'Match' && !amountsMatch && matchedEntry !== null
                         
                         // Check if this is an internal match
-                        const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                          ? entry.gl_entry
-                          : `${entry.voucher_type}-${entry.voucher_no}`
+                        const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                         const entryBackendStatus = backendMatchStatus[entryStatusKey]
                         const entryMatchedWith = entryBackendStatus?.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
                         const entryCompany = companyB // This is Company B side
@@ -4933,9 +4894,7 @@ export default function IntercompanyReconciliation() {
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                                   const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                   if (entryBackendStatus?.status === 'Match') {
                                     const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
@@ -4956,9 +4915,7 @@ export default function IntercompanyReconciliation() {
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                                   const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                   if (entryBackendStatus?.status === 'Match') {
                                     const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
@@ -4979,9 +4936,7 @@ export default function IntercompanyReconciliation() {
                               (() => {
                                 // IR Balance total = last transaction's IR Balance (running balance at bottom)
                                 const filtered = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).filter(entry => {
-                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                    ? entry.gl_entry
-                                    : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
                                   const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                   if (entryBackendStatus?.status === 'Match') {
                                     const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
@@ -5007,10 +4962,8 @@ export default function IntercompanyReconciliation() {
                                 (() => {
                                   // Balance total = last transaction's balance (running balance at bottom), not sum of column
                                   const filtered = filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).filter(entry => {
-                                    const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry
-                                      ? entry.gl_entry
-                                      : `${entry.voucher_type}-${entry.voucher_no}`
-                                    const entryBackendStatus = backendMatchStatus[entryStatusKey]
+                                    const entryStatusKey = entry.voucher_type === "Journal Entry" && entry.gl_entry ? entry.gl_entry : `${entry.voucher_type}-${entry.voucher_no}`
+                                  const entryBackendStatus = backendMatchStatus[entryStatusKey]
                                     if (entryBackendStatus?.status === 'Match') {
                                       const entryMatchedWith = entryBackendStatus.matched_with_parsed || entry.backendMatchData?.matched_with_parsed
                                       if (isInternalMatch(entry, entryMatchedWith, companyB)) return false

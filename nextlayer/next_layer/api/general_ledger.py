@@ -958,10 +958,6 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 				# Look for child table entry matching the party and gl_entry
 				child_table = doc.get("custom_intercompany_match_details", [])
 				matching_child_row = None
-				print(f"[get_match_status] Journal Entry {voucher_no}: Looking for party={party}, party_type={party_type}, gl_entry={gl_entry}")
-				print(f"[get_match_status] Found {len(child_table)} child table rows")
-				if gl_entry:
-					print(f"[get_match_status] Searching for gl_entry: {gl_entry}")
 
 				for row in child_table:
 					# Match by party and party_type first
@@ -970,14 +966,11 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 					if not party_match:
 						continue
 
-					print(f"[get_match_status] Found matching party row: party={row.party}, party_type={row.party_type}, gl_entry={row.gl_entry}, status={row.intercompany_match_status}")
-
 					# If gl_entry is provided, try to match by gl_entry
 					if gl_entry:
 						# First try exact match with gl_entry
 						if row.gl_entry == gl_entry:
 							matching_child_row = row
-							print(f"[get_match_status] Exact gl_entry match found: {gl_entry}")
 							break
 						# If no gl_entry in row (backward compatibility - old matches),
 						# and this is the only row for this party, use it
@@ -992,24 +985,44 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 							if not has_other_rows_with_gl_entry:
 								# This is the only row for this party, use it (backward compatibility)
 								matching_child_row = row
-								print(f"[get_match_status] Using row without gl_entry (backward compatibility): party={party}, party_type={party_type}")
 								# Update the row to include gl_entry for future queries
 								if not matching_child_row.gl_entry:
 									matching_child_row.gl_entry = gl_entry
 									try:
 										doc.save(ignore_permissions=True)
 										frappe.db.commit()
-										print(f"[get_match_status] Updated row with gl_entry: {gl_entry}")
 									except:
 										pass  # Don't fail if update doesn't work
 								break
-						else:
-							print(f"[get_match_status] gl_entry mismatch: row.gl_entry={row.gl_entry}, requested={gl_entry}")
 					else:
 						# If gl_entry is not provided, only match rows without gl_entry (backward compatibility)
 						if not row.gl_entry:
 							matching_child_row = row
 							break
+
+				# Fallback when gl_entry not provided: if exactly one child row for this (party, party_type), use it
+				# so the frontend still gets Match when it doesn't send gl_entry (e.g. missing in API response)
+				if not matching_child_row and not gl_entry:
+					rows_for_party = [
+						r for r in child_table
+						if r.party == party and r.party_type == party_type
+					]
+					if len(rows_for_party) == 1:
+						matching_child_row = rows_for_party[0]
+
+				# Fallback when gl_entry was provided but no row matched that gl_entry: if any child row for
+				# this (party, party_type) has status Match, use it so all GL rows of the same JE show Match
+				if not matching_child_row and gl_entry:
+					rows_for_party = [
+						r for r in child_table
+						if r.party == party and r.party_type == party_type
+					]
+					matched_row = next(
+						(r for r in rows_for_party if r.get("intercompany_match_status") == "Match"),
+						None,
+					)
+					if matched_row:
+						matching_child_row = matched_row
 
 				if matching_child_row:
 					# Found a child table entry for this party
@@ -1030,9 +1043,6 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 					# - These should be DIFFERENT for intercompany reconciliation!
 					# - If they were the same, it wouldn't be an intercompany match
 					status = matching_child_row.get("intercompany_match_status", "Pending")
-
-					print(f"[get_match_status] Journal Entry {voucher_no} party={party} party_type={party_type} gl_entry={gl_entry}: Found matching row with status={status}, row.gl_entry={matching_child_row.get('gl_entry')}")
-
 					return {
 						"success": True,
 						"status": status,
@@ -1044,8 +1054,6 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 					}
 				else:
 					# No child table entry for this party/gl_entry combination
-					print(f"[get_match_status] Journal Entry {voucher_no}: No matching child table row found for party={party}, party_type={party_type}, gl_entry={gl_entry}")
-					print(f"[get_match_status] Available rows: {[(r.party, r.party_type, r.gl_entry, r.intercompany_match_status) for r in child_table]}")
 					return {
 						"success": True,
 						"status": "Mismatch",
