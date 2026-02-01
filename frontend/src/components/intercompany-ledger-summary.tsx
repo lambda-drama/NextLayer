@@ -1,9 +1,10 @@
 "use client"
 
-import  { useState, useMemo } from "react"
+import  { useState, useMemo, useEffect } from "react"
 import { Button } from "../../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "../../components/ui/alert"
 import { ArrowLeftRight, RefreshCw, ArrowLeft, CheckCircle, XCircle, BarChart3, Users, Building2 } from "lucide-react"
@@ -55,9 +56,26 @@ export default function InterCompanyLedgerSummary() {
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(true)
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
   const [statusFilter, setStatusFilter] = useState<string>("All")
+  const [allowOffsetMatch, setAllowOffsetMatch] = useState<boolean>(false)
 
   // Data state
   const [error, setError] = useState<string>("")
+
+  // Fetch Inter Company Reconciliation Settings (allow_offset_match) on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/method/nextlayer.next_layer.api.ledger_summary.get_intercompany_reconciliation_settings')
+        const result = await response.json()
+        if (result?.message?.allow_offset_match !== undefined) {
+          setAllowOffsetMatch(Boolean(result.message.allow_offset_match))
+        }
+      } catch {
+        setAllowOffsetMatch(false)
+      }
+    }
+    fetchSettings()
+  }, [])
 
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
@@ -270,6 +288,17 @@ export default function InterCompanyLedgerSummary() {
       return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
     }
 
+    // Allow offset match (Inter Company Reconciliation Settings): when unmatched, check if
+    // |party_balance| + |gl_closing| ≈ in_transit_total (e.g. Pacific case: opposite signs, in-transit explains the sum)
+    if (allowOffsetMatch && intransitTotal !== undefined && intransitTotal !== null) {
+      const absIntransitTotal = Math.abs(intransitTotal)
+      // difference = |party_balance| - |gl_closing|, so |party_balance| + |gl_closing| = difference + 2*|gl_closing|
+      const offsetSum = difference + 2 * Math.abs(glClosing)
+      if (Math.abs(offsetSum - absIntransitTotal) <= tolerance) {
+        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
+      }
+    }
+
     // Otherwise it's unmatched
     return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
   }
@@ -425,18 +454,27 @@ export default function InterCompanyLedgerSummary() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 w-full">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Company</label>
-                <Select value={company} onValueChange={setCompany}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                    <SelectValue placeholder="Select Company" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-blue-200">
-                    {(allCompanies?.length ? allCompanies : companies).map((companyItem) => (
-                      <SelectItem key={companyItem.name} value={companyItem.name}>
-                        {companyItem.company_name ?? companyItem.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={[
+                    ...(allCompanies?.length ? allCompanies : companies).map((companyItem) => ({
+                      name: ("company_name" in companyItem ? companyItem.company_name : companyItem.name) ?? companyItem.name,
+                      value: companyItem.name,
+                    })),
+                    ...(company && !(allCompanies?.length ? allCompanies : companies).some((c) => c.name === company)
+                      ? [{ name: company, value: company }]
+                      : []),
+                  ]}
+                  value={company}
+                  onValueChange={setCompany}
+                  placeholder={
+                    allCompaniesLoading ? "Loading..." :
+                    (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
+                    "Select Company"
+                  }
+                  disabled={allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
+                  searchPlaceholder="Search companies..."
+                  emptyMessage="No companies found."
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">From Date</label>
