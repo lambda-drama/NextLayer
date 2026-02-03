@@ -6,7 +6,10 @@
  "engine": "InnoDB",
  "field_order": [
   "travel_expanse_section",
-  "enforce_attachment_on_travel_expense"
+  "enforce_attachment_on_travel_expense",
+  "section_break_qaxx",
+  "travel_expense_accounts",
+  "apply_this_account_restriction_on_journal"
  ],
  "fields": [
   {
@@ -19,13 +22,29 @@
    "fieldname": "travel_expanse_section",
    "fieldtype": "Section Break",
    "label": "Travel Expanse"
+  },
+  {
+   "fieldname": "travel_expense_accounts",
+   "fieldtype": "Table",
+   "label": "Travel Expense Accounts",
+   "options": "Account Travel Expense"
+  },
+  {
+   "fieldname": "section_break_qaxx",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "apply_this_account_restriction_on_journal",
+   "fieldtype": "Check",
+   "label": "Apply This Accounts Restriction on Journal"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-02 01:11:07.112179",
+ "modified": "2026-02-04 02:24:44.472898",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "NextLayer Settings",

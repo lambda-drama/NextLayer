@@ -196,6 +196,7 @@ doctype_js = {
 	"Purchase Invoice":"public/js/purchase_invoice.js",
 	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
+	"Journal Entry":"public/js/journal_entry.js",
 }
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
