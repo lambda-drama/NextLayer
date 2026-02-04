@@ -17,6 +17,13 @@ frappe.query_reports["Travel Expenditure"] = {
 			options: "Company Group",
 		},
 		{
+			fieldname: "currency",
+			label: __("Currency"),
+			fieldtype: "Link",
+			options: "Currency",
+			default: "USD",
+		},
+		{
 			fieldname: "from_date",
 			label: __("From Date"),
 			fieldtype: "Date",
@@ -52,7 +59,51 @@ frappe.query_reports["Travel Expenditure"] = {
 			fieldname: "group_by",
 			label: __("Group By"),
 			fieldtype: "Select",
-			options: ["", "Traveller Name", "Hotel"],
+			options: ["", "Traveller Name", "Expense Type", "Travel Group"],
+			on_change: function () {
+				// Enable tree/expandable rows when Group By is set (like P&L)
+				var report = frappe.query_report;
+				var group_by = report.get_filter_value("group_by");
+				if (group_by) {
+					report.report_settings.tree = true;
+					report.report_settings.name_field = "account";
+					report.report_settings.parent_field = "parent_account";
+					report.report_settings.initial_depth = 0;
+				} else {
+					report.report_settings.tree = false;
+					report.report_settings.name_field = null;
+					report.report_settings.parent_field = null;
+					report.report_settings.initial_depth = null;
+				}
+				report.refresh();
+			},
+		},
+		{
+			fieldname: "travel_group_breakdown_by",
+			label: __("Breakdown By"),
+			fieldtype: "Select",
+			options: ["Traveller Name", "Expense Type"],
+			default: "Traveller Name",
+			depends_on: "eval:doc.group_by == 'Travel Group'",
+			description: __("When Group By is Travel Group: show traveller distribution or expense type distribution when expanded"),
+		},
+		{
+			fieldname: "show_fully_cancelled_expenses",
+			label: __("Show Fully Cancelled Expenses"),
+			fieldtype: "Check",
+			description: __("Include travel expenses that have been fully cancelled (reverse journal created)"),
 		},
 	],
+	onload: function (report) {
+		// Set tree config on initial load based on group_by
+		var group_by = report.get_filter_value("group_by");
+		if (group_by) {
+			report.report_settings.tree = true;
+			report.report_settings.name_field = "account";
+			report.report_settings.parent_field = "parent_account";
+			report.report_settings.initial_depth = 0;
+		} else {
+			report.report_settings.tree = false;
+		}
+	},
 };

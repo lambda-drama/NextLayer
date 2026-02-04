@@ -58,11 +58,11 @@ def get_columns(filters):
 			"width": 100,
 		},
 		{
-			"label": "Amount (USD)",
-			"fieldname": "amount_usd",
+			"label": _("Amount ({0})").format(filters.get("currency") or "USD"),
+			"fieldname": "amount_converted",
 			"fieldtype": "Currency",
 			"width": 100,
-			"options": "USD",
+			"options": filters.get("currency") or "USD",
 		},
 		{
 			"label": "Company Group",
@@ -133,10 +133,14 @@ def get_columns(filters):
 		},
 	]
 
-	if filters.get("group_by") == "Traveller Name":
-		return [columns[2], columns[5], columns[6]]
-	if filters.get("group_by") == "Hotel":
-		return [columns[3], columns[5], columns[6]]  # Expense Type, Amount, Amount (USD)
+	if filters.get("group_by") in ("Traveller Name", "Expense Type", "Travel Group"):
+		# Tree columns: account_name (expandable), amount, amount_converted
+		currency = filters.get("currency") or "USD"
+		return [
+			{"label": _("Name"), "fieldname": "account_name", "fieldtype": "Data", "width": 250},
+			columns[5],  # Amount
+			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 100, "options": currency},
+		]
 	return columns
 
 
@@ -155,21 +159,40 @@ def get_data(filters):
 			"Company", filters.get("company"), "default_currency"
 		) or "USD"
 
+	presentation_currency = filters.get("currency") or "USD"
+	te_more_info_applied = set()  # Apply more_info net only once per TE (avoid over-counting)
 	for row in rows:
 		te_name = row.get("travel_expense")
 		more_list = more_info_map.get(te_name, [])
-		additional_total = sum(m["amount"] for m in more_list)
-		row["amount"] = (row.get("amount") or 0) + additional_total
+		# Additional = add to total; Refund = subtract (money returned)
+		more_info_net = 0
+		if te_name not in te_more_info_applied and more_list:
+			te_more_info_applied.add(te_name)
+			for m in more_list:
+				amt = m.get("amount") or 0
+				if (m.get("entry_type") or "").strip() == "Refund":
+					more_info_net -= amt
+				else:
+					more_info_net += amt
+		# Refund docs (separate TE with refund=1): amount represents money returned, show as negative
+		base_amount = row.get("amount") or 0
+		if row.get("is_refund"):
+			base_amount = -abs(base_amount)
+		row["amount"] = base_amount + more_info_net
 		row["additional_info"] = ", ".join(m.get("entry_type", "") + " " + (m.get("journal_entry") or "") for m in more_list) if more_list else None
 		row["currency"] = company_currency or row.get("currency")
-		row["amount_usd"] = convert_currency(
-			row["amount"], row["currency"] or company_currency, "USD", row.get("booking_date")
+		row["amount_converted"] = convert_currency(
+			row["amount"], row["currency"] or company_currency, presentation_currency, row.get("booking_date")
 		)
 
-	if filters.get("group_by") == "Traveller Name":
-		rows = group_by_traveller_name(rows)
-	elif filters.get("group_by") == "Hotel":
-		rows = group_by_expense_type(rows)
+	group_by = filters.get("group_by")
+	if group_by == "Traveller Name":
+		rows = group_by_traveller_name_tree(rows)
+	elif group_by == "Expense Type":
+		rows = group_by_expense_type_tree(rows)
+	elif group_by == "Travel Group":
+		breakdown_by = filters.get("travel_group_breakdown_by") or "Traveller Name"
+		rows = group_by_travel_group_tree(rows, breakdown_by)
 
 	return rows
 
@@ -186,9 +209,11 @@ def fetch_travel_expense_rows(filters):
 			TE.name.as_("travel_expense"),
 			TED.expense_date.as_("booking_date"),
 			TE.company.as_("company"),
+			TE.travel_group.as_("travel_group"),
 			TE.traveler_name.as_("traveller_name"),
 			TED.expense_type.as_("expense_type"),
 			TED.amount.as_("amount"),
+			TE.refund.as_("is_refund"),
 			TE.company_group.as_("company_group"),
 			TED.custom_airlines.as_("airline"),
 			TED.custom_date_of_travel.as_("departure_date"),
@@ -202,8 +227,10 @@ def fetch_travel_expense_rows(filters):
 		)
 	)
 
-	# Exclude addition-only docs if we ever have is_addition on Travel Expense
-	query = query.where((TE.is_addition == 0) | (TE.is_addition.isnull()))
+	# Include all TEs (additions are in more_information child table on the original)
+	# Exclude fully cancelled expenses unless user opts in
+	if not filters.get("show_fully_cancelled_expenses"):
+		query = query.where((TE.is_cancelled == 0) | (TE.is_cancelled.isnull()))
 
 	if filters.get("company"):
 		query = query.where(TE.company == filters["company"])
@@ -246,33 +273,137 @@ def fetch_more_information_totals():
 	return dict(by_parent)
 
 
-def group_by_traveller_name(rows):
-	travellers_map = defaultdict(
-		lambda: {"traveller_name": "", "amount": 0.0, "amount_usd": 0.0, "currency": ""}
-	)
+def group_by_traveller_name_tree(rows):
+	"""
+	Tree structure: parent = traveller (total), children = expense type breakdown.
+	Like P&L: click traveller to expand and see Travel, Hotel, Visa, etc. amounts.
+	"""
+	# Aggregate: traveller -> { total, currency, children: { expense_type -> amount, amount_converted } }
+	travellers = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
 	for row in rows:
-		key = row.get("traveller_name") or ""
-		travellers_map[key]["traveller_name"] = row.get("traveller_name")
-		travellers_map[key]["amount"] += row.get("amount") or 0
-		travellers_map[key]["amount_usd"] += row.get("amount_usd") or 0
-		if not travellers_map[key]["currency"]:
-			travellers_map[key]["currency"] = row.get("currency")
-	return list(travellers_map.values())
+		trav = row.get("traveller_name") or _("Unspecified")
+		exp_type = row.get("expense_type") or _("Unspecified")
+		travellers[trav]["amount"] += row.get("amount") or 0
+		travellers[trav]["amount_converted"] += row.get("amount_converted") or 0
+		if not travellers[trav]["currency"]:
+			travellers[trav]["currency"] = row.get("currency") or ""
+		travellers[trav]["children"][exp_type]["amount"] += row.get("amount") or 0
+		travellers[trav]["children"][exp_type]["amount_converted"] += row.get("amount_converted") or 0
+
+	result = []
+	for trav in sorted(travellers.keys()):
+		t = travellers[trav]
+		# Parent row
+		result.append({
+			"account": trav,
+			"parent_account": "",
+			"account_name": trav,
+			"indent": 0,
+			"amount": t["amount"],
+			"amount_converted": t["amount_converted"],
+			"currency": t["currency"],
+		})
+		# Child rows
+		for exp_type in sorted(t["children"].keys()):
+			c = t["children"][exp_type]
+			result.append({
+				"account": f"{trav}|{exp_type}",
+				"parent_account": trav,
+				"account_name": exp_type,
+				"indent": 1,
+				"amount": c["amount"],
+				"amount_converted": c["amount_converted"],
+				"currency": t["currency"],
+			})
+	return result
 
 
-def group_by_expense_type(rows):
-	"""Group by expense type (Travel, Hotel, Visa, etc.); shows Expense Type, Amount, Amount (USD)."""
-	by_type = defaultdict(
-		lambda: {"expense_type": "", "amount": 0.0, "amount_usd": 0.0, "currency": ""}
-	)
+def group_by_expense_type_tree(rows):
+	"""
+	Tree structure: parent = expense type (total), children = traveller breakdown.
+	Like P&L: click expense type to expand and see per-traveller amounts.
+	"""
+	by_type = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
 	for row in rows:
-		key = row.get("expense_type") or ""
-		by_type[key]["expense_type"] = row.get("expense_type")
-		by_type[key]["amount"] += row.get("amount") or 0
-		by_type[key]["amount_usd"] += row.get("amount_usd") or 0
-		if not by_type[key]["currency"]:
-			by_type[key]["currency"] = row.get("currency")
-	return list(by_type.values())
+		exp_type = row.get("expense_type") or _("Unspecified")
+		trav = row.get("traveller_name") or _("Unspecified")
+		by_type[exp_type]["amount"] += row.get("amount") or 0
+		by_type[exp_type]["amount_converted"] += row.get("amount_converted") or 0
+		if not by_type[exp_type]["currency"]:
+			by_type[exp_type]["currency"] = row.get("currency") or ""
+		by_type[exp_type]["children"][trav]["amount"] += row.get("amount") or 0
+		by_type[exp_type]["children"][trav]["amount_converted"] += row.get("amount_converted") or 0
+
+	result = []
+	for exp_type in sorted(by_type.keys()):
+		t = by_type[exp_type]
+		result.append({
+			"account": exp_type,
+			"parent_account": "",
+			"account_name": exp_type,
+			"indent": 0,
+			"amount": t["amount"],
+			"amount_converted": t["amount_converted"],
+			"currency": t["currency"],
+		})
+		for trav in sorted(t["children"].keys()):
+			c = t["children"][trav]
+			result.append({
+				"account": f"{exp_type}|{trav}",
+				"parent_account": exp_type,
+				"account_name": trav,
+				"indent": 1,
+				"amount": c["amount"],
+				"amount_converted": c["amount_converted"],
+				"currency": t["currency"],
+			})
+	return result
+
+
+def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
+	"""
+	Tree structure: parent = travel group (total), children = breakdown by traveller or expense type.
+	When breakdown_by = "Traveller Name": expand to see per-traveller amounts.
+	When breakdown_by = "Expense Type": expand to see per-expense-type amounts (Travel, Hotel, Visa, etc.).
+	"""
+	by_group = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
+	for row in rows:
+		tg = row.get("travel_group") or _("Unspecified")
+		if breakdown_by == "Traveller Name":
+			child_key = row.get("traveller_name") or _("Unspecified")
+		else:
+			child_key = row.get("expense_type") or _("Unspecified")
+		by_group[tg]["amount"] += row.get("amount") or 0
+		by_group[tg]["amount_converted"] += row.get("amount_converted") or 0
+		if not by_group[tg]["currency"]:
+			by_group[tg]["currency"] = row.get("currency") or ""
+		by_group[tg]["children"][child_key]["amount"] += row.get("amount") or 0
+		by_group[tg]["children"][child_key]["amount_converted"] += row.get("amount_converted") or 0
+
+	result = []
+	for tg in sorted(by_group.keys()):
+		t = by_group[tg]
+		result.append({
+			"account": tg,
+			"parent_account": "",
+			"account_name": tg,
+			"indent": 0,
+			"amount": t["amount"],
+			"amount_converted": t["amount_converted"],
+			"currency": t["currency"],
+		})
+		for child_key in sorted(t["children"].keys()):
+			c = t["children"][child_key]
+			result.append({
+				"account": f"{tg}|{child_key}",
+				"parent_account": tg,
+				"account_name": child_key,
+				"indent": 1,
+				"amount": c["amount"],
+				"amount_converted": c["amount_converted"],
+				"currency": t["currency"],
+			})
+	return result
 
 
 def convert_currency(amount, from_currency, to_currency, date):
