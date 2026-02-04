@@ -5,7 +5,7 @@
 function apply_account_restriction_if_company_set(frm) {
 	if (!frm.doc.company) return;
 	frappe.call({
-		method: "nextlayer.next_layer.doctype.nextlayer_settings.nextlayer_settings.get_restricted_accounts_for_journal",
+		method: "nextlayer.next_layer.doctype.travel_expense_settings.travel_expense_settings.get_restricted_accounts_for_journal",
 		callback: function (r) {
 			if (!r.exc && r.message && Array.isArray(r.message)) {
 				frm._restricted_accounts_for_journal = r.message;

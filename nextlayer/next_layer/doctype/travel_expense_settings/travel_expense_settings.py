@@ -5,7 +5,7 @@ import frappe
 from frappe.model.document import Document
 
 
-class NextLayerSettings(Document):
+class TravelExpenseSettings(Document):
 	pass
 
 
@@ -18,9 +18,9 @@ def get_restricted_accounts_for_journal():
 	Returns empty list if setting is off or no accounts configured.
 	"""
 	try:
-		if not frappe.db.exists("NextLayer Settings", "NextLayer Settings"):
+		if not frappe.db.exists("Travel Expense Settings", "Travel Expense Settings"):
 			return []
-		doc = frappe.get_single("NextLayer Settings")
+		doc = frappe.get_single("Travel Expense Settings")
 		if not doc.get("apply_this_account_restriction_on_journal"):
 			return []
 		accounts = []
