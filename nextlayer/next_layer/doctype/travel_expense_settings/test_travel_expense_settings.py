@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestNextLayerSettings(FrappeTestCase):
+class TestTravelExpenseSettings(FrappeTestCase):
 	pass

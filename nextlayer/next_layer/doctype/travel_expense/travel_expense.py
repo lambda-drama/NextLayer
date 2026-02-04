@@ -70,7 +70,7 @@ class TravelExpense(Document):
 	def _validate_attachment_if_enforced(self):
 		"""If NextLayer Settings has enforce_attachment_on_travel_expense, ensure at least one attachment exists."""
 		try:
-			settings = frappe.get_single("NextLayer Settings")
+			settings = frappe.get_single("Travel Expense Settings")
 		except Exception:
 			return
 		if not getattr(settings, "enforce_attachment_on_travel_expense", False):
