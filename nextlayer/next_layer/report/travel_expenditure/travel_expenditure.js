@@ -100,6 +100,17 @@ frappe.query_reports["Travel Expenditure"] = {
 			description: __("Include travel expenses that have been fully cancelled (reverse journal created)"),
 		},
 	],
+	formatter: function (value, row, column, data, default_formatter) {
+		value = default_formatter(value, row, column, data);
+
+		// Highlight custom Total row text in blue
+		if (data && data.name === "Total") {
+			// Only change text color & weight, keep background default
+			return `<span style="color: blue; font-weight: 600;">${value}</span>`;
+		}
+
+		return value;
+	},
 	onload: function (report) {
 		// Set tree config on initial load based on group_by
 		var group_by = report.get_filter_value("group_by");

@@ -58,13 +58,6 @@ def get_columns(filters):
 			"width": 120,
 		},
 		{
-			"label": "Amount",
-			"fieldname": "amount",
-			"fieldtype": "Currency",
-			"options": "currency",
-			"width": 100,
-		},
-		{
 			"label": _("Amount ({0})").format(filters.get("currency") or "USD"),
 			"fieldname": "amount_converted",
 			"fieldtype": "Currency",
@@ -142,28 +135,25 @@ def get_columns(filters):
 
 	group_by = filters.get("group_by")
 	currency = filters.get("currency") or "USD"
-	
+
 	if group_by == "Traveller Name":
 		return [
 			{"label": _("Traveller / Expense Type"), "fieldname": "name", "fieldtype": "Data", "width": 250},
-			{"label": _("Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 100},
 			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 110, "options": currency},
 		]
-	
+
 	if group_by == "Expense Type":
 		return [
 			{"label": _("Expense Type / Traveller"), "fieldname": "name", "fieldtype": "Data", "width": 250},
-			{"label": _("Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 100},
 			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 100, "options": currency},
 		]
-	
+
 	if group_by == "Travel Group":
 		return [
 			{"label": _("Travel Group / Details"), "fieldname": "name", "fieldtype": "Data", "width": 250},
-			{"label": _("Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 100},
 			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 100, "options": currency},
 		]
-	
+
 	return columns
 
 
@@ -217,6 +207,28 @@ def get_data(filters):
 		breakdown_by = filters.get("travel_group_breakdown_by") or "Traveller Name"
 		rows = group_by_travel_group_tree(rows, breakdown_by)
 
+	# Add custom total row at bottom (in presentation currency)
+	total = 0
+	if group_by:
+		# In tree views, sum only top-level nodes to avoid double-counting children
+		for r in rows:
+			if (r.get("indent") or 0) == 0:
+				total += r.get("amount_converted") or 0
+	else:
+		for r in rows:
+			total += r.get("amount_converted") or 0
+
+	if rows:
+		total_row = {
+			"name": _("Total"),
+			"account": _("Total"),
+			"account_name": _("Total"),
+			"travel_expense": _("Total"),
+			"amount_converted": total,
+			"bold": 1,
+		}
+		rows.append(total_row)
+
 	return rows
 
 
@@ -251,8 +263,12 @@ def fetch_travel_expense_rows(filters):
 	)
 
 	# Include all TEs (additions are in more_information child table on the original)
-	# Exclude fully cancelled expenses unless user opts in
-	if not filters.get("show_fully_cancelled_expenses"):
+	# Cancellation behaviour:
+	# - By default: show only NOT cancelled (is_cancelled = 0 or null)
+	# - If "Show Fully Cancelled Expenses" is ticked: show ONLY fully cancelled (is_cancelled = 1)
+	if filters.get("show_fully_cancelled_expenses"):
+		query = query.where(TE.is_cancelled == 1)
+	else:
 		query = query.where((TE.is_cancelled == 0) | (TE.is_cancelled.isnull()))
 
 	# Only include submitted Travel Expenses (exclude Draft and Cancelled docstatus)

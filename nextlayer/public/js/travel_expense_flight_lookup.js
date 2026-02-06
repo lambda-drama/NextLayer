@@ -244,9 +244,12 @@ frappe.ui.form.on("Travel Expense", {
 		
 		// Add "Additional Expenses" and "Cancel Charges" buttons
 		if (!frm.is_new()) {
-			frm.add_custom_button(__("Additional Expenses"), function() {
-				show_additional_expenses_modal(frm);
-			}, __("Actions"));
+			// Only allow Additional Expenses while not cancelled
+			if (!frm.doc.is_cancelled) {
+				frm.add_custom_button(__("Additional Expenses"), function() {
+					show_additional_expenses_modal(frm);
+				}, __("Actions"));
+			}
 			
 			// Only show Cancel Charges if document is submitted and not already cancelled
 			if (frm.doc.docstatus === 1 && !frm.doc.is_cancelled) {
@@ -427,9 +430,12 @@ frappe.ui.form.on("Travel Expense", {
 		
 		// Add "Additional Expenses" and "Cancel Charges" buttons after submit (only show if document is submitted)
 		if (frm.doc.docstatus === 1) {
-			frm.add_custom_button(__("Additional Expenses"), function() {
-				show_additional_expenses_modal(frm);
-			}, __("Create"));
+			// Only allow Additional Expenses while not cancelled
+			if (!frm.doc.is_cancelled) {
+				frm.add_custom_button(__("Additional Expenses"), function() {
+					show_additional_expenses_modal(frm);
+				}, __("Create"));
+			}
 			
 			// Check if Journal Entry exists, and show "Create Journal" button if it doesn't
 			// Use check_journal_entry_exists (read-only) to avoid creating journal on refresh
