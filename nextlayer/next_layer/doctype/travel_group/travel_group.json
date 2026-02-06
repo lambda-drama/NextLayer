@@ -20,8 +20,13 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-01-24 02:17:55.434116",
+ "links": [
+  {
+   "link_doctype": "Travel Expense",
+   "link_fieldname": "travel_group"
+  }
+ ],
+ "modified": "2026-02-06 14:05:04.850727",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Group",

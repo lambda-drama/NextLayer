@@ -37,6 +37,13 @@ def get_columns(filters):
 			"width": 150,
 		},
 		{
+			"label": "Travel Group",
+			"fieldname": "travel_group",
+			"fieldtype": "Link",
+			"options": "Travel Group",
+			"width": 150,
+		},
+		{
 			"label": "Expense Type",
 			"fieldname": "expense_type",
 			"fieldtype": "Link",
@@ -133,14 +140,30 @@ def get_columns(filters):
 		},
 	]
 
-	if filters.get("group_by") in ("Traveller Name", "Expense Type", "Travel Group"):
-		# Tree columns: account_name (expandable), amount, amount_converted
-		currency = filters.get("currency") or "USD"
+	group_by = filters.get("group_by")
+	currency = filters.get("currency") or "USD"
+	
+	if group_by == "Traveller Name":
 		return [
-			{"label": _("Name"), "fieldname": "account_name", "fieldtype": "Data", "width": 250},
-			columns[5],  # Amount
+			{"label": _("Traveller / Expense Type"), "fieldname": "name", "fieldtype": "Data", "width": 250},
+			{"label": _("Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 100},
+			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 110, "options": currency},
+		]
+	
+	if group_by == "Expense Type":
+		return [
+			{"label": _("Expense Type / Traveller"), "fieldname": "name", "fieldtype": "Data", "width": 250},
+			{"label": _("Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 100},
 			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 100, "options": currency},
 		]
+	
+	if group_by == "Travel Group":
+		return [
+			{"label": _("Travel Group / Details"), "fieldname": "name", "fieldtype": "Data", "width": 250},
+			{"label": _("Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 100},
+			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 100, "options": currency},
+		]
+	
 	return columns
 
 
@@ -232,12 +255,17 @@ def fetch_travel_expense_rows(filters):
 	if not filters.get("show_fully_cancelled_expenses"):
 		query = query.where((TE.is_cancelled == 0) | (TE.is_cancelled.isnull()))
 
+	# Only include submitted Travel Expenses (exclude Draft and Cancelled docstatus)
+	query = query.where(TE.docstatus == 1)
+
 	if filters.get("company"):
 		query = query.where(TE.company == filters["company"])
 	if filters.get("company_group"):
 		query = query.where(TE.company_group == filters["company_group"])
 	if filters.get("booked_by"):
 		query = query.where(TED.custom_booked_by == filters["booked_by"])
+	if filters.get("travel_expense"):
+		query = query.where(TE.name == filters["travel_expense"])
 	if filters.get("traveller_name"):
 		query = query.where(TE.traveler_name == filters["traveller_name"])
 	if filters.get("travel_type"):
@@ -276,9 +304,7 @@ def fetch_more_information_totals():
 def group_by_traveller_name_tree(rows):
 	"""
 	Tree structure: parent = traveller (total), children = expense type breakdown.
-	Like P&L: click traveller to expand and see Travel, Hotel, Visa, etc. amounts.
 	"""
-	# Aggregate: traveller -> { total, currency, children: { expense_type -> amount, amount_converted } }
 	travellers = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
 	for row in rows:
 		trav = row.get("traveller_name") or _("Unspecified")
@@ -293,23 +319,23 @@ def group_by_traveller_name_tree(rows):
 	result = []
 	for trav in sorted(travellers.keys()):
 		t = travellers[trav]
-		# Parent row
+		# Parent row - link formatted
+		parent_name = f'<a href="/app/member/{trav}">{trav}</a>' if trav != _("Unspecified") else trav
 		result.append({
-			"account": trav,
+			"name": parent_name,
 			"parent_account": "",
-			"account_name": trav,
 			"indent": 0,
 			"amount": t["amount"],
 			"amount_converted": t["amount_converted"],
 			"currency": t["currency"],
 		})
-		# Child rows
+		# Child rows - link formatted
 		for exp_type in sorted(t["children"].keys()):
 			c = t["children"][exp_type]
+			child_name = f'<a href="/app/expense-claim-type/{exp_type}">{exp_type}</a>' if exp_type != _("Unspecified") else exp_type
 			result.append({
-				"account": f"{trav}|{exp_type}",
-				"parent_account": trav,
-				"account_name": exp_type,
+				"name": child_name,
+				"parent_account": parent_name,
 				"indent": 1,
 				"amount": c["amount"],
 				"amount_converted": c["amount_converted"],
@@ -321,7 +347,6 @@ def group_by_traveller_name_tree(rows):
 def group_by_expense_type_tree(rows):
 	"""
 	Tree structure: parent = expense type (total), children = traveller breakdown.
-	Like P&L: click expense type to expand and see per-traveller amounts.
 	"""
 	by_type = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
 	for row in rows:
@@ -337,21 +362,23 @@ def group_by_expense_type_tree(rows):
 	result = []
 	for exp_type in sorted(by_type.keys()):
 		t = by_type[exp_type]
+		# Parent row - link formatted
+		parent_name = f'<a href="/app/expense-claim-type/{exp_type}">{exp_type}</a>' if exp_type != _("Unspecified") else exp_type
 		result.append({
-			"account": exp_type,
+			"name": parent_name,
 			"parent_account": "",
-			"account_name": exp_type,
 			"indent": 0,
 			"amount": t["amount"],
 			"amount_converted": t["amount_converted"],
 			"currency": t["currency"],
 		})
+		# Child rows - link formatted
 		for trav in sorted(t["children"].keys()):
 			c = t["children"][trav]
+			child_name = f'<a href="/app/member/{trav}">{trav}</a>' if trav != _("Unspecified") else trav
 			result.append({
-				"account": f"{exp_type}|{trav}",
-				"parent_account": exp_type,
-				"account_name": trav,
+				"name": child_name,
+				"parent_account": parent_name,
 				"indent": 1,
 				"amount": c["amount"],
 				"amount_converted": c["amount_converted"],
@@ -363,8 +390,6 @@ def group_by_expense_type_tree(rows):
 def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 	"""
 	Tree structure: parent = travel group (total), children = breakdown by traveller or expense type.
-	When breakdown_by = "Traveller Name": expand to see per-traveller amounts.
-	When breakdown_by = "Expense Type": expand to see per-expense-type amounts (Travel, Hotel, Visa, etc.).
 	"""
 	by_group = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
 	for row in rows:
@@ -383,21 +408,26 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 	result = []
 	for tg in sorted(by_group.keys()):
 		t = by_group[tg]
+		# Parent row - link formatted
+		parent_name = f'<a href="/app/travel-group/{tg}">{tg}</a>' if tg != _("Unspecified") else tg
 		result.append({
-			"account": tg,
+			"name": parent_name,
 			"parent_account": "",
-			"account_name": tg,
 			"indent": 0,
 			"amount": t["amount"],
 			"amount_converted": t["amount_converted"],
 			"currency": t["currency"],
 		})
+		# Child rows - link formatted based on breakdown
 		for child_key in sorted(t["children"].keys()):
 			c = t["children"][child_key]
+			if breakdown_by == "Traveller Name":
+				child_name = f'<a href="/app/member/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
+			else:
+				child_name = f'<a href="/app/expense-claim-type/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
 			result.append({
-				"account": f"{tg}|{child_key}",
-				"parent_account": tg,
-				"account_name": child_key,
+				"name": child_name,
+				"parent_account": parent_name,
 				"indent": 1,
 				"amount": c["amount"],
 				"amount_converted": c["amount_converted"],

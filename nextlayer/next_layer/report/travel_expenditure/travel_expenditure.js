@@ -44,6 +44,12 @@ frappe.query_reports["Travel Expenditure"] = {
 			options: "Member",
 		},
 		{
+			fieldname: "travel_expense",
+			label: __("Travel Expense"),
+			fieldtype: "Link",
+			options: "Travel Expense",
+		},
+		{
 			fieldname: "traveller_name",
 			label: __("Traveller Name"),
 			fieldtype: "Link",
@@ -61,12 +67,12 @@ frappe.query_reports["Travel Expenditure"] = {
 			fieldtype: "Select",
 			options: ["", "Traveller Name", "Expense Type", "Travel Group"],
 			on_change: function () {
-				// Enable tree/expandable rows when Group By is set (like P&L)
+				// Enable tree/expandable rows when Group By is set
 				var report = frappe.query_report;
 				var group_by = report.get_filter_value("group_by");
 				if (group_by) {
 					report.report_settings.tree = true;
-					report.report_settings.name_field = "account";
+					report.report_settings.name_field = "name";
 					report.report_settings.parent_field = "parent_account";
 					report.report_settings.initial_depth = 0;
 				} else {
@@ -99,7 +105,7 @@ frappe.query_reports["Travel Expenditure"] = {
 		var group_by = report.get_filter_value("group_by");
 		if (group_by) {
 			report.report_settings.tree = true;
-			report.report_settings.name_field = "account";
+			report.report_settings.name_field = "name";
 			report.report_settings.parent_field = "parent_account";
 			report.report_settings.initial_depth = 0;
 		} else {
