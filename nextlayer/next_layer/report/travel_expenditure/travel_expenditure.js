@@ -44,6 +44,12 @@ frappe.query_reports["Travel Expenditure"] = {
 			options: "Member",
 		},
 		{
+			fieldname: "travel_expense",
+			label: __("Travel Expense"),
+			fieldtype: "Link",
+			options: "Travel Expense",
+		},
+		{
 			fieldname: "traveller_name",
 			label: __("Traveller Name"),
 			fieldtype: "Link",
@@ -61,12 +67,12 @@ frappe.query_reports["Travel Expenditure"] = {
 			fieldtype: "Select",
 			options: ["", "Traveller Name", "Expense Type", "Travel Group"],
 			on_change: function () {
-				// Enable tree/expandable rows when Group By is set (like P&L)
+				// Enable tree/expandable rows when Group By is set
 				var report = frappe.query_report;
 				var group_by = report.get_filter_value("group_by");
 				if (group_by) {
 					report.report_settings.tree = true;
-					report.report_settings.name_field = "account";
+					report.report_settings.name_field = "name";
 					report.report_settings.parent_field = "parent_account";
 					report.report_settings.initial_depth = 0;
 				} else {
@@ -94,12 +100,23 @@ frappe.query_reports["Travel Expenditure"] = {
 			description: __("Include travel expenses that have been fully cancelled (reverse journal created)"),
 		},
 	],
+	formatter: function (value, row, column, data, default_formatter) {
+		value = default_formatter(value, row, column, data);
+
+		// Highlight custom Total row text in blue
+		if (data && data.name === "Total") {
+			// Only change text color & weight, keep background default
+			return `<span style="color: blue; font-weight: 600;">${value}</span>`;
+		}
+
+		return value;
+	},
 	onload: function (report) {
 		// Set tree config on initial load based on group_by
 		var group_by = report.get_filter_value("group_by");
 		if (group_by) {
 			report.report_settings.tree = true;
-			report.report_settings.name_field = "account";
+			report.report_settings.name_field = "name";
 			report.report_settings.parent_field = "parent_account";
 			report.report_settings.initial_depth = 0;
 		} else {
