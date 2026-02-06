@@ -96,6 +96,24 @@ export default function IntercompanyReconciliation() {
   // Intercompany matching tolerance from settings
   const [matchingTolerance, setMatchingTolerance] = useState<number>(0.01) // Default tolerance
 
+  // Load Intercompany Reconciliation Settings to optionally enable opening entries by default
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/method/nextlayer.next_layer.api.ledger_summary.get_intercompany_reconciliation_settings')
+        const result = await response.json()
+        const enableByDefault = result?.message?.enable_opening_entry_by_default
+        if (enableByDefault) {
+          setShowOpeningEntries(true)
+        }
+      } catch (e) {
+        // If settings cannot be loaded, keep existing default (false)
+        console.error('Failed to load Inter Company Reconciliation Settings', e)
+      }
+    }
+    fetchSettings()
+  }, [])
+
   // Helper function to create a unique key for each GL entry row
   // Uses gl_entry if available, otherwise falls back to voucher+account+debit+credit
   const getEntryKey = (entry: GLEntry): string => {

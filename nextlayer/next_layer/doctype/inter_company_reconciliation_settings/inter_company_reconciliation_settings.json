@@ -7,6 +7,7 @@
  "field_order": [
   "intercompany_reconcillition_details_tab",
   "intercompany_matching_tolerance",
+  "enable_opening_entry_by_default",
   "intercompany_ledger_summary_tab",
   "allow_offset_match"
  ],
@@ -32,13 +33,19 @@
    "fieldname": "allow_offset_match",
    "fieldtype": "Check",
    "label": "Allow Offset Match"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_opening_entry_by_default",
+   "fieldtype": "Check",
+   "label": "Enable Opening Entry By Default"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-02 02:12:50.120606",
+ "modified": "2026-02-06 17:53:22.125855",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Inter Company Reconciliation Settings",
