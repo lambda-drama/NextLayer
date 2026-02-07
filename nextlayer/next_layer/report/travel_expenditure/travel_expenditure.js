@@ -65,7 +65,7 @@ frappe.query_reports["Travel Expenditure"] = {
 			fieldname: "group_by",
 			label: __("Group By"),
 			fieldtype: "Select",
-			options: ["", "Traveller Name", "Expense Type", "Travel Group"],
+			options: ["", "Traveller Name", "Expense Type", "Travel Group", "Company"],
 			on_change: function () {
 				// Enable tree/expandable rows when Group By is set
 				var report = frappe.query_report;
@@ -94,6 +94,15 @@ frappe.query_reports["Travel Expenditure"] = {
 			description: __("When Group By is Travel Group: show traveller distribution or expense type distribution when expanded"),
 		},
 		{
+			fieldname: "company_breakdown_by",
+			label: __("Breakdown By"),
+			fieldtype: "Select",
+			options: ["Travel Group", "Traveller Name", "Expense Type"],
+			default: "Travel Group",
+			depends_on: "eval:doc.group_by == 'Company'",
+			description: __("When Group By is Company: show travel group, traveller, or expense type distribution when expanded"),
+		},
+		{
 			fieldname: "show_fully_cancelled_expenses",
 			label: __("Show Fully Cancelled Expenses"),
 			fieldtype: "Check",
@@ -101,6 +110,10 @@ frappe.query_reports["Travel Expenditure"] = {
 		},
 	],
 	formatter: function (value, row, column, data, default_formatter) {
+		// Render attachment column as HTML (links)
+		if (column.fieldname === "attachment" && value) {
+			return value;
+		}
 		value = default_formatter(value, row, column, data);
 
 		// Highlight custom Total row text in blue

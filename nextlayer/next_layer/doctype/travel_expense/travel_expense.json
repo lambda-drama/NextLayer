@@ -697,14 +697,14 @@
  "links": [
   {
    "link_doctype": "Journal Entry",
-   "link_fieldname": "custom_travel_expense_ref"
+   "link_fieldname": "reference_name"
   },
   {
    "link_doctype": "Travel Expense",
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-01-31 14:56:19.333184",
+ "modified": "2026-02-08 01:52:16.448585",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",

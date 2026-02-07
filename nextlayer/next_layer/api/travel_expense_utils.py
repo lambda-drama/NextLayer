@@ -245,7 +245,8 @@ def create_journal_entries_for_more_information(travel_expense):
 			"debit": expense_base,
 			"cost_center": cost_center,
 			"project": project,
-			"custom_travel_expense_ref": travel_expense.name,
+			"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 		}]
 
 		# Credit side: direct payment (if paid) or payable (if unpaid)
@@ -276,7 +277,8 @@ def create_journal_entries_for_more_information(travel_expense):
 			"credit": pay_base,
 			"cost_center": cost_center,
 			"project": project,
-			"custom_travel_expense_ref": travel_expense.name,
+			"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 		}
 		if not is_paid and pay_account == payable_account and traveler:
 			acc_entry["party_type"] = "Member"
@@ -415,7 +417,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 			"credit": expense_base,
 			"cost_center": cost_center,
 			"project": project,
-			"custom_travel_expense_ref": original_te.name,
+			"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 		})
 
 	# 2. Debit payment / payable for refund_amount
@@ -453,7 +456,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 			"debit": payment_base,
 			"cost_center": original_te.cost_center,
 			"project": original_te.project,
-			"custom_travel_expense_ref": original_te.name,
+			"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 		})
 	else:
 		# Refund reduces payable
@@ -477,7 +481,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 			"debit": payable_base,
 			"cost_center": original_te.cost_center,
 			"project": original_te.project,
-			"custom_travel_expense_ref": original_te.name,
+			"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 		}
 		if traveler:
 			acc["party_type"] = "Member"
@@ -515,7 +520,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 				"debit": expense_base,
 				"cost_center": cost_center,
 				"project": project,
-				"custom_travel_expense_ref": original_te.name,
+				"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 			})
 
 	# Multi‑currency determination (reuse pattern from main JE logic)
@@ -751,7 +757,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"credit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 2. For unpaid expenses: Debit Payable Account - refund amount returned (reduces payable)
@@ -798,7 +805,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"debit": payment_base_amount,
 					"cost_center": travel_expense.cost_center,
 					"project": travel_expense.project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			else:
 				# Original was unpaid - refund reduces payable
@@ -827,7 +835,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"party": traveler if traveler else None,
 					"cost_center": travel_expense.cost_center,
 					"project": travel_expense.project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 3. Debit Expense Account(s) for lost amount (if any)
@@ -874,7 +883,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 						"debit": expense_base_amount,
 						"cost_center": cost_center,
 						"project": project,
-						"custom_travel_expense_ref": travel_expense.name,
+						"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 					})
 		else:
 			# Normal expense (not refund) - original logic
@@ -914,7 +924,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"debit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 2. Credit Payable Account
@@ -947,7 +958,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 				"party": traveler if traveler else None,
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
-				"custom_travel_expense_ref": travel_expense.name,
+				"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 			})
 		
 		# Determine if multi-currency
@@ -1289,7 +1301,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 					"credit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 2. Debit Direct Payment Account - refund amount returned
@@ -1316,7 +1329,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				"debit": payment_base_amount,
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
-				"custom_travel_expense_ref": travel_expense.name,
+				"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 			})
 			
 			# 3. Debit Expense Account(s) for lost amount (if any)
@@ -1363,7 +1377,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 						"debit": expense_base_amount,
 						"cost_center": cost_center,
 						"project": project,
-						"custom_travel_expense_ref": travel_expense.name,
+						"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 					})
 		else:
 			# Normal expense (not refund) - original logic
@@ -1405,7 +1420,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 					"debit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 		
 			# 2. Credit Direct Payment Account
@@ -1518,7 +1534,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				"credit": payment_base_amount,
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
-				"custom_travel_expense_ref": travel_expense.name,
+				"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 			})
 		
 		# Determine if multi-currency
@@ -1645,7 +1662,7 @@ def cancel_travel_expense_charges(travel_expense_name):
 			WHERE EXISTS (
 				SELECT 1 FROM `tabJournal Entry Account`
 				WHERE parent = `tabJournal Entry`.name
-				AND custom_travel_expense_ref = %s
+				AND reference_type = 'Travel Expense' AND reference_name = %s
 			)
 			AND docstatus = 1
 			ORDER BY creation DESC
@@ -1681,7 +1698,8 @@ def cancel_travel_expense_charges(travel_expense_name):
 				"party": account.party,
 				"cost_center": account.cost_center,
 				"project": account.project,
-				"custom_travel_expense_ref": travel_expense_name,
+				"reference_type": "Travel Expense",
+				"reference_name": travel_expense_name,
 			}
 			reverse_accounts.append(reverse_account)
 		
@@ -1749,7 +1767,7 @@ def check_journal_entry_exists(travel_expense_name):
 			WHERE EXISTS (
 				SELECT 1 FROM `tabJournal Entry Account`
 				WHERE parent = `tabJournal Entry`.name
-				AND custom_travel_expense_ref = %s
+				AND reference_type = 'Travel Expense' AND reference_name = %s
 			)
 			ORDER BY creation DESC
 			LIMIT 1
@@ -1839,7 +1857,7 @@ def check_and_create_journal_entry(travel_expense_name):
 			WHERE EXISTS (
 				SELECT 1 FROM `tabJournal Entry Account`
 				WHERE parent = `tabJournal Entry`.name
-				AND custom_travel_expense_ref = %s
+				AND reference_type = 'Travel Expense' AND reference_name = %s
 			)
 			ORDER BY creation DESC
 			LIMIT 1
@@ -1984,7 +2002,8 @@ def _create_single_additional_je_for_row(travel_expense, row):
 		"debit": expense_base,
 		"cost_center": cost_center,
 		"project": project,
-		"custom_travel_expense_ref": travel_expense.name,
+		"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 	}]
 
 	if is_paid and direct_payment_account:
@@ -2001,7 +2020,8 @@ def _create_single_additional_je_for_row(travel_expense, row):
 			pay_amount = amount * get_exchange_rate(company_currency, pay_currency, posting_date, company)
 		except Exception:
 			pass
-	acc_entry = {"account": pay_account, "credit_in_account_currency": pay_amount, "credit": pay_base, "cost_center": cost_center, "project": project, "custom_travel_expense_ref": travel_expense.name}
+	acc_entry = {"account": pay_account, "credit_in_account_currency": pay_amount, "credit": pay_base, "cost_center": cost_center, "project": project, "reference_type": "Travel Expense",
+			"reference_name": travel_expense.name}
 	if not is_paid and pay_account == payable_account and traveler:
 		acc_entry["party_type"] = "Member"
 		acc_entry["party"] = traveler

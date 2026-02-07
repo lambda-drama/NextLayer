@@ -65,6 +65,19 @@ def get_columns(filters):
 			"options": filters.get("currency") or "USD",
 		},
 		{
+			"label": "Amount (Company Currency)",
+			"fieldname": "amount_company_currency",
+			"fieldtype": "Currency",
+			"width": 140,
+			"options": "Company:company:default_currency",
+		},
+		{
+			"label": "Attachment",
+			"fieldname": "attachment",
+			"fieldtype": "Data",
+			"width": 180,
+		},
+		{
 			"label": "Company Group",
 			"fieldname": "company_group",
 			"fieldtype": "Link",
@@ -124,6 +137,43 @@ def get_columns(filters):
 			"width": 150,
 		},
 		{
+			"label": "Check-in Date",
+			"fieldname": "hotel_checkin_date",
+			"fieldtype": "Date",
+			"width": 110,
+		},
+		{
+			"label": "Check-out Date",
+			"fieldname": "hotel_checkout_date",
+			"fieldtype": "Date",
+			"width": 110,
+		},
+		{
+			"label": "Days",
+			"fieldname": "hotel_days",
+			"fieldtype": "Int",
+			"width": 60,
+		},
+		{
+			"label": "Hotel Name",
+			"fieldname": "hotel_name",
+			"fieldtype": "Data",
+			"width": 150,
+		},
+		{
+			"label": "Hotel Location",
+			"fieldname": "hotel_location",
+			"fieldtype": "Link",
+			"options": "Location",
+			"width": 130,
+		},
+		{
+			"label": "Country",
+			"fieldname": "hotel_country",
+			"fieldtype": "Data",
+			"width": 100,
+		},
+		{
 			"label": "Currency",
 			"fieldname": "currency",
 			"fieldtype": "Link",
@@ -135,23 +185,52 @@ def get_columns(filters):
 
 	group_by = filters.get("group_by")
 	currency = filters.get("currency") or "USD"
+	# Company currency: from filter, else user default company, else USD
+	company_for_currency = filters.get("company") or frappe.defaults.get_user_default("Company")
+	company_currency = "USD"
+	if company_for_currency:
+		company_currency = (
+			frappe.get_cached_value("Company", company_for_currency, "default_currency") or "USD"
+		)
 
 	if group_by == "Traveller Name":
 		return [
 			{"label": _("Traveller / Expense Type"), "fieldname": "name", "fieldtype": "Data", "width": 250},
 			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 110, "options": currency},
+			{"label": "Amount (Company Currency)", "fieldname": "amount_company_currency", "fieldtype": "Currency", "width": 150, "options": "Company:company:default_currency"},
+			{"label": "Departure Airport", "fieldname": "departure_airport", "fieldtype": "Data", "width": 140},
+			{"label": "Arrival Airport", "fieldname": "arrival_airport", "fieldtype": "Data", "width": 140},
+			{"label": "Airline", "fieldname": "airline", "fieldtype": "Data", "width": 120},
+			{"label": "Travel Type", "fieldname": "travel_type", "fieldtype": "Data", "width": 100},
+			{"label": "Voucher No", "fieldname": "voucher_no", "fieldtype": "Data", "width": 120},
+			{"label": "Booked By", "fieldname": "booked_by", "fieldtype": "Data", "width": 120},
+			{"label": "Check-in Date", "fieldname": "hotel_checkin_date", "fieldtype": "Data", "width": 110},
+			{"label": "Check-out Date", "fieldname": "hotel_checkout_date", "fieldtype": "Data", "width": 110},
+			{"label": "Days", "fieldname": "hotel_days", "fieldtype": "Data", "width": 60},
+			{"label": "Hotel Name", "fieldname": "hotel_name", "fieldtype": "Data", "width": 150},
+			{"label": "Hotel Location", "fieldname": "hotel_location", "fieldtype": "Data", "width": 130},
+			{"label": "Country", "fieldname": "hotel_country", "fieldtype": "Data", "width": 100},
 		]
 
 	if group_by == "Expense Type":
 		return [
 			{"label": _("Expense Type / Traveller"), "fieldname": "name", "fieldtype": "Data", "width": 250},
-			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 100, "options": currency},
+			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 110, "options": currency},
+			{"label": "Amount (Company Currency)", "fieldname": "amount_company_currency", "fieldtype": "Currency", "width": 150, "options": "Company:company:default_currency"},
 		]
 
 	if group_by == "Travel Group":
 		return [
 			{"label": _("Travel Group / Details"), "fieldname": "name", "fieldtype": "Data", "width": 250},
-			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 100, "options": currency},
+			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 110, "options": currency},
+			{"label": "Amount (Company Currency)", "fieldname": "amount_company_currency", "fieldtype": "Currency", "width": 150, "options": "Company:company:default_currency"},
+		]
+
+	if group_by == "Company":
+		return [
+			{"label": _("Company / Details"), "fieldname": "name", "fieldtype": "Data", "width": 250},
+			{"label": _("Amount ({0})").format(currency), "fieldname": "amount_converted", "fieldtype": "Currency", "width": 110, "options": currency},
+			{"label": "Amount (Company Currency)", "fieldname": "amount_company_currency", "fieldtype": "Currency", "width": 150, "options": "Company:company:default_currency"},
 		]
 
 	return columns
@@ -162,6 +241,9 @@ def get_data(filters):
 	rows = fetch_travel_expense_rows(filters)
 	if not rows:
 		return []
+
+	# Attachments per Travel Expense
+	attachment_map = fetch_attachments_for_travel_expenses([r.get("travel_expense") for r in rows if r.get("travel_expense")])
 
 	# More Information (Additional) amounts per Travel Expense
 	more_info_map = fetch_more_information_totals()
@@ -176,6 +258,9 @@ def get_data(filters):
 	te_more_info_applied = set()  # Apply more_info net only once per TE (avoid over-counting)
 	for row in rows:
 		te_name = row.get("travel_expense")
+		row["attachment"] = attachment_map.get(te_name)
+		if row.get("amount_company_currency") is None:
+			row["amount_company_currency"] = row.get("amount")
 		more_list = more_info_map.get(te_name, [])
 		# Additional = add to total; Refund = subtract (money returned)
 		more_info_net = 0
@@ -206,17 +291,29 @@ def get_data(filters):
 	elif group_by == "Travel Group":
 		breakdown_by = filters.get("travel_group_breakdown_by") or "Traveller Name"
 		rows = group_by_travel_group_tree(rows, breakdown_by)
+	elif group_by == "Company":
+		breakdown_by = filters.get("company_breakdown_by") or "Travel Group"
+		rows = group_by_company_tree(rows, breakdown_by)
+
+	# Add company to each row when grouped so Currency column resolves symbol via Company:company:default_currency
+	company_for_display = filters.get("company") or frappe.defaults.get_user_default("Company")
+	if group_by and company_for_display:
+		for r in rows:
+			r["company"] = company_for_display
 
 	# Add custom total row at bottom (in presentation currency)
 	total = 0
+	total_company_currency = 0
 	if group_by:
 		# In tree views, sum only top-level nodes to avoid double-counting children
 		for r in rows:
 			if (r.get("indent") or 0) == 0:
 				total += r.get("amount_converted") or 0
+				total_company_currency += r.get("amount_company_currency") or 0
 	else:
 		for r in rows:
 			total += r.get("amount_converted") or 0
+			total_company_currency += r.get("amount_company_currency") or 0
 
 	if rows:
 		total_row = {
@@ -225,8 +322,11 @@ def get_data(filters):
 			"account_name": _("Total"),
 			"travel_expense": _("Total"),
 			"amount_converted": total,
+			"amount_company_currency": total_company_currency,
 			"bold": 1,
 		}
+		if group_by and company_for_display:
+			total_row["company"] = company_for_display
 		rows.append(total_row)
 
 	return rows
@@ -248,6 +348,7 @@ def fetch_travel_expense_rows(filters):
 			TE.traveler_name.as_("traveller_name"),
 			TED.expense_type.as_("expense_type"),
 			TED.amount.as_("amount"),
+			TED.amount_company_currency.as_("amount_company_currency"),
 			TE.refund.as_("is_refund"),
 			TE.company_group.as_("company_group"),
 			TED.custom_airlines.as_("airline"),
@@ -259,6 +360,12 @@ def fetch_travel_expense_rows(filters):
 			TED.custom_travel_type.as_("travel_type"),
 			TED.custom_prn_number.as_("voucher_no"),
 			TE.currency.as_("currency"),
+			TED.hotel_checkin_date.as_("hotel_checkin_date"),
+			TED.hotel_checkout_date.as_("hotel_checkout_date"),
+			TED.hotel_days.as_("hotel_days"),
+			TED.custom_hotel_name.as_("hotel_name"),
+			TED.hotel_location.as_("hotel_location"),
+			TED.hotel_country.as_("hotel_country"),
 		)
 	)
 
@@ -317,25 +424,124 @@ def fetch_more_information_totals():
 	return dict(by_parent)
 
 
+def fetch_attachments_for_travel_expenses(te_names):
+	"""Return mapping of Travel Expense name -> HTML link(s) to attachment(s)."""
+	if not te_names:
+		return {}
+	te_names = list(set(n for n in te_names if n))
+	files = frappe.get_all(
+		"File",
+		filters={
+			"attached_to_doctype": "Travel Expense",
+			"attached_to_name": ["in", te_names],
+		},
+		fields=["attached_to_name", "file_name", "file_url"],
+		order_by="attached_to_name, creation",
+	)
+	by_te = defaultdict(list)
+	for f in files:
+		link = f'<a href="{f.get("file_url") or "#"}" target="_blank">{f.get("file_name") or "Attachment"}</a>'
+		by_te[f["attached_to_name"]].append(link)
+	return {te: ", ".join(links) if links else None for te, links in by_te.items()}
+
+
+def _collect_unique(items):
+	"""Collect unique non-empty values and join."""
+	seen = set()
+	out = []
+	for x in (items or []):
+		if x and str(x).strip() and x not in seen:
+			seen.add(x)
+			out.append(str(x))
+	return ", ".join(out) if out else None
+
+
 def group_by_traveller_name_tree(rows):
 	"""
 	Tree structure: parent = traveller (total), children = expense type breakdown.
+	Include departure/arrival airport, airline, etc. per parent and child.
 	"""
-	travellers = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
+	travellers = defaultdict(lambda: {
+		"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
+		"currency": "",
+		"departure_airport": set(), "arrival_airport": set(), "airline": set(),
+		"travel_type": set(), "voucher_no": set(), "booked_by": set(),
+		"hotel_checkin_date": set(), "hotel_checkout_date": set(), "hotel_days": set(),
+		"hotel_name": set(), "hotel_location": set(), "hotel_country": set(),
+		"children": defaultdict(lambda: {
+			"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
+			"departure_airport": set(), "arrival_airport": set(), "airline": set(),
+			"travel_type": set(), "voucher_no": set(), "booked_by": set(),
+			"hotel_checkin_date": set(), "hotel_checkout_date": set(), "hotel_days": set(),
+			"hotel_name": set(), "hotel_location": set(), "hotel_country": set(),
+		}),
+	})
 	for row in rows:
 		trav = row.get("traveller_name") or _("Unspecified")
 		exp_type = row.get("expense_type") or _("Unspecified")
-		travellers[trav]["amount"] += row.get("amount") or 0
-		travellers[trav]["amount_converted"] += row.get("amount_converted") or 0
-		if not travellers[trav]["currency"]:
-			travellers[trav]["currency"] = row.get("currency") or ""
-		travellers[trav]["children"][exp_type]["amount"] += row.get("amount") or 0
-		travellers[trav]["children"][exp_type]["amount_converted"] += row.get("amount_converted") or 0
+		t = travellers[trav]
+		amt_cc = row.get("amount_company_currency") or row.get("amount") or 0
+		t["amount"] += row.get("amount") or 0
+		t["amount_converted"] += row.get("amount_converted") or 0
+		t["amount_company_currency"] += amt_cc
+		if row.get("departure_airport"):
+			t["departure_airport"].add(row["departure_airport"])
+		if row.get("arrival_airport"):
+			t["arrival_airport"].add(row["arrival_airport"])
+		if row.get("airline"):
+			t["airline"].add(row["airline"])
+		if row.get("travel_type"):
+			t["travel_type"].add(row["travel_type"])
+		if row.get("voucher_no"):
+			t["voucher_no"].add(row["voucher_no"])
+		if row.get("booked_by"):
+			t["booked_by"].add(row["booked_by"])
+		if row.get("hotel_checkin_date"):
+			t["hotel_checkin_date"].add(str(row["hotel_checkin_date"]))
+		if row.get("hotel_checkout_date"):
+			t["hotel_checkout_date"].add(str(row["hotel_checkout_date"]))
+		if row.get("hotel_days") is not None:
+			t["hotel_days"].add(str(row["hotel_days"]))
+		if row.get("hotel_name"):
+			t["hotel_name"].add(row["hotel_name"])
+		if row.get("hotel_location"):
+			t["hotel_location"].add(row["hotel_location"])
+		if row.get("hotel_country"):
+			t["hotel_country"].add(row["hotel_country"])
+		if not t["currency"]:
+			t["currency"] = row.get("currency") or ""
+		c = t["children"][exp_type]
+		c["amount"] += row.get("amount") or 0
+		c["amount_converted"] += row.get("amount_converted") or 0
+		c["amount_company_currency"] += amt_cc
+		if row.get("departure_airport"):
+			c["departure_airport"].add(row["departure_airport"])
+		if row.get("arrival_airport"):
+			c["arrival_airport"].add(row["arrival_airport"])
+		if row.get("airline"):
+			c["airline"].add(row["airline"])
+		if row.get("travel_type"):
+			c["travel_type"].add(row["travel_type"])
+		if row.get("voucher_no"):
+			c["voucher_no"].add(row["voucher_no"])
+		if row.get("booked_by"):
+			c["booked_by"].add(row["booked_by"])
+		if row.get("hotel_checkin_date"):
+			c["hotel_checkin_date"].add(str(row["hotel_checkin_date"]))
+		if row.get("hotel_checkout_date"):
+			c["hotel_checkout_date"].add(str(row["hotel_checkout_date"]))
+		if row.get("hotel_days") is not None:
+			c["hotel_days"].add(str(row["hotel_days"]))
+		if row.get("hotel_name"):
+			c["hotel_name"].add(row["hotel_name"])
+		if row.get("hotel_location"):
+			c["hotel_location"].add(row["hotel_location"])
+		if row.get("hotel_country"):
+			c["hotel_country"].add(row["hotel_country"])
 
 	result = []
 	for trav in sorted(travellers.keys()):
 		t = travellers[trav]
-		# Parent row - link formatted
 		parent_name = f'<a href="/app/member/{trav}">{trav}</a>' if trav != _("Unspecified") else trav
 		result.append({
 			"name": parent_name,
@@ -343,9 +549,21 @@ def group_by_traveller_name_tree(rows):
 			"indent": 0,
 			"amount": t["amount"],
 			"amount_converted": t["amount_converted"],
+			"amount_company_currency": t["amount_company_currency"],
 			"currency": t["currency"],
+			"departure_airport": _collect_unique(t["departure_airport"]),
+			"arrival_airport": _collect_unique(t["arrival_airport"]),
+			"airline": _collect_unique(t["airline"]),
+			"travel_type": _collect_unique(t["travel_type"]),
+			"voucher_no": _collect_unique(t["voucher_no"]),
+			"booked_by": _collect_unique(t["booked_by"]),
+			"hotel_checkin_date": _collect_unique(t["hotel_checkin_date"]),
+			"hotel_checkout_date": _collect_unique(t["hotel_checkout_date"]),
+			"hotel_days": _collect_unique(t["hotel_days"]),
+			"hotel_name": _collect_unique(t["hotel_name"]),
+			"hotel_location": _collect_unique(t["hotel_location"]),
+			"hotel_country": _collect_unique(t["hotel_country"]),
 		})
-		# Child rows - link formatted
 		for exp_type in sorted(t["children"].keys()):
 			c = t["children"][exp_type]
 			child_name = f'<a href="/app/expense-claim-type/{exp_type}">{exp_type}</a>' if exp_type != _("Unspecified") else exp_type
@@ -355,7 +573,20 @@ def group_by_traveller_name_tree(rows):
 				"indent": 1,
 				"amount": c["amount"],
 				"amount_converted": c["amount_converted"],
+				"amount_company_currency": c["amount_company_currency"],
 				"currency": t["currency"],
+				"departure_airport": _collect_unique(c["departure_airport"]),
+				"arrival_airport": _collect_unique(c["arrival_airport"]),
+				"airline": _collect_unique(c["airline"]),
+				"travel_type": _collect_unique(c["travel_type"]),
+				"voucher_no": _collect_unique(c["voucher_no"]),
+				"booked_by": _collect_unique(c["booked_by"]),
+				"hotel_checkin_date": _collect_unique(c["hotel_checkin_date"]),
+				"hotel_checkout_date": _collect_unique(c["hotel_checkout_date"]),
+				"hotel_days": _collect_unique(c["hotel_days"]),
+				"hotel_name": _collect_unique(c["hotel_name"]),
+				"hotel_location": _collect_unique(c["hotel_location"]),
+				"hotel_country": _collect_unique(c["hotel_country"]),
 			})
 	return result
 
@@ -364,21 +595,26 @@ def group_by_expense_type_tree(rows):
 	"""
 	Tree structure: parent = expense type (total), children = traveller breakdown.
 	"""
-	by_type = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
+	by_type = defaultdict(lambda: {
+		"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
+		"currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0})
+	})
 	for row in rows:
 		exp_type = row.get("expense_type") or _("Unspecified")
 		trav = row.get("traveller_name") or _("Unspecified")
+		amt_cc = row.get("amount_company_currency") or row.get("amount") or 0
 		by_type[exp_type]["amount"] += row.get("amount") or 0
 		by_type[exp_type]["amount_converted"] += row.get("amount_converted") or 0
+		by_type[exp_type]["amount_company_currency"] += amt_cc
 		if not by_type[exp_type]["currency"]:
 			by_type[exp_type]["currency"] = row.get("currency") or ""
 		by_type[exp_type]["children"][trav]["amount"] += row.get("amount") or 0
 		by_type[exp_type]["children"][trav]["amount_converted"] += row.get("amount_converted") or 0
+		by_type[exp_type]["children"][trav]["amount_company_currency"] += amt_cc
 
 	result = []
 	for exp_type in sorted(by_type.keys()):
 		t = by_type[exp_type]
-		# Parent row - link formatted
 		parent_name = f'<a href="/app/expense-claim-type/{exp_type}">{exp_type}</a>' if exp_type != _("Unspecified") else exp_type
 		result.append({
 			"name": parent_name,
@@ -386,9 +622,9 @@ def group_by_expense_type_tree(rows):
 			"indent": 0,
 			"amount": t["amount"],
 			"amount_converted": t["amount_converted"],
+			"amount_company_currency": t["amount_company_currency"],
 			"currency": t["currency"],
 		})
-		# Child rows - link formatted
 		for trav in sorted(t["children"].keys()):
 			c = t["children"][trav]
 			child_name = f'<a href="/app/member/{trav}">{trav}</a>' if trav != _("Unspecified") else trav
@@ -398,6 +634,7 @@ def group_by_expense_type_tree(rows):
 				"indent": 1,
 				"amount": c["amount"],
 				"amount_converted": c["amount_converted"],
+				"amount_company_currency": c["amount_company_currency"],
 				"currency": t["currency"],
 			})
 	return result
@@ -407,24 +644,29 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 	"""
 	Tree structure: parent = travel group (total), children = breakdown by traveller or expense type.
 	"""
-	by_group = defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0})})
+	by_group = defaultdict(lambda: {
+		"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
+		"currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0})
+	})
 	for row in rows:
 		tg = row.get("travel_group") or _("Unspecified")
 		if breakdown_by == "Traveller Name":
 			child_key = row.get("traveller_name") or _("Unspecified")
 		else:
 			child_key = row.get("expense_type") or _("Unspecified")
+		amt_cc = row.get("amount_company_currency") or row.get("amount") or 0
 		by_group[tg]["amount"] += row.get("amount") or 0
 		by_group[tg]["amount_converted"] += row.get("amount_converted") or 0
+		by_group[tg]["amount_company_currency"] += amt_cc
 		if not by_group[tg]["currency"]:
 			by_group[tg]["currency"] = row.get("currency") or ""
 		by_group[tg]["children"][child_key]["amount"] += row.get("amount") or 0
 		by_group[tg]["children"][child_key]["amount_converted"] += row.get("amount_converted") or 0
+		by_group[tg]["children"][child_key]["amount_company_currency"] += amt_cc
 
 	result = []
 	for tg in sorted(by_group.keys()):
 		t = by_group[tg]
-		# Parent row - link formatted
 		parent_name = f'<a href="/app/travel-group/{tg}">{tg}</a>' if tg != _("Unspecified") else tg
 		result.append({
 			"name": parent_name,
@@ -432,9 +674,9 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 			"indent": 0,
 			"amount": t["amount"],
 			"amount_converted": t["amount_converted"],
+			"amount_company_currency": t["amount_company_currency"],
 			"currency": t["currency"],
 		})
-		# Child rows - link formatted based on breakdown
 		for child_key in sorted(t["children"].keys()):
 			c = t["children"][child_key]
 			if breakdown_by == "Traveller Name":
@@ -447,6 +689,66 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 				"indent": 1,
 				"amount": c["amount"],
 				"amount_converted": c["amount_converted"],
+				"amount_company_currency": c["amount_company_currency"],
+				"currency": t["currency"],
+			})
+	return result
+
+
+def group_by_company_tree(rows, breakdown_by="Travel Group"):
+	"""
+	Tree structure: parent = company (total), children = breakdown by travel group, traveller, or expense type.
+	"""
+	by_company = defaultdict(lambda: {
+		"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
+		"currency": "", "children": defaultdict(lambda: {"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0}),
+	})
+	for row in rows:
+		company = row.get("company") or _("Unspecified")
+		if breakdown_by == "Travel Group":
+			child_key = row.get("travel_group") or _("Unspecified")
+		elif breakdown_by == "Traveller Name":
+			child_key = row.get("traveller_name") or _("Unspecified")
+		else:
+			child_key = row.get("expense_type") or _("Unspecified")
+		amt_cc = row.get("amount_company_currency") or row.get("amount") or 0
+		by_company[company]["amount"] += row.get("amount") or 0
+		by_company[company]["amount_converted"] += row.get("amount_converted") or 0
+		by_company[company]["amount_company_currency"] += amt_cc
+		if not by_company[company]["currency"]:
+			by_company[company]["currency"] = row.get("currency") or ""
+		by_company[company]["children"][child_key]["amount"] += row.get("amount") or 0
+		by_company[company]["children"][child_key]["amount_converted"] += row.get("amount_converted") or 0
+		by_company[company]["children"][child_key]["amount_company_currency"] += amt_cc
+
+	result = []
+	for company in sorted(by_company.keys()):
+		t = by_company[company]
+		parent_name = f'<a href="/app/company/{company}">{company}</a>' if company != _("Unspecified") else company
+		result.append({
+			"name": parent_name,
+			"parent_account": "",
+			"indent": 0,
+			"amount": t["amount"],
+			"amount_converted": t["amount_converted"],
+			"amount_company_currency": t["amount_company_currency"],
+			"currency": t["currency"],
+		})
+		for child_key in sorted(t["children"].keys()):
+			c = t["children"][child_key]
+			if breakdown_by == "Travel Group":
+				child_name = f'<a href="/app/travel-group/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
+			elif breakdown_by == "Traveller Name":
+				child_name = f'<a href="/app/member/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
+			else:
+				child_name = f'<a href="/app/expense-claim-type/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
+			result.append({
+				"name": child_name,
+				"parent_account": parent_name,
+				"indent": 1,
+				"amount": c["amount"],
+				"amount_converted": c["amount_converted"],
+				"amount_company_currency": c["amount_company_currency"],
 				"currency": t["currency"],
 			})
 	return result
