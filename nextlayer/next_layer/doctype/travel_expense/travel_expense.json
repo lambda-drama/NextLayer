@@ -20,6 +20,7 @@
   "posting_date",
   "traveler_name",
   "in_transit",
+  "trip_type",
   "flight_date",
   "flight_no",
   "flight_no_2",
@@ -41,6 +42,8 @@
   "column_break_second_flight1",
   "custom_date_of_travel_2",
   "custom_date_of_arrival_2",
+  "section_break_multi_city",
+  "multi_city_segments",
   "section_break_hotel",
   "hotel_checkin_date",
   "hotel_checkout_date",
@@ -101,6 +104,8 @@
   "total_company_currency",
   "total_taxes_and_charges_company_currency",
   "grand_total_company_currency",
+  "remarks_section",
+  "remark",
   "section_break_more_info",
   "more_information",
   "section_break_hidden",
@@ -136,7 +141,8 @@
    "default": "0",
    "fieldname": "in_transit",
    "fieldtype": "Check",
-   "label": "In-Transit"
+   "label": "In Transit",
+   "options": "\nIn Transit\nMulti City"
   },
   {
    "allow_on_submit": 1,
@@ -160,7 +166,7 @@
    "label": "Flight No"
   },
   {
-   "depends_on": "eval:doc.in_transit == 1",
+   "depends_on": "eval:doc.trip_type == \"In Transit\"",
    "fieldname": "flight_no_2",
    "fieldtype": "Data",
    "label": "Second Flight No"
@@ -235,7 +241,7 @@
    "fieldname": "custom_travel_type",
    "fieldtype": "Select",
    "label": "Travel Type",
-   "options": "\nOne Way\nReturn"
+   "options": "\nOne Way\nReturn\nMulti-city"
   },
   {
    "fieldname": "custom_pnr_number_",
@@ -244,20 +250,20 @@
   },
   {
    "collapsible": 1,
-   "depends_on": "eval:[\"Travel\", \"All\"].includes(doc.expense_category) && doc.in_transit == 1",
+   "depends_on": "eval:[\"Travel\", \"All\"].includes(doc.expense_category) && doc.trip_type == \"In Transit\"",
    "fieldname": "section_break_second_flight",
    "fieldtype": "Section Break",
    "label": "Second Flight Details"
   },
   {
-   "depends_on": "eval:doc.in_transit == 1",
+   "depends_on": "eval:doc.trip_type == \"In Transit\"",
    "fieldname": "custom_departure_airport_2",
    "fieldtype": "Link",
    "label": "Second Departure Airport",
    "options": "Airport"
   },
   {
-   "depends_on": "eval:doc.in_transit == 1",
+   "depends_on": "eval:doc.trip_type == \"In Transit\"",
    "fieldname": "custom_arrival_airport_2",
    "fieldtype": "Link",
    "label": "Second Arrival Airport",
@@ -268,16 +274,30 @@
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:doc.in_transit == 1",
+   "depends_on": "eval:doc.trip_type == \"In Transit\"",
    "fieldname": "custom_date_of_travel_2",
    "fieldtype": "Datetime",
    "label": "Second Date of Travel"
   },
   {
-   "depends_on": "eval:doc.in_transit == 1",
+   "depends_on": "eval:doc.trip_type == \"In Transit\"",
    "fieldname": "custom_date_of_arrival_2",
    "fieldtype": "Datetime",
    "label": "Second Date of Arrival"
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:[\"Travel\", \"All\"].includes(doc.expense_category) && doc.travel_type == \"Multi City\"",
+   "fieldname": "section_break_multi_city",
+   "fieldtype": "Section Break",
+   "label": "Multi City Segments"
+  },
+  {
+   "description": "First row = entry/origin, last row = destination. Amount stays at main charges.",
+   "fieldname": "multi_city_segments",
+   "fieldtype": "Table",
+   "label": "Multi City Segments",
+   "options": "Travel Expense Multi City"
   },
   {
    "collapsible": 1,
@@ -516,8 +536,9 @@
   },
   {
    "fieldname": "visa_type",
-   "fieldtype": "Data",
-   "label": "Type of Visa"
+   "fieldtype": "Link",
+   "label": "Type of Visa",
+   "options": "Visa Type"
   },
   {
    "fieldname": "section_break_expenses",
@@ -690,6 +711,23 @@
    "fieldtype": "Link",
    "label": "Expense Category",
    "options": "Expense Claim Type"
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "Remark"
+  },
+  {
+   "description": "Blank = normal (one segment). In Transit = two segments. Multi City = many segments.",
+   "fieldname": "trip_type",
+   "fieldtype": "Select",
+   "label": "Trip Type",
+   "options": "\nIn Transit\nMulti City"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -704,7 +742,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-02-08 01:52:16.448585",
+ "modified": "2026-02-09 02:19:29.305435",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",

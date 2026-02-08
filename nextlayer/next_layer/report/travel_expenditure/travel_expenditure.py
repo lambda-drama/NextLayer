@@ -54,7 +54,7 @@ def get_columns(filters):
 			"label": "Type of Travel",
 			"fieldname": "travel_type",
 			"fieldtype": "Select",
-			"options": "\nOne Way\nReturn",
+			"options": "\nOne Way\nReturn\nMulti-city",
 			"width": 120,
 		},
 		{

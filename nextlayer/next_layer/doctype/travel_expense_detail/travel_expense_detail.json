@@ -200,7 +200,7 @@
    "fieldtype": "Select",
    "label": "Travel Type",
    "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
-   "options": "\nOne Way\nReturn"
+   "options": "\nOne Way\nReturn\nMulti-city"
   },
   {
    "fieldname": "column_break_travel1",

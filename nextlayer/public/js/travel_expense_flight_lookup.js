@@ -40,7 +40,8 @@ frappe.ui.form.on("Travel Expense", {
 				return {
 					filters: {
 						company: frm.doc.company,
-						account_type: ["in", ["Bank", "Cash"]]
+						account_type: ["in", ["Bank", "Cash"]],
+						is_group: 0
 					}
 				};
 			});
@@ -98,24 +99,29 @@ frappe.ui.form.on("Travel Expense", {
 		}
 	},
 	
-	in_transit: function(frm) {
-		// Clear second flight fields when in_transit is unchecked
-		if (!frm.doc.in_transit) {
+	trip_type: function(frm) {
+		// Clear second flight fields when not In Transit
+		if (frm.doc.trip_type !== "In Transit") {
 			frm.set_value("flight_no_2", "");
 			frm.set_value("custom_departure_airport_2", "");
 			frm.set_value("custom_arrival_airport_2", "");
 			frm.set_value("custom_date_of_travel_2", "");
 			frm.set_value("custom_date_of_arrival_2", "");
 		} else {
-			// Setup event listeners when in_transit is checked
+			// Setup event listeners when In Transit is selected
 			setup_second_flight_listeners(frm);
+		}
+		// Clear multi_city_segments when not Multi City
+		if (frm.doc.trip_type !== "Multi City" && frm.doc.multi_city_segments && frm.doc.multi_city_segments.length) {
+			frm.clear_table("multi_city_segments");
+			frm.refresh_field("multi_city_segments");
 		}
 	},
 	
 	flight_no_2: function(frm) {
 		// Direct field change handler for second flight number
 		// Use a small delay to avoid triggering while user is still typing
-		if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+		if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 			// Clear any existing timeout
 			if (frm._flight_no_2_timeout) {
 				clearTimeout(frm._flight_no_2_timeout);
@@ -123,7 +129,7 @@ frappe.ui.form.on("Travel Expense", {
 			
 			// Set a timeout to trigger lookup after user stops typing (500ms delay)
 			frm._flight_no_2_timeout = setTimeout(function() {
-				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 					if (!flight_lookup_in_progress) {
 						lookup_flight_for_travel_expense_second_flight(frm);
 					}
@@ -723,7 +729,7 @@ function setup_second_flight_listeners(frm) {
 			frm.fields_dict.flight_no_2.$input.on('keydown', function(e) {
 				if (e.keyCode === 13) {
 					e.preventDefault();
-					if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+					if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 						if (!flight_lookup_in_progress) {
 							lookup_flight_for_travel_expense_second_flight(frm);
 						}
@@ -732,7 +738,7 @@ function setup_second_flight_listeners(frm) {
 			});
 			
 			frm.fields_dict.flight_no_2.$input.on('blur', function() {
-				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 					if (!flight_lookup_in_progress) {
 						lookup_flight_for_travel_expense_second_flight(frm);
 					}
@@ -749,7 +755,7 @@ function lookup_flight_for_travel_expense_second_flight(frm) {
 		return;
 	}
 	
-	if (!frm.doc.in_transit) {
+	if (frm.doc.trip_type !== "In Transit") {
 		return;
 	}
 	

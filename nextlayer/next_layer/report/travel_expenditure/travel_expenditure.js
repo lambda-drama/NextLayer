@@ -59,7 +59,7 @@ frappe.query_reports["Travel Expenditure"] = {
 			fieldname: "travel_type",
 			label: __("Type of Travel"),
 			fieldtype: "Select",
-			options: ["", "One Way", "Return"],
+			options: ["", "One Way", "Return", "Multi-city"],
 		},
 		{
 			fieldname: "group_by",
