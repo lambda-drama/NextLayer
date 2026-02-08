@@ -265,25 +265,19 @@ export default function InterCompanyLedgerSummary() {
       return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
     }
 
-    // If GL data is loaded for this party, check for match/unmatched
-    // Note: glClosing can be 0 legitimately, so we don't check for zero here
     const tolerance = 0.01 // Small tolerance for floating point comparison
     const absDifference = Math.abs(difference)
 
-    // First check if difference matches in-transit total (this takes priority over exact match)
-    // This ensures that when intransit explains the difference, it's "Match with Intransit" not "Match"
-    // Even if difference is zero, if intransit total exists and matches, it should be "Match with Intransit"
+
     if (intransitTotal !== undefined && intransitTotal !== null) {
       const absIntransitTotal = Math.abs(intransitTotal)
-      // Check if the difference equals the intransit total (within tolerance)
-      // This takes priority so entries with intransit match are not counted as regular "Match"
+
       if (Math.abs(absDifference - absIntransitTotal) < tolerance) {
         return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: false }
       }
     }
 
-    // Then check for exact match (difference is zero or very close to zero)
-    // This only applies when there's no intransit match
+
     if (absDifference < tolerance) {
       return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
     }
@@ -299,7 +293,6 @@ export default function InterCompanyLedgerSummary() {
       }
     }
 
-    // Otherwise it's unmatched
     return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
   }
 
@@ -618,116 +611,7 @@ export default function InterCompanyLedgerSummary() {
           </Alert>
         )}
 
-        {/* Reconciliation Analysis */}
-        {/* {hasLoadedData && reconciliationAnalysis && (
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                {reconciliationAnalysis.closingBalanceMatch ? (
-                  <CheckCircle className="h-5 w-5 text-green-300" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-300" />
-                )}
-                Ledger Summary Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <Card className="border-blue-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-lg text-gray-800">
-                  {company} - Customer Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(customerLedgerData.totals.totalOpeningBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(customerLedgerData.totals.totalInvoicedAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {formatCurrency(customerLedgerData.totals.totalPaidAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(customerLedgerData.totals.totalClosingBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-blue-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-lg text-gray-800">
-                  {company} - Supplier Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(supplierLedgerData.totals.totalOpeningBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(supplierLedgerData.totals.totalInvoicedAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {formatCurrency(supplierLedgerData.totals.totalPaidAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(supplierLedgerData.totals.totalClosingBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-              <div className="space-y-3">
-                <Alert
-                  className={`border-2 ${reconciliationAnalysis.closingBalanceMatch ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
-                >
-                  <AlertDescription className={reconciliationAnalysis.closingBalanceMatch ? "text-green-800" : "text-red-800"}>
-                    {reconciliationAnalysis.closingBalanceMatch ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 inline mr-2" />
-                        <strong>Balances Match:</strong> The customer and supplier closing balances for {company} are equal.
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 inline mr-2" />
-                        <strong>Balances Don't Match:</strong> There's a difference of {formatCurrency(Math.abs(reconciliationAnalysis.customerTotals.totalClosingBalance - reconciliationAnalysis.supplierTotals.totalClosingBalance), 'USD', company)} between the customer and supplier closing balances.
-                      </>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              </div>
-            </CardContent>
-          </Card>
-        )} */}
+      
 
         {/* Totals Summary */}
         {hasLoadedData && customerLedgerData && supplierLedgerData && (

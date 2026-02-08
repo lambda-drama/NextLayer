@@ -215,8 +215,7 @@ export default function IntercompanyReconciliation() {
   // Clear data when reloadTrigger is -1 (cache clear)
   useEffect(() => {
     if (reloadTrigger === -1) {
-      // Data will be cleared when shouldLoadData is false
-      // This effect ensures hooks reset their state
+   
     }
   }, [reloadTrigger])
 
@@ -256,11 +255,7 @@ export default function IntercompanyReconciliation() {
   })
   // Debug log for hidden summary - only log when value changes
   useEffect(() => {
-    // console.log("Hidden Summary A:", hiddenSummaryA)
-    // console.log("Hidden Summary B:", hiddenSummaryB)
-    // console.log("Permission-aware Data A:", permissionAwareDataA.length, "entries")
-    // console.log("Permission-aware Data B:", permissionAwareDataB.length, "entries")
-    // console.log("Data", permissionAwareDataB)
+  
   }, [hiddenSummaryA, hiddenSummaryB, permissionAwareDataA, permissionAwareDataB])
 
   // Auto-fill Company B when Company A and Party A are selected
@@ -318,8 +313,7 @@ export default function IntercompanyReconciliation() {
 
     // Define company relationships/mappings
     const companyMappings: {[key: string]: string[]} = {
-      // Add your specific company relationships here
-      // Example: 'Company A' should be paired with 'Company B'
+    
     }
 
     // If there's a specific mapping, use it
@@ -462,8 +456,6 @@ export default function IntercompanyReconciliation() {
 
     localStorage.setItem('intercompanyReconciliationState', JSON.stringify(currentState))
 
-    // Show a brief notification
-    // console.log(`Navigating to ${entry.voucher_type} ${entry.voucher_no}. Your data will be preserved when you return.`)
   }
 
   // Clear cache function - clears both frontend and backend cache
