@@ -27,14 +27,14 @@ frappe.query_reports["Travel Expenditure"] = {
 			fieldname: "from_date",
 			label: __("From Date"),
 			fieldtype: "Date",
-			default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
+			// default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
 			width: "80px",
 		},
 		{
 			fieldname: "to_date",
 			label: __("To Date"),
 			fieldtype: "Date",
-			default: frappe.datetime.get_today(),
+			// default: frappe.datetime.get_today(),
 			width: "80px",
 		},
 		{
