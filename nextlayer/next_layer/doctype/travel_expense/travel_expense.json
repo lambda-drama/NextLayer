@@ -10,9 +10,9 @@
  "field_order": [
   "naming_series",
   "company",
-  "travel_group",
   "currency",
   "expense_category",
+  "travel_group",
   "is_addition",
   "refund",
   "original_expense",
@@ -24,6 +24,7 @@
   "flight_date",
   "flight_no",
   "flight_no_2",
+  "custom_booked_by",
   "section_break_travel",
   "custom_departure_airport",
   "custom_arrival_airport",
@@ -33,7 +34,6 @@
   "custom_date_of_arrival",
   "custom_date_of_purchase",
   "column_break_travel2",
-  "custom_booked_by",
   "custom_travel_type",
   "custom_pnr_number_",
   "section_break_second_flight",
@@ -141,14 +141,16 @@
    "default": "0",
    "fieldname": "in_transit",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "In Transit",
-   "options": "\nIn Transit\nMulti City"
+   "read_only": 1
   },
   {
    "allow_on_submit": 1,
    "default": "0",
    "fieldname": "is_addition",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Is Addition",
    "read_only": 1
   },
@@ -159,6 +161,7 @@
    "options": "Travel Group"
   },
   {
+   "depends_on": "eval: doc.expense_category==\"Travel\"",
    "fieldname": "flight_no",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -185,7 +188,7 @@
   },
   {
    "collapsible": 1,
-   "depends_on": "eval:[\"Travel\", \"All\"].includes(doc.expense_category)",
+   "depends_on": "eval:[\"Travel\", \"All\"].includes(doc.expense_category) && doc.trip_type != \"Multi City\"",
    "fieldname": "section_break_travel",
    "fieldtype": "Section Break",
    "label": "Travel Details"
@@ -287,7 +290,7 @@
   },
   {
    "collapsible": 1,
-   "depends_on": "eval:[\"Travel\", \"All\"].includes(doc.expense_category) && doc.travel_type == \"Multi City\"",
+   "depends_on": "eval:[\"Travel\", \"All\"].includes(doc.expense_category) && doc.trip_type == \"Multi City\"",
    "fieldname": "section_break_multi_city",
    "fieldtype": "Section Break",
    "label": "Multi City Segments"
@@ -645,6 +648,7 @@
   {
    "fieldname": "original_expense",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Original Expense",
    "options": "Travel Expense",
    "read_only": 1
@@ -666,6 +670,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval: doc.expense_category==\"Travel\"",
    "fieldname": "flight_date",
    "fieldtype": "Date",
    "label": "Flight Date"
@@ -686,6 +691,7 @@
    "default": "0",
    "fieldname": "refund",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Refund",
    "read_only": 1
   },
@@ -712,7 +718,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Expense Category",
-   "options": "Expense Claim Type"
+   "options": "Expense Claim Type",
+   "reqd": 1
   },
   {
    "fieldname": "remarks_section",
@@ -725,6 +732,7 @@
    "label": "Remark"
   },
   {
+   "depends_on": "eval: doc.expense_category==\"Travel\"",
    "description": "Blank = normal (one segment). In Transit = two segments. Multi City = many segments.",
    "fieldname": "trip_type",
    "fieldtype": "Select",
@@ -744,7 +752,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-02-10 23:03:55.941473",
+ "modified": "2026-02-11 00:06:52.202775",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
