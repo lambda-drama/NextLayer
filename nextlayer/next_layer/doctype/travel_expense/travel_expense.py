@@ -9,8 +9,52 @@ from frappe.utils import flt
 
 class TravelExpense(Document):
 	def validate(self):
-		"""Calculate totals from child tables"""
+		"""Calculate totals and sync multi-city to expenses when applicable"""
+		self._sync_multi_city_to_expenses()
 		self.calculate_totals()
+
+	def _sync_multi_city_to_expenses(self):
+		"""When trip_type is Multi City, ensure one Travel expense row and fill it from multi_city_segments (first segment = departure/PRN/dates, last = arrival)."""
+		trip_type = getattr(self, "trip_type", None)
+		if trip_type != "Multi City":
+			return
+		segments = getattr(self, "multi_city_segments", None) or []
+		if not segments or len(segments) == 0:
+			return
+		first = segments[0]
+		last = segments[-1]
+		# Find or create one Travel expense row
+		travel_row = None
+		if self.expenses:
+			for row in self.expenses:
+				if row.expense_type and "travel" in (row.expense_type or "").lower():
+					travel_row = row
+					break
+		if not travel_row:
+			self.append("expenses", {
+				"expense_type": "Travel",
+				"expense_date": self.posting_date or frappe.utils.today(),
+				"amount": flt(getattr(self, "travel_amount", 0)) or 0,
+				"amount_company_currency": flt(getattr(self, "amountcompany_currency", 0)) or 0,
+				"sanctioned_amount": flt(getattr(self, "amountcompany_currency", 0)) or 0,
+			})
+			travel_row = self.expenses[-1]
+		# Map from first/last segment to Travel Expense Detail (main child table)
+		travel_row.custom_departure_airport = first.get("departure_airport")
+		travel_row.custom_arrival_airport = last.get("arrival_airport")
+		travel_row.custom_prn_number = first.get("custom_prn_number")
+		travel_row.custom_date_of_purchase = first.get("date_of_purchase")
+		travel_row.custom_travel_type = "Multi-city"
+		travel_row.custom_date_of_travel = first.get("date_of_travel")
+		travel_row.custom_date_of_arrival = last.get("date_of_arrival")
+		travel_row.custom_airlines = first.get("airlines")
+		if getattr(self, "travel_amount", 0) and not travel_row.amount:
+			travel_row.amount = flt(self.travel_amount)
+		if getattr(self, "amountcompany_currency", 0) and not travel_row.amount_company_currency:
+			travel_row.amount_company_currency = flt(self.amountcompany_currency)
+			travel_row.sanctioned_amount = flt(self.amountcompany_currency)
+		if self.posting_date and not travel_row.expense_date:
+			travel_row.expense_date = self.posting_date
 	
 	def calculate_totals(self):
 		"""Calculate total, total_taxes_and_charges, and grand_total in both transaction and company currency"""

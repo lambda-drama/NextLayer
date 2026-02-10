@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from erpnext.setup.utils import get_exchange_rate
+from frappe.utils import flt
 from erpnext.setup.utils import get_exchange_rate
 
 
@@ -889,23 +889,25 @@ def create_journal_entry_for_travel_expense(travel_expense):
 		else:
 			# Normal expense (not refund) - original logic
 			# 1. Debit Expense Account(s)
+			# amount is in company currency; base (debit) = company amount; debit_in_account_currency = convert to account currency when different
 			for expense_account, amount in expense_accounts.items():
 				expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
-				
-				# Calculate base amount
+				# Base amount is always in company currency
+				expense_base_amount = amount
 				if expense_account_currency == company_currency:
-					expense_base_amount = amount
+					expense_amount_in_account_currency = amount
 				else:
 					try:
+						# get_exchange_rate(from, to) = to per from → amount_in_account = amount * rate
 						exchange_rate = get_exchange_rate(
-							expense_account_currency,
 							company_currency,
+							expense_account_currency,
 							posting_date,
 							company
 						)
-						expense_base_amount = amount * exchange_rate
+						expense_amount_in_account_currency = amount * exchange_rate
 					except Exception:
-						expense_base_amount = amount
+						expense_amount_in_account_currency = amount
 				
 				# Get cost center and project from first expense row, or from main form
 				cost_center = travel_expense.cost_center
@@ -920,7 +922,7 @@ def create_journal_entry_for_travel_expense(travel_expense):
 				
 				je_accounts.append({
 					"account": expense_account,
-					"debit_in_account_currency": amount,
+					"debit_in_account_currency": expense_amount_in_account_currency,
 					"debit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
@@ -1147,22 +1149,50 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				continue
 
 			# Amount in expense account currency (for debit_in_account_currency)
+			# get_exchange_rate(from, to) returns "to per from" → amount_in_to = amount_in_from * rate
 			if expense_account_currency == company_currency:
 				amount_in_account_currency = amount_company
 			elif expense_account_currency == transaction_currency:
+				# Account is in transaction currency: use row amount if entered, else convert company amount
 				amount_in_account_currency = getattr(expense_row, 'amount', None) or 0
 				if not amount_in_account_currency and amount_company:
 					try:
 						rate = get_exchange_rate(company_currency, transaction_currency, posting_date, company)
-						amount_in_account_currency = amount_company / rate
+						if rate is not None and flt(rate) > 0:
+							amount_in_account_currency = amount_company * rate
+						else:
+							rev = get_exchange_rate(transaction_currency, company_currency, posting_date, company)
+							if rev is not None and flt(rev) > 0:
+								amount_in_account_currency = amount_company / rev
+							else:
+								amount_in_account_currency = amount_company
 					except Exception:
 						amount_in_account_currency = amount_company
 			else:
+				# Expense account in different currency (e.g. document AED, account USD): convert company amount to account currency.
+				# JE overwrites base debit with debit_in_account_currency * exchange_rate, so we must never pass 0.
 				try:
 					rate = get_exchange_rate(company_currency, expense_account_currency, posting_date, company)
-					amount_in_account_currency = amount_company / rate
-				except Exception:
-					amount_in_account_currency = amount_company
+					if rate is not None and flt(rate) > 0:
+						amount_in_account_currency = amount_company * rate
+					else:
+						rev = get_exchange_rate(expense_account_currency, company_currency, posting_date, company)
+						if rev is not None and flt(rev) > 0:
+							amount_in_account_currency = amount_company / rev
+						else:
+							frappe.throw(_(
+								"Exchange rate required from {0} to {1} (or reverse) for date {2} for expense account {3}. Please set up in Currency Exchange."
+							).format(company_currency, expense_account_currency, posting_date, expense_account))
+				except frappe.ValidationError:
+					raise
+				except Exception as e:
+					frappe.throw(_(
+						"Could not convert amount to expense account currency ({0}): {1}. Please set up exchange rate in Currency Exchange."
+					).format(expense_account_currency, str(e)))
+				if not amount_in_account_currency or flt(amount_in_account_currency) <= 0:
+					frappe.throw(_(
+						"Exchange rate from {0} to {1} for date {2} returned zero or invalid. Please set up in Currency Exchange."
+					).format(company_currency, expense_account_currency, posting_date))
 			
 			# Group by expense account (sum both currencies)
 			if expense_account in expense_accounts:

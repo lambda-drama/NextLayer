@@ -268,6 +268,10 @@ frappe.ui.form.on("Travel Expense", {
 	
 	before_save: function(frm) {
 		calculate_totals(frm);
+		// When Multi City: sync multi_city_segments to main expenses table (first segment = departure/PRN/dates, last = arrival)
+		if (frm.doc.trip_type === "Multi City" && frm.doc.multi_city_segments && frm.doc.multi_city_segments.length > 0) {
+			sync_multi_city_to_expenses(frm);
+		}
 		remove_expense_rows_without_type(frm);
 		if (frm.doc.expenses && frm.doc.expenses.length > 0) frm.refresh_field("expenses");
 		let expense_type = get_expense_type_for_charges(frm);
@@ -432,6 +436,65 @@ frappe.ui.form.on("Travel Expense", {
 					}
 				}
 			});
+		}
+		
+		// Multi City: button to fetch flight for selected segment row
+		if (frm.doc.trip_type === "Multi City" && frm.fields_dict.multi_city_segments) {
+			frm.add_custom_button(__("Fetch flight for segment"), function() {
+				let grid = frm.fields_dict.multi_city_segments.grid;
+				let segments = frm.doc.multi_city_segments || [];
+				if (!segments.length) {
+					frappe.msgprint(__("Add at least one row in Multi City Segments, enter Flight No and Flight Date, then click this button."));
+					return;
+				}
+				let row = null;
+				if (grid && grid.get_selected_children) {
+					let selected = grid.get_selected_children();
+					if (selected && selected.length > 0) {
+						let s = selected[0];
+						row = (s && s.doc) ? s.doc : segments.find(function(r) { return r.name === s; });
+					}
+				}
+				if (!row && segments.length > 0) {
+					row = segments[segments.length - 1];
+				}
+				if (!row || !(row.flight_no && row.flight_no.trim())) {
+					frappe.msgprint(__("Select a segment row, enter Flight No (and Flight Date), then click 'Fetch flight for segment'."));
+					return;
+				}
+				lookup_flight_for_multi_city_row(frm, row);
+			}, __("Multi City Segments"));
+			
+			// Multi City: same behaviour as main form – Enter or blur on Flight No / Flight Date triggers API lookup
+			let multi_city_grid = frm.fields_dict.multi_city_segments.grid;
+			if (multi_city_grid && multi_city_grid.wrapper) {
+				multi_city_grid.wrapper.off('keydown.multicity blur.multicity', 'input[data-fieldname="flight_no"], input[data-fieldname="flight_date"]');
+				// Enter key – trigger lookup
+				multi_city_grid.wrapper.on('keydown.multicity', 'input[data-fieldname="flight_no"], input[data-fieldname="flight_date"]', function(e) {
+					if (e.keyCode === 13) {
+						e.preventDefault();
+						let row_name = $(this).closest('.grid-row').attr('data-name');
+						if (row_name) {
+							let row = locals['Travel Expense Multi City'] && locals['Travel Expense Multi City'][row_name];
+							if (row && row.flight_no && row.flight_no.trim()) {
+								lookup_flight_for_multi_city_row(frm, row);
+							}
+						}
+					}
+				});
+				// Blur – trigger lookup when leaving the field (like main form)
+				multi_city_grid.wrapper.on('blur.multicity', 'input[data-fieldname="flight_no"], input[data-fieldname="flight_date"]', function() {
+					let $input = $(this);
+					let row_name = $input.closest('.grid-row').attr('data-name');
+					if (!row_name) return;
+					setTimeout(function() {
+						let row = locals['Travel Expense Multi City'] && locals['Travel Expense Multi City'][row_name];
+						if (row && row.flight_no && row.flight_no.trim() && !flight_lookup_in_progress) {
+							lookup_flight_for_multi_city_row(frm, row);
+						}
+					}, 100);
+				});
+			}
 		}
 		
 		// Add "Additional Expenses" and "Cancel Charges" buttons after submit (only show if document is submitted)
@@ -1544,6 +1607,171 @@ function fill_second_flight_fields(frm, flight_data, flight_number_searched) {
 	});
 }
 
+/** Multi City segment: fetch flight by flight_no + flight_date, show modal, on confirm fill the segment row. */
+function lookup_flight_for_multi_city_row(frm, row) {
+	let flight_number = (row.flight_no && row.flight_no.trim()) ? row.flight_no.trim() : "";
+	if (!flight_number) {
+		frappe.msgprint(__("Enter Flight No in the selected segment row."));
+		return;
+	}
+	if (flight_lookup_in_progress) return;
+	let flight_date = null;
+	if (row.flight_date) {
+		flight_date = frappe.datetime.str_to_obj(row.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(" ")[0];
+		}
+	}
+	flight_lookup_in_progress = true;
+	frappe.show_alert(__("Looking up flight information..."), 3);
+	frappe.call({
+		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
+		args: {
+			flight_number: flight_number,
+			flight_date: flight_date || null,
+		},
+		callback: function(r) {
+			flight_lookup_in_progress = false;
+			if (r.message && r.message.success) {
+				show_flight_confirmation_modal_for_multi_city(frm, r.message.data, flight_number, row);
+			} else {
+				frappe.msgprint({
+					title: __("Flight Lookup Failed"),
+					message: (r.message && r.message.error) || __("Unknown error"),
+					indicator: "red",
+				});
+			}
+		},
+		error: function() {
+			flight_lookup_in_progress = false;
+		}
+	});
+}
+
+function show_flight_confirmation_modal_for_multi_city(frm, flight_data, flight_number_searched, multi_city_row) {
+	if (!flight_data || (Array.isArray(flight_data) && flight_data.length === 0)) {
+		frappe.msgprint({ title: __("No Flight Found"), message: __("No flight information found."), indicator: "orange" });
+		return;
+	}
+	let flights = Array.isArray(flight_data) ? flight_data : [flight_data];
+	const first_flight = flights[0];
+	const last_flight = flights[flights.length - 1];
+	const departure = first_flight.departure || {};
+	const arrival = last_flight.arrival || {};
+	const dep_airport = departure.airport || {};
+	const arr_airport = arrival.airport || {};
+	const dep_scheduled = departure.scheduledTime || {};
+	const arr_scheduled = arrival.scheduledTime || {};
+	const airline = first_flight.airline || {};
+	let route_display = `${dep_airport.iata || "N/A"} → ${arr_airport.iata || "N/A"}`;
+	let html = `
+		<div style="padding: 15px;">
+			<p><strong>Route:</strong> ${route_display}</p>
+			<p><strong>Departure:</strong> ${dep_scheduled.local || "N/A"}</p>
+			<p><strong>Arrival:</strong> ${arr_scheduled.local || "N/A"}</p>
+			<p>Click Confirm to auto-fill this segment row.</p>
+		</div>`;
+	let d = new frappe.ui.Dialog({
+		title: __("Confirm Flight for Segment"),
+		fields: [{ fieldtype: "HTML", fieldname: "flight_info", options: html }],
+		primary_action_label: __("Confirm"),
+		primary_action: function() {
+			fill_multi_city_row_from_flight(frm, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled, multi_city_row);
+			d.hide();
+		},
+		secondary_action_label: __("Cancel"),
+		secondary_action: function() { d.hide(); },
+	});
+	d.show();
+}
+
+function fill_multi_city_row_from_flight(frm, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled, multi_city_row) {
+	let flight_array = Array.isArray(flights) ? flights : [flights];
+	const first_flight = flight_array[0];
+	const last_flight = flight_array[flight_array.length - 1];
+	const dep = first_flight.departure || {};
+	const arr = last_flight.arrival || {};
+	const dep_airport_obj = dep.airport || {};
+	const arr_airport_obj = arr.airport || {};
+	const dep_sched = dep.scheduledTime || {};
+	const arr_sched = arr.scheduledTime || {};
+	let dep_airport_name = dep_airport_obj.name || dep_airport_obj.shortName || "";
+	let dep_airport_iata = dep_airport_obj.iata || "";
+	let dep_airport_icao = dep_airport_obj.icao || "";
+	let dep_airport_city = dep_airport_obj.municipalityName || "";
+	let dep_airport_country = dep_airport_obj.countryCode || "";
+	let arr_airport_name = arr_airport_obj.name || arr_airport_obj.shortName || "";
+	let arr_airport_iata = arr_airport_obj.iata || "";
+	let arr_airport_icao = arr_airport_obj.icao || "";
+	let arr_airport_city = arr_airport_obj.municipalityName || "";
+	let arr_airport_country = arr_airport_obj.countryCode || "";
+	let airline_name = (airline && airline.name) || "";
+	let airline_iata = (airline && airline.iata) || "";
+	let airline_icao = (airline && airline.icao) || "";
+	function format_dt(str) {
+		if (!str) return null;
+		try {
+			let cleaned = (str.trim() || "").replace(/[+-]\d{2}:?\d{2}\s*$/, "").replace("T", " ");
+			let parts = cleaned.split(/\s+/);
+			if (parts.length < 2) return null;
+			let time = parts[1].split(".")[0];
+			if (time.match(/^\d{2}:\d{2}$/)) time += ":00";
+			return parts[0] + " " + time;
+		} catch (e) { return null; }
+	}
+	let dep_datetime = format_dt((dep_scheduled && dep_scheduled.local) ? dep_scheduled.local : (dep_sched && dep_sched.local) ? dep_sched.local : null);
+	let arr_datetime = format_dt((arr_scheduled && arr_scheduled.local) ? arr_scheduled.local : (arr_sched && arr_sched.local) ? arr_sched.local : null);
+	let date_of_purchase = dep_datetime ? dep_datetime.split(" ")[0] : null;
+	frappe.show_alert(__("Creating/updating airline and airport records..."), 3);
+	let promises = [];
+	if (airline_name) {
+		promises.push(frappe.call({
+			method: "nextlayer.next_layer.api.flight_utils.get_or_create_airline",
+			args: { airline_name: airline_name, airline_iata: airline_iata, airline_icao: airline_icao },
+		}));
+	} else { promises.push(Promise.resolve({ message: null })); }
+	if (dep_airport_name) {
+		promises.push(frappe.call({
+			method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+			args: { airport_name: dep_airport_name, airport_iata: dep_airport_iata, airport_icao: dep_airport_icao, airport_city: dep_airport_city, airport_country: dep_airport_country },
+		}));
+	} else { promises.push(Promise.resolve({ message: null })); }
+	if (arr_airport_name) {
+		promises.push(frappe.call({
+			method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+			args: { airport_name: arr_airport_name, airport_iata: arr_airport_iata, airport_icao: arr_airport_icao, airport_city: arr_airport_city, airport_country: arr_airport_country },
+		}));
+	} else { promises.push(Promise.resolve({ message: null })); }
+	Promise.all(promises).then(function(results) {
+		let airline_record = (results[0] && results[0].message) || null;
+		let dep_airport_record = (results[1] && results[1].message) || null;
+		let arr_airport_record = (results[2] && results[2].message) || null;
+		if (dep_airport_record) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "departure_airport", dep_airport_record);
+		}
+		if (arr_airport_record) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "arrival_airport", arr_airport_record);
+		}
+		if (airline_record) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "airlines", airline_record);
+		}
+		if (dep_datetime) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "date_of_travel", dep_datetime);
+		}
+		if (arr_datetime) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "date_of_arrival", arr_datetime);
+		}
+		if (date_of_purchase) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "date_of_purchase", date_of_purchase);
+		}
+		frappe.show_alert(__("Segment filled successfully!"), 3, "green");
+		frm.refresh_field("multi_city_segments");
+	}).catch(function(err) {
+		frappe.show_alert(__("Error filling segment. Check manually."), 5, "red");
+		frappe.log_error(err, "Multi City Flight Fill Error");
+	});
+}
+
 function get_status_color(status) {
 	if (!status) return "#666";
 	const status_lower = status.toLowerCase();
@@ -1654,6 +1882,52 @@ function get_expense_type_for_charges(frm) {
 	if (cat === "" || cat === "All") return null;
 	if (CHARGES_EXPENSE_CATEGORIES.indexOf(cat) !== -1) return cat;
 	return cat;
+}
+
+/** When trip_type is Multi City: ensure one Travel expense row and fill from multi_city_segments (first = departure/PRN/dates, last = arrival). */
+function sync_multi_city_to_expenses(frm) {
+	let segments = frm.doc.multi_city_segments || [];
+	if (segments.length === 0) return;
+	let first = segments[0];
+	let last = segments[segments.length - 1];
+	let travel_row = null;
+	if (frm.doc.expenses && frm.doc.expenses.length > 0) {
+		for (let i = 0; i < frm.doc.expenses.length; i++) {
+			if (frm.doc.expenses[i].expense_type && frm.doc.expenses[i].expense_type.toLowerCase().indexOf("travel") !== -1) {
+				travel_row = frm.doc.expenses[i];
+				break;
+			}
+		}
+	}
+	if (!travel_row) {
+		travel_row = frm.add_child("expenses");
+		travel_row.expense_type = "Travel";
+		travel_row.expense_date = frm.doc.posting_date || frappe.datetime.get_today();
+		travel_row.amount = parseFloat(frm.doc.travel_amount) || 0;
+		travel_row.amount_company_currency = parseFloat(frm.doc.amountcompany_currency) || travel_row.amount;
+		travel_row.sanctioned_amount = travel_row.amount_company_currency || travel_row.amount;
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_type", "Travel");
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_date", travel_row.expense_date);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", travel_row.amount);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount_company_currency", travel_row.amount_company_currency);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", travel_row.sanctioned_amount);
+	}
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_departure_airport", first.departure_airport || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_arrival_airport", last.arrival_airport || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_prn_number", first.custom_prn_number || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_date_of_purchase", first.date_of_purchase || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_travel_type", "Multi-city");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_date_of_travel", first.date_of_travel || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_date_of_arrival", last.date_of_arrival || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_airlines", first.airlines || "");
+	if (frm.doc.travel_amount) {
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", frm.doc.travel_amount);
+	}
+	if (frm.doc.amountcompany_currency) {
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount_company_currency", frm.doc.amountcompany_currency);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", frm.doc.amountcompany_currency);
+	}
+	frm.refresh_field("expenses");
 }
 
 // Helper: find or create child row for given expense_type and update amount / amount_company_currency

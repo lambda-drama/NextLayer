@@ -122,6 +122,18 @@ frappe.query_reports["Travel Expenditure"] = {
 			return `<span style="color: blue; font-weight: 600;">${value}</span>`;
 		}
 
+		// Apply different font weights based on indent level
+		if (data && data.indent !== undefined && data.name !== "Total") {
+			if (data.indent === 0) {
+				// Parent row - bold (700)
+				return `<span style="font-weight: 700;">${value}</span>`;
+			} else if (data.indent === 1) {
+				// First child - semi-bold (600)
+				return `<span style="font-weight: 600;">${value}</span>`;
+			}
+			// indent === 2 or higher - normal weight (default)
+		}
+
 		return value;
 	},
 	onload: function (report) {

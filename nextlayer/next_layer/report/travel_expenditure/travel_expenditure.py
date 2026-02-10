@@ -326,6 +326,12 @@ def get_data(filters):
 		if company_for_display:
 			total_company_currency_code = frappe.get_cached_value("Company", company_for_display, "default_currency") or "USD"
 		
+		# Set Amount (Company Currency) to 0 if:
+		# 1. No company selected in filters, OR
+		# 2. Grouped by Company (different companies have different currencies)
+		if not filters.get("company") or group_by == "Company":
+			total_company_currency = 0
+		
 		total_row = {
 			"name": _("Total"),
 			"account": _("Total"),
