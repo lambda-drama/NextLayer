@@ -476,23 +476,15 @@ def _collect_unique(items):
 def group_by_traveller_name_tree(rows):
 	"""
 	3-level tree structure: 
-	Level 1 (parent): Traveller Name (total)
-	Level 2 (child): Expense Type breakdown
-	Level 3 (grandchild): Individual transactions
+	Level 1 (parent): Traveller Name (total) - amounts only
+	Level 2 (child): Expense Type breakdown - amounts only
+	Level 3 (grandchild): Individual transactions - all details
 	"""
 	travellers = defaultdict(lambda: {
 		"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
 		"company_currency": "",
-		"departure_airport": set(), "arrival_airport": set(), "airline": set(),
-		"travel_type": set(), "voucher_no": set(), "booked_by": set(),
-		"hotel_checkin_date": set(), "hotel_checkout_date": set(), "hotel_days": set(),
-		"hotel_name": set(), "hotel_location": set(), "hotel_country": set(),
 		"children": defaultdict(lambda: {
 			"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
-			"departure_airport": set(), "arrival_airport": set(), "airline": set(),
-			"travel_type": set(), "voucher_no": set(), "booked_by": set(),
-			"hotel_checkin_date": set(), "hotel_checkout_date": set(), "hotel_days": set(),
-			"hotel_name": set(), "hotel_location": set(), "hotel_country": set(),
 			"transactions": [],  # Store individual transactions
 		}),
 	})
@@ -505,30 +497,6 @@ def group_by_traveller_name_tree(rows):
 		t["amount"] += row.get("amount") or 0
 		t["amount_converted"] += row.get("amount_converted") or 0
 		t["amount_company_currency"] += amt_cc
-		if row.get("departure_airport"):
-			t["departure_airport"].add(row["departure_airport"])
-		if row.get("arrival_airport"):
-			t["arrival_airport"].add(row["arrival_airport"])
-		if row.get("airline"):
-			t["airline"].add(row["airline"])
-		if row.get("travel_type"):
-			t["travel_type"].add(row["travel_type"])
-		if row.get("voucher_no"):
-			t["voucher_no"].add(row["voucher_no"])
-		if row.get("booked_by"):
-			t["booked_by"].add(row["booked_by"])
-		if row.get("hotel_checkin_date"):
-			t["hotel_checkin_date"].add(str(row["hotel_checkin_date"]))
-		if row.get("hotel_checkout_date"):
-			t["hotel_checkout_date"].add(str(row["hotel_checkout_date"]))
-		if row.get("hotel_days") is not None:
-			t["hotel_days"].add(str(row["hotel_days"]))
-		if row.get("hotel_name"):
-			t["hotel_name"].add(row["hotel_name"])
-		if row.get("hotel_location"):
-			t["hotel_location"].add(row["hotel_location"])
-		if row.get("hotel_country"):
-			t["hotel_country"].add(row["hotel_country"])
 		if not t["company_currency"]:
 			t["company_currency"] = row.get("company_currency") or "USD"
 		
@@ -536,30 +504,6 @@ def group_by_traveller_name_tree(rows):
 		c["amount"] += row.get("amount") or 0
 		c["amount_converted"] += row.get("amount_converted") or 0
 		c["amount_company_currency"] += amt_cc
-		if row.get("departure_airport"):
-			c["departure_airport"].add(row["departure_airport"])
-		if row.get("arrival_airport"):
-			c["arrival_airport"].add(row["arrival_airport"])
-		if row.get("airline"):
-			c["airline"].add(row["airline"])
-		if row.get("travel_type"):
-			c["travel_type"].add(row["travel_type"])
-		if row.get("voucher_no"):
-			c["voucher_no"].add(row["voucher_no"])
-		if row.get("booked_by"):
-			c["booked_by"].add(row["booked_by"])
-		if row.get("hotel_checkin_date"):
-			c["hotel_checkin_date"].add(str(row["hotel_checkin_date"]))
-		if row.get("hotel_checkout_date"):
-			c["hotel_checkout_date"].add(str(row["hotel_checkout_date"]))
-		if row.get("hotel_days") is not None:
-			c["hotel_days"].add(str(row["hotel_days"]))
-		if row.get("hotel_name"):
-			c["hotel_name"].add(row["hotel_name"])
-		if row.get("hotel_location"):
-			c["hotel_location"].add(row["hotel_location"])
-		if row.get("hotel_country"):
-			c["hotel_country"].add(row["hotel_country"])
 		
 		# Store the transaction for level 3
 		c["transactions"].append(row)
@@ -568,7 +512,7 @@ def group_by_traveller_name_tree(rows):
 	for trav in sorted(travellers.keys()):
 		t = travellers[trav]
 		parent_name = f'<a href="/app/member/{trav}">{trav}</a>' if trav != _("Unspecified") else trav
-		# Level 1: Traveller (Parent) - BOLD
+		# Level 1: Traveller (Parent) - BOLD, amounts only
 		result.append({
 			"name": parent_name,
 			"parent_account": "",
@@ -577,25 +521,26 @@ def group_by_traveller_name_tree(rows):
 			"amount_converted": t["amount_converted"],
 			"amount_company_currency": t["amount_company_currency"],
 			"company_currency": t["company_currency"],
-			"departure_airport": _collect_unique(t["departure_airport"]),
-			"arrival_airport": _collect_unique(t["arrival_airport"]),
-			"airline": _collect_unique(t["airline"]),
-			"travel_type": _collect_unique(t["travel_type"]),
-			"voucher_no": _collect_unique(t["voucher_no"]),
-			"booked_by": _collect_unique(t["booked_by"]),
-			"hotel_checkin_date": _collect_unique(t["hotel_checkin_date"]),
-			"hotel_checkout_date": _collect_unique(t["hotel_checkout_date"]),
-			"hotel_days": _collect_unique(t["hotel_days"]),
-			"hotel_name": _collect_unique(t["hotel_name"]),
-			"hotel_location": _collect_unique(t["hotel_location"]),
-			"hotel_country": _collect_unique(t["hotel_country"]),
-			"bold": 1,  # Make parent bold
+			# No travel details at parent level
+			"departure_airport": "",
+			"arrival_airport": "",
+			"airline": "",
+			"travel_type": "",
+			"voucher_no": "",
+			"booked_by": "",
+			"hotel_checkin_date": "",
+			"hotel_checkout_date": "",
+			"hotel_days": "",
+			"hotel_name": "",
+			"hotel_location": "",
+			"hotel_country": "",
+			"bold": 1,
 		})
 		
 		for exp_type in sorted(t["children"].keys()):
 			c = t["children"][exp_type]
 			child_name = f'<a href="/app/expense-claim-type/{exp_type}">{exp_type}</a>' if exp_type != _("Unspecified") else exp_type
-			# Level 2: Expense Type (Child) - BOLD
+			# Level 2: Expense Type (Child) - BOLD, amounts only
 			result.append({
 				"name": child_name,
 				"parent_account": parent_name,
@@ -604,22 +549,23 @@ def group_by_traveller_name_tree(rows):
 				"amount_converted": c["amount_converted"],
 				"amount_company_currency": c["amount_company_currency"],
 				"company_currency": t["company_currency"],
-				"departure_airport": _collect_unique(c["departure_airport"]),
-				"arrival_airport": _collect_unique(c["arrival_airport"]),
-				"airline": _collect_unique(c["airline"]),
-				"travel_type": _collect_unique(c["travel_type"]),
-				"voucher_no": _collect_unique(c["voucher_no"]),
-				"booked_by": _collect_unique(c["booked_by"]),
-				"hotel_checkin_date": _collect_unique(c["hotel_checkin_date"]),
-				"hotel_checkout_date": _collect_unique(c["hotel_checkout_date"]),
-				"hotel_days": _collect_unique(c["hotel_days"]),
-				"hotel_name": _collect_unique(c["hotel_name"]),
-				"hotel_location": _collect_unique(c["hotel_location"]),
-				"hotel_country": _collect_unique(c["hotel_country"]),
-				"bold": 1,  # Make child bold
+				# No travel details at child level
+				"departure_airport": "",
+				"arrival_airport": "",
+				"airline": "",
+				"travel_type": "",
+				"voucher_no": "",
+				"booked_by": "",
+				"hotel_checkin_date": "",
+				"hotel_checkout_date": "",
+				"hotel_days": "",
+				"hotel_name": "",
+				"hotel_location": "",
+				"hotel_country": "",
+				"bold": 1,
 			})
 			
-			# Level 3: Individual Transactions (Grandchild)
+			# Level 3: Individual Transactions (Grandchild) - ALL DETAILS
 			for transaction in c["transactions"]:
 				te_name = transaction.get("travel_expense") or ""
 				transaction_display = f'<a href="/app/travel-expense/{te_name}">{te_name}</a>' if te_name else _("Transaction")
@@ -631,6 +577,7 @@ def group_by_traveller_name_tree(rows):
 					"amount_converted": transaction.get("amount_converted") or 0,
 					"amount_company_currency": transaction.get("amount_company_currency") or 0,
 					"company_currency": transaction.get("company_currency") or "USD",
+					# Show all travel details at transaction level
 					"departure_airport": transaction.get("departure_airport") or "",
 					"arrival_airport": transaction.get("arrival_airport") or "",
 					"airline": transaction.get("airline") or "",
