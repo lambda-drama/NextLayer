@@ -129,7 +129,7 @@ frappe.query_reports["Travel Expenditure"] = {
 				return `<span style="font-weight: 700;">${value}</span>`;
 			} else if (data.indent === 1) {
 				// First child - semi-bold (600)
-				return `<span style="font-weight: 600;">${value}</span>`;
+				return `<span style="font-weight: 450;">${value}</span>`;
 			}
 			// indent === 2 or higher - normal weight (default)
 		}
