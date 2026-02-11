@@ -713,31 +713,25 @@ frappe.ui.form.on("Sales Taxes and Charges", {
 
 function lookup_flight_for_travel_expense(frm) {
 	let flight_number = frm.doc.flight_no ? frm.doc.flight_no.trim() : "";
-	
-	if (!flight_number) {
+	if (!flight_number) return;
+	if (flight_lookup_in_progress) return;
+
+	// When Historical is ticked: show date-range modal, then fetch via historical API and display like normal lookup; on accept auto-fill travel fields
+	if (frm.doc.historical) {
+		show_historical_date_range_modal(frm, flight_number);
 		return;
 	}
-	
-	// Skip if lookup is already in progress
-	if (flight_lookup_in_progress) {
-		return;
-	}
-	
-	// Get flight date if available
+
+	// Normal flow: use flight_date if entered, else raw
 	let flight_date = null;
 	if (frm.doc.flight_date) {
-		// Convert to YYYY-MM-DD format if it's a date field
 		flight_date = frappe.datetime.str_to_obj(frm.doc.flight_date);
 		if (flight_date) {
-			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(" ")[0];
 		}
 	}
-	
-	// Mark lookup as in progress
 	flight_lookup_in_progress = true;
-	
 	frappe.show_alert(__("Looking up flight information..."), 3);
-	
 	frappe.call({
 		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 		args: {
@@ -745,41 +739,114 @@ function lookup_flight_for_travel_expense(frm) {
 			flight_date: flight_date || null,
 		},
 		callback: function (r) {
-			// Clear lookup flag
 			flight_lookup_in_progress = false;
-			
 			if (r.message) {
 				const result = r.message;
-				
 				if (result.success) {
-					// Show flight details modal for user confirmation (for main form - finds/creates Travel row)
 					show_flight_confirmation_modal(frm, result.data, flight_number, null);
 				} else {
-					frappe.show_alert(
-						__("Failed to fetch flight details: ") + (result.error || "Unknown error"),
-						5,
-						"red"
-					);
-					
+					frappe.show_alert(__("Failed to fetch flight details: ") + (result.error || "Unknown error"), 5, "red");
 					frappe.msgprint({
 						title: __("Flight Lookup Failed"),
-						message: __(`
-							<div style="padding: 10px;">
+						message: __(
+							`<div style="padding: 10px;">
 								<p><strong>Flight Number:</strong> ${flight_number}</p>
 								<p><strong>Error:</strong> ${result.error || "Unknown error"}</p>
 								${result.error_details ? `<p><strong>Details:</strong> ${result.error_details}</p>` : ""}
-							</div>
-						`),
+							</div>`
+						),
 						indicator: "red",
 					});
 				}
 			}
 		},
-		error: function() {
-			// Clear lookup flag on error
+		error: function () {
 			flight_lookup_in_progress = false;
-		}
+		},
 	});
+}
+
+/** When Historical is ticked: ask for From/To date, fetch via historical API, then show same confirmation modal and on accept auto-fill like normal. */
+function show_historical_date_range_modal(frm, flight_number) {
+	let d = new frappe.ui.Dialog({
+		title: __("Historical Flight — Select Date Range"),
+		fields: [
+			{
+				fieldtype: "Section Break",
+				label: __("Date Range"),
+			},
+			{
+				fieldtype: "Data",
+				fieldname: "flight_number_display",
+				label: __("Flight Number"),
+				read_only: 1,
+				default: flight_number,
+			},
+			{
+				fieldtype: "Date",
+				fieldname: "date_from",
+				label: __("From Date"),
+				reqd: 1,
+				description: __("Start of period (YYYY-MM-DD)"),
+			},
+			{
+				fieldtype: "Date",
+				fieldname: "date_to",
+				label: __("To Date"),
+				reqd: 1,
+				description: __("End of period (YYYY-MM-DD)"),
+			},
+		],
+		primary_action_label: __("Fetch"),
+		primary_action: function (values) {
+			d.hide();
+			let date_from = values.date_from || null;
+			let date_to = values.date_to || null;
+			if (!date_from || !date_to) {
+				frappe.msgprint({ title: __("Required"), message: __("Please enter From Date and To Date."), indicator: "orange" });
+				return;
+			}
+			flight_lookup_in_progress = true;
+			frappe.show_alert(__("Fetching historical flight data..."), 3);
+			frappe.call({
+				method: "nextlayer.next_layer.api.aerodata_utils.get_flight_history",
+				args: {
+					flight_number: flight_number,
+					date_from: date_from,
+					date_to: date_to,
+				},
+				callback: function (r) {
+					flight_lookup_in_progress = false;
+					if (!r.message) return;
+					let res = r.message;
+					if (res.success && res.data && res.data.length > 0) {
+						// Show same confirmation modal as normal lookup; on confirm, fill_travel_expense_fields runs and auto-fills travel fields
+						show_flight_confirmation_modal(frm, res.data, flight_number, null);
+					} else {
+						frappe.msgprint({
+							title: __("Historical Lookup Failed"),
+							message: __(
+								"<div style='padding: 10px;'><p><strong>Error:</strong> " +
+								(res.error || "No flights found for this range.") +
+								"</p>" +
+								(res.error_details ? "<p><strong>Details:</strong> " + res.error_details + "</p>" : "") +
+								"</div>"
+							),
+							indicator: "red",
+						});
+					}
+				},
+				error: function () {
+					flight_lookup_in_progress = false;
+				},
+			});
+		},
+		secondary_action_label: __("Cancel"),
+		secondary_action: function () {
+			d.hide();
+		},
+	});
+	d.show();
 }
 
 function setup_second_flight_listeners(frm) {
