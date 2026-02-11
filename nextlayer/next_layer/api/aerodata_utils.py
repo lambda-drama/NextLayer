@@ -269,6 +269,100 @@ def get_flight_details(flight_number, flight_date=None):
 
 
 @frappe.whitelist()
+def get_flight_history(flight_number, date_from=None, date_to=None):
+	"""
+	Get historical (and schedule) flight data for a flight number within a date range.
+	Uses AeroDataBox "Flight History & Schedule (range of dates)" capability.
+	See: https://api.market/store/aedbx/aerodatabox
+
+	Args:
+		flight_number: Flight number (e.g., D3189, AA100)
+		date_from: Start date YYYY-MM-DD
+		date_to: End date YYYY-MM-DD
+
+	Returns:
+		dict: success, data (list of flights), error, error_details
+	"""
+	try:
+		settings = frappe.get_single("Aerodata Settings")
+		if not settings.enabled:
+			return {"success": False, "error": "Aerodata integration is not enabled"}
+		if not settings.api_key:
+			return {"success": False, "error": "API Key is not configured"}
+
+		api_key = settings.get_password("api_key")
+		api_endpoint = settings.api_endpoint or "https://prod.api.market/api/v1/aedbx/aerodatabox"
+		flight_number_upper = (flight_number or "").strip().upper()
+		if not flight_number_upper:
+			return {"success": False, "error": "Flight number is required"}
+
+		# AeroDataBox Flight History & Schedule: range of dates endpoint
+		# Try common patterns: same base path with dateFrom/dateTo or fromDate/toDate
+		url = f"{api_endpoint}/flights/Number/{flight_number_upper}"
+		params = {
+			"dateLocalRole": "Both",
+			"withAircraftImage": "false",
+			"withLocation": "false",
+		}
+		if date_from:
+			params["dateFrom"] = date_from
+		if date_to:
+			params["dateTo"] = date_to
+
+		headers = {
+			"accept": "application/json",
+			"x-api-market-key": api_key,
+		}
+
+		response = requests.get(url, params=params, headers=headers, timeout=30)
+		frappe.logger().info(f"Aerodata History Request: {url} params={params} status={response.status_code}")
+
+		if response.status_code == 200:
+			data = response.json()
+			flights = None
+			if isinstance(data, list):
+				flights = data
+			elif isinstance(data, dict):
+				flights = data.get("data") or data.get("flights") or data.get("results")
+				if not flights and "number" in data:
+					flights = [data]
+			if not flights:
+				flights = []
+
+			# Normalize to list of flight objects (same shape as get_flight_details)
+			return {
+				"success": True,
+				"data": flights,
+				"count": len(flights),
+				"flight_number": flight_number_upper,
+				"date_from": date_from,
+				"date_to": date_to,
+			}
+		elif response.status_code in (400, 404):
+			body = response.text[:500] if response.text else ""
+			return {
+				"success": False,
+				"error": f"API returned {response.status_code}",
+				"error_details": body or "No flight history found for this range.",
+			}
+		elif response.status_code == 401:
+			return {"success": False, "error": "Invalid API Key", "error_details": "Check Aerodata Settings."}
+		else:
+			return {
+				"success": False,
+				"error": f"Request failed with status {response.status_code}",
+				"error_details": (response.text or "")[:500],
+			}
+	except Exception as e:
+		frappe.log_error(f"Aerodata get_flight_history: {str(e)}", "Aerodata History")
+		return {
+			"success": False,
+			"error": "Failed to fetch historical data",
+			"error_details": str(e),
+		}
+
+
+@frappe.whitelist()
 def test_connection():
 	"""
 	Test the connection to Aerodata API

@@ -20,8 +20,209 @@ frappe.ui.form.on("Aerodata Settings", {
 			},
 			__("Actions")
 		).addClass("btn-info");
+
+		// Add button to check historical data (Flight History & Schedule range of dates)
+		frm.add_custom_button(
+			__("Check Historical Data"),
+			function () {
+				historical_data_modal(frm);
+			},
+			__("Actions")
+		).addClass("btn-default");
 	},
 });
+
+function historical_data_modal(frm) {
+	let d = new frappe.ui.Dialog({
+		title: __("Check Historical Data"),
+		fields: [
+			{
+				fieldtype: "Section Break",
+				label: __("Flight & Date Range"),
+			},
+			{
+				fieldtype: "Data",
+				fieldname: "flight_number",
+				label: __("Flight Number"),
+				description: __(
+					"e.g. D3189, AA100. Historical and schedule data for this flight in the selected date range."
+				),
+				reqd: 1,
+			},
+			{
+				fieldtype: "Date",
+				fieldname: "date_from",
+				label: __("Date From"),
+				description: __("Start date (YYYY-MM-DD). Optional for some plans."),
+			},
+			{
+				fieldtype: "Date",
+				fieldname: "date_to",
+				label: __("Date To"),
+				description: __("End date (YYYY-MM-DD). Optional for some plans."),
+			},
+			{
+				fieldtype: "Column Break",
+			},
+			{
+				fieldtype: "HTML",
+				fieldname: "historical_help",
+				options: `
+					<div style="padding: 10px; background: #e3f2fd; border-radius: 5px; font-size: 12px;">
+						<p><strong>Flight History & Schedule (range of dates)</strong></p>
+						<p>AeroDataBox returns current, future and historical flights for the flight number in the given range.</p>
+						<p><a href="https://api.market/store/aedbx/aerodatabox" target="_blank" rel="noopener">API.Market – AeroDataBox</a></p>
+					</div>
+				`,
+			},
+		],
+		primary_action_label: __("Fetch Historical Data"),
+		primary_action: function (values) {
+			lookup_historical_data(frm, values);
+			d.hide();
+		},
+		secondary_action_label: __("Cancel"),
+		secondary_action: function () {
+			d.hide();
+		},
+	});
+	d.show();
+}
+
+function lookup_historical_data(frm, values) {
+	let flight_number = (values.flight_number || "").trim();
+	if (!flight_number) {
+		frappe.msgprint({ title: __("Required"), message: __("Please enter a flight number."), indicator: "orange" });
+		return;
+	}
+	frappe.show_alert(__("Fetching historical data..."), 3);
+	frappe.call({
+		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_history",
+		args: {
+			flight_number: flight_number,
+			date_from: values.date_from || null,
+			date_to: values.date_to || null,
+		},
+		callback: function (r) {
+			if (!r.message) return;
+			let res = r.message;
+			if (res.success) {
+				display_historical_results(res);
+			} else {
+				frappe.msgprint({
+					title: __("Historical Data Failed"),
+					message: __(
+						"<div style='padding: 10px;'><p><strong>Error:</strong> " +
+						(res.error || "Unknown error") +
+						"</p>" +
+						(res.error_details ? "<p><strong>Details:</strong> " + res.error_details + "</p>" : "") +
+						"</div>"
+					),
+					indicator: "red",
+				});
+			}
+		},
+	});
+}
+
+function display_historical_results(res) {
+	let flights = res.data || [];
+	let count = res.count != null ? res.count : flights.length;
+	let flight_number_label = res.flight_number || "";
+	let date_from = res.date_from || "";
+	let date_to = res.date_to || "";
+
+	if (flights.length === 0) {
+		frappe.msgprint({
+			title: __("Historical Data"),
+			message: __(
+				"<div style='padding: 15px;'><p>No flights found for <strong>" +
+				flight_number_label +
+				"</strong>" +
+				(date_from || date_to ? " in the selected date range." : ".") +
+				"</p><p>Try a different flight number or date range.</p></div>"
+			),
+			indicator: "orange",
+		});
+		return;
+	}
+
+	let message = `
+		<div style="padding: 15px; max-width: 960px;">
+			<h3 style="margin-top: 0;">Historical / schedule data: ${flight_number_label}</h3>
+			<p style="color: #666; margin-bottom: 20px;">${count} flight(s) found${date_from || date_to ? " (" + (date_from || "?") + " to " + (date_to || "?") + ")" : ""}</p>
+	`;
+	flights.forEach(function (flight, index) {
+		let departure = flight.departure || {};
+		let arrival = flight.arrival || {};
+		let dep_airport = departure.airport || {};
+		let arr_airport = arrival.airport || {};
+		let dep_scheduled = departure.scheduledTime || {};
+		let arr_scheduled = arrival.scheduledTime || {};
+		let arr_predicted = arrival.predictedTime || {};
+		let airline = flight.airline || {};
+		let aircraft = flight.aircraft || {};
+		let status = flight.status || "N/A";
+		let distance = flight.greatCircleDistance || {};
+		let flight_num = flight.number || flight.flightNumber || flight_number_label;
+		message += `
+			<div style="background: #fafafa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2196f3; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+				<h4 style="margin: 0 0 15px 0; color: #333;">✈️ Flight ${flight_num}${flights.length > 1 ? " — #" + (index + 1) : ""}</h4>
+				<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+					<div style="background: #f5f5f5; padding: 12px; border-radius: 5px;">
+						<h5 style="margin: 0 0 8px 0; color: #333;">Flight Details</h5>
+						<p style="margin: 4px 0;"><strong>Flight Number:</strong> ${flight_num}</p>
+						<p style="margin: 4px 0;"><strong>Airline:</strong> ${airline.name || "N/A"} (${airline.iata || ""}${airline.icao ? " / " + airline.icao : ""})</p>
+						<p style="margin: 4px 0;"><strong>Aircraft:</strong> ${aircraft.model || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: ${get_status_color(status)}; font-weight: bold;">${status}</span></p>
+						${distance.km ? `<p style="margin: 4px 0;"><strong>Distance:</strong> ${distance.km} km (${distance.mile || ""} miles)</p>` : ""}
+					</div>
+					<div style="background: #f5f5f5; padding: 12px; border-radius: 5px;">
+						<h5 style="margin: 0 0 8px 0; color: #333;">Route</h5>
+						<p style="margin: 4px 0;"><strong>From:</strong> ${dep_airport.name || dep_airport.shortName || "N/A"} (${dep_airport.iata || "N/A"})</p>
+						<p style="margin: 4px 0;"><strong>To:</strong> ${arr_airport.name || arr_airport.shortName || "N/A"} (${arr_airport.iata || "N/A"})</p>
+						${dep_airport.municipalityName ? `<p style="margin: 4px 0;"><strong>Departure City:</strong> ${dep_airport.municipalityName}</p>` : ""}
+						${arr_airport.municipalityName ? `<p style="margin: 4px 0;"><strong>Arrival City:</strong> ${arr_airport.municipalityName}</p>` : ""}
+					</div>
+				</div>
+				<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+					<div style="background: #e3f2fd; padding: 12px; border-radius: 5px;">
+						<h5 style="margin: 0 0 8px 0; color: #1976d2;">🛫 Departure</h5>
+						<p style="margin: 4px 0;"><strong>Airport:</strong> ${dep_airport.name || dep_airport.shortName || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Code:</strong> ${dep_airport.iata || "N/A"} / ${dep_airport.icao || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Terminal:</strong> ${departure.terminal || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Scheduled (Local):</strong> ${dep_scheduled.local || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Scheduled (UTC):</strong> ${dep_scheduled.utc || "N/A"}</p>
+						${dep_airport.timeZone ? `<p style="margin: 4px 0;"><strong>Time Zone:</strong> ${dep_airport.timeZone}</p>` : ""}
+					</div>
+					<div style="background: #e8f5e9; padding: 12px; border-radius: 5px;">
+						<h5 style="margin: 0 0 8px 0; color: #388e3c;">🛬 Arrival</h5>
+						<p style="margin: 4px 0;"><strong>Airport:</strong> ${arr_airport.name || arr_airport.shortName || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Code:</strong> ${arr_airport.iata || "N/A"} / ${arr_airport.icao || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Terminal:</strong> ${arrival.terminal || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Scheduled (Local):</strong> ${arr_scheduled.local || "N/A"}</p>
+						<p style="margin: 4px 0;"><strong>Scheduled (UTC):</strong> ${arr_scheduled.utc || "N/A"}</p>
+						${arr_predicted.local ? `<p style="margin: 4px 0;"><strong>Predicted (Local):</strong> <span style="color: #ff9800;">${arr_predicted.local}</span></p>` : ""}
+						${arr_predicted.utc ? `<p style="margin: 4px 0;"><strong>Predicted (UTC):</strong> <span style="color: #ff9800;">${arr_predicted.utc}</span></p>` : ""}
+						${arr_airport.timeZone ? `<p style="margin: 4px 0;"><strong>Time Zone:</strong> ${arr_airport.timeZone}</p>` : ""}
+					</div>
+				</div>
+				${flight.lastUpdatedUtc ? `
+					<div style="margin-top: 12px; padding: 8px; background: #f5f5f5; border-radius: 5px;">
+						<p style="margin: 0; color: #666; font-size: 12px;"><strong>Last Updated:</strong> ${format_datetime(flight.lastUpdatedUtc)}</p>
+					</div>
+				` : ""}
+			</div>
+		`;
+	});
+	message += "</div>";
+
+	frappe.msgprint({
+		title: __("Historical Data"),
+		message: message,
+		indicator: "green",
+	});
+}
 
 function lookup_flight_modal(frm) {
 	// Create modal dialog for flight lookup

@@ -11,8 +11,9 @@
   "naming_series",
   "company",
   "currency",
-  "expense_category",
   "travel_group",
+  "expense_category",
+  "trip_type",
   "is_addition",
   "refund",
   "original_expense",
@@ -20,7 +21,7 @@
   "posting_date",
   "traveler_name",
   "in_transit",
-  "trip_type",
+  "historical",
   "flight_date",
   "flight_no",
   "flight_no_2",
@@ -738,6 +739,13 @@
    "fieldtype": "Select",
    "label": "Trip Type",
    "options": "\nIn Transit\nMulti City"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.expense_category==\"Travel\"",
+   "fieldname": "historical",
+   "fieldtype": "Check",
+   "label": "Historical"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -752,7 +760,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-02-11 00:06:52.202775",
+ "modified": "2026-02-12 02:08:07.207538",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
