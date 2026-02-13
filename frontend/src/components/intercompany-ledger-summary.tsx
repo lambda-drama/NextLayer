@@ -79,8 +79,19 @@ export default function InterCompanyLedgerSummary() {
 
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
-  const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
+  const { companies: permissionAwareCompanies, isLoading: permissionCompaniesLoading } = usePermissionAwareCompanies()
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
+
+  // Company filter: same as Intercompany Ledger Reconciliation — only show companies the user has permission to
+  const displayCompaniesForFilter = permissionAwareCompanies
+
+  // Clear selected company if it is not in the permitted list (e.g. after permission change or restored state)
+  useEffect(() => {
+    if (company && displayCompaniesForFilter.length > 0 && !displayCompaniesForFilter.some((c) => c.name === company)) {
+      setCompany("")
+    }
+  }, [company, displayCompaniesForFilter])
+
   // Use ledger summary hooks - only fetch when hasLoadedData is true
   const { data: customerLedgerData, isLoading: isLoadingCustomer, error: errorCustomer } = useLedgerSummary({
     company: company,
@@ -448,23 +459,18 @@ export default function InterCompanyLedgerSummary() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Company</label>
                 <Combobox
-                  options={[
-                    ...(allCompanies?.length ? allCompanies : companies).map((companyItem) => ({
-                      name: ("company_name" in companyItem ? companyItem.company_name : companyItem.name) ?? companyItem.name,
-                      value: companyItem.name,
-                    })),
-                    ...(company && !(allCompanies?.length ? allCompanies : companies).some((c) => c.name === company)
-                      ? [{ name: company, value: company }]
-                      : []),
-                  ]}
+                  options={displayCompaniesForFilter.map((companyItem) => ({
+                    name: ("company_name" in companyItem ? companyItem.company_name : companyItem.name) ?? companyItem.name,
+                    value: companyItem.name,
+                  }))}
                   value={company}
                   onValueChange={setCompany}
                   placeholder={
-                    allCompaniesLoading ? "Loading..." :
-                    (allCompanies.length === 0 && companies.length === 0) ? "No companies available" :
+                    permissionCompaniesLoading ? "Loading..." :
+                    displayCompaniesForFilter.length === 0 ? "No companies available" :
                     "Select Company"
                   }
-                  disabled={allCompaniesLoading || (allCompanies.length === 0 && companies.length === 0)}
+                  disabled={permissionCompaniesLoading || displayCompaniesForFilter.length === 0}
                   searchPlaceholder="Search companies..."
                   emptyMessage="No companies found."
                 />
