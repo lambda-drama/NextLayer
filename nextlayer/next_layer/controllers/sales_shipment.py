@@ -260,6 +260,40 @@ def recreate_sales_shipment_cost_gl_for_repost_doc(account_repost_doc):
             recreate_sales_shipment_cost_gl_for_sales_invoice(x.voucher_no)
 
 
+def _normalize_riv_vouchers(vouchers):
+    """Ensure each item is (voucher_type, voucher_no) for RIV voucher lists."""
+    out = []
+    for v in vouchers or []:
+        if isinstance(v, (list, tuple)) and len(v) >= 2:
+            out.append((v[0], v[1]))
+        elif isinstance(v, dict):
+            vt, vn = v.get("voucher_type"), v.get("voucher_no")
+            if vt and vn:
+                out.append((vt, vn))
+    return out
+
+
+def recreate_sales_shipment_cost_gl_after_repost_item_valuation(vouchers):
+    """
+    Recreate Sales Shipment Cost GL for every Sales Invoice in the list of
+    (voucher_type, voucher_no) that was reposted by Repost Item Valuation.
+    Same approach as Repost Accounting Ledger: repost wipes all GL for the
+    voucher and recreates only from voucher.get_gl_entries(), so SSC GL are
+    recreated here.
+    """
+    if not vouchers:
+        return
+    for voucher_type, voucher_no in vouchers:
+        if voucher_type == "Sales Invoice" and voucher_no:
+            try:
+                recreate_sales_shipment_cost_gl_for_sales_invoice(voucher_no)
+            except Exception as e:
+                frappe.log_error(
+                    message=f"Recreate Sales Shipment Cost GL for SI {voucher_no} after Repost Item Valuation: {e}",
+                    title="Recreate Sales Shipment Cost GL (RIV)",
+                )
+
+
 def _recreate_sales_shipment_cost_gl_for_repost_doc_after_delay(account_repost_doc, delay_seconds=90):
     """
     Sleep then recreate SSC GL. Used when repost runs in background so our step
@@ -291,6 +325,43 @@ def recreate_sales_shipment_cost_gl_after_repost_submit(doc, method=None):
         )
     else:
         recreate_sales_shipment_cost_gl_for_repost_doc(doc.name)
+
+
+@frappe.whitelist()
+def repost_all_sales_shipment_cost_gl_for_company(company):
+    """
+    Find all submitted Sales Shipment Cost for the given company that have no
+    GL entries (or need reposting) and repost GL for each. Used by the
+    "Repost SSC" button on Company form.
+    """
+    allowed_roles = {"System Manager", "Administrator", "Stock Manager"}
+    if not set(frappe.get_roles(frappe.session.user)).intersection(allowed_roles):
+        frappe.throw(
+            _("You do not have permission. Only System Manager, Administrator, or Stock Manager can repost.")
+        )
+    if not company:
+        return {"reposted": 0, "total_checked": 0, "error": "Company is required"}
+
+    names = frappe.get_all(
+        "Sales Shipment Cost",
+        filters={"company": company, "docstatus": 1},
+        pluck="name",
+    )
+    reposted = 0
+    for docname in names:
+        result = check_gl_entries_exist(docname)
+        if result and not result.get("exists"):
+            try:
+                doc = frappe.get_doc("Sales Shipment Cost", docname)
+                delete_gl_entries(doc)
+                _make_gl_entries(doc)
+                reposted += 1
+            except Exception as e:
+                frappe.log_error(
+                    message=f"Repost SSC for company {company}, doc {docname}: {e}",
+                    title="Repost All Sales Shipment Cost GL",
+                )
+    return {"reposted": reposted, "total_checked": len(names)}
 
 
 @frappe.whitelist()
@@ -365,3 +436,50 @@ def update_landed_cost_rows(doc, method):
             else:
                 row.exchange_rate = 1
                 row.base_amount = row.amount
+
+
+def _apply_repost_item_valuation_patch():
+    """
+    Patch Repost Item Valuation so that after each repost we recreate Sales
+    Shipment Cost GL for affected Sales Invoices. "Start Reposting" enqueues the
+    scheduler job repost_entries(), which calls repost(doc) — it never calls
+    repost_now(), so we patch the module-level repost() and the scheduler entry
+    repost_entries() to ensure our code runs.
+    """
+    try:
+        import erpnext.stock.doctype.repost_item_valuation.repost_item_valuation as riv_module
+    except ImportError:
+        return
+    if getattr(riv_module, "_nextlayer_riv_patch_applied", False):
+        return
+
+    _original_repost = riv_module.repost
+
+    def _repost_with_ssc_recreate(doc):
+        _original_repost(doc)
+        # After repost: recreate Sales Shipment Cost GL for affected Sales Invoices
+        try:
+            directly_dependent = list(riv_module._get_directly_dependent_vouchers(doc))
+            affected = list(riv_module.get_affected_transactions(doc))
+            vouchers = _normalize_riv_vouchers(directly_dependent + affected)
+            recreate_sales_shipment_cost_gl_after_repost_item_valuation(vouchers)
+        except Exception as e:
+            frappe.log_error(
+                message=f"Recreate Sales Shipment Cost GL after RIV {getattr(doc, 'name', '')}: {e}",
+                title="Recreate Sales Shipment Cost GL (RIV)",
+            )
+
+    riv_module.repost = _repost_with_ssc_recreate
+
+    # Ensure patch is applied when scheduler runs repost_entries (worker may load erpnext first)
+    _original_repost_entries = riv_module.repost_entries
+
+    def _repost_entries_with_patch():
+        _apply_repost_item_valuation_patch()
+        return _original_repost_entries()
+
+    riv_module.repost_entries = _repost_entries_with_patch
+    riv_module._nextlayer_riv_patch_applied = True
+
+
+_apply_repost_item_valuation_patch()

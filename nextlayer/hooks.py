@@ -281,10 +281,9 @@ jinja = {
 # DocType Class
 # ---------------
 # Override standard doctype classes
-
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Repost Item Valuation": "nextlayer.next_layer.overrides.repost_item_valuation.RepostItemValuationOverride",
+}
 
 # Document Events
 # ---------------
@@ -349,8 +348,7 @@ jinja = {
 
 # Request Events
 # ----------------
-# before_request = ["nextlayer.utils.before_request"]
-# after_request = ["nextlayer.utils.after_request"]
+# before_request / after_request not used for RIV; use override_doctype_class + app init patch
 
 # Job Events
 # ----------
