@@ -4,6 +4,8 @@ app_publisher = "jr@gmail.com"
 app_description = "More improvements on ERPNext"
 app_email = "jr@gmail.com"
 app_license = "mit"
+app_icon = "fa fa-exchange"
+app_icon_url = "/assets/nextlayer/logo.jpeg"
 
 # Apps
 # ------------------
@@ -11,15 +13,15 @@ app_license = "mit"
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "nextlayer",
-# 		"logo": "/assets/nextlayer/logo.png",
-# 		"title": "Next Layer",
-# 		"route": "/nextlayer",
-# 		"has_permission": "nextlayer.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "nextlayer",
+		"logo": "/assets/nextlayer/logo.jpeg",
+		"title": "Next Layer",
+		"route": "/nextlayer",
+		# "has_permission": "nextlayer.api.permission.has_app_permission"
+	}
+]
 
 fixtures = [
     {
