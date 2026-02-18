@@ -75,7 +75,17 @@ fixtures = [
                     "Sales Invoice-custom_registered_owner",
                     "Customer Group-custom_unique_gl_series",
                     "Journal Entry Account-custom_travel_expense_ref",
-                    "Journal Entry-custom_intercompany_match_details"
+                    "Journal Entry-custom_intercompany_match_details",
+                    
+                    #Sales Order
+                    "Sales Order-custom_engine",
+                    "Sales Order-custom_chassis_no",
+                    "Sales Order-custom_column_break_l7nyf",
+                    "Sales Order-custom_model",
+                    "Sales Order-custom_color",
+                    "Sales Order-custom_registered_owner",
+                    "Sales Order-custom_assembled_by",
+                    "Sales Order-custom_owner_information",
                 ),
             ]
         ],

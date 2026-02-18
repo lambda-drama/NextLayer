@@ -1,6 +1,25 @@
 [
  {
   "allow_guest": 1,
+  "api_method": "generate_custom_invoice_no",
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Insert",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2026-02-04 14:46:57.111625",
+  "module": null,
+  "name": "Generate Invoice Number",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": null,
+  "script": "company = frappe.form_dict.get('company')\n\n# Define abbreviations for specific companies\nif company == \"CITYWALK FOOTWEAR PVT LTD\":\n    abbr = \"CW/EX\"\nelif company == \"Royal Pacific Private Limited\":\n    abbr = \"R/EXP\"\nelif company == \"GL GENERAL TRADING Mogadishu\":\n    abbr = \"GLI/EXP\"\nelse:\n    abbr = frappe.db.get_value('Company', company, 'abbr')\n\nif not abbr:\n    frappe.throw(_('Company abbreviation not found'))\n\n# Get the current fiscal year\ncurrent_date = frappe.utils.today()\ncurrent_fiscal_year = frappe.db.get_value('Fiscal Year', {\n    'year_start_date': ['<=', current_date],\n    'year_end_date': ['>=', current_date]\n}, 'name')\n\nif not current_fiscal_year:\n    frappe.throw(_('Fiscal Year not found for the current date'))\n\n# Check if the company's country is India\ncountry = frappe.db.get_value('Company', company, 'country')\nif country == \"India\":\n    # Format fiscal year for India as \"24-25\"\n    start_year = current_fiscal_year.split('-')[0][-2:]\n    end_year = f\"{int(start_year) + 1:02d}\"\n    formatted_fiscal_year = f\"{start_year}-{end_year}\"\nelse:\n    formatted_fiscal_year = current_fiscal_year\n\n# Define cutoff date - hard reset from this date onwards\nCUTOFF_DATE = frappe.utils.getdate(\"2026-02-01\")\ntoday_date = frappe.utils.getdate(frappe.utils.today())\n\nif today_date >= CUTOFF_DATE:\n    # After cutoff date: get invoices created on or after the cutoff date only\n    last_invoice = frappe.db.sql(\"\"\"\n        SELECT name, custom_invoice_no\n        FROM `tabSales Invoice`\n        WHERE company = %s \n        AND custom_invoice_no LIKE %s\n        AND creation >= %s\n        AND SUBSTRING_INDEX(SUBSTRING_INDEX(custom_invoice_no, '/', 1), '-', -1) REGEXP '^[0-9]+$'\n        ORDER BY\n            CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(custom_invoice_no, '/', 1), '-', -1) AS UNSIGNED) DESC\n        LIMIT 1\n    \"\"\", (company, f\"{abbr}%/{formatted_fiscal_year}\", CUTOFF_DATE), as_dict=True)\n    \n    if last_invoice:\n        last_number_part = last_invoice[0].custom_invoice_no.split('-')[1].split('/')[0]\n        new_number = int(last_number_part) + 1\n    else:\n        # No invoices created after cutoff, start from 1\n        new_number = 1\nelse:\n    # Before cutoff date: use old logic\n    last_invoice = frappe.db.sql(\"\"\"\n        SELECT name, custom_invoice_no\n        FROM `tabSales Invoice`\n        WHERE company = %s \n        AND custom_invoice_no LIKE %s\n        AND SUBSTRING_INDEX(SUBSTRING_INDEX(custom_invoice_no, '/', 1), '-', -1) REGEXP '^[0-9]+$'\n        ORDER BY\n            CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(custom_invoice_no, '/', 1), '-', -1) AS UNSIGNED) DESC\n        LIMIT 1\n    \"\"\", (company, f\"{abbr}%/{formatted_fiscal_year}\"), as_dict=True)\n    \n    if last_invoice:\n        last_number_part = last_invoice[0].custom_invoice_no.split('-')[1].split('/')[0]\n        new_number = int(last_number_part) + 1\n    else:\n        new_number = 1\n\n# Generate the new invoice number\nnew_invoice_no = f\"{abbr}-{new_number:03d}/{formatted_fiscal_year}\"\n\n# Set the generated invoice number as the response\nfrappe.response['message'] = new_invoice_no",
+  "script_type": "API"
+ },
+ {
+  "allow_guest": 1,
   "api_method": "get_uom_conversion_factors",
   "cron_format": null,
   "disabled": 0,
@@ -1499,5 +1518,24 @@
   "reference_doctype": null,
   "script": "# Update remaining days for Sales Invoices\nsales_invoices = frappe.get_all(\"Sales Invoice\", filters={\"docstatus\": 1}, fields=[\"name\", \"custom_estimated_date_of_arrival\"])\ntoday = frappe.utils.nowdate()\n\nfor doc in sales_invoices:\n    estimated_arrival = doc.custom_estimated_date_of_arrival\n    if estimated_arrival:\n        difference = frappe.utils.date_diff(estimated_arrival, today)\n        frappe.db.set_value(\"Sales Invoice\", doc.name, \"custom_remaining_days\", difference, update_modified=False)\n\n# Update remaining days for Purchase Invoices\npurchase_invoices = frappe.get_all(\"Purchase Invoice\", filters={\"docstatus\": 1}, fields=[\"name\", \"custom_estimated_date_of_arrival\"])\n\nfor doc in purchase_invoices:\n    estimated_arrival = doc.custom_estimated_date_of_arrival\n    if estimated_arrival:\n        difference = frappe.utils.date_diff(estimated_arrival, today)\n        frappe.db.set_value(\"Purchase Invoice\", doc.name, \"custom_remaining_days\", difference, update_modified=False)\n",
   "script_type": "Scheduler Event"
+ },
+ {
+  "allow_guest": 0,
+  "api_method": null,
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "After Save",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2026-02-14 20:13:28.773477",
+  "module": null,
+  "name": "Ensure Fetching Container Conversion",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": "Sales Invoice",
+  "script": "for item in doc.items:\n    if not item.item_code:\n        continue\n\n    # Load Item master\n    item_doc = frappe.get_doc(\"Item\", item.item_code)\n\n    container_conversion = None\n    carton_conversion = None\n\n    # Read UOM conversions\n    for uom_row in item_doc.uoms:\n        if uom_row.uom == \"Container\":\n            container_conversion = uom_row.conversion_factor\n\n        elif uom_row.uom == \"Carton\":\n            carton_conversion = uom_row.conversion_factor\n\n    # ---- Update Container ----\n    if (\n        container_conversion\n        and frappe.utils.flt(item.container_conversion_factor)\n            != frappe.utils.flt(container_conversion)\n    ):\n        frappe.db.set_value(\n            item.doctype,\n            item.name,\n            \"container_conversion_factor\",\n            container_conversion,\n            update_modified=False\n        )\n\n    # ---- Update Carton ----\n    if (\n        carton_conversion\n        and frappe.utils.flt(item.carton_conversion_factor)\n            != frappe.utils.flt(carton_conversion)\n    ):\n        frappe.db.set_value(\n            item.doctype,\n            item.name,\n            \"carton_conversion_factor\",\n            carton_conversion,\n            update_modified=False\n        )\n",
+  "script_type": "DocType Event"
  }
 ]
