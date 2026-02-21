@@ -9,7 +9,7 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff, ArrowUpDown } from "lucide-react"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff, ArrowUpDown, Package } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -796,12 +796,7 @@ export default function IntercompanyReconciliation() {
 
   // Function to find matching entries between Company A and Company B (on FULL data first)
   const findMatchingEntries = useMemo(() => {
-    console.log("[findMatchingEntries] Starting matching process:", {
-      glDataACount: glDataA.length,
-      glDataBCount: glDataB.length,
-      permissionAwareDataACount: permissionAwareDataA.length,
-      permissionAwareDataBCount: permissionAwareDataB.length
-    })
+   
     
     // Allow processing if at least one company has data (don't require both)
     if (!glDataA.length && !glDataB.length) {
@@ -3122,6 +3117,15 @@ export default function IntercompanyReconciliation() {
               >
                 <Building2 className="h-4 w-4" />
                 <span>Ledger Summary</span>
+              </Button>
+            </Link>
+            <Link to="/import-export">
+              <Button
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <Package className="h-4 w-4" />
+                <span>Import/Export</span>
               </Button>
             </Link>
           </div>
