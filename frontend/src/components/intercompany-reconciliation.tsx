@@ -800,7 +800,7 @@ export default function IntercompanyReconciliation() {
     
     // Allow processing if at least one company has data (don't require both)
     if (!glDataA.length && !glDataB.length) {
-      console.log("[findMatchingEntries] No data, returning empty arrays")
+      console.log('')
       return { glDataAWithStatus: [], glDataBWithStatus: [] }
     }
 
