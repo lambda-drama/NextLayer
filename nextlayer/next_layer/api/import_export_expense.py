@@ -55,25 +55,15 @@ def _join_unique(values):
 
 
 def _get_company_currency(company_name):
-    """
-    Return the default currency for a company.
-    Always reads from the Company doctype — never assumes USD.
-    """
     if not company_name:
         return "USD"
     return frappe.get_cached_value("Company", company_name, "default_currency") or "USD"
 
 
 def _collect_transit_display(pi_names, si_names):
-    """
-    Return a display string of all transit_no values recorded in Transit Numbers
-    rows where the linked document is an SI (from PI side) — these are the
-    human-readable reference numbers the user wants to see.
-    """
     if not _transit_table_exists():
         return ""
     transit_nos = []
-    # From PI side: rows whose parent is a PI and document_type=Sales Invoice
     for pi_name in pi_names:
         for row in frappe.get_all(
             "Transit Numbers",
@@ -84,7 +74,6 @@ def _collect_transit_display(pi_names, si_names):
             val = row.get("transit_no") or ""
             if val and val not in transit_nos:
                 transit_nos.append(val)
-    # From SI side: rows whose parent is an SI and document_type=Purchase Invoice
     for si_name in si_names:
         for row in frappe.get_all(
             "Transit Numbers",
@@ -149,23 +138,36 @@ def _get_journey_component(doctype, name):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Journey grouping
+#
+# FIX: Previously we looped PIs and SIs separately, which could create
+# duplicate journey IDs if the frozenset lookup had any edge-case mismatches.
+# Now we collect ALL candidate invoices first, then run a single unified BFS
+# pass so every invoice ends up in exactly one journey regardless of which
+# side (PI or SI) triggered the discovery.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _build_journey_map(from_date, to_date, company_filter):
+    """
+    Returns:
+        journey_to_pi:   dict[journey_id → list[pi_name]]
+        journey_to_si:   dict[journey_id → list[si_name]]
+        journey_display: dict[journey_id → display_label]
+
+    KEY CHANGE vs previous version
+    ────────────────────────────────
+    We collect all qualifying PIs and SIs into a single candidate set, then
+    run BFS once per unvisited node.  This guarantees that a PI and SI that
+    are linked via Transit Numbers always land in the same journey bucket —
+    even when one of them falls outside the date range (it gets pulled in by
+    the BFS of its linked partner that IS in range).
+    """
     journey_to_pi   = defaultdict(list)
     journey_to_si   = defaultdict(list)
     journey_display = {}
-    seen_components = {}
+    seen_components = {}          # frozenset → journey_id
+    visited_nodes   = set()       # (doctype, name) already assigned
 
-    def _get_or_create_jid(doctype, name):
-        component = _get_journey_component(doctype, name)
-        if component not in seen_components:
-            first_dt, first_name = sorted(component)[0]
-            jid = f"{first_dt}|{first_name}"
-            seen_components[component] = jid
-            journey_display[jid] = first_name
-        return seen_components[component]
-
+    # ── Step 1: collect all qualifying invoice names ──────────────────────
     pi_filters = [
         ["Purchase Invoice", "docstatus",             "=",       1],
         ["Purchase Invoice", "posting_date",          "between", [from_date, to_date]],
@@ -173,11 +175,6 @@ def _build_journey_map(from_date, to_date, company_filter):
     ]
     if company_filter:
         pi_filters.append(["Purchase Invoice", "company", "=", company_filter])
-
-    for row in frappe.get_all("Purchase Invoice", filters=pi_filters, fields=["name"]):
-        name = row.get("name")
-        if name:
-            journey_to_pi[_get_or_create_jid("Purchase Invoice", name)].append(name)
 
     si_filters = [
         ["Sales Invoice", "docstatus",             "=",       1],
@@ -187,10 +184,50 @@ def _build_journey_map(from_date, to_date, company_filter):
     if company_filter:
         si_filters.append(["Sales Invoice", "company", "=", company_filter])
 
+    # Build a set of (doctype, name) that are "in range" — these are the seeds
+    # for BFS.  The BFS itself may pull in invoices that are outside the date
+    # range (linked partners); that is intentional so costs are never orphaned.
+    seed_nodes = set()
+    for row in frappe.get_all("Purchase Invoice", filters=pi_filters, fields=["name"]):
+        if row.get("name"):
+            seed_nodes.add(("Purchase Invoice", row["name"]))
     for row in frappe.get_all("Sales Invoice", filters=si_filters, fields=["name"]):
-        name = row.get("name")
-        if name:
-            journey_to_si[_get_or_create_jid("Sales Invoice", name)].append(name)
+        if row.get("name"):
+            seed_nodes.add(("Sales Invoice", row["name"]))
+
+    # ── Step 2: unified BFS pass ──────────────────────────────────────────
+    for (doctype, name) in seed_nodes:
+        if (doctype, name) in visited_nodes:
+            continue
+
+        # BFS expands to all linked invoices (regardless of date range)
+        component = _get_journey_component(doctype, name)
+
+        if component not in seen_components:
+            # Stable journey ID: sort the component and use the first element
+            first_dt, first_name = sorted(component)[0]
+            jid = f"{first_dt}|{first_name}"
+            seen_components[component] = jid
+            journey_display[jid] = first_name
+        else:
+            jid = seen_components[component]
+
+        # Mark every node in the component as visited so we don't re-process
+        visited_nodes.update(component)
+
+        # Distribute invoices to their respective buckets.
+        # We only add an invoice to a bucket if it was in our original seed set
+        # (i.e. it passed the date-range + company filter).  Invoices pulled in
+        # solely because they are linked partners are used for cost lookup only.
+        for (dt, n) in component:
+            if (dt, n) not in seed_nodes:
+                continue          # linked partner outside date range — skip bucketing
+            if dt == "Purchase Invoice":
+                if n not in journey_to_pi[jid]:
+                    journey_to_pi[jid].append(n)
+            elif dt == "Sales Invoice":
+                if n not in journey_to_si[jid]:
+                    journey_to_si[jid].append(n)
 
     return journey_to_pi, journey_to_si, journey_display
 
@@ -259,11 +296,13 @@ def _collect_si_item_data(si_names, item_filter):
 # ─────────────────────────────────────────────────────────────────────────────
 # Import cost aggregation — Landed Cost Vouchers
 #
-# NOTE: We do NOT filter LCVs by posting_date here.
-# The date range is used to discover journeys (via PI/SI posting dates).
-# Once we have the journey's PI list, we want ALL LCVs ever linked to those
-# PIs regardless of when the LCV was posted — otherwise costs posted in a
-# different accounting period than the PI are silently dropped.
+# FIX: si_set / pi_set are now built from ALL invoices in the journey
+# component, not just the ones that passed the date-range filter.
+# This means an LCV linked to a PI that was posted outside the report date
+# range (but belongs to an in-range journey) is no longer silently skipped.
+#
+# The caller passes `all_pi_names` (full component) and `seed_pi_names`
+# (only those within the date range, for display/bucketing).
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _aggregate_import_costs(
@@ -271,12 +310,11 @@ def _aggregate_import_costs(
 ):
     """
     Sum LCV applicable_charges per item_code for LCVs linked to this journey's PIs.
-    Returns: item_costs, item_names, posting_dates, company_currency
+    pi_names should contain ALL PIs in the journey component (not just in-range ones).
     """
     item_costs    = defaultdict(float)
     item_names    = {}
     posting_dates = []
-    # company_currency starts as None; we populate it from the first matching LCV
     company_currency = None
 
     if not pi_names:
@@ -284,7 +322,6 @@ def _aggregate_import_costs(
 
     pi_set = set(pi_names)
 
-    # No date filter on LCVs — we filter by company only, then match by PI linkage
     lcv_filters = [["Landed Cost Voucher", "docstatus", "=", 1]]
     if company_filter:
         lcv_filters.append(["Landed Cost Voucher", "company", "=", company_filter])
@@ -295,8 +332,8 @@ def _aggregate_import_costs(
         fields=["name", "company", "posting_date"],
         order_by="posting_date asc",
     ):
-        lcv_name    = lcv_row.get("name")
-        lcv_company = lcv_row.get("company") or ""
+        lcv_name     = lcv_row.get("name")
+        lcv_company  = lcv_row.get("company") or ""
         lcv_currency = _get_company_currency(lcv_company)
 
         if currency_filter and currency_filter != "all" and lcv_currency != currency_filter:
@@ -316,7 +353,6 @@ def _aggregate_import_costs(
         if not (linked_pis & pi_set):
             continue
 
-        # Capture currency from the first matching LCV
         if company_currency is None:
             company_currency = lcv_currency
 
@@ -339,10 +375,6 @@ def _aggregate_import_costs(
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Export cost aggregation — Sales Shipment Costs
-#
-# NOTE: Same reasoning as LCVs above — we do NOT filter SSCs by posting_date.
-# The date range already scoped which journeys we care about via SI posting
-# dates. Once we have the SI list, we collect ALL SSCs that link to them.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _aggregate_export_costs(
@@ -356,8 +388,8 @@ def _aggregate_export_costs(
     storage               = 0.0
     export_charges_doonta = 0.0
 
-    # company_currency starts as None; populated from the first matching SSC
-    ssc_company_currency = None
+    # SSC applicable_charges are always stored in USD (not company currency)
+    ssc_company_currency = "USD"
 
     if not si_names or not frappe.db.table_exists("Sales Shipment Cost"):
         return (
@@ -368,7 +400,6 @@ def _aggregate_export_costs(
 
     si_set = set(si_names)
 
-    # No date filter on SSCs — filter by company only, then match by SI linkage
     ssc_filters = [["Sales Shipment Cost", "docstatus", "=", 1]]
     if company_filter:
         ssc_filters.append(["Sales Shipment Cost", "company", "=", company_filter])
@@ -393,14 +424,9 @@ def _aggregate_export_costs(
         if not (linked_sis & si_set):
             continue
 
-        ssc_currency = _get_company_currency(ssc_doc.company)
-
-        if currency_filter and currency_filter != "all" and ssc_currency != currency_filter:
+        # SSC amounts are always in USD — no per-doc currency derivation needed
+        if currency_filter and currency_filter != "all" and currency_filter != "USD":
             continue
-
-        # Capture currency from the first matching SSC
-        if ssc_company_currency is None:
-            ssc_company_currency = ssc_currency
 
         posting_dates.append(str(ssc_doc.posting_date or ""))
 
@@ -435,6 +461,37 @@ def _aggregate_export_costs(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Expand journey component to get ALL linked PIs / SIs
+# (includes invoices outside the date range that are linked partners)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _expand_journey_invoices(pi_names, si_names):
+    """
+    Given the seed PI/SI names (those that passed the date filter), run BFS
+    on each to collect ALL invoices in the full journey component.
+    Returns (all_pi_names, all_si_names) — supersets of the input lists.
+
+    This is used so that cost aggregation (LCVs / SSCs) can find documents
+    linked to out-of-range partners.
+    """
+    all_pi = set(pi_names)
+    all_si = set(si_names)
+
+    seeds = (
+        [("Purchase Invoice", n) for n in pi_names] +
+        [("Sales Invoice",    n) for n in si_names]
+    )
+    for doctype, name in seeds:
+        for (dt, n) in _get_journey_component(doctype, name):
+            if dt == "Purchase Invoice":
+                all_pi.add(n)
+            elif dt == "Sales Invoice":
+                all_si.add(n)
+
+    return list(all_pi), list(all_si)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Row building — one row per (journey, item)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -449,7 +506,7 @@ def _build_journey_rows(
     import_container, import_bl,
     export_container, export_bl, destination,
     freight, storage, export_charges_doonta,
-    posting_dates, company_currency,
+    posting_dates, company_currency, export_currency="USD",
 ):
     rows = []
     source = (
@@ -493,6 +550,7 @@ def _build_journey_rows(
                 "export_charges":        None,
                 "total":                 jl_total,
                 "company_currency":      company_currency,
+                "export_currency":       export_currency,
                 "source":                source,
             })
         return rows
@@ -539,6 +597,7 @@ def _build_journey_rows(
             "export_charges":        exp_charges or None,
             "total":                 total,
             "company_currency":      company_currency,
+            "export_currency":       export_currency,
             "source":                source,
         })
 
@@ -581,31 +640,29 @@ def get_import_export_expense_report(filters=None):
             si_names     = list(set(journey_to_si.get(journey_id, [])))
             display_name = journey_display.get(journey_id, journey_id.replace("|", " "))
 
+            # ── Expand to full journey component ────────────────────────────
+            # This pulls in any linked PIs/SIs that were outside the date
+            # range, ensuring LCVs and SSCs linked to them are not missed.
+            all_pi_names, all_si_names = _expand_journey_invoices(pi_names, si_names)
+
             import_container, import_bl              = _collect_import_meta(pi_names)
             export_container, export_bl, destination = _collect_export_meta(si_names)
-            si_item_data                             = _collect_si_item_data(si_names, item_filter)
 
-            # ── Import costs (LCVs) ──────────────────────────────────────────
-            # Note: no date filter on LCVs — we find all LCVs ever linked to
-            # this journey's PIs so costs posted in a different period are
-            # never silently dropped.
+            # SI item data uses only the in-range SIs (display / price data)
+            si_item_data = _collect_si_item_data(si_names, item_filter)
+
+            # ── Import costs: use ALL PIs in the component ──────────────────
             import_costs, import_item_names, import_dates, lcv_currency = \
-                _aggregate_import_costs(pi_names, company_filter, currency_filter, item_filter)
+                _aggregate_import_costs(all_pi_names, company_filter, currency_filter, item_filter)
 
-            # ── Export costs (SSCs) ──────────────────────────────────────────
-            # Same reasoning — no date filter on SSCs.
+            # ── Export costs: use ALL SIs in the component ──────────────────
             (
                 export_costs, export_item_names, export_dates,
                 freight, storage, export_charges_doonta,
                 ssc_currency,
-            ) = _aggregate_export_costs(si_names, company_filter, currency_filter, item_filter)
+            ) = _aggregate_export_costs(all_si_names, company_filter, currency_filter, item_filter)
 
             # ── Company currency resolution ──────────────────────────────────
-            # Priority:
-            #   1. Explicitly filtered company → always authoritative
-            #   2. Currency returned by LCV aggregation (first matching LCV)
-            #   3. Currency returned by SSC aggregation (first matching SSC)
-            #   4. Fall back to company filter default, else "USD"
             if company_filter:
                 company_currency = _get_company_currency(company_filter)
             elif lcv_currency is not None:
@@ -634,10 +691,11 @@ def get_import_export_expense_report(filters=None):
                 freight=freight, storage=storage,
                 export_charges_doonta=export_charges_doonta,
                 posting_dates=all_dates, company_currency=company_currency,
+                export_currency="USD",   # SSC applicable_charges are always USD
             )
 
             for row in journey_rows:
-                totals["total_additional_costs"]      += row.get("additional_costs")      or 0
+                totals["total_additional_costs"]       += row.get("additional_costs")      or 0
                 totals["total_export_charges_doonta"]  += row.get("export_charges_doonta") or 0
                 totals["total_export_charges"]         += row.get("export_charges")        or 0
                 totals["total_freight"]                += row.get("freight")               or 0

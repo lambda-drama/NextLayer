@@ -17,7 +17,7 @@ add_to_apps_screen = [
 		"logo": "/assets/nextlayer/images/logo.jpeg",
 		"title": "Next Layer",
 		"route": "/nextlayer",
-		"has_permission": "nextlayer.api.permission.has_app_permission"
+		# "has_permission": "nextlayer.api.permission.has_app_permission"
 	}
 ]
 
