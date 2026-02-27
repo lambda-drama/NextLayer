@@ -80,12 +80,16 @@ interface JourneyGroup {
   exportBl:            string
   destination:         string
   items:               ImportExportEntry[]
+  // Import-side amounts — in company_currency (from LCV)
   freightStorage:      number
-  doonta:              number
   totalImport:         number
-  totalExport:         number
-  grandTotal:          number
   companyCurrency:     string
+  // Export-side amounts — always USD (from SSC)
+  doonta:              number
+  totalExport:         number
+  exportCurrency:      string   // always "USD"
+  // Grand total (mixed currencies — display separately)
+  grandTotal:          number
   transactionCurrency: string
 }
 
@@ -105,21 +109,25 @@ function groupByJourney(entries: ImportExportEntry[]): JourneyGroup[] {
         destination:         row.destination       || "—",
         items:               [],
         freightStorage:      0,
-        doonta:              0,
         totalImport:         0,
-        totalExport:         0,
-        grandTotal:          0,
         companyCurrency:     row.company_currency,
+        doonta:              0,
+        totalExport:         0,
+        exportCurrency:      row.export_currency || "USD",
+        grandTotal:          0,
         transactionCurrency: row.transaction_currency,
       })
     }
     const g = map.get(jid)!
     g.items.push(row)
+    // Import-side: freight + storage + additional_costs → company_currency
     g.freightStorage += (row.freight ?? 0) + (row.storage ?? 0)
-    g.doonta         += row.export_charges_doonta  ?? 0
-    g.totalImport    += row.additional_costs       ?? 0
-    g.totalExport    += row.export_charges         ?? 0
-    g.grandTotal     += row.total                  ?? 0
+    g.totalImport    += row.additional_costs ?? 0
+    // Export-side: doonta + export_charges → always USD
+    g.doonta         += row.export_charges_doonta ?? 0
+    g.totalExport    += row.export_charges        ?? 0
+    // Grand total raw (mixed, just for reference)
+    g.grandTotal     += row.total ?? 0
   }
   return Array.from(map.values())
 }
@@ -151,7 +159,8 @@ interface JourneyRowProps {
 }
 
 function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
-  const cc  = group.companyCurrency
+  const cc  = group.companyCurrency   // for import / freight / storage
+  const usd = group.exportCurrency    // always "USD" — for export / doonta
   const pal = expanded ? PAL_OPEN : index % 2 === 0 ? PAL_EVEN : PAL_ODD
 
   const cell = (extra?: React.CSSProperties) => ({
@@ -159,15 +168,15 @@ function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
     ...extra,
   })
 
-  // ── Collapsed journey summary row ────────────────────────────────────────
   return (
     <>
+      {/* ── Collapsed journey summary row ──────────────────────────────── */}
       <tr
         onClick={onToggle}
         className="cursor-pointer select-none transition-all duration-100 hover:brightness-95"
         style={{ background: pal.bg }}
       >
-        {/* [A] toggle chevron */}
+        {/* [A] toggle */}
         <td className="border px-2 py-3 text-center w-8" style={cell()}>
           {expanded
             ? <ChevronDown  className="h-4 w-4 mx-auto" style={{ color: pal.text }} />
@@ -180,7 +189,7 @@ function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
           {index + 1}
         </td>
 
-        {/* [2] Transit No. / Description — the primary journey label */}
+        {/* [2] Transit No. / Description */}
         <td className="border px-3 py-3 text-[11px] font-bold"
             style={cell({ color: pal.text })}>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -194,32 +203,26 @@ function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
           </div>
         </td>
 
-        {/* [3] Item — blank (journey level) */}
+        {/* [3] Item — blank */}
         <td className="border px-2 py-3" style={cell()} />
-
         {/* [4] Source — blank */}
         <td className="border px-2 py-3" style={cell()} />
-
         {/* [5] Units — blank */}
         <td className="border px-2 py-3" style={cell()} />
-
         {/* [6] Price — blank */}
         <td className="border px-2 py-3" style={cell()} />
-
-        {/* [7] Total Value — blank (sum not meaningful across currencies) */}
+        {/* [7] Total Value — blank */}
         <td className="border px-2 py-3" style={cell()} />
 
         {/* [8] Import Container */}
         <td className="border px-2 py-3 text-[11px] text-center max-w-[120px] truncate"
-            style={cell({ color: pal.sub })}
-            title={group.importContainer}>
+            style={cell({ color: pal.sub })} title={group.importContainer}>
           {group.importContainer}
         </td>
 
         {/* [9] Export Container */}
         <td className="border px-2 py-3 text-[11px] text-center max-w-[120px] truncate"
-            style={cell({ color: pal.sub })}
-            title={group.exportContainer}>
+            style={cell({ color: pal.sub })} title={group.exportContainer}>
           {group.exportContainer}
         </td>
 
@@ -241,31 +244,31 @@ function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
           {group.destination}
         </td>
 
-        {/* [13] Freight & Storage — aggregate */}
+        {/* [13] Freight & Storage — IMPORT side → company_currency */}
         <td className="border px-2 py-3 text-[11px] text-right font-mono font-semibold"
             style={cell({ color: "#1d4ed8" })}>
           {fmtC(group.freightStorage, cc)}
         </td>
 
-        {/* [14] Doonta — aggregate */}
+        {/* [14] Doonta — EXPORT side → USD */}
         <td className="border px-2 py-3 text-[11px] text-right font-mono font-semibold"
             style={cell({ color: "#4338ca" })}>
-          {fmtC(group.doonta, cc)}
+          {fmtC(group.doonta, usd)}
         </td>
 
-        {/* [15] Import Charges — aggregate */}
+        {/* [15] Import Charges — IMPORT side → company_currency */}
         <td className="border px-2 py-3 text-[11px] text-right font-mono font-bold"
             style={cell({ color: "#15803d" })}>
           {fmtC(group.totalImport, cc)}
         </td>
 
-        {/* [16] Export Charges — aggregate */}
+        {/* [16] Export Charges — EXPORT side → USD */}
         <td className="border px-2 py-3 text-[11px] text-right font-mono font-bold"
             style={cell({ color: "#b91c1c" })}>
-          {fmtC(group.totalExport, cc)}
+          {fmtC(group.totalExport, usd)}
         </td>
 
-        {/* [17] Grand Total */}
+        {/* [17] Grand Total — note: mixed currencies, show both if differ */}
         <td className="border px-2 py-3 text-[11px] text-right font-mono font-bold"
             style={{
               borderColor: "#93c5fd",
@@ -286,13 +289,15 @@ function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
             const isImport       = row.source === "import" || row.source === "both"
             const isExport       = row.source === "export" || row.source === "both"
             const rowBg          = iIdx % 2 === 0 ? "#f8faff" : "#f0f5ff"
+            const rowCc          = row.company_currency   // import charges currency
+            const rowUsd         = row.export_currency || "USD"  // export charges currency
 
             return (
               <tr
                 key={`${row.journey_id}-${row.item_code || "x"}-${iIdx}`}
                 style={{ background: rowBg }}
               >
-                {/* indent — left-accent bar showing this row is a child */}
+                {/* indent accent bar */}
                 <td className="border border-blue-100 w-8"
                     style={{ background: "rgba(30,58,138,0.08)", borderLeft: "3px solid #3b82f6" }} />
 
@@ -356,47 +361,43 @@ function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
                 </td>
 
                 {/* Import B/L */}
-                <td className={`${TD} text-center text-gray-500`}>
-                  {row.import_bl || "—"}
-                </td>
+                <td className={`${TD} text-center text-gray-500`}>{row.import_bl || "—"}</td>
 
                 {/* Export B/L */}
-                <td className={`${TD} text-center text-gray-500`}>
-                  {row.export_bl || "—"}
-                </td>
+                <td className={`${TD} text-center text-gray-500`}>{row.export_bl || "—"}</td>
 
                 {/* Destination */}
                 <td className={`${TD} text-center font-medium text-indigo-700`}>
                   {row.destination || "—"}
                 </td>
 
-                {/* Freight & Storage — first item only */}
+                {/* [13] Freight & Storage — IMPORT → company_currency, first row only */}
                 <td className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono text-blue-700">
-                  {freightStorage > 0 ? fmtC(freightStorage, row.company_currency) : "—"}
+                  {freightStorage > 0 ? fmtC(freightStorage, rowCc) : "—"}
                 </td>
 
-                {/* Doonta — first item only */}
+                {/* [14] Doonta — EXPORT → USD, first row only */}
                 <td className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono text-indigo-600">
-                  {doontaAmt > 0 ? fmtC(doontaAmt, row.company_currency) : "—"}
+                  {doontaAmt > 0 ? fmtC(doontaAmt, rowUsd) : "—"}
                 </td>
 
-                {/* Import Charges — per item */}
+                {/* [15] Import Charges — IMPORT → company_currency */}
                 <td className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-emerald-700">
                   {(row.additional_costs ?? 0) > 0
-                    ? fmtC(row.additional_costs, row.company_currency)
+                    ? fmtC(row.additional_costs, rowCc)
                     : "—"}
                 </td>
 
-                {/* Export Charges — per item */}
+                {/* [16] Export Charges — EXPORT → USD */}
                 <td className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-red-600">
                   {(row.export_charges ?? 0) > 0
-                    ? fmtC(row.export_charges, row.company_currency)
+                    ? fmtC(row.export_charges, rowUsd)
                     : "—"}
                 </td>
 
-                {/* Item total */}
+                {/* [17] Item total — use company_currency as base */}
                 <td className="border border-blue-200 px-2 py-2 text-[11px] text-right font-mono font-bold text-blue-900 bg-blue-50">
-                  {fmtC(row.total, row.company_currency)}
+                  {fmtC(row.total, rowCc)}
                 </td>
               </tr>
             )
@@ -409,18 +410,23 @@ function JourneyRow({ group, index, expanded, onToggle }: JourneyRowProps) {
                 className="border border-blue-200 px-4 py-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-widest text-right">
               Journey Subtotal
             </td>
+            {/* Freight & Storage — company_currency */}
             <td className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-blue-800">
               {fmtC(group.freightStorage, cc)}
             </td>
+            {/* Doonta — USD */}
             <td className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-indigo-700">
-              {fmtC(group.doonta, cc)}
+              {fmtC(group.doonta, usd)}
             </td>
+            {/* Import Charges — company_currency */}
             <td className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700">
               {fmtC(group.totalImport, cc)}
             </td>
+            {/* Export Charges — USD */}
             <td className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700">
-              {fmtC(group.totalExport, cc)}
+              {fmtC(group.totalExport, usd)}
             </td>
+            {/* Grand total */}
             <td className="border border-blue-300 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-blue-900 bg-blue-100">
               {fmtC(group.grandTotal, cc)}
             </td>
@@ -453,10 +459,12 @@ export default function ImportExportExpense() {
     company, item, fromDate, toDate, currency, enabled: hasLoadedData,
   })
 
-  const entries = data?.entries ?? []
-  const totals  = data?.totals  ?? ({} as ImportExportTotals)
-  const groups  = groupByJourney(entries)
-  const displayCurrency = entries[0]?.company_currency ?? (currency !== "all" ? currency : "USD")
+  const entries        = data?.entries ?? []
+  const totals         = data?.totals  ?? ({} as ImportExportTotals)
+  const groups         = groupByJourney(entries)
+  // For grand totals footer: import cols use company_currency, export cols always USD
+  const displayCc      = entries[0]?.company_currency ?? (currency !== "all" ? currency : "USD")
+  const displayUsd     = "USD"
 
   // Auto-expand all journeys when data loads
   useEffect(() => {
@@ -465,7 +473,7 @@ export default function ImportExportExpense() {
     }
   }, [groups.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load item options for the filter combobox
+  // Load item options
   useEffect(() => {
     const fetchItems = async () => {
       try {
@@ -494,7 +502,6 @@ export default function ImportExportExpense() {
   const expandAll   = useCallback(() => setExpandedIds(new Set(groups.map((g) => g.journeyId))), [groups])
   const collapseAll = useCallback(() => setExpandedIds(new Set()), [])
 
-  // Footer cell style
   const TDF = "border border-blue-300 px-2 py-2.5 text-[11px] text-right font-mono font-bold whitespace-nowrap"
 
   return (
@@ -637,83 +644,52 @@ export default function ImportExportExpense() {
 
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                {/*
-                ═══════════════════════════════════════════════════════
-                  18 COLUMNS (A + 1–17):
-                  [A]  ▶/▼ toggle
-                  [1]  #
-                  [2]  Transit No. / Description
-                  [3]  Item
-                  [4]  Source
-                  [5]  Units
-                  [6]  Price                 (transaction currency)
-                  [7]  Total Value           (transaction currency)
-                  [8]  Import Container
-                  [9]  Export Container
-                  [10] Import B/L
-                  [11] Export B/L
-                  [12] Destination
-                  [13] Freight & Storage     (company currency, journey-level)
-                  [14] Export Charges Doonta (company currency, journey-level)
-                  [15] Import Charges        (company currency, per item)
-                  [16] Export Charges        (company currency, per item)
-                  [17] Total                 (company currency)
-                ═══════════════════════════════════════════════════════
-                */}
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr>
-                      {/* [A] */}
                       <th className={TH} style={{ width: 32 }} />
-                      {/* [1] # */}
                       <th className={TH} style={{ width: 36 }}>#</th>
-                      {/* [2] Transit No. / Description */}
                       <th className={TH} style={{ minWidth: 170 }}>Transit No. / Description</th>
-                      {/* [3] Item */}
                       <th className={TH} style={{ minWidth: 110 }}>Item</th>
-                      {/* [4] Source */}
                       <th className={TH} style={{ width: 74 }}>Source</th>
-                      {/* [5] Units */}
                       <th className={TH} style={{ minWidth: 68 }}>Units</th>
-                      {/* [6] Price */}
                       <th className={TH} style={{ minWidth: 100 }}>Price</th>
-                      {/* [7] Total Value */}
                       <th className={TH} style={{ minWidth: 110 }}>Total Value</th>
-                      {/* [8–12] Meta */}
                       <th className={TH} style={{ minWidth: 110 }}>Import Cont.</th>
                       <th className={TH} style={{ minWidth: 110 }}>Export Cont.</th>
                       <th className={TH} style={{ minWidth: 88 }}>Import B/L</th>
                       <th className={TH} style={{ minWidth: 88 }}>Export B/L</th>
                       <th className={TH} style={{ minWidth: 88 }}>Destination</th>
-                      {/* [13] Freight & Storage */}
+                      {/* Import-side header — signals company_currency */}
                       <th
                         className={TH}
-                        style={{ minWidth: 110, background: "#dbeafe", color: "#1e3a8a", fontWeight: 700 }}
+                        style={{ minWidth: 130, background: "#dbeafe", color: "#1e3a8a", fontWeight: 700 }}
                       >
                         Freight &amp; Storage
+                        <div className="text-[9px] font-normal opacity-70 mt-0.5">company currency</div>
                       </th>
-                      {/* [14] Doonta */}
+                      {/* Export-side header — signals USD */}
                       <th
                         className={TH}
-                        style={{ minWidth: 130, background: "#e0e7ff", color: "#3730a3", fontWeight: 700 }}
+                        style={{ minWidth: 150, background: "#e0e7ff", color: "#3730a3", fontWeight: 700 }}
                       >
                         Export Charges Doonta
+                        <div className="text-[9px] font-normal opacity-70 mt-0.5">USD</div>
                       </th>
-                      {/* [15] Import Charges */}
                       <th
                         className={TH}
-                        style={{ minWidth: 110, background: "#d1fae5", color: "#065f46", fontWeight: 700 }}
+                        style={{ minWidth: 120, background: "#d1fae5", color: "#065f46", fontWeight: 700 }}
                       >
                         Import Charges
+                        <div className="text-[9px] font-normal opacity-70 mt-0.5">company currency</div>
                       </th>
-                      {/* [16] Export Charges */}
                       <th
                         className={TH}
-                        style={{ minWidth: 110, background: "#fee2e2", color: "#7f1d1d", fontWeight: 700 }}
+                        style={{ minWidth: 120, background: "#fee2e2", color: "#7f1d1d", fontWeight: 700 }}
                       >
                         Export Charges
+                        <div className="text-[9px] font-normal opacity-70 mt-0.5">USD</div>
                       </th>
-                      {/* [17] Total */}
                       <th
                         className={TH}
                         style={{ minWidth: 110, background: "#c7d2fe", color: "#1e1b4b", fontWeight: 700 }}
@@ -749,32 +725,31 @@ export default function ImportExportExpense() {
                   {groups.length > 0 && (
                     <tfoot>
                       <tr style={{ background: "#1e3a8a" }}>
-                        {/* Label spanning [A] through [12] = 13 cols */}
                         <td
                           colSpan={13}
                           className="border border-blue-700 px-4 py-2.5 text-xs font-bold text-white text-right uppercase tracking-widest"
                         >
                           Grand Totals
                         </td>
-                        {/* [13] Freight & Storage */}
+                        {/* Freight & Storage — company_currency */}
                         <td className={`${TDF} bg-blue-100 text-blue-900 border-blue-300`}>
-                          {fmtC((totals.total_freight ?? 0) + (totals.total_storage ?? 0), displayCurrency)}
+                          {fmtC((totals.total_freight ?? 0) + (totals.total_storage ?? 0), displayCc)}
                         </td>
-                        {/* [14] Doonta */}
+                        {/* Doonta — USD */}
                         <td className={`${TDF} bg-indigo-50 text-indigo-900 border-indigo-200`}>
-                          {fmtC(totals.total_export_charges_doonta, displayCurrency)}
+                          {fmtC(totals.total_export_charges_doonta, displayUsd)}
                         </td>
-                        {/* [15] Import Charges */}
+                        {/* Import Charges — company_currency */}
                         <td className={`${TDF} bg-emerald-50 text-emerald-900 border-emerald-200`}>
-                          {fmtC(totals.total_additional_costs, displayCurrency)}
+                          {fmtC(totals.total_additional_costs, displayCc)}
                         </td>
-                        {/* [16] Export Charges */}
+                        {/* Export Charges — USD */}
                         <td className={`${TDF} bg-red-50 text-red-900 border-red-200`}>
-                          {fmtC(totals.total_export_charges, displayCurrency)}
+                          {fmtC(totals.total_export_charges, displayUsd)}
                         </td>
-                        {/* [17] Grand Total */}
+                        {/* Grand total */}
                         <td className={`${TDF} bg-blue-200 text-blue-950 border-blue-400 text-sm`}>
-                          {fmtC(totals.grand_total, displayCurrency)}
+                          {fmtC(totals.grand_total, displayCc)}
                         </td>
                       </tr>
                     </tfoot>
