@@ -63,7 +63,7 @@ function show_invoice_settings_modal(frm, doctype) {
 				get_query: function() {
 					return {
 						filters: {
-							custom_company: frm.doc.company || ''
+							company: frm.doc.company || ''
 						}
 					};
 				}
