@@ -1,0 +1,204 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-02-28 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "customer",
+  "project_type",
+  "cost_estimate_template",
+  "column_break_1",
+  "estimate_date",
+  "status",
+  "currency",
+  "section_items",
+  "items",
+  "section_labor",
+  "labor",
+  "section_overheads",
+  "overheads",
+  "section_totals",
+  "total_material_cost",
+  "total_labor_cost",
+  "overhead_cost",
+  "column_break_aycy",
+  "profit_percent",
+  "grand_total",
+  "selling_price_after_profit"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "EST-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "project_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project Type"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "Today",
+   "fieldname": "estimate_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Estimate Date"
+  },
+  {
+   "description": "Select a template to auto-fill items, labor and overheads",
+   "fieldname": "cost_estimate_template",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cost Estimate Template",
+   "options": "Cost Estimate Template"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nApproved\nConverted"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "Materials"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Cost Estimate Item"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_labor",
+   "fieldtype": "Section Break",
+   "label": "Labor"
+  },
+  {
+   "fieldname": "labor",
+   "fieldtype": "Table",
+   "label": "Labor",
+   "options": "Cost Estimate Labor"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_overheads",
+   "fieldtype": "Section Break",
+   "label": "Overheads"
+  },
+  {
+   "fieldname": "overheads",
+   "fieldtype": "Table",
+   "label": "Overheads",
+   "options": "Cost Estimate Overhead"
+  },
+  {
+   "fieldname": "section_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_material_cost",
+   "fieldtype": "Currency",
+   "label": "Total Material Cost",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_labor_cost",
+   "fieldtype": "Currency",
+   "label": "Total Labor Cost",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "overhead_cost",
+   "fieldtype": "Currency",
+   "label": "Overhead Cost",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "profit_percent",
+   "fieldtype": "Percent",
+   "label": "Profit %"
+  },
+  {
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "label": "Grand Total (Cost)",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "selling_price_after_profit",
+   "fieldtype": "Currency",
+   "ignore_user_permissions": 1,
+   "label": "Selling Price (after Profit)",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_aycy",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-02 01:06:05.847816",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Cost Estimate",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

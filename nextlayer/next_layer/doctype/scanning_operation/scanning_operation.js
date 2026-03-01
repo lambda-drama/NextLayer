@@ -1084,7 +1084,7 @@ function setup_accounting_dimension_filters(frm) {
 	frm.set_query("branch", function() {
 		return {
 			filters: {
-				custom_company: frm.doc.company || ""
+				company: frm.doc.company || ""
 			}
 		};
 	});
