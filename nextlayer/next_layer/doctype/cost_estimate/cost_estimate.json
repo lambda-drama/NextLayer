@@ -132,18 +132,21 @@
    "fieldname": "total_material_cost",
    "fieldtype": "Currency",
    "label": "Total Material Cost",
+   "options": "currency",
    "read_only": 1
   },
   {
    "fieldname": "total_labor_cost",
    "fieldtype": "Currency",
    "label": "Total Labor Cost",
+   "options": "currency",
    "read_only": 1
   },
   {
    "fieldname": "overhead_cost",
    "fieldtype": "Currency",
    "label": "Overhead Cost",
+   "options": "currency",
    "read_only": 1
   },
   {
@@ -155,6 +158,7 @@
    "fieldname": "grand_total",
    "fieldtype": "Currency",
    "label": "Grand Total (Cost)",
+   "options": "currency",
    "read_only": 1
   },
   {
@@ -162,6 +166,7 @@
    "fieldtype": "Currency",
    "ignore_user_permissions": 1,
    "label": "Selling Price (after Profit)",
+   "options": "currency",
    "read_only": 1
   },
   {
@@ -171,7 +176,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-28 05:53:46.042893",
+ "modified": "2026-03-02 01:06:05.847816",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate",

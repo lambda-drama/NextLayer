@@ -52,7 +52,8 @@
    "fieldname": "daily_rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Daily Rate"
+   "label": "Daily Rate",
+   "options": "currency"
   },
   {
    "fieldname": "column_break_1",
@@ -70,14 +71,16 @@
    "fieldname": "amount",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Amount"
+   "label": "Amount",
+   "options": "currency"
   },
   {
    "fieldname": "cost",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Cost",
-   "read_only": 1
+   "read_only": 1,
+   "options": "currency"
   }
  ],
  "index_web_pages_for_search": 0,

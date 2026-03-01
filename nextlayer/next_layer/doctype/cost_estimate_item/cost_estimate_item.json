@@ -11,7 +11,8 @@
   "qty",
   "uom",
   "rate",
-  "amount"
+  "amount",
+  "account"
  ],
  "fields": [
   {
@@ -47,14 +48,24 @@
    "fieldname": "rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Rate"
+   "label": "Rate",
+   "options": "currency"
   },
   {
    "fieldname": "amount",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Amount",
-   "read_only": 1
+   "read_only": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Account",
+   "options": "Account",
+   "description": "Expense / cost account for this item"
   }
  ],
  "index_web_pages_for_search": 0,
