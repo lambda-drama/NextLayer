@@ -86,6 +86,12 @@ fixtures = [
                     "Sales Order-custom_registered_owner",
                     "Sales Order-custom_assembled_by",
                     "Sales Order-custom_owner_information",
+                    
+                    #Quotation
+                    "Quotation-custom_revision_type",
+                    "Quotation-custom_parent_quotation",
+                    "Quotation-custom_site_visit_date",
+                    "Quotation-custom_is_revision"
                 ),
             ]
         ],
@@ -172,6 +178,7 @@ doc_events = {
     "Item": {
         "before_save": "nextlayer.next_layer.controllers.generate_barcode.auto_generate_barcode_for_item",
     },
+    
 }
 
 # Includes in <head>
@@ -207,6 +214,7 @@ doctype_js = {
 	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
 	"Journal Entry":"public/js/journal_entry.js",
+    "Quotation":"public/js/quotation.js",
 }
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
