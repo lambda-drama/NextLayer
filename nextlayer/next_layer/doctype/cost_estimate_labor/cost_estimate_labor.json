@@ -11,6 +11,7 @@
   "resource_type",
   "days",
   "daily_rate",
+  "qty",
   "column_break_1",
   "contractor_description",
   "amount",
@@ -55,6 +56,13 @@
    "in_list_view": 1,
    "label": "Daily Rate",
    "options": "currency"
+  },
+  {
+   "default": "1",
+   "fieldname": "qty",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Qty"
   },
   {
    "fieldname": "column_break_1",

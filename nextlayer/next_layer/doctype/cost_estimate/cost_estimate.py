@@ -18,7 +18,8 @@ class CostEstimate(Document):
 		total_labor = 0
 		for row in (self.labor or []):
 			if row.get("calculation_type") == "Per Day":
-				total_labor += flt(row.get("days"), 0) * flt(row.get("daily_rate"), 0)
+				qty = flt(row.get("qty"), 0) or 1
+				total_labor += qty * flt(row.get("days"), 0) * flt(row.get("daily_rate"), 0)
 			else:
 				total_labor += flt(row.get("amount"), 0)
 		self.total_labor_cost = total_labor
@@ -63,7 +64,8 @@ def get_template_data(template_name, currency=None):
 	for row in template.labor:
 		calc_type = row.get("calculation_type") or "Per Day"
 		if calc_type == "Per Day":
-			cost = flt(row.get("days"), 0) * flt(row.get("daily_rate"), 0)
+			qty = flt(row.get("qty"), 0) or 1
+			cost = qty * flt(row.get("days"), 0) * flt(row.get("daily_rate"), 0)
 		else:
 			cost = flt(row.get("amount"), 0)
 		labor.append({
@@ -72,6 +74,7 @@ def get_template_data(template_name, currency=None):
 			"resource_type": row.get("resource_type"),
 			"days": row.get("days"),
 			"daily_rate": row.get("daily_rate"),
+			"qty": row.get("qty"),
 			"contractor_description": row.get("contractor_description"),
 			"amount": row.get("amount"),
 			"cost": cost,

@@ -13,11 +13,11 @@
  "fields": [
   {
    "fieldname": "cost_type",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Cost Type",
-   "reqd": 1,
-   "description": "e.g. Transport, Equipment rental, Permit fees"
+   "label": "Cost Type (Expense Account)",
+   "options": "Account",
+   "reqd": 1
   },
   {
    "fieldname": "amount",

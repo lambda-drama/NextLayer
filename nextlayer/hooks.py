@@ -178,7 +178,9 @@ doc_events = {
     "Item": {
         "before_save": "nextlayer.next_layer.controllers.generate_barcode.auto_generate_barcode_for_item",
     },
-    
+    "Quotation": {
+        "autoname": "nextlayer.next_layer.controllers.quotation_naming.set_quotation_name",
+    },
 }
 
 # Includes in <head>

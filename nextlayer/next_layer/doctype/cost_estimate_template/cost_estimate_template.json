@@ -9,6 +9,7 @@
   "template_name",
   "project_type",
   "column_break_slkr",
+  "company",
   "currency",
   "section_items",
   "items",
@@ -34,12 +35,12 @@
    "unique": 1
   },
   {
-   "description": "e.g. Residential House, Commercial Building",
    "fieldname": "project_type",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Project Type"
+   "label": "Project Type",
+   "options": "Project Type"
   },
   {
    "fieldname": "currency",
@@ -120,11 +121,17 @@
   {
    "fieldname": "column_break_ahkp",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-28 05:45:18.008556",
+ "modified": "2026-03-03 02:52:43.094820",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate Template",
