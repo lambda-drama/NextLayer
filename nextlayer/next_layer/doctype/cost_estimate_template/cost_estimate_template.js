@@ -1,6 +1,29 @@
 // Copyright (c) 2026, Next Layer and contributors
 // For license information, please see license.txt
 
+frappe.ui.form.on("Cost Estimate Template", {
+	onload: function (frm) {
+		frm.set_query("cost_type", "overheads", function () {
+			return {
+				filters: {
+					root_type: "Expense",
+					company: frm.doc.company // filter by company
+				}
+			};
+		});
+	},
+	company: function (frm) {
+		frm.set_query("cost_type", "overheads", function () {
+			return {
+				filters: {
+					root_type: "Expense",
+					company: frm.doc.company // filter by company
+				}
+			};
+		});
+	},
+});
+
 frappe.ui.form.on("Cost Estimate Template Labor", {
 	calculation_type: function (frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
@@ -12,6 +35,7 @@ frappe.ui.form.on("Cost Estimate Template Labor", {
 			row.resource_type = "";
 			row.days = null;
 			row.daily_rate = null;
+			row.qty = null;
 		}
 		frappe.model.set_value(cdt, cdn, row);
 	},
@@ -21,6 +45,10 @@ frappe.ui.form.on("Cost Estimate Template Labor", {
 	daily_rate: function (frm, cdt, cdn) {
 		update_labor_cost(frm, cdt, cdn);
 	},
+	qty: function (frm, cdt, cdn) {
+		update_labor_cost(frm, cdt, cdn);
+	},
+
 	amount: function (frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
 		if (row.calculation_type === "Lump Sum") {
@@ -33,7 +61,9 @@ frappe.ui.form.on("Cost Estimate Template Labor", {
 function update_labor_cost(frm, cdt, cdn) {
 	const row = locals[cdt][cdn];
 	if (row.calculation_type === "Per Day") {
-		row.cost = (flt(row.days) || 0) * (flt(row.daily_rate) || 0);
+		// cost = qty × days × daily_rate (qty defaults to 1 if not set)
+		const qty = flt(row.qty, 0) || 1;
+		row.cost = qty * (flt(row.days) || 0) * (flt(row.daily_rate) || 0);
 		frappe.model.set_value(cdt, cdn, "cost", row.cost);
 	}
 }

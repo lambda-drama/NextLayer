@@ -18,7 +18,8 @@ class CostEstimateTemplate(Document):
 		total_labor = 0
 		for row in (self.labor or []):
 			if row.get("calculation_type") == "Per Day":
-				total_labor += flt(row.get("days"), 0) * flt(row.get("daily_rate"), 0)
+				qty = flt(row.get("qty"), 0) or 1
+				total_labor += qty * flt(row.get("days"), 0) * flt(row.get("daily_rate"), 0)
 			else:
 				total_labor += flt(row.get("amount"), 0)
 		self.total_labor_cost = total_labor

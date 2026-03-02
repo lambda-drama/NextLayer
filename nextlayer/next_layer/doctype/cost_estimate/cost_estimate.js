@@ -6,6 +6,9 @@ frappe.ui.form.on("Cost Estimate", {
 		frm.set_query("cost_estimate_template", function () {
 			return { filters: {} };
 		});
+		frm.set_query("cost_type", "overheads", function () {
+			return { filters: [["Account", "root_type", "=", "Expense"]] };
+		});
 	},
 	cost_estimate_template: function (frm) {
 		if (!frm.doc.cost_estimate_template) return;
@@ -57,7 +60,8 @@ function update_cost_estimate_totals(frm) {
 	let total_labor = 0;
 	(frm.doc.labor || []).forEach(function (row) {
 		if (row.calculation_type === "Per Day") {
-			total_labor += flt(row.days, 0) * flt(row.daily_rate, 0);
+			const qty = flt(row.qty, 0) || 1;
+			total_labor += qty * flt(row.days, 0) * flt(row.daily_rate, 0);
 		} else {
 			total_labor += flt(row.amount, 0);
 		}
@@ -108,7 +112,7 @@ function update_estimate_item_amount(frm, cdt, cdn) {
 	if (frm) update_cost_estimate_totals(frm);
 }
 
-// Labor cost: Per Day = days * daily_rate; Lump Sum = amount
+// Labor cost: Per Day = qty × days × daily_rate; Lump Sum = amount
 frappe.ui.form.on("Cost Estimate Labor", {
 	calculation_type: function (frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
@@ -120,6 +124,7 @@ frappe.ui.form.on("Cost Estimate Labor", {
 			row.resource_type = "";
 			row.days = null;
 			row.daily_rate = null;
+			row.qty = null;
 		}
 		frappe.model.set_value(cdt, cdn, row);
 	},
@@ -127,6 +132,9 @@ frappe.ui.form.on("Cost Estimate Labor", {
 		update_estimate_labor_cost(frm, cdt, cdn);
 	},
 	daily_rate: function (frm, cdt, cdn) {
+		update_estimate_labor_cost(frm, cdt, cdn);
+	},
+	qty: function (frm, cdt, cdn) {
 		update_estimate_labor_cost(frm, cdt, cdn);
 	},
 	amount: function (frm, cdt, cdn) {
@@ -142,7 +150,9 @@ frappe.ui.form.on("Cost Estimate Labor", {
 function update_estimate_labor_cost(frm, cdt, cdn) {
 	const row = locals[cdt][cdn];
 	if (row.calculation_type === "Per Day") {
-		row.cost = (flt(row.days) || 0) * (flt(row.daily_rate) || 0);
+		// cost = qty × days × daily_rate (qty defaults to 1 if not set)
+		const qty = flt(row.qty, 0) || 1;
+		row.cost = qty * (flt(row.days) || 0) * (flt(row.daily_rate) || 0);
 		frappe.model.set_value(cdt, cdn, "cost", row.cost);
 	}
 	if (frm) update_cost_estimate_totals(frm);
