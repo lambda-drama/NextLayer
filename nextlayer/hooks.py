@@ -172,6 +172,7 @@ doc_events = {
     "Item": {
         "before_save": "nextlayer.next_layer.controllers.generate_barcode.auto_generate_barcode_for_item",
     },
+    
 }
 
 # Includes in <head>
@@ -207,6 +208,7 @@ doctype_js = {
 	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
 	"Journal Entry":"public/js/journal_entry.js",
+    "Quotation":"public/js/quotation.js",
 }
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
