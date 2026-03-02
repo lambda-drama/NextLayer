@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-02-28 00:00:00.000000",
+ "creation": "2026-02-28 00:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -28,24 +28,25 @@
   {
    "depends_on": "eval:doc.calculation_type == 'Per Day'",
    "fieldname": "activity",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Activity / Task"
+   "label": "Activity / Task",
+   "options": "Activity Type"
   },
   {
    "depends_on": "eval:doc.calculation_type == 'Per Day'",
+   "description": "e.g. Engineer, Technician",
    "fieldname": "resource_type",
    "fieldtype": "Data",
-   "label": "Resource Type",
-   "description": "e.g. Engineer, Technician"
+   "label": "Resource Type"
   },
   {
+   "default": "1",
    "depends_on": "eval:doc.calculation_type == 'Per Day'",
    "fieldname": "days",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Days",
-   "default": "1"
+   "label": "Days"
   },
   {
    "depends_on": "eval:doc.calculation_type == 'Per Day'",
@@ -79,19 +80,19 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Cost",
-   "read_only": 1,
-   "options": "currency"
+   "options": "currency",
+   "read_only": 1
   }
  ],
- "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-02-28 00:00:00.000000",
+ "modified": "2026-03-03 01:51:29.080591",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate Template Labor",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
