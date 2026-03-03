@@ -71,13 +71,15 @@ def get_template_data(template_name, currency=None):
 		labor.append({
 			"calculation_type": calc_type,
 			"activity": row.get("activity"),
-			"resource_type": row.get("resource_type"),
+			# "resource_type": row.get("resource_type"),
 			"days": row.get("days"),
 			"daily_rate": row.get("daily_rate"),
 			"qty": row.get("qty"),
 			"contractor_description": row.get("contractor_description"),
 			"amount": row.get("amount"),
 			"cost": cost,
+			"qty":row.get("qty"),
+			"contractor": row.get("contractor"),
 		})
 
 	overheads = []
@@ -94,6 +96,7 @@ def get_template_data(template_name, currency=None):
 		"items": items,
 		"labor": labor,
 		"overheads": overheads,
+		"company": template.company,
 	}
 
 
@@ -126,6 +129,7 @@ def get_items_from_template(docname):
 	for row in data.get("overheads") or []:
 		doc.append("overheads", row)
 
+	doc.company = data.get("company")
 	doc.calculate_totals()
 	doc.save()
 	return True
