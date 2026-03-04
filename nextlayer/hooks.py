@@ -91,7 +91,14 @@ fixtures = [
                     "Quotation-custom_revision_type",
                     "Quotation-custom_parent_quotation",
                     "Quotation-custom_site_visit_date",
-                    "Quotation-custom_is_revision"
+                    "Quotation-custom_is_revision",
+                    
+                    #Contract
+                    "Contract-custom_type_of_work",
+                    "Contract-custom_column_break_9d5n8",
+                    "Contract-custom_type_of_floor",
+                    "Contract-custom_area_size",
+                    "Contract-custom_contract_details"
                 ),
             ]
         ],

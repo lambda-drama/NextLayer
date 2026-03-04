@@ -25,6 +25,8 @@ frappe.ui.form.on("Cost Estimate", {
 			const d = r.message;
 			if (d.currency && !frm.doc.currency) frm.set_value("currency", d.currency);
 			if (d.project_type && !frm.doc.project_type) frm.set_value("project_type", d.project_type);
+			if (d.estimate_by) frm.set_value("estimate_by", d.estimate_by);
+			if (d.company && !frm.doc.company) frm.set_value("company", d.company);
 			frm.clear_table("items");
 			(d.items || []).forEach(function (row) {
 				const r = frm.add_child("items");
@@ -43,6 +45,9 @@ frappe.ui.form.on("Cost Estimate", {
 			frm.refresh_fields();
 			update_cost_estimate_totals(frm);
 		});
+	},
+	estimate_by: function (frm) {
+		frm.refresh_field("items");
 	},
 	profit_percent: function (frm) {
 		update_cost_estimate_totals(frm);
