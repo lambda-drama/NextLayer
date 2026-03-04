@@ -101,6 +101,8 @@ fixtures = [
                     "Contract-custom_contract_details",
                     "Contract-custom_posting_date",
                     "Contract-custom_company",
+                    "Contract-custom_project_signee",
+                    "Contract-custom_signee_detail"
                 ),
             ]
         ],
