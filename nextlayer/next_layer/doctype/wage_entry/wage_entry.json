@@ -1,0 +1,138 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:WE-{YYYY}-{####}",
+ "creation": "2026-03-04 04:55:01.144560",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "wage_type",
+  "company",
+  "column_break_lxbm",
+  "project",
+  "currency",
+  "start_date",
+  "end_date",
+  "wage_breakdown_section",
+  "wages",
+  "section_break_uzhv",
+  "total_qty",
+  "column_break_nerr",
+  "total_amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date"
+  },
+  {
+   "default": "Daily",
+   "fieldname": "wage_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Wage Type",
+   "options": "\nDaily\nWeekly\nMonthly\nContract"
+  },
+  {
+   "fieldname": "column_break_lxbm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.wage_type !=\"Daily\"",
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date"
+  },
+  {
+   "depends_on": "eval:doc.wage_type !=\"Daily\"",
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date"
+  },
+  {
+   "fieldname": "wage_breakdown_section",
+   "fieldtype": "Section Break",
+   "label": "Wage Breakdown"
+  },
+  {
+   "fieldname": "wages",
+   "fieldtype": "Table",
+   "label": "Wages",
+   "options": "Wage Breakdown Detail"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "section_break_uzhv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_qty",
+   "fieldtype": "Currency",
+   "label": "Total Qty"
+  },
+  {
+   "fieldname": "column_break_nerr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Total Amount",
+   "options": "currency"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-04 05:10:54.626283",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Wage Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
