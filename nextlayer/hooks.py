@@ -98,7 +98,9 @@ fixtures = [
                     "Contract-custom_column_break_9d5n8",
                     "Contract-custom_type_of_floor",
                     "Contract-custom_area_size",
-                    "Contract-custom_contract_details"
+                    "Contract-custom_contract_details",
+                    "Contract-custom_posting_date",
+                    "Contract-custom_company",
                 ),
             ]
         ],
