@@ -12,6 +12,7 @@
   "company",
   "currency",
   "section_items",
+  "estimate_by",
   "items",
   "section_labor",
   "labor",
@@ -52,6 +53,13 @@
    "fieldname": "section_items",
    "fieldtype": "Section Break",
    "label": "Materials"
+  },
+  {
+   "default": "Item Group",
+   "fieldname": "estimate_by",
+   "fieldtype": "Select",
+   "label": "Estimate By",
+   "options": "\nItem\nItem Group"
   },
   {
    "fieldname": "items",
@@ -132,7 +140,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-03 13:42:04.109435",
+ "modified": "2026-03-04 04:34:09.493523",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate Template",

@@ -45,20 +45,23 @@ def get_template_data(template_name, currency=None):
 	template = frappe.get_doc("Cost Estimate Template", template_name)
 	currency = currency or template.currency
 
+	estimate_by = getattr(template, "estimate_by", None) or "Item"
 	items = []
 	for row in template.items:
 		rate = flt(row.get("rate"))
 		if not rate and row.get("item_code") and currency:
 			rate = flt(get_item_price(row.get("item_code"), currency), 0)
 		qty = flt(row.get("qty"), 1)
-		items.append({
+		item_row = {
 			"item_code": row.get("item_code"),
 			"description": row.get("description"),
+			"item_group": row.get("item_group"),
 			"qty": qty,
 			"uom": row.get("uom"),
 			"rate": rate,
 			"amount": qty * rate,
-		})
+		}
+		items.append(item_row)
 
 	labor = []
 	for row in template.labor:
@@ -93,10 +96,11 @@ def get_template_data(template_name, currency=None):
 	return {
 		"project_type": template.project_type,
 		"currency": template.currency,
+		"estimate_by": estimate_by,
+		"company": getattr(template, "company", None),
 		"items": items,
 		"labor": labor,
 		"overheads": overheads,
-		"company": template.company,
 	}
 
 
@@ -116,6 +120,10 @@ def get_items_from_template(docname):
 		doc.currency = data["currency"]
 	if not doc.project_type and data.get("project_type"):
 		doc.project_type = data["project_type"]
+	if data.get("estimate_by"):
+		doc.estimate_by = data["estimate_by"]
+	if data.get("company") and not doc.company:
+		doc.company = data["company"]
 
 	doc.items = []
 	for row in data.get("items") or []:

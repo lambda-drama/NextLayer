@@ -9,6 +9,7 @@
   "naming_series",
   "customer",
   "project_type",
+  "project",
   "cost_estimate_template",
   "column_break_1",
   "estimate_date",
@@ -16,6 +17,7 @@
   "company",
   "currency",
   "section_items",
+  "estimate_by",
   "items",
   "section_labor",
   "labor",
@@ -181,11 +183,24 @@
    "label": "Company",
    "options": "Company",
    "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "default": "Item Group",
+   "fieldname": "estimate_by",
+   "fieldtype": "Select",
+   "label": "Estimate By",
+   "options": "\nItem Group\nItem"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-03 13:55:35.211860",
+ "modified": "2026-03-04 04:33:50.499023",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate",

@@ -1,14 +1,16 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-02-28 00:00:00.000000",
+ "creation": "2026-02-28 00:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "item_group",
   "item_code",
   "description",
   "qty",
+  "column_break_wdwp",
   "uom",
   "rate",
   "amount",
@@ -16,27 +18,30 @@
  ],
  "fields": [
   {
+   "depends_on": "eval:doc.estimate_by == 'Item'",
    "fieldname": "item_code",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Item",
-   "options": "Item",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.estimate_by == 'Item'",
+   "options": "Item"
   },
   {
+   "depends_on": "eval:doc.estimate_by == 'Item'",
    "fetch_from": "item_code.description",
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
   },
   {
+   "default": "1",
    "fieldname": "qty",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Qty",
-   "default": "1"
+   "label": "Qty"
   },
   {
+   "depends_on": "eval:doc.estimate_by == 'Item'",
    "fetch_from": "item_code.stock_uom",
    "fieldname": "uom",
    "fieldtype": "Link",
@@ -56,27 +61,40 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Amount",
-   "read_only": 1,
-   "options": "currency"
+   "options": "currency",
+   "read_only": 1
   },
   {
+   "description": "Expense / cost account for this item",
    "fieldname": "account",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Account",
-   "options": "Account",
-   "description": "Expense / cost account for this item"
+   "options": "Account"
+  },
+  {
+   "depends_on": "eval:doc.estimate_by == 'Item Group'",
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Group",
+   "mandatory_depends_on": "eval:doc.estimate_by == 'Item Group'",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "column_break_wdwp",
+   "fieldtype": "Column Break"
   }
  ],
- "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-02-28 00:00:00.000000",
+ "modified": "2026-03-04 04:16:56.243098",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate Item",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

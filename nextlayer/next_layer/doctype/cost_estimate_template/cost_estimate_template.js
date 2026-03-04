@@ -22,6 +22,9 @@ frappe.ui.form.on("Cost Estimate Template", {
 			};
 		});
 	},
+	estimate_by: function (frm) {
+		frm.refresh_field("items");
+	},
 });
 
 frappe.ui.form.on("Cost Estimate Template Labor", {
