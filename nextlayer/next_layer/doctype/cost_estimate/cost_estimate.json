@@ -16,6 +16,10 @@
   "status",
   "company",
   "currency",
+  "duration_section",
+  "estimate_start_date",
+  "column_break_zdma",
+  "estimate_end_date",
   "section_items",
   "estimate_by",
   "items",
@@ -67,7 +71,7 @@
    "fieldname": "estimate_date",
    "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Estimate Date"
+   "label": "Date"
   },
   {
    "description": "Select a template to auto-fill items, labor and overheads",
@@ -196,11 +200,30 @@
    "fieldtype": "Select",
    "label": "Estimate By",
    "options": "\nItem Group\nItem"
+  },
+  {
+   "fieldname": "duration_section",
+   "fieldtype": "Section Break",
+   "label": "Duration"
+  },
+  {
+   "fieldname": "estimate_start_date",
+   "fieldtype": "Date",
+   "label": "Estimate Start Date"
+  },
+  {
+   "fieldname": "column_break_zdma",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estimate_end_date",
+   "fieldtype": "Date",
+   "label": "Estimate End Date"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-04 04:33:50.499023",
+ "modified": "2026-03-06 02:14:14.111940",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate",

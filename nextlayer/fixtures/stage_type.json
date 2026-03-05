@@ -1,0 +1,18 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Stage Type",
+  "modified": "2026-03-06 02:09:24.900347",
+  "name": "Underground",
+  "stage_group": "Sub Structure",
+  "type_name": "Underground"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Stage Type",
+  "modified": "2026-03-06 02:09:15.431457",
+  "name": "Foundation",
+  "stage_group": "Sub Structure",
+  "type_name": "Foundation"
+ }
+]
