@@ -11,6 +11,7 @@
   "company",
   "column_break_lxbm",
   "project",
+  "stage",
   "currency",
   "start_date",
   "end_date",
@@ -19,7 +20,9 @@
   "section_break_uzhv",
   "total_qty",
   "column_break_nerr",
-  "total_amount"
+  "total_amount",
+  "section_break_wqsw",
+  "description"
  ],
  "fields": [
   {
@@ -105,12 +108,27 @@
    "label": "Project",
    "options": "Project",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_wqsw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  },
+  {
+   "fieldname": "stage",
+   "fieldtype": "Link",
+   "label": "Stage",
+   "options": "Stage"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-04 05:10:54.626283",
+ "modified": "2026-03-06 02:06:08.557506",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",

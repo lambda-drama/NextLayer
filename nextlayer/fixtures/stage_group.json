@@ -1,0 +1,23 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Stage Group",
+  "group_name": "Sub Structure",
+  "modified": "2026-03-06 02:07:10.620466",
+  "name": "Sub Structure"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Stage Group",
+  "group_name": "Super Structure",
+  "modified": "2026-03-06 02:07:23.493754",
+  "name": "Super Structure"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Stage Group",
+  "group_name": "Finishing",
+  "modified": "2026-03-06 02:07:33.075477",
+  "name": "Finishing"
+ }
+]

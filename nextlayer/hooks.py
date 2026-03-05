@@ -102,7 +102,19 @@ fixtures = [
                     "Contract-custom_posting_date",
                     "Contract-custom_company",
                     "Contract-custom_project_signee",
-                    "Contract-custom_signee_detail"
+                    "Contract-custom_signee_detail",
+                    "Contract-custom_party_signature",
+                    "Contract-custom_party_signee",
+                    "Contract-custom_currency",
+                    "Contract-custom_stage",
+                    "Contract-custom_project",
+                    "Contract-custom_payment_details",
+                    "Contract-custom_payment_terms",
+                    "Contract-custom_payment_term",
+                    
+                    #Project
+                    "Project-custom_attachment",
+                    "Project-custom_project_attachments"
                 ),
             ]
         ],
@@ -146,7 +158,18 @@ fixtures = [
         "doctype":"Travel Group",
         "filters":[
         ]
-    }
+    },
+    {
+        "doctype":"Stage Group",
+        "filters":[
+        ]
+    },
+    {
+        "doctype":"Stage Type",
+        "filters":[
+        ]
+    },
+    
 ]
 
 

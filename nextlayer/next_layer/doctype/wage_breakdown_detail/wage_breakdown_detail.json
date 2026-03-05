@@ -14,7 +14,9 @@
   "amount",
   "checkin",
   "checkout",
-  "phone_no"
+  "phone_no",
+  "section_break_ehxv",
+  "description"
  ],
  "fields": [
   {
@@ -74,13 +76,22 @@
    "fieldname": "phone_no",
    "fieldtype": "Data",
    "label": "Phone No"
+  },
+  {
+   "fieldname": "section_break_ehxv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-04 22:56:57.616267",
+ "modified": "2026-03-06 00:22:28.630993",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Breakdown Detail",
