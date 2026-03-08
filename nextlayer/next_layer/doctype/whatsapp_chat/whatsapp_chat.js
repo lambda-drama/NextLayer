@@ -19,7 +19,10 @@ frappe.ui.form.on("WhatsApp Chat", {
 			
 			if (canSend) {
 				frm.add_custom_button(__("Send"), function() {
-					send_whatsapp_message(frm);
+					send_whatsapp_message(frm, "whatsapp_chat");
+				}, __("Actions"));
+				frm.add_custom_button(__("waSend"), function() {
+					send_whatsapp_message(frm, "wasender_chat");
 				}, __("Actions"));
 			}
 		}
@@ -38,7 +41,7 @@ function open_reply_form(frm) {
 	frappe.new_doc("WhatsApp Chat");
 }
 
-function send_whatsapp_message(frm) {
+function send_whatsapp_message(frm, provider) {
 	// Validate required fields
 	if (!frm.doc.to) {
 		frappe.msgprint(__("Please enter the recipient phone number (TO field)"));
@@ -68,14 +71,17 @@ function send_whatsapp_message(frm) {
 		save_promise = frm.save();
 	}
 
+
 	// Show loading indicator
 	frappe.show_progress(__("Sending"), 50, __("Sending WhatsApp message..."));
+	method = provider === "wasender_chat" ? "nextlayer.next_layer.api.wasender_whatsapp.send_whatsapp_from_chat"
+	: "nextlayer.next_layer.api.whatsapp_utils.send_whatsapp_from_chat";
 
 	// Wait for save to complete, then send
 	save_promise.then(() => {
 		// Call the backend API to send the message
 		frappe.call({
-			method: "nextlayer.next_layer.api.whatsapp_utils.send_whatsapp_from_chat",
+			method: method,
 			args: {
 				chat_name: frm.doc.name
 			},
