@@ -5,7 +5,11 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "intercompany_matching_tolerance"
+  "intercompany_reconcillition_details_tab",
+  "intercompany_matching_tolerance",
+  "enable_opening_entry_by_default",
+  "intercompany_ledger_summary_tab",
+  "allow_offset_match"
  ],
  "fields": [
   {
@@ -13,13 +17,35 @@
    "fieldname": "intercompany_matching_tolerance",
    "fieldtype": "Float",
    "label": "InterCompany Matching Tolerance"
+  },
+  {
+   "fieldname": "intercompany_reconcillition_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Intercompany Reconcillition Details"
+  },
+  {
+   "fieldname": "intercompany_ledger_summary_tab",
+   "fieldtype": "Tab Break",
+   "label": "Intercompany Ledger Summary"
+  },
+  {
+   "default": "0",
+   "fieldname": "allow_offset_match",
+   "fieldtype": "Check",
+   "label": "Allow Offset Match"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_opening_entry_by_default",
+   "fieldtype": "Check",
+   "label": "Enable Opening Entry By Default"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-01-25 23:18:55.803181",
+ "modified": "2026-02-06 17:53:22.125855",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Inter Company Reconciliation Settings",

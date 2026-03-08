@@ -380,7 +380,7 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 		branch = ''
 		if sales_invoice_doc.branch:
 			try:
-				branch_company = frappe.db.get_value("Branch", sales_invoice_doc.branch, "custom_company")
+				branch_company = frappe.db.get_value("Branch", sales_invoice_doc.branch, "company")
 				# Only include branch if it belongs to the target company
 				if branch_company == target_company:
 					branch = sales_invoice_doc.branch
@@ -538,7 +538,7 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 		branch = ''
 		if purchase_invoice_doc.branch:
 			try:
-				branch_company = frappe.db.get_value("Branch", purchase_invoice_doc.branch, "custom_company")
+				branch_company = frappe.db.get_value("Branch", purchase_invoice_doc.branch, "company")
 				# Only include branch if it belongs to the target company
 				if branch_company == target_company:
 					branch = purchase_invoice_doc.branch

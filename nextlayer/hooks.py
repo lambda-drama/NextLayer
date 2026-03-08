@@ -11,15 +11,15 @@ app_license = "mit"
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "nextlayer",
-# 		"logo": "/assets/nextlayer/logo.png",
-# 		"title": "Next Layer",
-# 		"route": "/nextlayer",
-# 		"has_permission": "nextlayer.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "nextlayer",
+		"logo": "/assets/nextlayer/images/logo.jpeg",
+		"title": "Next Layer",
+		"route": "/nextlayer",
+		# "has_permission": "nextlayer.api.permission.has_app_permission"
+	}
+]
 
 fixtures = [
     {
@@ -75,7 +75,46 @@ fixtures = [
                     "Sales Invoice-custom_registered_owner",
                     "Customer Group-custom_unique_gl_series",
                     "Journal Entry Account-custom_travel_expense_ref",
-                    "Journal Entry-custom_intercompany_match_details"
+                    "Journal Entry-custom_intercompany_match_details",
+                    
+                    #Sales Order
+                    "Sales Order-custom_engine",
+                    "Sales Order-custom_chassis_no",
+                    "Sales Order-custom_column_break_l7nyf",
+                    "Sales Order-custom_model",
+                    "Sales Order-custom_color",
+                    "Sales Order-custom_registered_owner",
+                    "Sales Order-custom_assembled_by",
+                    "Sales Order-custom_owner_information",
+                    
+                    #Quotation
+                    "Quotation-custom_revision_type",
+                    "Quotation-custom_parent_quotation",
+                    "Quotation-custom_site_visit_date",
+                    "Quotation-custom_is_revision",
+                    
+                    #Contract
+                    "Contract-custom_type_of_work",
+                    "Contract-custom_column_break_9d5n8",
+                    "Contract-custom_type_of_floor",
+                    "Contract-custom_area_size",
+                    "Contract-custom_contract_details",
+                    "Contract-custom_posting_date",
+                    "Contract-custom_company",
+                    "Contract-custom_project_signee",
+                    "Contract-custom_signee_detail",
+                    "Contract-custom_party_signature",
+                    "Contract-custom_party_signee",
+                    "Contract-custom_currency",
+                    "Contract-custom_stage",
+                    "Contract-custom_project",
+                    "Contract-custom_payment_details",
+                    "Contract-custom_payment_terms",
+                    "Contract-custom_payment_term",
+                    
+                    #Project
+                    "Project-custom_attachment",
+                    "Project-custom_project_attachments"
                 ),
             ]
         ],
@@ -119,12 +158,26 @@ fixtures = [
         "doctype":"Travel Group",
         "filters":[
         ]
-    }
+    },
+    {
+        "doctype":"Stage Group",
+        "filters":[
+        ]
+    },
+    {
+        "doctype":"Stage Type",
+        "filters":[
+        ]
+    },
+    
 ]
 
 
 
 doc_events = {
+    "Repost Accounting Ledger": {
+        "on_submit": "nextlayer.next_layer.controllers.sales_shipment.recreate_sales_shipment_cost_gl_after_repost_submit",
+    },
     "Sales Order": {
         "before_save": "nextlayer.next_layer.controllers.sales_order.before_save",
     },
@@ -158,6 +211,9 @@ doc_events = {
     },
     "Item": {
         "before_save": "nextlayer.next_layer.controllers.generate_barcode.auto_generate_barcode_for_item",
+    },
+    "Quotation": {
+        "autoname": "nextlayer.next_layer.controllers.quotation_naming.set_quotation_name",
     },
 }
 
@@ -193,6 +249,8 @@ doctype_js = {
 	"Purchase Invoice":"public/js/purchase_invoice.js",
 	"Expense Claim":"public/js/expense_claim_flight_lookup.js",
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
+	"Journal Entry":"public/js/journal_entry.js",
+    "Quotation":"public/js/quotation.js",
 }
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -277,10 +335,9 @@ jinja = {
 # DocType Class
 # ---------------
 # Override standard doctype classes
-
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Repost Item Valuation": "nextlayer.next_layer.overrides.repost_item_valuation.RepostItemValuationOverride",
+}
 
 # Document Events
 # ---------------
@@ -345,8 +402,7 @@ jinja = {
 
 # Request Events
 # ----------------
-# before_request = ["nextlayer.utils.before_request"]
-# after_request = ["nextlayer.utils.after_request"]
+# before_request / after_request not used for RIV; use override_doctype_class + app init patch
 
 # Job Events
 # ----------

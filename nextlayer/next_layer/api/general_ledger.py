@@ -137,8 +137,6 @@ def get_permission_aware_gl_data(filters):
 
 		# Set default values
 		filters.setdefault("show_remarks", 1)
-		# Don't set group_by - let it be empty/None so GL report shows individual entries (like when group_by is blank in UI)
-		# Only set if not already provided
 		if "group_by" not in filters:
 			filters["group_by"] = ""
 		filters.setdefault("include_dimensions", 1)
@@ -167,9 +165,6 @@ def get_permission_aware_gl_data(filters):
 			columns, all_data = execute(filters)
 		finally:
 			frappe.set_user(original_user)
-
-		print(f"[get_permission_aware_gl_data] Total entries from GL report: {len(all_data)}")
-		print(f"[get_permission_aware_gl_data] Filters: company={filters.get('company')}, party={filters.get('party')}, from_date={filters.get('from_date')}, to_date={filters.get('to_date')}")
 
 		# Filter based on document sharing permissions for display
 		# Run permission checks as the original user to respect sharing permissions
@@ -204,7 +199,6 @@ def get_permission_aware_gl_data(filters):
 
 			if not posting_date:
 				skipped_no_date += 1
-				print(f"[get_permission_aware_gl_data] Skipped entry (no posting_date): voucher={voucher_type}-{voucher_no}, account={account}")
 				continue
 
 			processed_count += 1
@@ -216,14 +210,10 @@ def get_permission_aware_gl_data(filters):
 				company = entry.get('party', 'Unknown')
 
 				if has_permission:
-					# User has permission - show full document details in entries list
-					print(f"[get_permission_aware_gl_data] Including entry (has permission): {voucher_type}-{voucher_no}, posting_date={posting_date}, debit={entry.get('debit', 0)}, credit={entry.get('credit', 0)}")
 					visible_entries.append(entry)
 				else:
-					# Only add to hidden summary for reconciliation totals
 					hidden_count += 1
 					skipped_permission += 1
-					print(f"[get_permission_aware_gl_data] Skipped entry (no permission): {voucher_type}-{voucher_no}, posting_date={posting_date}, debit={entry.get('debit', 0)}, credit={entry.get('credit', 0)}")
 
 					# Add to hidden summary for reporting
 					if voucher_type in hidden_summary:
@@ -231,11 +221,7 @@ def get_permission_aware_gl_data(filters):
 						hidden_summary[voucher_type]["total_debit"] += flt(entry.get('debit', 0))
 						hidden_summary[voucher_type]["total_credit"] += flt(entry.get('credit', 0))
 			else:
-				# Include entries without voucher info
-				print(f"[get_permission_aware_gl_data] Including entry (no voucher info): posting_date={posting_date}, account={account}")
 				visible_entries.append(entry)
-
-		print(f"[get_permission_aware_gl_data] Filtering summary: total={len(all_data)}, skipped_summary={skipped_summary}, skipped_no_date={skipped_no_date}, skipped_opening={skipped_opening}, skipped_permission={skipped_permission}, final_visible={len(visible_entries)}, hidden={hidden_count}")
 
 		return {
 			"success": True,
@@ -266,7 +252,6 @@ def check_document_permission_as_original_user(voucher_type, voucher_no, origina
 		current_user = frappe.session.user
 		try:
 			frappe.set_user(original_user)
-			# Now check permissions as the original user
 			doc = frappe.get_doc(voucher_type, voucher_no)
 			return frappe.has_permission(doc, ptype="read")
 		finally:
@@ -310,11 +295,12 @@ def get_all_companies_for_ui():
 	Data access is still controlled by permissions in other APIs
 	"""
 	try:
-		# First try to get companies
+		# First try to get companies (ignore permissions so Intercompany Ledger Summary can show all)
 		companies = frappe.get_all(
 			"Company",
 			fields=["name", "default_currency"],
-			order_by="name"
+			order_by="name",
+			ignore_permissions=True
 		)
 
 		# If no companies found, return empty array
@@ -336,8 +322,6 @@ def get_all_companies_for_ui():
 def get_parties(party_type="Customer", company=None):
 	"""Get list of parties (customers/suppliers) for dropdown"""
 	try:
-		# Skip company permission check - allow access to all companies for reconciliation
-
 		filters = {}
 
 		# add internal customer/supplier filter
@@ -430,8 +414,6 @@ def get_permission_aware_parties(party_type="Customer"):
 		allowed_parties = []
 		for party in parties:
 			try:
-				# Check if user has read permission on this specific party document
-
 				has_perm = frappe.has_permission(
 					doctype=party_type,
 					ptype="read",
@@ -498,18 +480,16 @@ def update_match_status():
 		company = data.get("company")
 		match_status = data.get("status")
 		matched_with = data.get("matched_with")
-		party = data.get("party")  # For Journal Entries
-		party_type = data.get("party_type")  # For Journal Entries (Customer/Supplier)
-		gl_entry = data.get("gl_entry")  # For Journal Entries - specific GL Entry (debit or credit)
+		party = data.get("party")  
+		party_type = data.get("party_type")
+		gl_entry = data.get("gl_entry")  
 
 		if not all([voucher_type, voucher_no, company, match_status]):
 			frappe.throw("Missing required fields: voucher_type, voucher_no, company, status")
 
-		# Check if document exists
 		if not frappe.db.exists(voucher_type, voucher_no):
 			frappe.throw(f"Document {voucher_type} {voucher_no} not found")
 
-		# Get the current document
 		current_doc = frappe.get_doc(voucher_type, voucher_no)
 
 		# For Journal Entries, handle child table updates
@@ -631,20 +611,13 @@ def update_match_status():
 										}
 									)
 					except Exception as e:
-						# Log but don't fail the main operation - paired unmatch is best effort
-						# The paired entry might already be unmatched by the other transaction
 						frappe.logger().warning(f"Non-critical error handling paired unmatch for Journal Entry {voucher_no}: {str(e)}")
-						print(f"[update_match_status] Non-critical error handling paired unmatch (main unmatch will continue): {str(e)}")
-						# Don't log as error since this is expected in concurrent scenarios
 
 			# Ensure matched_with includes company information
 			if matched_with and isinstance(matched_with, dict):
 				if "company" not in matched_with:
 					matched_with["company"] = company
-				# Preserve is_internal_match flag if present
-				# This flag indicates entries matched within the same company (internal reversals)
 
-			# When matching a Journal Entry, print all GL entries on the voucher for visibility
 			if voucher_type == "Journal Entry" and match_status == "Match":
 				gl_entries = frappe.get_all(
 					"GL Entry",
@@ -652,29 +625,21 @@ def update_match_status():
 					pluck="name"
 				)
 
-			# Find or create child table row for this party and gl_entry
-			# For Journal Entries, we need to differentiate between debit and credit GL entries
 			child_table = current_doc.get("custom_intercompany_match_details", [])
 			matching_child_row = None
 
 			for row in child_table:
-				# Match by party, party_type, and gl_entry (if provided)
 				party_match = row.party == party and row.party_type == party_type
 				gl_entry_match = True
 				if gl_entry:
-					# If gl_entry is provided, it must match
 					gl_entry_match = row.gl_entry == gl_entry
 				else:
-					# If gl_entry is not provided, only match rows without gl_entry (backward compatibility)
 					gl_entry_match = not row.gl_entry
 
 				if party_match and gl_entry_match:
 					matching_child_row = row
 					break
 
-			# When matching: if no row found by (party, party_type, gl_entry), reuse existing row with same
-			# (party, party_type) and update its gl_entry. Avoids creating a second line when the existing
-			# row had a missing/invalid gl_entry (e.g. e178330462 no longer exists).
 			if matching_child_row is None and match_status == "Match" and gl_entry:
 				for row in child_table:
 					if row.party == party and row.party_type == party_type:
@@ -778,19 +743,16 @@ def update_match_status():
 								child_row_data["gl_entry"] = gl_entry
 							current_doc.append("custom_intercompany_match_details", child_row_data)
 
-					print(f"[update_match_status] Saving Journal Entry {voucher_no} with party {party} (attempt {retry_count + 1})")
 					current_doc.save(ignore_permissions=True)
 					frappe.db.commit()
 
 					frappe.logger().info(f"Successfully updated Journal Entry {voucher_no} child table for party {party}")
-					print(f"[update_match_status] Successfully saved Journal Entry {voucher_no} for party {party}")
 
 					main_operation_success = True
 					break  # Exit retry loop on success
 
 				except frappe.QueryDeadlockError as e:
 					retry_count += 1
-					print(f"[update_match_status] QueryDeadlockError for Journal Entry {voucher_no} (attempt {retry_count}/{max_retries}): {str(e)}")
 					if retry_count >= max_retries:
 						frappe.logger().error(f"Max retries reached for Journal Entry {voucher_no} child table update: {str(e)}")
 						raise e
@@ -803,9 +765,7 @@ def update_match_status():
 					if retry_count >= max_retries:
 						frappe.logger().error(f"Max retries reached for Journal Entry {voucher_no} child table update: {str(e)}")
 						frappe.log_error(f"Journal Entry child table update error for {voucher_no} party {party}: {str(e)}")
-						print(f"[update_match_status] Error updating Journal Entry {voucher_no} for party {party}: {str(e)}")
-						print(f"[update_match_status] Error type: {type(e).__name__}")
-						print(f"[update_match_status] Error traceback: {frappe.get_traceback()}")
+						
 						raise e
 					# Wait before retrying
 					import time
@@ -878,9 +838,7 @@ def update_match_status():
 		if matched_with and isinstance(matched_with, dict):
 			if "company" not in matched_with:
 				matched_with["company"] = company
-			# Preserve is_internal_match flag if present
-			# This flag indicates entries matched within the same company (internal reversals)
-
+	
 		matched_with_value = matched_with
 		if isinstance(matched_with, (dict, list)):
 			matched_with_value = frappe.as_json(matched_with)
@@ -923,7 +881,6 @@ def update_match_status():
 				time.sleep(0.1 * (2 ** retry_count))
 
 			except Exception as e:
-				# For non-concurrency errors, don't retry
 				raise e
 
 		return {
@@ -957,10 +914,6 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 				# Look for child table entry matching the party and gl_entry
 				child_table = doc.get("custom_intercompany_match_details", [])
 				matching_child_row = None
-				print(f"[get_match_status] Journal Entry {voucher_no}: Looking for party={party}, party_type={party_type}, gl_entry={gl_entry}")
-				print(f"[get_match_status] Found {len(child_table)} child table rows")
-				if gl_entry:
-					print(f"[get_match_status] Searching for gl_entry: {gl_entry}")
 
 				for row in child_table:
 					# Match by party and party_type first
@@ -969,14 +922,11 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 					if not party_match:
 						continue
 
-					print(f"[get_match_status] Found matching party row: party={row.party}, party_type={row.party_type}, gl_entry={row.gl_entry}, status={row.intercompany_match_status}")
-
 					# If gl_entry is provided, try to match by gl_entry
 					if gl_entry:
 						# First try exact match with gl_entry
 						if row.gl_entry == gl_entry:
 							matching_child_row = row
-							print(f"[get_match_status] Exact gl_entry match found: {gl_entry}")
 							break
 						# If no gl_entry in row (backward compatibility - old matches),
 						# and this is the only row for this party, use it
@@ -991,24 +941,44 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 							if not has_other_rows_with_gl_entry:
 								# This is the only row for this party, use it (backward compatibility)
 								matching_child_row = row
-								print(f"[get_match_status] Using row without gl_entry (backward compatibility): party={party}, party_type={party_type}")
 								# Update the row to include gl_entry for future queries
 								if not matching_child_row.gl_entry:
 									matching_child_row.gl_entry = gl_entry
 									try:
 										doc.save(ignore_permissions=True)
 										frappe.db.commit()
-										print(f"[get_match_status] Updated row with gl_entry: {gl_entry}")
 									except:
 										pass  # Don't fail if update doesn't work
 								break
-						else:
-							print(f"[get_match_status] gl_entry mismatch: row.gl_entry={row.gl_entry}, requested={gl_entry}")
 					else:
 						# If gl_entry is not provided, only match rows without gl_entry (backward compatibility)
 						if not row.gl_entry:
 							matching_child_row = row
 							break
+
+				# Fallback when gl_entry not provided: if exactly one child row for this (party, party_type), use it
+				# so the frontend still gets Match when it doesn't send gl_entry (e.g. missing in API response)
+				if not matching_child_row and not gl_entry:
+					rows_for_party = [
+						r for r in child_table
+						if r.party == party and r.party_type == party_type
+					]
+					if len(rows_for_party) == 1:
+						matching_child_row = rows_for_party[0]
+
+				# Fallback when gl_entry was provided but no row matched that gl_entry: if any child row for
+				# this (party, party_type) has status Match, use it so all GL rows of the same JE show Match
+				if not matching_child_row and gl_entry:
+					rows_for_party = [
+						r for r in child_table
+						if r.party == party and r.party_type == party_type
+					]
+					matched_row = next(
+						(r for r in rows_for_party if r.get("intercompany_match_status") == "Match"),
+						None,
+					)
+					if matched_row:
+						matching_child_row = matched_row
 
 				if matching_child_row:
 					# Found a child table entry for this party
@@ -1022,16 +992,8 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 						except:
 							matched_with_parsed = matched_with_raw
 
-					# Get the status from the child table - this is the source of truth
-					# We should NOT override it based on company matching, because:
-					# - The matched_with.company is the company of the MATCHED transaction
-					# - The company parameter is the company of the CURRENT transaction
-					# - These should be DIFFERENT for intercompany reconciliation!
-					# - If they were the same, it wouldn't be an intercompany match
+					
 					status = matching_child_row.get("intercompany_match_status", "Pending")
-
-					print(f"[get_match_status] Journal Entry {voucher_no} party={party} party_type={party_type} gl_entry={gl_entry}: Found matching row with status={status}, row.gl_entry={matching_child_row.get('gl_entry')}")
-
 					return {
 						"success": True,
 						"status": status,
@@ -1043,8 +1005,6 @@ def get_match_status(voucher_type, voucher_no, company, party=None, party_type=N
 					}
 				else:
 					# No child table entry for this party/gl_entry combination
-					print(f"[get_match_status] Journal Entry {voucher_no}: No matching child table row found for party={party}, party_type={party_type}, gl_entry={gl_entry}")
-					print(f"[get_match_status] Available rows: {[(r.party, r.party_type, r.gl_entry, r.intercompany_match_status) for r in child_table]}")
 					return {
 						"success": True,
 						"status": "Mismatch",
@@ -1122,18 +1082,14 @@ def get_voucher_amount(voucher_type, voucher_no):
 			amount = max(total_debit, total_credit)
 
 		elif voucher_type in ["Sales Invoice", "Purchase Invoice"]:
-			# For invoices, use grand_total
 			amount = doc.get("grand_total") or doc.get("total") or 0
-			# Determine debit/credit based on invoice type
 			if voucher_type == "Sales Invoice":
-				credit = amount  # Sales Invoice creates credit entry
+				credit = amount 
 			else:
-				debit = amount  # Purchase Invoice creates debit entry
+				debit = amount  
 
 		elif voucher_type in ["Payment Entry", "Bank Entry"]:
-			# For Payment Entry, use paid_amount or total_allocated_amount
 			amount = doc.get("paid_amount") or doc.get("total_allocated_amount") or doc.get("total_amount") or 0
-			# Payment Entry can be either debit or credit depending on payment type
 			if doc.get("payment_type") == "Pay":
 				debit = amount
 			else:
@@ -1148,7 +1104,6 @@ def get_voucher_amount(voucher_type, voucher_no):
 			debit = amount
 
 		else:
-			# For other doctypes, try common amount fields
 			amount = doc.get("grand_total") or doc.get("total") or doc.get("amount") or doc.get("total_amount") or 0
 
 		return {
@@ -1230,21 +1185,17 @@ def validate_intercompany_filters(filters):
 def get_permission_aware_companies():
 	"""Get companies that the current user has permission to access"""
 	try:
-		# Get companies that user has permission to access
 		companies = frappe.get_all("Company",
 			fields=["name", "company_name"],
 			order_by="name"
 		)
 
-		# Get user permitted companies
 		user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
 
-		# Extract permitted company names from the permission data
 		permitted_company_names = []
 		if user_permitted and "Company" in user_permitted:
 			permitted_company_names = [perm.get("doc") for perm in user_permitted["Company"]]
 
-		# If user has specific company permissions, filter accordingly
 		if permitted_company_names:
 			allowed_companies = []
 			for company in companies:
@@ -1314,9 +1265,9 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 		# Get the admin password from Global Defaults
 		global_defaults = frappe.get_single("Global Defaults")
 		stored_password = get_decrypted_password(
-	"Global Defaults",   # Doctype
-	"Global Defaults",   # Docname (same as Doctype for Single DocTypes)
-	"custom_admin_password"  # Fieldname
+	"Global Defaults",  
+	"Global Defaults",   
+	"custom_admin_password"  
 )
 		print("Stored password fetched", stored_password)
 		if not stored_password:
@@ -1335,7 +1286,7 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 			filters_a = _dict({
 				"company": company_a,
 				"party_type": "Customer",
-				"party": [party_a],  # Convert to list format
+				"party": [party_a],  
 				"from_date": from_date,
 				"to_date": to_date,
 				"currency": currency,
@@ -1344,7 +1295,6 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 				"show_opening_entries": show_opening_entries
 			})
 
-			# Get all GL data for Company A (including hidden ones)
 			original_user = frappe.session.user
 			try:
 				frappe.set_user("Administrator")
@@ -1352,7 +1302,6 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 			finally:
 				frappe.set_user(original_user)
 
-			# Filter to get only hidden transactions (those user doesn't have permission to see)
 			for entry in all_data_a:
 				# Skip summary rows
 				if (isinstance(entry.get('account'), str) and
@@ -1382,7 +1331,7 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 			filters_b = _dict({
 				"company": company_b,
 				"party_type": party_type_b,
-				"party": [party_b],  # Convert to list format
+				"party": [party_b],  
 				"from_date": from_date,
 				"to_date": to_date,
 				"currency": currency,
@@ -1399,7 +1348,6 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 			finally:
 				frappe.set_user(original_user)
 
-			# Filter to get only hidden transactions (those user doesn't have permission to see)
 			for entry in all_data_b:
 				# Skip summary rows
 				if (isinstance(entry.get('account'), str) and
@@ -1414,12 +1362,10 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 				voucher_type = entry.get('voucher_type', '')
 				voucher_no = entry.get('voucher_no', '')
 
-				# Check if user has permission to view this document
 				if voucher_type and voucher_no:
 					has_permission = check_document_permission_as_original_user(voucher_type, voucher_no, original_user)
 
 					if not has_permission:
-						# This is a hidden transaction - add it to the list
 						formatted_entry = format_gl_entries_for_frontend([entry], columns_b)[0]
 						formatted_entry['is_hidden'] = True
 						hidden_transactions_b.append(formatted_entry)
@@ -1472,15 +1418,12 @@ def clear_intercompany_fields_before_submit(doc, method=None):
 		if doc.doctype == "Journal Entry":
 			child_table = doc.get("custom_intercompany_match_details", [])
 			if child_table:
-				# Clear all rows from the child table
 				doc.set("custom_intercompany_match_details", [])
 				frappe.logger().info(
 					f"Cleared all intercompany match detail rows before submission for Journal Entry {doc.name}"
 				)
 			return
 
-		# For other document types, clear top-level fields
-		# Check if the document has intercompany fields
 		if not hasattr(doc, 'intercompany_match_status'):
 			return
 
@@ -1512,6 +1455,47 @@ def clear_intercompany_fields_before_submit(doc, method=None):
 		# Don't raise the exception to prevent submission failure
 
 
+def _unchain_je_child_row_from_voucher(je_name, main_voucher_type, main_voucher_no):
+	"""
+	Find the child row in Journal Entry je_name that points to main_voucher_type/main_voucher_no
+	and set it to Mismatch. Used when unchain a combined match - all journals in the group must go to Mismatch.
+	"""
+	try:
+		je_doc = frappe.get_doc("Journal Entry", je_name)
+		child_table = je_doc.get("custom_intercompany_match_details", [])
+		for row in child_table:
+			if not row.intercompany_matched_with:
+				continue
+			try:
+				parsed = frappe.parse_json(row.intercompany_matched_with)
+				# Single match (dict) or list - check if it points to main voucher
+				points_to_main = False
+				if isinstance(parsed, dict):
+					points_to_main = parsed.get('voucher_type') == main_voucher_type and parsed.get('voucher_no') == main_voucher_no
+				elif isinstance(parsed, list):
+					points_to_main = any(
+						isinstance(m, dict) and m.get('voucher_type') == main_voucher_type and m.get('voucher_no') == main_voucher_no
+						for m in parsed
+					)
+				if points_to_main:
+					frappe.db.set_value(
+						"InterCompany Journal Match Detail",
+						row.name,
+						{
+							'intercompany_match_status': 'Mismatch',
+							'intercompany_matched_with': None,
+							'intercompany_matched_by': None,
+							'intercompany_matched_on': None
+						}
+					)
+					frappe.logger().info(f"Unchained child row in Journal Entry {je_name} from {main_voucher_type} {main_voucher_no}")
+					break
+			except Exception:
+				continue
+	except Exception as e:
+		frappe.logger().error(f"Error unchaining JE {je_name} from {main_voucher_type} {main_voucher_no}: {e}")
+
+
 def cleanup_intercompany_matches_on_cancel(doc, method=None):
 	"""
 	Clean up intercompany matches when a document is cancelled.
@@ -1526,9 +1510,7 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 		method: The method name (for hook compatibility)
 	"""
 	try:
-		# Handle Journal Entries with child table
 		if doc.doctype == "Journal Entry":
-			# Clear Travel Expense More Information links when this JE is cancelled
 			try:
 				from nextlayer.next_layer.api.travel_expense_utils import clear_more_information_on_je_cancel
 				clear_more_information_on_je_cancel(doc.name)
@@ -1540,7 +1522,6 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 			if not child_table:
 				return
 
-			# Find all matched rows in the child table
 			matched_rows = [row for row in child_table if row.intercompany_match_status == 'Match' and row.intercompany_matched_with]
 
 			if not matched_rows:
@@ -1549,44 +1530,56 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 			# Process each matched row
 			for matched_row in matched_rows:
 				try:
-					# Parse the matched_with data
 					try:
 						matched_data = frappe.parse_json(matched_row.intercompany_matched_with)
 					except:
 						matched_data = matched_row.intercompany_matched_with
 
-					if not isinstance(matched_data, dict):
-						continue
+					# Handle single match (dict) or combined match (list)
+					matches_to_process = [matched_data] if isinstance(matched_data, dict) else (matched_data if isinstance(matched_data, list) else [])
 
-					voucher_type = matched_data.get('voucher_type')
-					voucher_no = matched_data.get('voucher_no')
-					matched_company = matched_data.get('company')
+					# Set this row on the cancelled doc to Mismatch (invalidating the match)
+					frappe.db.set_value(
+						"InterCompany Journal Match Detail",
+						matched_row.name,
+						{
+							'intercompany_match_status': 'Mismatch',
+							'intercompany_matched_with': None,
+							'intercompany_matched_by': None,
+							'intercompany_matched_on': None
+						}
+					)
 
-					if not voucher_type or not voucher_no:
-						continue
+					for match_item in matches_to_process:
+						if not isinstance(match_item, dict):
+							continue
+						voucher_type = match_item.get('voucher_type')
+						voucher_no = match_item.get('voucher_no')
 
-					# Check if the matched document still exists
-					if not frappe.db.exists(voucher_type, voucher_no):
-						frappe.logger().info(f"Matched document {voucher_type} {voucher_no} no longer exists, skipping cleanup")
-						continue
+						if not voucher_type or not voucher_no:
+							continue
 
-					# Get the matched document
-					matched_doc = frappe.get_doc(voucher_type, voucher_no)
+						if not frappe.db.exists(voucher_type, voucher_no):
+							frappe.logger().info(f"Matched document {voucher_type} {voucher_no} no longer exists, skipping cleanup")
+							continue
 
-					# If the matched document is also a Journal Entry, update its child table
-					if voucher_type == "Journal Entry":
-						matched_child_table = matched_doc.get("custom_intercompany_match_details", [])
+						matched_doc = frappe.get_doc(voucher_type, voucher_no)
 
-						# Find the child table row in the matched Journal Entry that points back to this cancelled Journal Entry
-						for matched_child_row in matched_child_table:
-							if matched_child_row.intercompany_matched_with:
-								try:
-									matched_child_matched_data = frappe.parse_json(matched_child_row.intercompany_matched_with)
-									if isinstance(matched_child_matched_data, dict):
-										# Check if this row's matched_with points back to the cancelled Journal Entry
-										if (matched_child_matched_data.get('voucher_type') == doc.doctype and
-											matched_child_matched_data.get('voucher_no') == doc.name):
-											# Update the specific child table row
+						# If the matched document is also a Journal Entry, update its child table
+						if voucher_type == "Journal Entry":
+							matched_child_table = matched_doc.get("custom_intercompany_match_details", [])
+
+							for matched_child_row in matched_child_table:
+								if matched_child_row.intercompany_matched_with:
+									try:
+										matched_child_matched_data = frappe.parse_json(matched_child_row.intercompany_matched_with)
+										matches_list = [matched_child_matched_data] if isinstance(matched_child_matched_data, dict) else (matched_child_matched_data if isinstance(matched_child_matched_data, list) else [])
+										cancelled_in_match = any(
+											isinstance(m, dict) and m.get('voucher_type') == doc.doctype and m.get('voucher_no') == doc.name
+											for m in matches_list
+										)
+										if cancelled_in_match:
+											# Combined match: cancelling one invalidates the whole match. Set this row to Mismatch
 											frappe.db.set_value(
 												"InterCompany Journal Match Detail",
 												matched_child_row.name,
@@ -1598,26 +1591,35 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 												}
 											)
 											frappe.logger().info(f"Unmatched child table row in Journal Entry {voucher_no} (party={matched_child_row.party}, gl_entry={matched_child_row.gl_entry})")
+											# Also set ALL other journals in this combined match to Mismatch (same party, same company - totals no longer balance)
+											for m in matches_list:
+												if not isinstance(m, dict):
+													continue
+												ovt, ovn = m.get('voucher_type'), m.get('voucher_no')
+												if not ovt or not ovn or not frappe.db.exists(ovt, ovn):
+													continue
+												if ovt == "Journal Entry":
+													_unchain_je_child_row_from_voucher(ovn, voucher_type, voucher_no)
 											break
-								except:
-									continue
-					else:
-						# For non-Journal Entry documents, update top-level fields
-						if (hasattr(matched_doc, 'intercompany_match_status') and
-							hasattr(matched_doc, 'intercompany_matched_with') and
-							matched_doc.intercompany_match_status == 'Match' and
-							matched_doc.intercompany_matched_with):
-							frappe.db.set_value(
-								voucher_type,
-								voucher_no,
-								{
-									'intercompany_match_status': 'Mismatch',
-									'intercompany_matched_with': None,
-									'intercompany_matched_by': None,
-									'intercompany_matched_on': None
-								}
-							)
-							frappe.logger().info(f"Unmatched {voucher_type} {voucher_no} on cancel of Journal Entry {doc.name}")
+									except Exception:
+										continue
+						else:
+							# For non-Journal Entry documents, update top-level fields
+							if (hasattr(matched_doc, 'intercompany_match_status') and
+								hasattr(matched_doc, 'intercompany_matched_with') and
+								matched_doc.intercompany_match_status == 'Match' and
+								matched_doc.intercompany_matched_with):
+								frappe.db.set_value(
+									voucher_type,
+									voucher_no,
+									{
+										'intercompany_match_status': 'Mismatch',
+										'intercompany_matched_with': None,
+										'intercompany_matched_by': None,
+										'intercompany_matched_on': None
+									}
+								)
+								frappe.logger().info(f"Unmatched {voucher_type} {voucher_no} on cancel of Journal Entry {doc.name}")
 
 				except Exception as e:
 					frappe.logger().error(f"Error cleaning up match for child table row in Journal Entry {doc.name}: {str(e)}")
@@ -1626,7 +1628,6 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 			frappe.db.commit()
 			return
 
-		# Handle other document types (Payment Entry, Sales Invoice, Purchase Invoice) with top-level fields
 		if not hasattr(doc, 'intercompany_match_status') or not hasattr(doc, 'intercompany_matched_with'):
 			return
 
@@ -1639,7 +1640,6 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 		except:
 			matched_data = doc.intercompany_matched_with
 
-		# Handle both single match and multiple matches
 		matches_to_clean = []
 		if isinstance(matched_data, dict):
 			matches_to_clean = [matched_data]
@@ -1664,10 +1664,8 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 				continue
 
 			try:
-				# Get the matched document
 				matched_doc = frappe.get_doc(voucher_type, voucher_no)
 
-				# If the matched document is a Journal Entry, update its child table
 				if voucher_type == "Journal Entry":
 					matched_child_table = matched_doc.get("custom_intercompany_match_details", [])
 
@@ -1676,27 +1674,36 @@ def cleanup_intercompany_matches_on_cancel(doc, method=None):
 						if matched_child_row.intercompany_matched_with:
 							try:
 								matched_child_matched_data = frappe.parse_json(matched_child_row.intercompany_matched_with)
-								if isinstance(matched_child_matched_data, dict):
-									# Check if this row's matched_with points back to the cancelled document
-									if (matched_child_matched_data.get('voucher_type') == doc.doctype and
-										matched_child_matched_data.get('voucher_no') == doc.name):
-										# Update the specific child table row
-										frappe.db.set_value(
-											"InterCompany Journal Match Detail",
-											matched_child_row.name,
-											{
-												'intercompany_match_status': 'Mismatch',
-												'intercompany_matched_with': None,
-												'intercompany_matched_by': None,
-												'intercompany_matched_on': None
-											}
-										)
-										frappe.logger().info(f"Unmatched child table row in Journal Entry {voucher_no} (party={matched_child_row.party}, gl_entry={matched_child_row.gl_entry}) on cancel of {doc.doctype} {doc.name}")
-										break
-							except:
+								matches_list = [matched_child_matched_data] if isinstance(matched_child_matched_data, dict) else (matched_child_matched_data if isinstance(matched_child_matched_data, list) else [])
+								cancelled_in_match = any(
+									isinstance(m, dict) and m.get('voucher_type') == doc.doctype and m.get('voucher_no') == doc.name
+									for m in matches_list
+								)
+								if cancelled_in_match:
+									frappe.db.set_value(
+										"InterCompany Journal Match Detail",
+										matched_child_row.name,
+										{
+											'intercompany_match_status': 'Mismatch',
+											'intercompany_matched_with': None,
+											'intercompany_matched_by': None,
+											'intercompany_matched_on': None
+										}
+									)
+									frappe.logger().info(f"Unmatched child table row in Journal Entry {voucher_no} (party={matched_child_row.party}, gl_entry={matched_child_row.gl_entry}) on cancel of {doc.doctype} {doc.name}")
+									# Also set ALL other journals in this combined match to Mismatch
+									for m in matches_list:
+										if not isinstance(m, dict):
+											continue
+										ovt, ovn = m.get('voucher_type'), m.get('voucher_no')
+										if not ovt or not ovn or not frappe.db.exists(ovt, ovn):
+											continue
+										if ovt == "Journal Entry":
+											_unchain_je_child_row_from_voucher(ovn, voucher_type, voucher_no)
+									break
+							except Exception:
 								continue
 				else:
-					# For non-Journal Entry documents, check if this document also has matches
 					if (hasattr(matched_doc, 'intercompany_match_status') and
 						hasattr(matched_doc, 'intercompany_matched_with') and
 						matched_doc.intercompany_match_status == 'Match' and
@@ -1731,7 +1738,6 @@ def bulk_cleanup_cancelled_sales_invoices():
 	Finds all cancelled Sales Invoices that have intercompany matches and cleans them up.
 	"""
 	try:
-		# Find all cancelled Sales Invoices with intercompany matches
 		cancelled_invoices = frappe.get_all(
 			"Sales Invoice",
 			filters={
@@ -1753,7 +1759,6 @@ def bulk_cleanup_cancelled_sales_invoices():
 				except:
 					matched_data = invoice.intercompany_matched_with
 
-				# Handle both single match and multiple matches
 				matches_to_clean = []
 				if isinstance(matched_data, dict):
 					matches_to_clean = [matched_data]
@@ -1773,7 +1778,6 @@ def bulk_cleanup_cancelled_sales_invoices():
 
 					# Check if the matched document still exists
 					if frappe.db.exists(voucher_type, voucher_no):
-						# Update the matched document to Mismatch status
 						frappe.db.set_value(
 							voucher_type,
 							voucher_no,
@@ -1819,7 +1823,6 @@ def bulk_cleanup_cancelled_purchase_invoices():
 	Finds all cancelled Purchase Invoices that have intercompany matches and cleans them up.
 	"""
 	try:
-		# Find all cancelled Purchase Invoices with intercompany matches
 		cancelled_invoices = frappe.get_all(
 			"Purchase Invoice",
 			filters={
@@ -1835,13 +1838,11 @@ def bulk_cleanup_cancelled_purchase_invoices():
 
 		for invoice in cancelled_invoices:
 			try:
-				# Parse the matched_with data
 				try:
 					matched_data = frappe.parse_json(invoice.intercompany_matched_with)
 				except:
 					matched_data = invoice.intercompany_matched_with
 
-				# Handle both single match and multiple matches
 				matches_to_clean = []
 				if isinstance(matched_data, dict):
 					matches_to_clean = [matched_data]
@@ -1923,7 +1924,6 @@ def bulk_cleanup_cancelled_journal_entries():
 
 		for entry in cancelled_entries:
 			try:
-				# Parse the matched_with data
 				try:
 					matched_data = frappe.parse_json(entry.intercompany_matched_with)
 				except:
@@ -1949,7 +1949,6 @@ def bulk_cleanup_cancelled_journal_entries():
 
 					# Check if the matched document still exists
 					if frappe.db.exists(voucher_type, voucher_no):
-						# Update the matched document to Mismatch status
 						frappe.db.set_value(
 							voucher_type,
 							voucher_no,
@@ -1995,7 +1994,6 @@ def bulk_cleanup_cancelled_payment_entries():
 	Finds all cancelled Payment Entries that have intercompany matches and cleans them up.
 	"""
 	try:
-		# Find all cancelled Payment Entries with intercompany matches
 		cancelled_entries = frappe.get_all(
 			"Payment Entry",
 			filters={
@@ -2089,7 +2087,6 @@ def get_intercompany_matching_tolerance():
 				"Inter Company Reconciliation Settings",
 				"intercompany_matching_tolerance"
 			)
-			# Return tolerance if it exists and is a valid number, otherwise return default
 			if tolerance is not None and tolerance >= 0:
 				print("Tolerance fetched from settings:", tolerance)
 				return {
@@ -2097,14 +2094,12 @@ def get_intercompany_matching_tolerance():
 					"tolerance": float(tolerance)
 				}
 
-		# Default tolerance if settings don't exist or value is invalid
 		return {
 			"success": True,
 			"tolerance": 0.01
 		}
 	except Exception as e:
 		frappe.log_error(f"Error getting intercompany matching tolerance: {str(e)}")
-		# Return default tolerance on error
 		return {
 			"success": True,
 			"tolerance": 0.01
@@ -2122,7 +2117,6 @@ def clear_gl_cache(companyA=None, companyB=None, fromDate=None, toDate=None, par
 
 		# If specific filters are provided, clear matching cache keys
 		if companyA or companyB or fromDate or toDate or partyA or partyB:
-			# Clear cache for Company A
 			if companyA and fromDate and toDate:
 				if partyA:
 					cache_key_a = f"gl_data_{companyA}_{fromDate}_{toDate}_{partyA}_0"
@@ -2130,12 +2124,8 @@ def clear_gl_cache(companyA=None, companyB=None, fromDate=None, toDate=None, par
 					cache_key_a_with_opening = f"gl_data_{companyA}_{fromDate}_{toDate}_{partyA}_1"
 					cache.delete_value(cache_key_a_with_opening)
 				else:
-					# Clear all cache keys for this company and date range
-					# Note: This is a best-effort approach since we can't list all cache keys
-					# In practice, cache keys are auto-expired after 5 minutes anyway
 					pass
 
-			# Clear cache for Company B
 			if companyB and fromDate and toDate:
 				if partyB:
 					cache_key_b = f"gl_data_{companyB}_{fromDate}_{toDate}_{partyB}_0"
@@ -2143,9 +2133,7 @@ def clear_gl_cache(companyA=None, companyB=None, fromDate=None, toDate=None, par
 					cache_key_b_with_opening = f"gl_data_{companyB}_{fromDate}_{toDate}_{partyB}_1"
 					cache.delete_value(cache_key_b_with_opening)
 		else:
-			# If no filters provided, we can't easily clear all GL cache
-			# Cache keys are auto-expired after 5 minutes anyway
-			# This is mainly for frontend state clearing
+	
 			pass
 
 		return {

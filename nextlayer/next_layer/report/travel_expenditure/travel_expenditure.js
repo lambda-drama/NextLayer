@@ -1,0 +1,151 @@
+// Copyright (c) 2026, jr@gmail.com and contributors
+// For license information, please see license.txt
+
+frappe.query_reports["Travel Expenditure"] = {
+	filters: [
+		{
+			fieldname: "company",
+			label: __("Company"),
+			fieldtype: "Link",
+			options: "Company",
+			default: frappe.defaults.get_user_default("Company"),
+		},
+		{
+			fieldname: "company_group",
+			label: __("Company Group"),
+			fieldtype: "Link",
+			options: "Company Group",
+		},
+		{
+			fieldname: "currency",
+			label: __("Currency"),
+			fieldtype: "Link",
+			options: "Currency",
+			default: "USD",
+		},
+		{
+			fieldname: "from_date",
+			label: __("From Date"),
+			fieldtype: "Date",
+			// default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
+			width: "80px",
+		},
+		{
+			fieldname: "to_date",
+			label: __("To Date"),
+			fieldtype: "Date",
+			// default: frappe.datetime.get_today(),
+			width: "80px",
+		},
+		{
+			fieldname: "booked_by",
+			label: __("Booked By"),
+			fieldtype: "Link",
+			options: "Member",
+		},
+		{
+			fieldname: "travel_expense",
+			label: __("Travel Expense"),
+			fieldtype: "Link",
+			options: "Travel Expense",
+		},
+		{
+			fieldname: "traveller_name",
+			label: __("Traveller Name"),
+			fieldtype: "Link",
+			options: "Member",
+		},
+		{
+			fieldname: "travel_type",
+			label: __("Type of Travel"),
+			fieldtype: "Select",
+			options: ["", "One Way", "Return", "Multi-city"],
+		},
+		{
+			fieldname: "group_by",
+			label: __("Group By"),
+			fieldtype: "Select",
+			options: ["", "Traveller Name", "Expense Type", "Travel Group", "Company"],
+			on_change: function () {
+				// Enable tree/expandable rows when Group By is set
+				var report = frappe.query_report;
+				var group_by = report.get_filter_value("group_by");
+				if (group_by) {
+					report.report_settings.tree = true;
+					report.report_settings.name_field = "name";
+					report.report_settings.parent_field = "parent_account";
+					report.report_settings.initial_depth = 0;
+				} else {
+					report.report_settings.tree = false;
+					report.report_settings.name_field = null;
+					report.report_settings.parent_field = null;
+					report.report_settings.initial_depth = null;
+				}
+				report.refresh();
+			},
+		},
+		{
+			fieldname: "travel_group_breakdown_by",
+			label: __("Breakdown By"),
+			fieldtype: "Select",
+			options: ["Traveller Name", "Expense Type"],
+			default: "Traveller Name",
+			depends_on: "eval:doc.group_by == 'Travel Group'",
+			description: __("When Group By is Travel Group: show traveller distribution or expense type distribution when expanded"),
+		},
+		{
+			fieldname: "company_breakdown_by",
+			label: __("Breakdown By"),
+			fieldtype: "Select",
+			options: ["Travel Group", "Traveller Name", "Expense Type"],
+			default: "Travel Group",
+			depends_on: "eval:doc.group_by == 'Company'",
+			description: __("When Group By is Company: show travel group, traveller, or expense type distribution when expanded"),
+		},
+		{
+			fieldname: "show_fully_cancelled_expenses",
+			label: __("Show Fully Cancelled Expenses"),
+			fieldtype: "Check",
+			description: __("Include travel expenses that have been fully cancelled (reverse journal created)"),
+		},
+	],
+	formatter: function (value, row, column, data, default_formatter) {
+		// Render attachment column as HTML (links)
+		if (column.fieldname === "attachment" && value) {
+			return value;
+		}
+		value = default_formatter(value, row, column, data);
+
+		// Highlight custom Total row text in blue
+		if (data && data.name === "Total") {
+			// Only change text color & weight, keep background default
+			return `<span style="color: blue; font-weight: 600;">${value}</span>`;
+		}
+
+		// Apply different font weights based on indent level
+		if (data && data.indent !== undefined && data.name !== "Total") {
+			if (data.indent === 0) {
+				// Parent row - bold (700)
+				return `<span style="font-weight: 700;">${value}</span>`;
+			} else if (data.indent === 1) {
+				// First child - semi-bold (600)
+				return `<span style="font-weight: 450;">${value}</span>`;
+			}
+			// indent === 2 or higher - normal weight (default)
+		}
+
+		return value;
+	},
+	onload: function (report) {
+		// Set tree config on initial load based on group_by
+		var group_by = report.get_filter_value("group_by");
+		if (group_by) {
+			report.report_settings.tree = true;
+			report.report_settings.name_field = "name";
+			report.report_settings.parent_field = "parent_account";
+			report.report_settings.initial_depth = 0;
+		} else {
+			report.report_settings.tree = false;
+		}
+	},
+};

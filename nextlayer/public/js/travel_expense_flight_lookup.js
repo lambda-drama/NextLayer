@@ -8,7 +8,11 @@ frappe.ui.form.on("Travel Expense", {
 	travel_amount: function(frm) {
 		convert_and_update_amount(frm);
 	},
-	
+	amountcompany_currency: function(frm) {
+		let amt = parseFloat(frm.doc.amountcompany_currency) || 0;
+		let tx = parseFloat(frm.doc.travel_amount) || amt;
+		if (amt > 0) update_category_row_amount(frm, tx, amt);
+	},
 	currency: function(frm) {
 		convert_and_update_amount(frm);
 		recalculate_all_expense_amounts_company_currency(frm);
@@ -36,7 +40,8 @@ frappe.ui.form.on("Travel Expense", {
 				return {
 					filters: {
 						company: frm.doc.company,
-						account_type: ["in", ["Bank", "Cash"]]
+						account_type: ["in", ["Bank", "Cash"]],
+						is_group: 0
 					}
 				};
 			});
@@ -53,12 +58,23 @@ frappe.ui.form.on("Travel Expense", {
 	},
 	
 	posting_date: function(frm) {
-		// Recalculate conversion when posting date changes (exchange rate might be different)
 		if (frm.doc.travel_amount && frm.doc.currency) {
 			convert_and_update_amount(frm);
 		}
 		recalculate_all_expense_amounts_company_currency(frm);
 		calculate_totals(frm);
+	},
+	rate_per_day: function(frm) {
+		if (frm.doc.expense_category !== "Hotel") return;
+		compute_hotel_amount_and_push(frm);
+	},
+	hotel_checkin_date: function(frm) {
+		if (frm.doc.expense_category !== "Hotel") return;
+		compute_hotel_amount_and_push(frm);
+	},
+	hotel_checkout_date: function(frm) {
+		if (frm.doc.expense_category !== "Hotel") return;
+		compute_hotel_amount_and_push(frm);
 	},
 	
 	is_paid: function(frm) {
@@ -83,24 +99,29 @@ frappe.ui.form.on("Travel Expense", {
 		}
 	},
 	
-	in_transit: function(frm) {
-		// Clear second flight fields when in_transit is unchecked
-		if (!frm.doc.in_transit) {
+	trip_type: function(frm) {
+		// Clear second flight fields when not In Transit
+		if (frm.doc.trip_type !== "In Transit") {
 			frm.set_value("flight_no_2", "");
 			frm.set_value("custom_departure_airport_2", "");
 			frm.set_value("custom_arrival_airport_2", "");
 			frm.set_value("custom_date_of_travel_2", "");
 			frm.set_value("custom_date_of_arrival_2", "");
 		} else {
-			// Setup event listeners when in_transit is checked
+			// Setup event listeners when In Transit is selected
 			setup_second_flight_listeners(frm);
+		}
+		// Clear multi_city_segments when not Multi City
+		if (frm.doc.trip_type !== "Multi City" && frm.doc.multi_city_segments && frm.doc.multi_city_segments.length) {
+			frm.clear_table("multi_city_segments");
+			frm.refresh_field("multi_city_segments");
 		}
 	},
 	
 	flight_no_2: function(frm) {
 		// Direct field change handler for second flight number
 		// Use a small delay to avoid triggering while user is still typing
-		if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+		if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 			// Clear any existing timeout
 			if (frm._flight_no_2_timeout) {
 				clearTimeout(frm._flight_no_2_timeout);
@@ -108,7 +129,7 @@ frappe.ui.form.on("Travel Expense", {
 			
 			// Set a timeout to trigger lookup after user stops typing (500ms delay)
 			frm._flight_no_2_timeout = setTimeout(function() {
-				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 					if (!flight_lookup_in_progress) {
 						lookup_flight_for_travel_expense_second_flight(frm);
 					}
@@ -229,9 +250,12 @@ frappe.ui.form.on("Travel Expense", {
 		
 		// Add "Additional Expenses" and "Cancel Charges" buttons
 		if (!frm.is_new()) {
-			frm.add_custom_button(__("Additional Expenses"), function() {
-				show_additional_expenses_modal(frm);
-			}, __("Actions"));
+			// Only allow Additional Expenses while not cancelled
+			if (!frm.doc.is_cancelled) {
+				frm.add_custom_button(__("Additional Expenses"), function() {
+					show_additional_expenses_modal(frm);
+				}, __("Actions"));
+			}
 			
 			// Only show Cancel Charges if document is submitted and not already cancelled
 			if (frm.doc.docstatus === 1 && !frm.doc.is_cancelled) {
@@ -243,70 +267,67 @@ frappe.ui.form.on("Travel Expense", {
 	},
 	
 	before_save: function(frm) {
-		// Calculate totals before save
 		calculate_totals(frm);
-		// Count travel expenses
-		let travel_count = 0;
+		// When Multi City: sync multi_city_segments to main expenses table (first segment = departure/PRN/dates, last = arrival)
+		if (frm.doc.trip_type === "Multi City" && frm.doc.multi_city_segments && frm.doc.multi_city_segments.length > 0) {
+			sync_multi_city_to_expenses(frm);
+		}
+		remove_expense_rows_without_type(frm);
+		if (frm.doc.expenses && frm.doc.expenses.length > 0) frm.refresh_field("expenses");
+		let expense_type = get_expense_type_for_charges(frm);
+		if (!expense_type) return;
+
+		// For Hotel: amount can come from travel_amount or rate_per_day * total_nights
+		let amount_transaction = parseFloat(frm.doc.travel_amount) || 0;
+		if (expense_type === "Hotel" && (frm.doc.rate_per_day || frm.doc.hotel_checkin_date) && (!amount_transaction || amount_transaction === 0)) {
+			let total_nights = 0;
+			if (frm.doc.hotel_checkin_date && frm.doc.hotel_checkout_date) {
+				let checkin = new Date(frm.doc.hotel_checkin_date);
+				let checkout = new Date(frm.doc.hotel_checkout_date);
+				if (checkout >= checkin) {
+					total_nights = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+				}
+			}
+			let rate = parseFloat(frm.doc.rate_per_day) || 0;
+			if (rate > 0 && total_nights > 0) {
+				amount_transaction = rate * total_nights;
+				frm.set_value("travel_amount", amount_transaction);
+				frm.set_value("total_nights", total_nights);
+			}
+		}
+		if (!amount_transaction && amount_transaction !== 0) amount_transaction = 0;
+		let amount_company = parseFloat(frm.doc.amountcompany_currency) || 0;
+
+		let count_same_type = 0;
 		if (frm.doc.expenses && frm.doc.expenses.length > 0) {
 			frm.doc.expenses.forEach(function(row) {
-				if (row.expense_type && row.expense_type.toLowerCase().includes("travel")) {
-					travel_count++;
-				}
+				if (row.expense_type === expense_type) count_same_type++;
 			});
 		}
-		
-		if (travel_count === 0 && frm.doc.travel_amount) {
-			let amount_transaction = frm.doc.travel_amount || 0;
-			let amount_company = frm.doc.amountcompany_currency || 0;
-			
-			// If amountcompany_currency is not set, convert it
-			if (!amount_company || amount_company === 0) {
-				if (frm.doc.company && frm.doc.currency) {
-					frappe.db.get_value("Company", frm.doc.company, "default_currency", function(r) {
-						if (r && r.default_currency) {
-							let company_currency = r.default_currency;
-							if (frm.doc.currency === company_currency) {
-								amount_company = amount_transaction;
-							} else {
-								amount_company = amount_transaction;
-							}
-						}
-					});
-				} else {
-					amount_company = amount_transaction; 
-				}
-			}
-			
-			// Create a new travel expense row
-			let travel_row = frm.add_child("expenses");
-			travel_row.expense_type = "Travel";
-			travel_row.amount = amount_transaction; 
-			travel_row.amount_company_currency = amount_company; 
-			travel_row.sanctioned_amount = amount_company || amount_transaction;
-			travel_row.expense_date = frm.doc.posting_date || frappe.datetime.get_today();
-			
-			// Set the values using frappe.model.set_value
-			frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_type", "Travel");
-			frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", amount_transaction);
-			frappe.model.set_value(travel_row.doctype, travel_row.name, "amount_company_currency", amount_company);
-			frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", amount_company || amount_transaction);
+
+		if (count_same_type === 0 && amount_transaction > 0) {
+			let new_row = frm.add_child("expenses");
+			new_row.expense_type = expense_type;
+			new_row.amount = amount_transaction;
+			new_row.amount_company_currency = amount_company || amount_transaction;
+			new_row.sanctioned_amount = amount_company || amount_transaction;
+			new_row.expense_date = frm.doc.posting_date || frappe.datetime.get_today();
+			frappe.model.set_value(new_row.doctype, new_row.name, "expense_type", expense_type);
+			frappe.model.set_value(new_row.doctype, new_row.name, "amount", amount_transaction);
+			frappe.model.set_value(new_row.doctype, new_row.name, "amount_company_currency", amount_company || amount_transaction);
+			frappe.model.set_value(new_row.doctype, new_row.name, "sanctioned_amount", amount_company || amount_transaction);
 			if (frm.doc.posting_date) {
-				frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_date", frm.doc.posting_date);
+				frappe.model.set_value(new_row.doctype, new_row.name, "expense_date", frm.doc.posting_date);
 			}
-			
-			// Convert to company currency if needed
 			if (frm.doc.company && frm.doc.currency && frm.doc.posting_date) {
-				convert_expense_amount_to_company_currency(frm, travel_row.doctype, travel_row.name);
+				convert_expense_amount_to_company_currency(frm, new_row.doctype, new_row.name);
 			}
 		}
-		
-		// Transfer travel details from main doctype to child table if expense type is Travel
+
+		// Sync main form details to child rows by expense type
 		if (frm.doc.expenses && frm.doc.expenses.length > 0) {
 			frm.doc.expenses.forEach(function(row) {
-				// Check if expense type is Travel (case-insensitive)
-				if (row.expense_type && row.expense_type.toLowerCase().includes("travel")) {
-					// Field mapping: main doctype -> child table
-					// Note: main doctype has custom_pnr_number_ (with underscore), child table has custom_prn_number
+				if (row.expense_type === "Travel") {
 					let field_mappings = [
 						{ main: "custom_departure_airport", child: "custom_departure_airport" },
 						{ main: "custom_arrival_airport", child: "custom_arrival_airport" },
@@ -316,34 +337,35 @@ frappe.ui.form.on("Travel Expense", {
 						{ main: "custom_date_of_purchase", child: "custom_date_of_purchase" },
 						{ main: "custom_booked_by", child: "custom_booked_by" },
 						{ main: "custom_travel_type", child: "custom_travel_type" },
-						{ main: "custom_pnr_number_", child: "custom_prn_number" }, // Note: different field names
+						{ main: "custom_pnr_number_", child: "custom_prn_number" },
 					];
-					
-					// Transfer values if child table field is missing/empty and main doctype has value
-					field_mappings.forEach(function(mapping) {
-						let main_value = frm.doc[mapping.main];
-						let child_value = row[mapping.child];
-						
-						// If child field is missing/empty and main has value, transfer it
-						if ((!child_value || child_value === "" || child_value === null) && main_value) {
-							row[mapping.child] = main_value;
-							frappe.model.set_value(row.doctype, row.name, mapping.child, main_value);
+					field_mappings.forEach(function(m) {
+						let v = frm.doc[m.main];
+						if (v && (!row[m.child] || row[m.child] === "")) {
+							row[m.child] = v;
+							frappe.model.set_value(row.doctype, row.name, m.child, v);
 						}
 					});
-					
-					// Update amount with travel_amount (transaction currency)
-					// Update amount_company_currency with amountcompany_currency (company currency)
+				}
+				if (row.expense_type === "Hotel") {
+					let hotel_fields = ["hotel_checkin_date", "hotel_checkout_date", "hotel_days", "custom_hotel_name", "hotel_territory", "hotel_location", "hotel_city", "hotel_country", "rate_per_day", "purpose"];
+					hotel_fields.forEach(function(f) {
+						let v = frm.doc[f];
+						if (v !== undefined && v !== null && v !== "" && (!row[f] || row[f] === "")) {
+							row[f] = v;
+							frappe.model.set_value(row.doctype, row.name, f, v);
+						}
+					});
+				}
+				if (row.expense_type === expense_type) {
 					if (frm.doc.travel_amount) {
 						frappe.model.set_value(row.doctype, row.name, "amount", frm.doc.travel_amount);
 					}
-					
 					if (frm.doc.amountcompany_currency) {
 						frappe.model.set_value(row.doctype, row.name, "amount_company_currency", frm.doc.amountcompany_currency);
 						frappe.model.set_value(row.doctype, row.name, "sanctioned_amount", frm.doc.amountcompany_currency);
 					} else if (frm.doc.travel_amount) {
-						// If amountcompany_currency is not set, convert it
 						convert_expense_amount_to_company_currency(frm, row.doctype, row.name);
-						// Use travel_amount as fallback for sanctioned_amount
 						frappe.model.set_value(row.doctype, row.name, "sanctioned_amount", frm.doc.travel_amount);
 					}
 				}
@@ -354,7 +376,27 @@ frappe.ui.form.on("Travel Expense", {
 	refresh: function(frm) {
 		// Calculate totals on refresh
 		calculate_totals(frm);
-		
+		// Set hotel_days (Days) from checkin/checkout when Hotel section has dates
+		if (frm.doc.expense_category === "Hotel" && frm.doc.hotel_checkin_date && frm.doc.hotel_checkout_date) {
+			let checkin = new Date(frm.doc.hotel_checkin_date);
+			let checkout = new Date(frm.doc.hotel_checkout_date);
+			if (checkout >= checkin) {
+				let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+				frm.set_value("hotel_days", days);
+				frm.refresh_field("hotel_days");
+			}
+		}
+		// Accounting Details: collapsible but start collapsed (Frappe keeps it open when it has mandatory fields)
+		if (frm.layout && frm.layout.sections && !frm._accounting_section_collapsed_set) {
+			for (let i = 0; i < frm.layout.sections.length; i++) {
+				let section = frm.layout.sections[i];
+				if (section.df && section.df.fieldname === "section_break_accounting") {
+					section.collapse(true);
+					frm._accounting_section_collapsed_set = true;
+					break;
+				}
+			}
+		}
 		// Add event listeners to expenses child table
 		if (frm.fields_dict.expenses && frm.fields_dict.expenses.grid) {
 			frm.fields_dict.expenses.grid.wrapper.on('change', function() {
@@ -396,11 +438,73 @@ frappe.ui.form.on("Travel Expense", {
 			});
 		}
 		
+		// Multi City: button to fetch flight for selected segment row
+		if (frm.doc.trip_type === "Multi City" && frm.fields_dict.multi_city_segments) {
+			frm.add_custom_button(__("Fetch flight for segment"), function() {
+				let grid = frm.fields_dict.multi_city_segments.grid;
+				let segments = frm.doc.multi_city_segments || [];
+				if (!segments.length) {
+					frappe.msgprint(__("Add at least one row in Multi City Segments, enter Flight No and Flight Date, then click this button."));
+					return;
+				}
+				let row = null;
+				if (grid && grid.get_selected_children) {
+					let selected = grid.get_selected_children();
+					if (selected && selected.length > 0) {
+						let s = selected[0];
+						row = (s && s.doc) ? s.doc : segments.find(function(r) { return r.name === s; });
+					}
+				}
+				if (!row && segments.length > 0) {
+					row = segments[segments.length - 1];
+				}
+				if (!row || !(row.flight_no && row.flight_no.trim())) {
+					frappe.msgprint(__("Select a segment row, enter Flight No (and Flight Date), then click 'Fetch flight for segment'."));
+					return;
+				}
+				lookup_flight_for_multi_city_row(frm, row);
+			}, __("Multi City Segments"));
+			
+			// Multi City: same behaviour as main form – Enter or blur on Flight No / Flight Date triggers API lookup
+			let multi_city_grid = frm.fields_dict.multi_city_segments.grid;
+			if (multi_city_grid && multi_city_grid.wrapper) {
+				multi_city_grid.wrapper.off('keydown.multicity blur.multicity', 'input[data-fieldname="flight_no"], input[data-fieldname="flight_date"]');
+				// Enter key – trigger lookup
+				multi_city_grid.wrapper.on('keydown.multicity', 'input[data-fieldname="flight_no"], input[data-fieldname="flight_date"]', function(e) {
+					if (e.keyCode === 13) {
+						e.preventDefault();
+						let row_name = $(this).closest('.grid-row').attr('data-name');
+						if (row_name) {
+							let row = locals['Travel Expense Multi City'] && locals['Travel Expense Multi City'][row_name];
+							if (row && row.flight_no && row.flight_no.trim()) {
+								lookup_flight_for_multi_city_row(frm, row);
+							}
+						}
+					}
+				});
+				// Blur – trigger lookup when leaving the field (like main form)
+				multi_city_grid.wrapper.on('blur.multicity', 'input[data-fieldname="flight_no"], input[data-fieldname="flight_date"]', function() {
+					let $input = $(this);
+					let row_name = $input.closest('.grid-row').attr('data-name');
+					if (!row_name) return;
+					setTimeout(function() {
+						let row = locals['Travel Expense Multi City'] && locals['Travel Expense Multi City'][row_name];
+						if (row && row.flight_no && row.flight_no.trim() && !flight_lookup_in_progress) {
+							lookup_flight_for_multi_city_row(frm, row);
+						}
+					}, 100);
+				});
+			}
+		}
+		
 		// Add "Additional Expenses" and "Cancel Charges" buttons after submit (only show if document is submitted)
 		if (frm.doc.docstatus === 1) {
-			frm.add_custom_button(__("Additional Expenses"), function() {
-				show_additional_expenses_modal(frm);
-			}, __("Create"));
+			// Only allow Additional Expenses while not cancelled
+			if (!frm.doc.is_cancelled) {
+				frm.add_custom_button(__("Additional Expenses"), function() {
+					show_additional_expenses_modal(frm);
+				}, __("Create"));
+			}
 			
 			// Check if Journal Entry exists, and show "Create Journal" button if it doesn't
 			// Use check_journal_entry_exists (read-only) to avoid creating journal on refresh
@@ -444,6 +548,30 @@ frappe.ui.form.on("Travel Expense", {
 
 // Handle flight lookup from child table (Travel Expense Detail)
 frappe.ui.form.on("Travel Expense Detail", {
+	hotel_checkin_date: function(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		if (!row || !row.expense_type || !row.expense_type.toLowerCase().includes("hotel")) return;
+		if (row.hotel_checkin_date && row.hotel_checkout_date) {
+			let checkin = new Date(row.hotel_checkin_date);
+			let checkout = new Date(row.hotel_checkout_date);
+			if (checkout >= checkin) {
+				let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+				frappe.model.set_value(cdt, cdn, "hotel_days", days);
+			}
+		}
+	},
+	hotel_checkout_date: function(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		if (!row || !row.expense_type || !row.expense_type.toLowerCase().includes("hotel")) return;
+		if (row.hotel_checkin_date && row.hotel_checkout_date) {
+			let checkin = new Date(row.hotel_checkin_date);
+			let checkout = new Date(row.hotel_checkout_date);
+			if (checkout >= checkin) {
+				let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+				frappe.model.set_value(cdt, cdn, "hotel_days", days);
+			}
+		}
+	},
 	cost_center: function(frm, cdt, cdn) {
 		// Set company filter for cost_center in child table
 		frm.set_query("cost_center", "expenses", function() {
@@ -585,31 +713,59 @@ frappe.ui.form.on("Sales Taxes and Charges", {
 
 function lookup_flight_for_travel_expense(frm) {
 	let flight_number = frm.doc.flight_no ? frm.doc.flight_no.trim() : "";
-	
-	if (!flight_number) {
-		return;
-	}
-	
-	// Skip if lookup is already in progress
-	if (flight_lookup_in_progress) {
-		return;
-	}
-	
-	// Get flight date if available
+	if (!flight_number) return;
+	if (flight_lookup_in_progress) return;
+
+	// Reuse Flight Date for both From and To when converting to YYYY-MM-DD
 	let flight_date = null;
 	if (frm.doc.flight_date) {
-		// Convert to YYYY-MM-DD format if it's a date field
 		flight_date = frappe.datetime.str_to_obj(frm.doc.flight_date);
 		if (flight_date) {
-			flight_date = frappe.datetime.obj_to_str(flight_date).split(' ')[0]; // Get date part only
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(" ")[0];
 		}
 	}
-	
-	// Mark lookup as in progress
+
+	// When Historical is ticked: call historical API with Flight Date as both From and To, then show result modal directly (no date-range modal)
+	if (frm.doc.historical) {
+		flight_lookup_in_progress = true;
+		frappe.show_alert(__("Fetching historical flight data..."), 3);
+		frappe.call({
+			method: "nextlayer.next_layer.api.aerodata_utils.get_flight_history",
+			args: {
+				flight_number: flight_number,
+				date_from: flight_date || null,
+				date_to: flight_date || null,
+			},
+			callback: function (r) {
+				flight_lookup_in_progress = false;
+				if (!r.message) return;
+				let res = r.message;
+				if (res.success && res.data && res.data.length > 0) {
+					show_flight_confirmation_modal(frm, res.data, flight_number, null);
+				} else {
+					frappe.msgprint({
+						title: __("Historical Lookup Failed"),
+						message: __(
+							"<div style='padding: 10px;'><p><strong>Error:</strong> " +
+							(res.error || "No flights found for this date.") +
+							"</p>" +
+							(res.error_details ? "<p><strong>Details:</strong> " + res.error_details + "</p>" : "") +
+							"<p class='text-muted'>Use <strong>Flight Date</strong> on the form as the date for historical lookup.</p></div>"
+						),
+						indicator: "red",
+					});
+				}
+			},
+			error: function () {
+				flight_lookup_in_progress = false;
+			},
+		});
+		return;
+	}
+
+	// Normal flow: use flight_date if entered, else raw
 	flight_lookup_in_progress = true;
-	
 	frappe.show_alert(__("Looking up flight information..."), 3);
-	
 	frappe.call({
 		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
 		args: {
@@ -617,40 +773,30 @@ function lookup_flight_for_travel_expense(frm) {
 			flight_date: flight_date || null,
 		},
 		callback: function (r) {
-			// Clear lookup flag
 			flight_lookup_in_progress = false;
-			
 			if (r.message) {
 				const result = r.message;
-				
 				if (result.success) {
-					// Show flight details modal for user confirmation (for main form - finds/creates Travel row)
 					show_flight_confirmation_modal(frm, result.data, flight_number, null);
 				} else {
-					frappe.show_alert(
-						__("Failed to fetch flight details: ") + (result.error || "Unknown error"),
-						5,
-						"red"
-					);
-					
+					frappe.show_alert(__("Failed to fetch flight details: ") + (result.error || "Unknown error"), 5, "red");
 					frappe.msgprint({
 						title: __("Flight Lookup Failed"),
-						message: __(`
-							<div style="padding: 10px;">
+						message: __(
+							`<div style="padding: 10px;">
 								<p><strong>Flight Number:</strong> ${flight_number}</p>
 								<p><strong>Error:</strong> ${result.error || "Unknown error"}</p>
 								${result.error_details ? `<p><strong>Details:</strong> ${result.error_details}</p>` : ""}
-							</div>
-						`),
+							</div>`
+						),
 						indicator: "red",
 					});
 				}
 			}
 		},
-		error: function() {
-			// Clear lookup flag on error
+		error: function () {
 			flight_lookup_in_progress = false;
-		}
+		},
 	});
 }
 
@@ -664,7 +810,7 @@ function setup_second_flight_listeners(frm) {
 			frm.fields_dict.flight_no_2.$input.on('keydown', function(e) {
 				if (e.keyCode === 13) {
 					e.preventDefault();
-					if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+					if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 						if (!flight_lookup_in_progress) {
 							lookup_flight_for_travel_expense_second_flight(frm);
 						}
@@ -673,7 +819,7 @@ function setup_second_flight_listeners(frm) {
 			});
 			
 			frm.fields_dict.flight_no_2.$input.on('blur', function() {
-				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.in_transit) {
+				if (frm.doc.flight_no_2 && frm.doc.flight_no_2.trim() && frm.doc.trip_type === "In Transit") {
 					if (!flight_lookup_in_progress) {
 						lookup_flight_for_travel_expense_second_flight(frm);
 					}
@@ -690,7 +836,7 @@ function lookup_flight_for_travel_expense_second_flight(frm) {
 		return;
 	}
 	
-	if (!frm.doc.in_transit) {
+	if (frm.doc.trip_type !== "In Transit") {
 		return;
 	}
 	
@@ -1479,6 +1625,171 @@ function fill_second_flight_fields(frm, flight_data, flight_number_searched) {
 	});
 }
 
+/** Multi City segment: fetch flight by flight_no + flight_date, show modal, on confirm fill the segment row. */
+function lookup_flight_for_multi_city_row(frm, row) {
+	let flight_number = (row.flight_no && row.flight_no.trim()) ? row.flight_no.trim() : "";
+	if (!flight_number) {
+		frappe.msgprint(__("Enter Flight No in the selected segment row."));
+		return;
+	}
+	if (flight_lookup_in_progress) return;
+	let flight_date = null;
+	if (row.flight_date) {
+		flight_date = frappe.datetime.str_to_obj(row.flight_date);
+		if (flight_date) {
+			flight_date = frappe.datetime.obj_to_str(flight_date).split(" ")[0];
+		}
+	}
+	flight_lookup_in_progress = true;
+	frappe.show_alert(__("Looking up flight information..."), 3);
+	frappe.call({
+		method: "nextlayer.next_layer.api.aerodata_utils.get_flight_details",
+		args: {
+			flight_number: flight_number,
+			flight_date: flight_date || null,
+		},
+		callback: function(r) {
+			flight_lookup_in_progress = false;
+			if (r.message && r.message.success) {
+				show_flight_confirmation_modal_for_multi_city(frm, r.message.data, flight_number, row);
+			} else {
+				frappe.msgprint({
+					title: __("Flight Lookup Failed"),
+					message: (r.message && r.message.error) || __("Unknown error"),
+					indicator: "red",
+				});
+			}
+		},
+		error: function() {
+			flight_lookup_in_progress = false;
+		}
+	});
+}
+
+function show_flight_confirmation_modal_for_multi_city(frm, flight_data, flight_number_searched, multi_city_row) {
+	if (!flight_data || (Array.isArray(flight_data) && flight_data.length === 0)) {
+		frappe.msgprint({ title: __("No Flight Found"), message: __("No flight information found."), indicator: "orange" });
+		return;
+	}
+	let flights = Array.isArray(flight_data) ? flight_data : [flight_data];
+	const first_flight = flights[0];
+	const last_flight = flights[flights.length - 1];
+	const departure = first_flight.departure || {};
+	const arrival = last_flight.arrival || {};
+	const dep_airport = departure.airport || {};
+	const arr_airport = arrival.airport || {};
+	const dep_scheduled = departure.scheduledTime || {};
+	const arr_scheduled = arrival.scheduledTime || {};
+	const airline = first_flight.airline || {};
+	let route_display = `${dep_airport.iata || "N/A"} → ${arr_airport.iata || "N/A"}`;
+	let html = `
+		<div style="padding: 15px;">
+			<p><strong>Route:</strong> ${route_display}</p>
+			<p><strong>Departure:</strong> ${dep_scheduled.local || "N/A"}</p>
+			<p><strong>Arrival:</strong> ${arr_scheduled.local || "N/A"}</p>
+			<p>Click Confirm to auto-fill this segment row.</p>
+		</div>`;
+	let d = new frappe.ui.Dialog({
+		title: __("Confirm Flight for Segment"),
+		fields: [{ fieldtype: "HTML", fieldname: "flight_info", options: html }],
+		primary_action_label: __("Confirm"),
+		primary_action: function() {
+			fill_multi_city_row_from_flight(frm, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled, multi_city_row);
+			d.hide();
+		},
+		secondary_action_label: __("Cancel"),
+		secondary_action: function() { d.hide(); },
+	});
+	d.show();
+}
+
+function fill_multi_city_row_from_flight(frm, flights, dep_airport, arr_airport, airline, dep_scheduled, arr_scheduled, multi_city_row) {
+	let flight_array = Array.isArray(flights) ? flights : [flights];
+	const first_flight = flight_array[0];
+	const last_flight = flight_array[flight_array.length - 1];
+	const dep = first_flight.departure || {};
+	const arr = last_flight.arrival || {};
+	const dep_airport_obj = dep.airport || {};
+	const arr_airport_obj = arr.airport || {};
+	const dep_sched = dep.scheduledTime || {};
+	const arr_sched = arr.scheduledTime || {};
+	let dep_airport_name = dep_airport_obj.name || dep_airport_obj.shortName || "";
+	let dep_airport_iata = dep_airport_obj.iata || "";
+	let dep_airport_icao = dep_airport_obj.icao || "";
+	let dep_airport_city = dep_airport_obj.municipalityName || "";
+	let dep_airport_country = dep_airport_obj.countryCode || "";
+	let arr_airport_name = arr_airport_obj.name || arr_airport_obj.shortName || "";
+	let arr_airport_iata = arr_airport_obj.iata || "";
+	let arr_airport_icao = arr_airport_obj.icao || "";
+	let arr_airport_city = arr_airport_obj.municipalityName || "";
+	let arr_airport_country = arr_airport_obj.countryCode || "";
+	let airline_name = (airline && airline.name) || "";
+	let airline_iata = (airline && airline.iata) || "";
+	let airline_icao = (airline && airline.icao) || "";
+	function format_dt(str) {
+		if (!str) return null;
+		try {
+			let cleaned = (str.trim() || "").replace(/[+-]\d{2}:?\d{2}\s*$/, "").replace("T", " ");
+			let parts = cleaned.split(/\s+/);
+			if (parts.length < 2) return null;
+			let time = parts[1].split(".")[0];
+			if (time.match(/^\d{2}:\d{2}$/)) time += ":00";
+			return parts[0] + " " + time;
+		} catch (e) { return null; }
+	}
+	let dep_datetime = format_dt((dep_scheduled && dep_scheduled.local) ? dep_scheduled.local : (dep_sched && dep_sched.local) ? dep_sched.local : null);
+	let arr_datetime = format_dt((arr_scheduled && arr_scheduled.local) ? arr_scheduled.local : (arr_sched && arr_sched.local) ? arr_sched.local : null);
+	let date_of_purchase = dep_datetime ? dep_datetime.split(" ")[0] : null;
+	frappe.show_alert(__("Creating/updating airline and airport records..."), 3);
+	let promises = [];
+	if (airline_name) {
+		promises.push(frappe.call({
+			method: "nextlayer.next_layer.api.flight_utils.get_or_create_airline",
+			args: { airline_name: airline_name, airline_iata: airline_iata, airline_icao: airline_icao },
+		}));
+	} else { promises.push(Promise.resolve({ message: null })); }
+	if (dep_airport_name) {
+		promises.push(frappe.call({
+			method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+			args: { airport_name: dep_airport_name, airport_iata: dep_airport_iata, airport_icao: dep_airport_icao, airport_city: dep_airport_city, airport_country: dep_airport_country },
+		}));
+	} else { promises.push(Promise.resolve({ message: null })); }
+	if (arr_airport_name) {
+		promises.push(frappe.call({
+			method: "nextlayer.next_layer.api.flight_utils.get_or_create_airport",
+			args: { airport_name: arr_airport_name, airport_iata: arr_airport_iata, airport_icao: arr_airport_icao, airport_city: arr_airport_city, airport_country: arr_airport_country },
+		}));
+	} else { promises.push(Promise.resolve({ message: null })); }
+	Promise.all(promises).then(function(results) {
+		let airline_record = (results[0] && results[0].message) || null;
+		let dep_airport_record = (results[1] && results[1].message) || null;
+		let arr_airport_record = (results[2] && results[2].message) || null;
+		if (dep_airport_record) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "departure_airport", dep_airport_record);
+		}
+		if (arr_airport_record) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "arrival_airport", arr_airport_record);
+		}
+		if (airline_record) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "airlines", airline_record);
+		}
+		if (dep_datetime) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "date_of_travel", dep_datetime);
+		}
+		if (arr_datetime) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "date_of_arrival", arr_datetime);
+		}
+		if (date_of_purchase) {
+			frappe.model.set_value(multi_city_row.doctype, multi_city_row.name, "date_of_purchase", date_of_purchase);
+		}
+		frappe.show_alert(__("Segment filled successfully!"), 3, "green");
+		frm.refresh_field("multi_city_segments");
+	}).catch(function(err) {
+		frappe.show_alert(__("Error filling segment. Check manually."), 5, "red");
+		frappe.log_error(err, "Multi City Flight Fill Error");
+	});
+}
+
 function get_status_color(status) {
 	if (!status) return "#666";
 	const status_lower = status.toLowerCase();
@@ -1522,9 +1833,7 @@ function convert_and_update_amount(frm) {
 		
 		// If currencies are the same, no conversion needed
 		if (from_currency === company_currency) {
-			// Same currency, use amount directly
-			update_travel_row_amount(frm, travel_amount);
-			// Set amountcompany_currency to the same value
+			update_category_row_amount(frm, travel_amount, travel_amount);
 			frm.set_value("amountcompany_currency", travel_amount);
 			frm.refresh_field("amountcompany_currency");
 			return;
@@ -1546,10 +1855,7 @@ function convert_and_update_amount(frm) {
 					let exchange_rate = rate_result.message;
 					let converted_amount = travel_amount * exchange_rate;
 					console.log("Travel amount", travel_amount, "converted to", converted_amount, "using rate", exchange_rate);
-					// Update travel row with converted amount (in company currency)
-					update_travel_row_amount(frm, travel_amount);
-					
-					// Update amountcompany_currency field with converted amount
+					update_category_row_amount(frm, travel_amount, converted_amount);
 					frm.set_value("amountcompany_currency", converted_amount);
 					frm.refresh_field("amountcompany_currency");
 					
@@ -1566,9 +1872,7 @@ function convert_and_update_amount(frm) {
 					);
 				} else {
 					console.log("Travel amount", travel_amount, "not converted due to missing exchange rate.");
-					// If exchange rate not found, use original amount
-					update_travel_row_amount(frm, travel_amount);
-					// Set amountcompany_currency to original amount (assuming same currency if no rate found)
+					update_category_row_amount(frm, travel_amount, travel_amount);
 					frm.set_value("amountcompany_currency", travel_amount);
 					frm.refresh_field("amountcompany_currency");
 					frappe.show_alert(
@@ -1579,9 +1883,7 @@ function convert_and_update_amount(frm) {
 				}
 			},
 			error: function() {
-				// On error, use original amount
-				update_travel_row_amount(frm, travel_amount);
-				// Set amountcompany_currency to original amount
+				update_category_row_amount(frm, travel_amount, travel_amount);
 				frm.set_value("amountcompany_currency", travel_amount);
 				frm.refresh_field("amountcompany_currency");
 			}
@@ -1589,39 +1891,130 @@ function convert_and_update_amount(frm) {
 	});
 }
 
-// Helper function to update travel row amount in child table
-function update_travel_row_amount(frm, converted_amount) {
-	if (!frm.doc.expenses || frm.doc.expenses.length === 0) {
-		return;
-	}
-	
-	// Find travel expense row
+// Expense categories that use the main Charges (Amount / Amount Company Currency) and push to child table
+var CHARGES_EXPENSE_CATEGORIES = ["Travel", "Hotel", "Visa", "Residence and Iqama"];
+
+function get_expense_type_for_charges(frm) {
+	if (!frm.doc.expense_category) return null;
+	let cat = (frm.doc.expense_category || "").trim();
+	if (cat === "" || cat === "All") return null;
+	if (CHARGES_EXPENSE_CATEGORIES.indexOf(cat) !== -1) return cat;
+	return cat;
+}
+
+/** When trip_type is Multi City: ensure one Travel expense row and fill from multi_city_segments (first = departure/PRN/dates, last = arrival). */
+function sync_multi_city_to_expenses(frm) {
+	let segments = frm.doc.multi_city_segments || [];
+	if (segments.length === 0) return;
+	let first = segments[0];
+	let last = segments[segments.length - 1];
 	let travel_row = null;
-	for (let i = 0; i < frm.doc.expenses.length; i++) {
-		let row = frm.doc.expenses[i];
-		if (row.expense_type && row.expense_type.toLowerCase().includes("travel")) {
-			travel_row = row;
-			break;
+	if (frm.doc.expenses && frm.doc.expenses.length > 0) {
+		for (let i = 0; i < frm.doc.expenses.length; i++) {
+			if (frm.doc.expenses[i].expense_type && frm.doc.expenses[i].expense_type.toLowerCase().indexOf("travel") !== -1) {
+				travel_row = frm.doc.expenses[i];
+				break;
+			}
 		}
 	}
-	
-	// If no travel row found, create one
 	if (!travel_row) {
 		travel_row = frm.add_child("expenses");
 		travel_row.expense_type = "Travel";
 		travel_row.expense_date = frm.doc.posting_date || frappe.datetime.get_today();
+		travel_row.amount = parseFloat(frm.doc.travel_amount) || 0;
+		travel_row.amount_company_currency = parseFloat(frm.doc.amountcompany_currency) || travel_row.amount;
+		travel_row.sanctioned_amount = travel_row.amount_company_currency || travel_row.amount;
 		frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_type", "Travel");
-		if (frm.doc.posting_date) {
-			frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_date", frm.doc.posting_date);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "expense_date", travel_row.expense_date);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", travel_row.amount);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount_company_currency", travel_row.amount_company_currency);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", travel_row.sanctioned_amount);
+	}
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_departure_airport", first.departure_airport || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_arrival_airport", last.arrival_airport || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_prn_number", first.custom_prn_number || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_date_of_purchase", first.date_of_purchase || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_travel_type", "Multi-city");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_date_of_travel", first.date_of_travel || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_date_of_arrival", last.date_of_arrival || "");
+	frappe.model.set_value(travel_row.doctype, travel_row.name, "custom_airlines", first.airlines || "");
+	if (frm.doc.travel_amount) {
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", frm.doc.travel_amount);
+	}
+	if (frm.doc.amountcompany_currency) {
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "amount_company_currency", frm.doc.amountcompany_currency);
+		frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", frm.doc.amountcompany_currency);
+	}
+	frm.refresh_field("expenses");
+}
+
+// Helper: find or create child row for given expense_type and update amount / amount_company_currency
+function update_category_row_amount(frm, amount_transaction, amount_company) {
+	let expense_type = get_expense_type_for_charges(frm);
+	if (!expense_type) return;
+	amount_transaction = parseFloat(amount_transaction) || 0;
+	amount_company = parseFloat(amount_company) || amount_transaction;
+
+	let target_row = null;
+	if (frm.doc.expenses && frm.doc.expenses.length > 0) {
+		for (let i = 0; i < frm.doc.expenses.length; i++) {
+			let row = frm.doc.expenses[i];
+			if (row.expense_type === expense_type) {
+				target_row = row;
+				break;
+			}
 		}
 	}
-	
-	// Update amount and sanctioned_amount
-	frappe.model.set_value(travel_row.doctype, travel_row.name, "amount", converted_amount);
-	frappe.model.set_value(travel_row.doctype, travel_row.name, "sanctioned_amount", converted_amount);
-	
-	// Refresh the expenses field to show updated values
+	if (!target_row) {
+		target_row = frm.add_child("expenses");
+		target_row.expense_type = expense_type;
+		target_row.expense_date = frm.doc.posting_date || frappe.datetime.get_today();
+		frappe.model.set_value(target_row.doctype, target_row.name, "expense_type", expense_type);
+		if (frm.doc.posting_date) {
+			frappe.model.set_value(target_row.doctype, target_row.name, "expense_date", frm.doc.posting_date);
+		}
+	}
+	frappe.model.set_value(target_row.doctype, target_row.name, "amount", amount_transaction);
+	frappe.model.set_value(target_row.doctype, target_row.name, "amount_company_currency", amount_company);
+	frappe.model.set_value(target_row.doctype, target_row.name, "sanctioned_amount", amount_company || amount_transaction);
+	remove_expense_rows_without_type(frm);
 	frm.refresh_field("expenses");
+}
+
+function remove_expense_rows_without_type(frm) {
+	if (!frm.doc.expenses || frm.doc.expenses.length === 0) return;
+	for (let i = frm.doc.expenses.length - 1; i >= 0; i--) {
+		let et = (frm.doc.expenses[i].expense_type || "").toString().trim();
+		if (!et) {
+			frappe.model.remove_from_locals("Travel Expense Detail", frm.doc.expenses[i].name);
+			frm.doc.expenses.splice(i, 1);
+		}
+	}
+}
+
+// Helper function to update travel row amount in child table (kept for backward compatibility; uses category)
+function update_travel_row_amount(frm, converted_amount) {
+	let expense_type = get_expense_type_for_charges(frm) || "Travel";
+	let amount_transaction = parseFloat(frm.doc.travel_amount) || converted_amount;
+	update_category_row_amount(frm, amount_transaction, converted_amount);
+}
+
+function compute_hotel_amount_and_push(frm) {
+	if (!frm.doc.hotel_checkin_date || !frm.doc.hotel_checkout_date) return;
+	let checkin = new Date(frm.doc.hotel_checkin_date);
+	let checkout = new Date(frm.doc.hotel_checkout_date);
+	if (checkout < checkin) return;
+	let days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+	let rate = parseFloat(frm.doc.rate_per_day) || 0;
+	frm.set_value("hotel_days", days);
+	frm.set_value("total_nights", days);
+	frm.refresh_field("hotel_days");
+	frm.refresh_field("total_nights");
+	if (rate <= 0) return;
+	let amount = rate * days;
+	frm.set_value("travel_amount", amount);
+	frm.refresh_field("travel_amount");
+	convert_and_update_amount(frm);
 }
 
 // Auto-fill hotel details from original travel expense

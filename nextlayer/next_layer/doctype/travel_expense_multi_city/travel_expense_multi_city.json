@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-26 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "flight_no",
+  "flight_date",
+  "departure_airport",
+  "arrival_airport",
+  "airlines",
+  "column_break_1",
+  "travel_type",
+  "custom_prn_number",
+  "date_of_purchase",
+  "column_break_2",
+  "date_of_travel",
+  "date_of_arrival"
+ ],
+ "fields": [
+  {
+   "fieldname": "flight_no",
+   "fieldtype": "Data",
+   "label": "Flight No"
+  },
+  {
+   "fieldname": "flight_date",
+   "fieldtype": "Date",
+   "label": "Flight Date"
+  },
+  {
+   "fieldname": "departure_airport",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Departure Airport",
+   "options": "Airport",
+   "reqd": 1
+  },
+  {
+   "fieldname": "arrival_airport",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Arrival Airport",
+   "options": "Airport",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "airlines",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Airlines",
+   "options": "Airlines"
+  },
+  {
+   "fieldname": "travel_type",
+   "fieldtype": "Select",
+   "label": "Travel Type",
+   "options": "\nOne Way\nReturn"
+  },
+  {
+   "fieldname": "custom_prn_number",
+   "fieldtype": "Data",
+   "label": "PNR Number"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date_of_travel",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Date of Travel"
+  },
+  {
+   "fieldname": "date_of_arrival",
+   "fieldtype": "Datetime",
+   "label": "Date of Arrival"
+  },
+  {
+   "fieldname": "date_of_purchase",
+   "fieldtype": "Date",
+   "label": "Date of Purchase"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-11 00:04:12.029546",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Travel Expense Multi City",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "ASC",
+ "states": []
+}

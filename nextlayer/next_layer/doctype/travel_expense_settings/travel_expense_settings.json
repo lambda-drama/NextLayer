@@ -1,0 +1,69 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-02 01:05:16.107098",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "travel_expanse_section",
+  "enforce_attachment_on_travel_expense",
+  "section_break_qaxx",
+  "travel_expense_accounts",
+  "apply_this_account_restriction_on_journal"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enforce_attachment_on_travel_expense",
+   "fieldtype": "Check",
+   "label": "Enforce Attachment on Travel Expense"
+  },
+  {
+   "fieldname": "travel_expanse_section",
+   "fieldtype": "Section Break",
+   "label": "Travel Expanse"
+  },
+  {
+   "fieldname": "travel_expense_accounts",
+   "fieldtype": "Table",
+   "label": "Travel Expense Accounts",
+   "options": "Account Travel Expense"
+  },
+  {
+   "fieldname": "section_break_qaxx",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "apply_this_account_restriction_on_journal",
+   "fieldtype": "Check",
+   "label": "Apply This Accounts Restriction on Journal"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-02-04 02:24:44.472898",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Travel Expense Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

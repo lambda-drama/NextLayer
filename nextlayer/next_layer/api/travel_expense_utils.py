@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from erpnext.setup.utils import get_exchange_rate
+from frappe.utils import flt
 from erpnext.setup.utils import get_exchange_rate
 
 
@@ -245,7 +245,8 @@ def create_journal_entries_for_more_information(travel_expense):
 			"debit": expense_base,
 			"cost_center": cost_center,
 			"project": project,
-			"custom_travel_expense_ref": travel_expense.name,
+			"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 		}]
 
 		# Credit side: direct payment (if paid) or payable (if unpaid)
@@ -276,7 +277,8 @@ def create_journal_entries_for_more_information(travel_expense):
 			"credit": pay_base,
 			"cost_center": cost_center,
 			"project": project,
-			"custom_travel_expense_ref": travel_expense.name,
+			"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 		}
 		if not is_paid and pay_account == payable_account and traveler:
 			acc_entry["party_type"] = "Member"
@@ -415,7 +417,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 			"credit": expense_base,
 			"cost_center": cost_center,
 			"project": project,
-			"custom_travel_expense_ref": original_te.name,
+			"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 		})
 
 	# 2. Debit payment / payable for refund_amount
@@ -453,7 +456,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 			"debit": payment_base,
 			"cost_center": original_te.cost_center,
 			"project": original_te.project,
-			"custom_travel_expense_ref": original_te.name,
+			"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 		})
 	else:
 		# Refund reduces payable
@@ -477,7 +481,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 			"debit": payable_base,
 			"cost_center": original_te.cost_center,
 			"project": original_te.project,
-			"custom_travel_expense_ref": original_te.name,
+			"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 		}
 		if traveler:
 			acc["party_type"] = "Member"
@@ -515,7 +520,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 				"debit": expense_base,
 				"cost_center": cost_center,
 				"project": project,
-				"custom_travel_expense_ref": original_te.name,
+				"reference_type": "Travel Expense",
+				"reference_name": original_te.name,
 			})
 
 	# Multi‑currency determination (reuse pattern from main JE logic)
@@ -751,7 +757,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"credit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 2. For unpaid expenses: Debit Payable Account - refund amount returned (reduces payable)
@@ -798,7 +805,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"debit": payment_base_amount,
 					"cost_center": travel_expense.cost_center,
 					"project": travel_expense.project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			else:
 				# Original was unpaid - refund reduces payable
@@ -827,7 +835,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 					"party": traveler if traveler else None,
 					"cost_center": travel_expense.cost_center,
 					"project": travel_expense.project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 3. Debit Expense Account(s) for lost amount (if any)
@@ -874,28 +883,31 @@ def create_journal_entry_for_travel_expense(travel_expense):
 						"debit": expense_base_amount,
 						"cost_center": cost_center,
 						"project": project,
-						"custom_travel_expense_ref": travel_expense.name,
+						"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 					})
 		else:
 			# Normal expense (not refund) - original logic
 			# 1. Debit Expense Account(s)
+			# amount is in company currency; base (debit) = company amount; debit_in_account_currency = convert to account currency when different
 			for expense_account, amount in expense_accounts.items():
 				expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
-				
-				# Calculate base amount
+				# Base amount is always in company currency
+				expense_base_amount = amount
 				if expense_account_currency == company_currency:
-					expense_base_amount = amount
+					expense_amount_in_account_currency = amount
 				else:
 					try:
+						# get_exchange_rate(from, to) = to per from → amount_in_account = amount * rate
 						exchange_rate = get_exchange_rate(
-							expense_account_currency,
 							company_currency,
+							expense_account_currency,
 							posting_date,
 							company
 						)
-						expense_base_amount = amount * exchange_rate
+						expense_amount_in_account_currency = amount * exchange_rate
 					except Exception:
-						expense_base_amount = amount
+						expense_amount_in_account_currency = amount
 				
 				# Get cost center and project from first expense row, or from main form
 				cost_center = travel_expense.cost_center
@@ -910,11 +922,12 @@ def create_journal_entry_for_travel_expense(travel_expense):
 				
 				je_accounts.append({
 					"account": expense_account,
-					"debit_in_account_currency": amount,
+					"debit_in_account_currency": expense_amount_in_account_currency,
 					"debit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 2. Credit Payable Account
@@ -947,7 +960,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 				"party": traveler if traveler else None,
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
-				"custom_travel_expense_ref": travel_expense.name,
+				"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 			})
 		
 		# Determine if multi-currency
@@ -1092,53 +1106,102 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		# Check if this is a refund
 		is_refund = getattr(travel_expense, 'refund', 0)
 		
-		# Validate all expense rows have expense type and get expense accounts
-		expense_accounts = {}
+		# Get posting date and transaction currency once (used for amounts and exchange)
+		posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
+		transaction_currency = getattr(travel_expense, 'currency', None) or company_currency
+
+		# Validate all expense rows have expense type and get expense accounts.
+		# Store both company-currency amount (for JE base/debit) and account-currency amount (for debit_in_account_currency)
+		# so that e.g. Visa (USD) is debited with 68 USD, not 249.65 AED.
+		expense_accounts = {}  # account -> {"company_currency": x, "account_currency": y}
 		total_expense_amount = 0
 		for expense_row in travel_expense.expenses:
 			expense_type = expense_row.expense_type
 			if not expense_type:
 				frappe.throw(_("Expense Type is required for all expense rows"))
 			
-			# Get expense account from Expense Claim Type
+			# Get expense account from Expense Claim Type and its currency
 			expense_account = get_expense_account_from_expense_type(expense_type, company)
-			
-			# Get amount for this expense (use company currency amount, fallback to transaction currency)
-			expense_amount = getattr(expense_row, 'amount_company_currency', None)
-			if not expense_amount or expense_amount == 0:
-				# If amount_company_currency is not set or zero, try transaction currency amount
+			expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
+
+			# Company-currency amount (for JE base amount)
+			amount_company = getattr(expense_row, 'amount_company_currency', None)
+			if not amount_company or amount_company == 0:
 				transaction_amount = getattr(expense_row, 'amount', None) or 0
 				if transaction_amount and transaction_amount > 0:
-					# Convert transaction currency to company currency
-					transaction_currency = getattr(travel_expense, 'currency', None) or company_currency
 					if transaction_currency != company_currency:
 						try:
-							posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
 							exchange_rate = get_exchange_rate(
 								transaction_currency,
 								company_currency,
 								posting_date,
 								company
 							)
-							expense_amount = transaction_amount * exchange_rate
+							amount_company = transaction_amount * exchange_rate
 						except Exception:
-							expense_amount = transaction_amount
+							amount_company = transaction_amount
 					else:
-						expense_amount = transaction_amount
+						amount_company = transaction_amount
 				else:
-					expense_amount = 0
+					amount_company = 0
 			
-			# Skip zero amounts
-			if expense_amount <= 0:
+			if amount_company <= 0:
 				continue
-			
-			# Group by expense account
-			if expense_account in expense_accounts:
-				expense_accounts[expense_account] += expense_amount
+
+			# Amount in expense account currency (for debit_in_account_currency)
+			# get_exchange_rate(from, to) returns "to per from" → amount_in_to = amount_in_from * rate
+			if expense_account_currency == company_currency:
+				amount_in_account_currency = amount_company
+			elif expense_account_currency == transaction_currency:
+				# Account is in transaction currency: use row amount if entered, else convert company amount
+				amount_in_account_currency = getattr(expense_row, 'amount', None) or 0
+				if not amount_in_account_currency and amount_company:
+					try:
+						rate = get_exchange_rate(company_currency, transaction_currency, posting_date, company)
+						if rate is not None and flt(rate) > 0:
+							amount_in_account_currency = amount_company * rate
+						else:
+							rev = get_exchange_rate(transaction_currency, company_currency, posting_date, company)
+							if rev is not None and flt(rev) > 0:
+								amount_in_account_currency = amount_company / rev
+							else:
+								amount_in_account_currency = amount_company
+					except Exception:
+						amount_in_account_currency = amount_company
 			else:
-				expense_accounts[expense_account] = expense_amount
+				# Expense account in different currency (e.g. document AED, account USD): convert company amount to account currency.
+				# JE overwrites base debit with debit_in_account_currency * exchange_rate, so we must never pass 0.
+				try:
+					rate = get_exchange_rate(company_currency, expense_account_currency, posting_date, company)
+					if rate is not None and flt(rate) > 0:
+						amount_in_account_currency = amount_company * rate
+					else:
+						rev = get_exchange_rate(expense_account_currency, company_currency, posting_date, company)
+						if rev is not None and flt(rev) > 0:
+							amount_in_account_currency = amount_company / rev
+						else:
+							frappe.throw(_(
+								"Exchange rate required from {0} to {1} (or reverse) for date {2} for expense account {3}. Please set up in Currency Exchange."
+							).format(company_currency, expense_account_currency, posting_date, expense_account))
+				except frappe.ValidationError:
+					raise
+				except Exception as e:
+					frappe.throw(_(
+						"Could not convert amount to expense account currency ({0}): {1}. Please set up exchange rate in Currency Exchange."
+					).format(expense_account_currency, str(e)))
+				if not amount_in_account_currency or flt(amount_in_account_currency) <= 0:
+					frappe.throw(_(
+						"Exchange rate from {0} to {1} for date {2} returned zero or invalid. Please set up in Currency Exchange."
+					).format(company_currency, expense_account_currency, posting_date))
 			
-			total_expense_amount += expense_amount
+			# Group by expense account (sum both currencies)
+			if expense_account in expense_accounts:
+				expense_accounts[expense_account]["company_currency"] += amount_company
+				expense_accounts[expense_account]["account_currency"] += amount_in_account_currency
+			else:
+				expense_accounts[expense_account] = {"company_currency": amount_company, "account_currency": amount_in_account_currency}
+			
+			total_expense_amount += amount_company
 		
 		# Validate that we have at least one expense account with amount > 0
 		if not expense_accounts or total_expense_amount <= 0:
@@ -1165,9 +1228,6 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 		
 		# Log currency info for debugging
 		frappe.logger().debug(f"Travel Expense {travel_expense.name}: Company currency={company_currency}, Payment account={direct_payment_account}, Account currency={direct_payment_account_currency}, Total amount={total_amount}")
-		
-		# Get posting date
-		posting_date = getattr(travel_expense, 'posting_date', None) or frappe.utils.today()
 		
 		# Build journal entry accounts list
 		je_accounts = []
@@ -1271,7 +1331,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 					"credit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 			
 			# 2. Debit Direct Payment Account - refund amount returned
@@ -1298,7 +1359,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				"debit": payment_base_amount,
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
-				"custom_travel_expense_ref": travel_expense.name,
+				"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 			})
 			
 			# 3. Debit Expense Account(s) for lost amount (if any)
@@ -1345,39 +1407,30 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 						"debit": expense_base_amount,
 						"cost_center": cost_center,
 						"project": project,
-						"custom_travel_expense_ref": travel_expense.name,
+						"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 					})
 		else:
 			# Normal expense (not refund) - original logic
 			# 1. Debit Expense Account(s)
-			for expense_account, amount in expense_accounts.items():
+			for expense_account, amounts in expense_accounts.items():
+				amount_company = amounts["company_currency"]
+				amount_in_account_currency = amounts["account_currency"]
 				# Validate amount is not zero
-				if amount <= 0:
+				if amount_company <= 0:
 					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero or negative amount ({1}). Please check expense amounts.").format(
-						expense_account, amount
+						expense_account, amount_company
 					))
 				
 				expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency") or company_currency
 				
-				# Calculate base amount
-				if expense_account_currency == company_currency:
-					expense_base_amount = amount
-				else:
-					try:
-						exchange_rate = get_exchange_rate(
-							expense_account_currency,
-							company_currency,
-							posting_date,
-							company
-						)
-						expense_base_amount = amount * exchange_rate
-					except Exception:
-						expense_base_amount = amount
+				# Base amount is always in company currency (for JE totals)
+				expense_base_amount = amount_company
 				
 				# Validate base amount is not zero
 				if expense_base_amount <= 0:
-					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero base amount after currency conversion. Amount: {1}, Base Amount: {2}").format(
-						expense_account, amount, expense_base_amount
+					frappe.throw(_("Cannot create journal entry: Expense account {0} has zero base amount. Company amount: {1}.").format(
+						expense_account, amount_company
 					))
 				
 				# Get cost center and project from first expense row, or from main form
@@ -1393,16 +1446,17 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				
 				je_accounts.append({
 					"account": expense_account,
-					"debit_in_account_currency": amount,
+					"debit_in_account_currency": amount_in_account_currency,
 					"debit": expense_base_amount,
 					"cost_center": cost_center,
 					"project": project,
-					"custom_travel_expense_ref": travel_expense.name,
+					"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 				})
 		
 			# 2. Credit Direct Payment Account
-			# Calculate sum of all debit amounts to ensure credit matches
-			total_debit_amount = sum(expense_accounts.values())
+			# Calculate sum of all debit base amounts (company currency) to ensure credit matches
+			total_debit_amount = sum(amt["company_currency"] for amt in expense_accounts.values())
 			
 			# Use total_debit_amount if total_amount is zero or doesn't match
 			if total_amount <= 0 or abs(total_amount - total_debit_amount) > 0.01:
@@ -1510,7 +1564,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 				"credit": payment_base_amount,
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
-				"custom_travel_expense_ref": travel_expense.name,
+				"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 			})
 		
 		# Determine if multi-currency
@@ -1637,7 +1692,7 @@ def cancel_travel_expense_charges(travel_expense_name):
 			WHERE EXISTS (
 				SELECT 1 FROM `tabJournal Entry Account`
 				WHERE parent = `tabJournal Entry`.name
-				AND custom_travel_expense_ref = %s
+				AND reference_type = 'Travel Expense' AND reference_name = %s
 			)
 			AND docstatus = 1
 			ORDER BY creation DESC
@@ -1673,7 +1728,8 @@ def cancel_travel_expense_charges(travel_expense_name):
 				"party": account.party,
 				"cost_center": account.cost_center,
 				"project": account.project,
-				"custom_travel_expense_ref": travel_expense_name,
+				"reference_type": "Travel Expense",
+				"reference_name": travel_expense_name,
 			}
 			reverse_accounts.append(reverse_account)
 		
@@ -1741,7 +1797,7 @@ def check_journal_entry_exists(travel_expense_name):
 			WHERE EXISTS (
 				SELECT 1 FROM `tabJournal Entry Account`
 				WHERE parent = `tabJournal Entry`.name
-				AND custom_travel_expense_ref = %s
+				AND reference_type = 'Travel Expense' AND reference_name = %s
 			)
 			ORDER BY creation DESC
 			LIMIT 1
@@ -1831,7 +1887,7 @@ def check_and_create_journal_entry(travel_expense_name):
 			WHERE EXISTS (
 				SELECT 1 FROM `tabJournal Entry Account`
 				WHERE parent = `tabJournal Entry`.name
-				AND custom_travel_expense_ref = %s
+				AND reference_type = 'Travel Expense' AND reference_name = %s
 			)
 			ORDER BY creation DESC
 			LIMIT 1
@@ -1976,7 +2032,8 @@ def _create_single_additional_je_for_row(travel_expense, row):
 		"debit": expense_base,
 		"cost_center": cost_center,
 		"project": project,
-		"custom_travel_expense_ref": travel_expense.name,
+		"reference_type": "Travel Expense",
+			"reference_name": travel_expense.name,
 	}]
 
 	if is_paid and direct_payment_account:
@@ -1993,7 +2050,8 @@ def _create_single_additional_je_for_row(travel_expense, row):
 			pay_amount = amount * get_exchange_rate(company_currency, pay_currency, posting_date, company)
 		except Exception:
 			pass
-	acc_entry = {"account": pay_account, "credit_in_account_currency": pay_amount, "credit": pay_base, "cost_center": cost_center, "project": project, "custom_travel_expense_ref": travel_expense.name}
+	acc_entry = {"account": pay_account, "credit_in_account_currency": pay_amount, "credit": pay_base, "cost_center": cost_center, "project": project, "reference_type": "Travel Expense",
+			"reference_name": travel_expense.name}
 	if not is_paid and pay_account == payable_account and traveler:
 		acc_entry["party_type"] = "Member"
 		acc_entry["party"] = traveler

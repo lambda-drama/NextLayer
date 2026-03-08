@@ -1,9 +1,10 @@
 "use client"
 
-import  { useState, useMemo } from "react"
+import  { useState, useMemo, useEffect } from "react"
 import { Button } from "../../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "../../components/ui/alert"
 import { ArrowLeftRight, RefreshCw, ArrowLeft, CheckCircle, XCircle, BarChart3, Users, Building2 } from "lucide-react"
@@ -55,14 +56,42 @@ export default function InterCompanyLedgerSummary() {
   const [ignoreSystemGeneratedNotes, setIgnoreSystemGeneratedNotes] = useState<boolean>(true)
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
   const [statusFilter, setStatusFilter] = useState<string>("All")
+  const [allowOffsetMatch, setAllowOffsetMatch] = useState<boolean>(false)
 
   // Data state
   const [error, setError] = useState<string>("")
 
+  // Fetch Inter Company Reconciliation Settings (allow_offset_match) on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/method/nextlayer.next_layer.api.ledger_summary.get_intercompany_reconciliation_settings')
+        const result = await response.json()
+        if (result?.message?.allow_offset_match !== undefined) {
+          setAllowOffsetMatch(Boolean(result.message.allow_offset_match))
+        }
+      } catch {
+        setAllowOffsetMatch(false)
+      }
+    }
+    fetchSettings()
+  }, [])
+
   // Use the custom hooks
   const { companies, isLoading: companiesLoading, error: companiesError } = useCompanies()
-  const { companies: permissionAwareCompanies } = usePermissionAwareCompanies()
+  const { companies: permissionAwareCompanies, isLoading: permissionCompaniesLoading } = usePermissionAwareCompanies()
   const { companies: allCompanies, isLoading: allCompaniesLoading, error: allCompaniesError } = useAllCompaniesForUI()
+
+  // Company filter: same as Intercompany Ledger Reconciliation — only show companies the user has permission to
+  const displayCompaniesForFilter = permissionAwareCompanies
+
+  // Clear selected company if it is not in the permitted list (e.g. after permission change or restored state)
+  useEffect(() => {
+    if (company && displayCompaniesForFilter.length > 0 && !displayCompaniesForFilter.some((c) => c.name === company)) {
+      setCompany("")
+    }
+  }, [company, displayCompaniesForFilter])
+
   // Use ledger summary hooks - only fetch when hasLoadedData is true
   const { data: customerLedgerData, isLoading: isLoadingCustomer, error: errorCustomer } = useLedgerSummary({
     company: company,
@@ -247,30 +276,34 @@ export default function InterCompanyLedgerSummary() {
       return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
     }
 
-    // If GL data is loaded for this party, check for match/unmatched
-    // Note: glClosing can be 0 legitimately, so we don't check for zero here
     const tolerance = 0.01 // Small tolerance for floating point comparison
     const absDifference = Math.abs(difference)
 
-    // First check if difference matches in-transit total (this takes priority over exact match)
-    // This ensures that when intransit explains the difference, it's "Match with Intransit" not "Match"
-    // Even if difference is zero, if intransit total exists and matches, it should be "Match with Intransit"
+
     if (intransitTotal !== undefined && intransitTotal !== null) {
       const absIntransitTotal = Math.abs(intransitTotal)
-      // Check if the difference equals the intransit total (within tolerance)
-      // This takes priority so entries with intransit match are not counted as regular "Match"
+
       if (Math.abs(absDifference - absIntransitTotal) < tolerance) {
-        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50" }
+        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: false }
       }
     }
 
-    // Then check for exact match (difference is zero or very close to zero)
-    // This only applies when there's no intransit match
+
     if (absDifference < tolerance) {
       return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
     }
 
-    // Otherwise it's unmatched
+    // Allow offset match (Inter Company Reconciliation Settings): when unmatched, check if
+    // |party_balance| + |gl_closing| ≈ in_transit_total (e.g. Pacific case: opposite signs, in-transit explains the sum)
+    if (allowOffsetMatch && intransitTotal !== undefined && intransitTotal !== null) {
+      const absIntransitTotal = Math.abs(intransitTotal)
+      // difference = |party_balance| - |gl_closing|, so |party_balance| + |gl_closing| = difference + 2*|gl_closing|
+      const offsetSum = difference + 2 * Math.abs(glClosing)
+      if (Math.abs(offsetSum - absIntransitTotal) <= tolerance) {
+        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: true }
+      }
+    }
+
     return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
   }
 
@@ -425,18 +458,22 @@ export default function InterCompanyLedgerSummary() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 w-full">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Company</label>
-                <Select value={company} onValueChange={setCompany}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                    <SelectValue placeholder="Select Company" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-blue-200">
-                    {permissionAwareCompanies.map((companyItem) => (
-                      <SelectItem key={companyItem.name} value={companyItem.name}>
-                        {companyItem.company_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={displayCompaniesForFilter.map((companyItem) => ({
+                    name: ("company_name" in companyItem ? companyItem.company_name : companyItem.name) ?? companyItem.name,
+                    value: companyItem.name,
+                  }))}
+                  value={company}
+                  onValueChange={setCompany}
+                  placeholder={
+                    permissionCompaniesLoading ? "Loading..." :
+                    displayCompaniesForFilter.length === 0 ? "No companies available" :
+                    "Select Company"
+                  }
+                  disabled={permissionCompaniesLoading || displayCompaniesForFilter.length === 0}
+                  searchPlaceholder="Search companies..."
+                  emptyMessage="No companies found."
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">From Date</label>
@@ -580,116 +617,7 @@ export default function InterCompanyLedgerSummary() {
           </Alert>
         )}
 
-        {/* Reconciliation Analysis */}
-        {/* {hasLoadedData && reconciliationAnalysis && (
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                {reconciliationAnalysis.closingBalanceMatch ? (
-                  <CheckCircle className="h-5 w-5 text-green-300" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-300" />
-                )}
-                Ledger Summary Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <Card className="border-blue-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-lg text-gray-800">
-                  {company} - Customer Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(customerLedgerData.totals.totalOpeningBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(customerLedgerData.totals.totalInvoicedAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {formatCurrency(customerLedgerData.totals.totalPaidAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(customerLedgerData.totals.totalClosingBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-blue-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-lg text-gray-800">
-                  {company} - Supplier Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(supplierLedgerData.totals.totalOpeningBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Opening Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(supplierLedgerData.totals.totalInvoicedAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Invoiced Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {formatCurrency(supplierLedgerData.totals.totalPaidAmount, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Paid Amount ({getCompanyCurrency(company)})</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(supplierLedgerData.totals.totalClosingBalance, 'USD', company)}
-                    </div>
-                    <div className="text-sm text-gray-600">Closing Balance ({getCompanyCurrency(company)})</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-              <div className="space-y-3">
-                <Alert
-                  className={`border-2 ${reconciliationAnalysis.closingBalanceMatch ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
-                >
-                  <AlertDescription className={reconciliationAnalysis.closingBalanceMatch ? "text-green-800" : "text-red-800"}>
-                    {reconciliationAnalysis.closingBalanceMatch ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 inline mr-2" />
-                        <strong>Balances Match:</strong> The customer and supplier closing balances for {company} are equal.
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 inline mr-2" />
-                        <strong>Balances Don't Match:</strong> There's a difference of {formatCurrency(Math.abs(reconciliationAnalysis.customerTotals.totalClosingBalance - reconciliationAnalysis.supplierTotals.totalClosingBalance), 'USD', company)} between the customer and supplier closing balances.
-                      </>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              </div>
-            </CardContent>
-          </Card>
-        )} */}
+      
 
         {/* Totals Summary */}
         {hasLoadedData && customerLedgerData && supplierLedgerData && (
@@ -910,12 +838,17 @@ export default function InterCompanyLedgerSummary() {
                         const showIntransitTotal = status.text === 'Match' ? '-' :
                           (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
+                        // Only when allow offset is ticked AND this row matched via offset rule: show in-transit in Difference column
+                        const showDifference = status.text === 'Match with In-Transit' && status.isOffsetMatch === true && intransitTotal != null
+                          ? intransitTotal
+                          : difference
+
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(showDifference, entry.currency, company)}</TableCell>
                             <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
@@ -965,12 +898,17 @@ export default function InterCompanyLedgerSummary() {
                         const showIntransitTotal = status.text === 'Match' ? '-' :
                           (intransitTotal !== undefined ? formatCurrency(intransitTotal, entry.currency, company) : '-')
 
+                        // Only when allow offset is ticked AND this row matched via offset rule: show in-transit in Difference column
+                        const showDifference = status.text === 'Match with In-Transit' && status.isOffsetMatch === true && intransitTotal != null
+                          ? intransitTotal
+                          : difference
+
                         return (
                           <TableRow key={index} className="hover:bg-blue-50">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(difference, entry.currency, company)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(showDifference, entry.currency, company)}</TableCell>
                             <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>

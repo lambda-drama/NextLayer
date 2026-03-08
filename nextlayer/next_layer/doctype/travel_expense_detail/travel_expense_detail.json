@@ -16,6 +16,7 @@
   "section_break_hotel",
   "hotel_checkin_date",
   "hotel_checkout_date",
+  "hotel_days",
   "custom_hotel_name",
   "column_break_hotel1",
   "hotel_territory",
@@ -98,19 +99,29 @@
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
    "fieldname": "hotel_checkin_date",
    "fieldtype": "Date",
-   "label": "Check-in Date"
+   "label": "Check-in Date",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
    "fieldname": "hotel_checkout_date",
    "fieldtype": "Date",
-   "label": "Check-out Date"
+   "label": "Check-out Date",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')"
+  },
+  {
+   "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
+   "fieldname": "hotel_days",
+   "fieldtype": "Int",
+   "label": "Days",
+   "read_only": 1
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
    "fieldname": "custom_hotel_name",
    "fieldtype": "Data",
-   "label": "Hotel Name"
+   "label": "Hotel Name",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')"
   },
   {
    "fieldname": "column_break_hotel1",
@@ -128,13 +139,15 @@
    "fieldname": "hotel_location",
    "fieldtype": "Link",
    "label": "Hotel Location",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
    "options": "Location"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')",
    "fieldname": "rate_per_day",
    "fieldtype": "Currency",
-   "label": "Rate per Day"
+   "label": "Rate per Day",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('hotel')"
   },
   {
    "fieldname": "column_break_hotel2",
@@ -178,14 +191,16 @@
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
    "fieldname": "custom_date_of_purchase",
    "fieldtype": "Date",
-   "label": "Date of Purchase"
+   "label": "Date of Purchase",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')"
   },
   {
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
    "fieldname": "custom_travel_type",
    "fieldtype": "Select",
    "label": "Travel Type",
-   "options": "\nOne Way\nReturn"
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
+   "options": "\nOne Way\nReturn\nMulti-city"
   },
   {
    "fieldname": "column_break_travel1",
@@ -203,6 +218,7 @@
    "fieldname": "custom_departure_airport",
    "fieldtype": "Link",
    "label": "Departure Airport",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
    "options": "Airport"
   },
   {
@@ -210,6 +226,7 @@
    "fieldname": "custom_arrival_airport",
    "fieldtype": "Link",
    "label": "Arrival Airport",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
    "options": "Airport"
   },
   {
@@ -221,6 +238,7 @@
    "fieldname": "custom_airlines",
    "fieldtype": "Link",
    "label": "Airlines",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
    "options": "Airlines"
   },
   {
@@ -233,7 +251,8 @@
    "depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')",
    "fieldname": "custom_date_of_arrival",
    "fieldtype": "Datetime",
-   "label": "Date of Arrival"
+   "label": "Date of Arrival",
+   "mandatory_depends_on": "eval:doc.expense_type && doc.expense_type.toLowerCase().includes('travel')"
   },
   {
    "fieldname": "section_break_accounting",
@@ -256,7 +275,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-02 17:19:43.773297",
+ "modified": "2026-02-06 15:09:30.946383",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense Detail",

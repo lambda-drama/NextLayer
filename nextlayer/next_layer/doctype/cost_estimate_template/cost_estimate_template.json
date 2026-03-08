@@ -1,0 +1,168 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:template_name",
+ "creation": "2026-02-28 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "template_name",
+  "project_type",
+  "column_break_slkr",
+  "company",
+  "currency",
+  "section_items",
+  "estimate_by",
+  "items",
+  "section_labor",
+  "labor",
+  "section_overheads",
+  "overheads",
+  "section_totals",
+  "total_material_cost",
+  "total_labor_cost",
+  "column_break_ahkp",
+  "total_overhead_cost",
+  "grand_total"
+ ],
+ "fields": [
+  {
+   "fieldname": "template_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Template Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "project_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project Type",
+   "options": "Project Type"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "Materials"
+  },
+  {
+   "default": "Item Group",
+   "fieldname": "estimate_by",
+   "fieldtype": "Select",
+   "label": "Estimate By",
+   "options": "\nItem\nItem Group"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Cost Estimate Template Item"
+  },
+  {
+   "fieldname": "section_labor",
+   "fieldtype": "Section Break",
+   "label": "Labor"
+  },
+  {
+   "fieldname": "labor",
+   "fieldtype": "Table",
+   "label": "Labor",
+   "options": "Cost Estimate Template Labor"
+  },
+  {
+   "fieldname": "section_overheads",
+   "fieldtype": "Section Break",
+   "label": "Overheads"
+  },
+  {
+   "fieldname": "overheads",
+   "fieldtype": "Table",
+   "label": "Overheads",
+   "options": "Cost Estimate Template Overhead"
+  },
+  {
+   "fieldname": "section_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_material_cost",
+   "fieldtype": "Currency",
+   "label": "Total Material Cost",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_labor_cost",
+   "fieldtype": "Currency",
+   "label": "Total Labor Cost",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_overhead_cost",
+   "fieldtype": "Currency",
+   "label": "Total Overhead Cost",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "label": "Grand Total",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_slkr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ahkp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-04 04:34:09.493523",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Cost Estimate Template",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

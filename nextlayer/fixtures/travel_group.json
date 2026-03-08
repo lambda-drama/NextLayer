@@ -1,0 +1,23 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Travel Group",
+  "modified": "2026-01-30 01:11:51.808003",
+  "name": "Family",
+  "travel_group": "Family"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Travel Group",
+  "modified": "2026-01-24 03:08:30.719076",
+  "name": "Management",
+  "travel_group": "Management"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Travel Group",
+  "modified": "2026-01-24 03:08:17.755358",
+  "name": "Staff",
+  "travel_group": "Staff"
+ }
+]

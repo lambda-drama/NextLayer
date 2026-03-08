@@ -12,6 +12,13 @@ frappe.ui.form.on("Company", {
 		frm.add_custom_button(__("Generate Short Barcodes (6/8)"), function() {
 			open_short_barcode_dialog(frm);
 		}, __("Actions"));
+
+		// Repost Sales Shipment Cost GL for this company (all SSC that have no GL entries)
+		if (frappe.user.has_role("System Manager") || frappe.user.has_role("Administrator") || frappe.user.has_role("Stock Manager")) {
+			frm.add_custom_button(__("Repost SSC"), function() {
+				repost_ssc_for_company(frm);
+			}, __("Actions"));
+		}
 	}
 });
 
@@ -151,4 +158,33 @@ function open_short_barcode_dialog(frm) {
 	});
 
 	d.show();
+}
+
+// Repost GL for all Sales Shipment Cost (this company) that have no GL entries
+function repost_ssc_for_company(frm) {
+	frappe.confirm(
+		__("This will find all submitted Sales Shipment Cost for this company that have no GL entries and recreate them. Continue?"),
+		function() {
+			frappe.call({
+				method: "nextlayer.next_layer.controllers.sales_shipment.repost_all_sales_shipment_cost_gl_for_company",
+				args: { company: frm.doc.name },
+				freeze: true,
+				freeze_message: __("Checking and reposting Sales Shipment Cost GL..."),
+				callback: function(r) {
+					if (r.message) {
+						const res = r.message;
+						if (res.error) {
+							frappe.msgprint({ title: __("Error"), message: res.error, indicator: "red" });
+							return;
+						}
+						frappe.msgprint({
+							title: __("Repost SSC"),
+							message: __("Reposted {0} of {1} Sales Shipment Cost (checked).", [res.reposted, res.total_checked]),
+							indicator: "green"
+						});
+					}
+				}
+			});
+		}
+	);
 }
