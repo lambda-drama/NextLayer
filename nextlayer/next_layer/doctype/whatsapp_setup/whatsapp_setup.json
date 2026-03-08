@@ -17,7 +17,11 @@
   "app_id",
   "webhook_verify_token",
   "section_break_templates",
-  "template_details"
+  "template_details",
+  "np_details",
+  "np_enabled",
+  "np_token",
+  "np_url"
  ],
  "fields": [
   {
@@ -87,12 +91,35 @@
    "fieldtype": "Table",
    "label": "Template Details",
    "options": "WhatsApp Setup Template Details"
+  },
+  {
+   "fieldname": "np_details",
+   "fieldtype": "Tab Break",
+   "label": "New Provider Details"
+  },
+  {
+   "default": "0",
+   "fieldname": "np_enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "np_token",
+   "fieldtype": "Data",
+   "label": "Token",
+   "reqd": 1
+  },
+  {
+   "fieldname": "np_url",
+   "fieldtype": "Data",
+   "label": "URL",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-10-13 00:05:19.162676",
+ "modified": "2026-03-08 12:21:05.916161",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Setup",
