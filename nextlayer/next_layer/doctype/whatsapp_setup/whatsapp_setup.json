@@ -20,7 +20,9 @@
   "template_details",
   "np_details",
   "np_enabled",
+  "section_break_ipxa",
   "np_token",
+  "column_break_dorh",
   "np_url"
  ],
  "fields": [
@@ -95,7 +97,7 @@
   {
    "fieldname": "np_details",
    "fieldtype": "Tab Break",
-   "label": "New Provider Details"
+   "label": "WasenderApi Details"
   },
   {
    "default": "0",
@@ -106,20 +108,28 @@
   {
    "fieldname": "np_token",
    "fieldtype": "Data",
-   "label": "Token",
+   "label": "WasenderApi Token",
    "reqd": 1
   },
   {
    "fieldname": "np_url",
    "fieldtype": "Data",
-   "label": "URL",
+   "label": "WasenderApi URL",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_ipxa",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_dorh",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-08 12:21:05.916161",
+ "modified": "2026-03-08 20:42:29.882287",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Setup",
