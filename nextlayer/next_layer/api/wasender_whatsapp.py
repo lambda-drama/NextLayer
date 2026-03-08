@@ -14,7 +14,16 @@ def make_wasender_api_call(
 	reference_name: str = None,
 	update_existing_chat: frappe._dict = None,
 ):
-	"""Make the actual API call to WASender"""
+	"""Make the actual API call to WASender
+	Args:
+	    data (dict): Payload to send to WASender API
+	    endpoint (str): WASender API endpoint (e.g. "send-message")
+	    reference_doctype (str, optional): DocType for linking the chat message. Defaults to None.
+	    reference_name (str, optional): Doc name for linking the chat message. Defaults to None.
+	    update_existing_chat (frappe._dict, optional): Existing WhatsApp Chat document to update instead of creating a new one. Defaults to None.
+	Returns:
+	    dict: Response with success status and message details
+	"""
 	settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
 
 	if not settings.np_enabled:
