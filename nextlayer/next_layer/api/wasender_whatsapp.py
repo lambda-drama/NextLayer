@@ -2,7 +2,7 @@ import json
 import mimetypes
 
 import frappe
-from frappe.integrations.utils import make_post_request
+from frappe.integrations.utils import make_post_request, make_get_request
 
 from .whatsapp_utils import get_custom_attachment_url, get_document_attachment_url
 
@@ -201,31 +201,139 @@ def formart_number(number: str) -> str:
 		number = f"+{number}"
 	return number
 
+@frappe.whitelist()
+def sync_groups() -> dict:
+    """Fetch groups from WASender and store group metadata only"""
 
-def get_groups() -> dict:
     settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
 
     if not settings.np_enabled:
-        return {"success": False, "error": "WASender integration is disabled."}
-    if not settings.np_token:
-        return {"success": False, "error": "WASender token not configured."}
-    if not settings.np_url:
-        return {"success": False, "error": "WASender URL not configured."}
+        return {"success": False, "error": "WASender integration disabled"}
 
-    url = f"{settings.np_url}get-groups"
+    url = f"{settings.np_url}groups"
+
     headers = {
-        "Authorization": f"Bearer {settings.np_token}",
+        "Authorization": f"Bearer {settings.np_token}"
     }
 
-    try:
-        response = make_post_request(url, headers=headers)
-        return {"success": True, "groups": response.get("data", [])}
+    response = make_get_request(url, headers=headers)
 
-    except Exception as e:
-        frappe.log_error(
-            f"WASender API Error while fetching group IDs:\n"
-            f"URL: {url}\n"
-            f"Error: {str(e)}",
-            "WASender WhatsApp Get Groups",
+    if not response.get("success"):
+        return {"success": False, "error": response.get("message")}
+
+    groups = response.get("data", [])
+	
+    existing = set(
+        frappe.get_all(
+            "Whatsapp Group Profile",
+            pluck="group_id"
         )
-        return {"success": False, "error": str(e)}
+    )
+
+    for group in groups:
+
+        if group["id"] in existing:
+            continue
+
+        doc = frappe.new_doc("Whatsapp Group Profile")
+        doc.group_name = group.get("name") or "Unnamed Group"
+        doc.group_id = group["id"]
+        doc.profile_picture = group.get("imgUrl")
+
+        doc.insert(ignore_permissions=True)
+
+    frappe.db.commit()
+
+    return {"success": True, "groups_synced": len(groups)}
+
+@frappe.whitelist()
+def update_group_members(group_id):
+    """
+    Fetch members for a WhatsApp group and append only new members
+    without creating duplicates.
+    """
+
+    group = frappe.get_doc("Whatsapp Group Profile", {"group_id": group_id})
+
+    response = get_group_members(group_id)
+
+    if not response.get("success"):
+        return response
+
+    members = response.get("members", [])
+
+    # Existing phone numbers in child table
+    existing_members = {m.phone_number for m in group.members}
+    print("Existing members:", existing_members)
+    print("Members from API:", members)
+
+    added = 0
+
+    for m in members:
+        phone = m.get("pn", "")
+
+        if phone in existing_members:
+            continue
+
+        group.append(
+            "members",
+            {
+                "phone_number": phone,
+                "is_admin": m.get("Admin", False),
+            }
+        )
+
+        existing_members.add(phone)
+        added += 1
+
+    if added:
+        group.save(ignore_permissions=True)
+        frappe.db.commit()
+
+    return {
+        "success": True,
+        "members_added": added,
+        "total_members": len(group.members)
+    }
+	
+def get_group_members(group_id: str) -> dict:
+	"""
+	Get members of a WhatsApp group from WASender API
+
+	Args:
+	    group_id (str): ID of the WhatsApp group
+		
+	Returns:
+	    dict: Response with success status and list of members or error message
+	"""
+	settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+
+	if not settings.np_enabled:
+		return {"success": False, "error": "WASender integration is disabled."}
+	if not settings.np_token:
+		return {"success": False, "error": "WASender token not configured."}
+	if not settings.np_url:
+		return {"success": False, "error": "WASender URL not configured."}
+
+	url = f"{settings.np_url}groups/{group_id}/metadata"
+	headers = {
+		"Authorization": f"Bearer {settings.np_token}",
+	}
+	
+	try:
+		response = make_get_request(url, headers=headers)
+		if not response.get("success"):
+			frappe.throw(f"Failed to fetch group members: {response.get('message')}")
+			return {"success": False, "error": response.get("message")}
+		return {"success": True, "members": response.get("data", []).get("participants", [])}
+
+	except Exception as e:
+		frappe.throw(f"Failed to fetch group members: {str(e)}")
+		frappe.log_error(
+			f"WASender API Error while fetching group members:\n"
+			f"URL: {url}\n"
+			f"Group ID: {group_id}\n"
+			f"Error: {str(e)}",
+			"WASender WhatsApp Get Group Members",
+		)
+		return {"success": False, "error": str(e)}
