@@ -22,8 +22,9 @@
   "np_enabled",
   "section_break_ipxa",
   "np_token",
-  "column_break_dorh",
-  "np_url"
+  "np_url",
+  "column_break_qzwp",
+  "np_webhook_verify_token"
  ],
  "fields": [
   {
@@ -107,8 +108,8 @@
   },
   {
    "fieldname": "np_token",
-   "fieldtype": "Data",
-   "label": "WasenderApi Token",
+   "fieldtype": "Password",
+   "label": "Token",
    "reqd": 1
   },
   {
@@ -118,18 +119,19 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_break_ipxa",
-   "fieldtype": "Section Break"
+   "fieldname": "column_break_qzwp",
+   "fieldtype": "Column Break"
   },
   {
-   "fieldname": "column_break_dorh",
-   "fieldtype": "Column Break"
+   "fieldname": "np_webhook_verify_token",
+   "fieldtype": "Data",
+   "label": "Webhook Verify Token"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-08 20:42:29.882287",
+ "modified": "2026-03-08 18:48:36.338436",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Setup",
