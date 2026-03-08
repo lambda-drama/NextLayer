@@ -193,7 +193,7 @@ def formart_number(number: str) -> str:
 	return number
 
 
-def get_group_ids():
+def get_groups():
     settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
 
     if not settings.np_enabled:
