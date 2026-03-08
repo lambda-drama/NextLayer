@@ -21,7 +21,9 @@
   "np_details",
   "np_enabled",
   "np_token",
-  "np_url"
+  "np_url",
+  "column_break_qzwp",
+  "np_webhook_verify_token"
  ],
  "fields": [
   {
@@ -105,7 +107,7 @@
   },
   {
    "fieldname": "np_token",
-   "fieldtype": "Data",
+   "fieldtype": "Password",
    "label": "Token",
    "reqd": 1
   },
@@ -114,12 +116,21 @@
    "fieldtype": "Data",
    "label": "URL",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_qzwp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "np_webhook_verify_token",
+   "fieldtype": "Data",
+   "label": "Webhook Verify Token"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-08 12:21:05.916161",
+ "modified": "2026-03-08 18:48:36.338436",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Setup",

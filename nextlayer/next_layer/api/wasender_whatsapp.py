@@ -13,7 +13,7 @@ def make_wasender_api_call(
 	reference_doctype: str = None,
 	reference_name: str = None,
 	update_existing_chat: frappe._dict = None,
-):
+) -> dict:
 	"""Make the actual API call to WASender
 	Args:
 	    data (dict): Payload to send to WASender API
@@ -169,6 +169,7 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 		data = {"to": formatted_number}
 
 		FILE_TYPES = {
+			"application/pdf": "documentUrl",
 			"image/jpeg": "imageUrl",
 			"image/png": "imageUrl",
 			"video/mp4": "videoUrl",
@@ -184,8 +185,7 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 				file_type, _ = mimetypes.guess_type(attachment_url)
 				if file_type and file_type in FILE_TYPES:
 					data[FILE_TYPES[file_type]] = attachment_url
-				else:
-					data["documentUrl"] = attachment_url
+				
 
 		return make_wasender_api_call(data, "send-message", update_existing_chat=chat_doc)
 
@@ -202,7 +202,7 @@ def formart_number(number: str) -> str:
 	return number
 
 
-def get_groups():
+def get_groups() -> dict:
     settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
 
     if not settings.np_enabled:
