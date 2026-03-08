@@ -191,3 +191,32 @@ def formart_number(number: str) -> str:
 	if not number.startswith("+"):
 		number = f"+{number}"
 	return number
+
+
+def get_group_ids():
+    settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+
+    if not settings.np_enabled:
+        return {"success": False, "error": "WASender integration is disabled."}
+    if not settings.np_token:
+        return {"success": False, "error": "WASender token not configured."}
+    if not settings.np_url:
+        return {"success": False, "error": "WASender URL not configured."}
+
+    url = f"{settings.np_url}get-groups"
+    headers = {
+        "Authorization": f"Bearer {settings.np_token}",
+    }
+
+    try:
+        response = make_post_request(url, headers=headers)
+        return {"success": True, "groups": response.get("data", [])}
+
+    except Exception as e:
+        frappe.log_error(
+            f"WASender API Error while fetching group IDs:\n"
+            f"URL: {url}\n"
+            f"Error: {str(e)}",
+            "WASender WhatsApp Get Groups",
+        )
+        return {"success": False, "error": str(e)}
