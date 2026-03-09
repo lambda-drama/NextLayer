@@ -20,11 +20,10 @@
   "template_details",
   "np_details",
   "np_enabled",
-  "column_break_qzwp",
-  "section_break_xjmo",
   "np_token",
   "np_url",
-  "column_break_jpmg",
+  "column_break_qzwp",
+  "pat_token",
   "np_webhook_verify_token"
  ],
  "fields": [
@@ -99,24 +98,24 @@
   {
    "fieldname": "np_details",
    "fieldtype": "Tab Break",
-   "label": "WasenderApi Details"
+   "label": "New Provider Details"
   },
   {
    "default": "0",
    "fieldname": "np_enabled",
    "fieldtype": "Check",
-   "label": "Enabled WasenderApi"
+   "label": "Enabled"
   },
   {
    "fieldname": "np_token",
    "fieldtype": "Password",
-   "label": "WasenderApi Token",
+   "label": "Token",
    "reqd": 1
   },
   {
    "fieldname": "np_url",
    "fieldtype": "Data",
-   "label": "WasenderApi URL",
+   "label": "URL",
    "reqd": 1
   },
   {
@@ -129,18 +128,15 @@
    "label": "Webhook Verify Token"
   },
   {
-   "fieldname": "section_break_xjmo",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "column_break_jpmg",
-   "fieldtype": "Column Break"
+   "fieldname": "pat_token",
+   "fieldtype": "Data",
+   "label": "Personal Access Token"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-09 00:24:19.190830",
+ "modified": "2026-03-09 21:17:42.243303",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Setup",

@@ -11,7 +11,7 @@
   "label",
   "type",
   "status",
-  "is_group_message",
+  "to_group_message",
   "to",
   "to_group",
   "from",
@@ -62,7 +62,7 @@
   },
   {
    "allow_in_quick_entry": 1,
-   "depends_on": "eval:doc.type==\"Outgoing\" && !doc.is_group_message",
+   "depends_on": "eval:doc.type==\"Outgoing\" && !doc.to_group_message",
    "description": "Mobile number with country code",
    "fieldname": "to",
    "fieldtype": "Data",
@@ -198,23 +198,26 @@
    "options": "reference_doctype"
   },
   {
-   "default": "0",
-   "depends_on": "eval:!doc.status",
-   "fieldname": "is_group_message",
-   "fieldtype": "Check",
-   "label": "Is Group Message"
-  },
-  {
-   "depends_on": "eval:doc.type==\"Outgoing\" && doc.is_group_message",
+   "depends_on": "eval:doc.type==\"Outgoing\" && doc.to_group_message",
+   "description": "Select group",
    "fieldname": "to_group",
    "fieldtype": "Link",
    "label": "TO",
-   "options": "Whatsapp Group Profile"
+   "options": "Whatsapp Group Profile",
+   "set_only_once": 1
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:!doc.status",
+   "fieldname": "to_group_message",
+   "fieldtype": "Check",
+   "label": "To Group Message"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-09 10:49:34.362425",
+ "modified": "2026-03-09 20:22:40.359820",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Chat",
