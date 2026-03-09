@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "enabled",
+  "section_break_renr",
   "token",
   "url",
   "version",
@@ -20,6 +21,7 @@
   "template_details",
   "np_details",
   "np_enabled",
+  "section_break_oxjo",
   "np_token",
   "np_url",
   "column_break_qzwp",
@@ -37,7 +39,7 @@
    "fieldname": "token",
    "fieldtype": "Password",
    "in_list_view": 1,
-   "label": "Token",
+   "label": "WasenderApi Token",
    "length": 250,
    "reqd": 1
   },
@@ -98,7 +100,7 @@
   {
    "fieldname": "np_details",
    "fieldtype": "Tab Break",
-   "label": "New Provider Details"
+   "label": "WasenderApi Details"
   },
   {
    "default": "0",
@@ -109,13 +111,13 @@
   {
    "fieldname": "np_token",
    "fieldtype": "Password",
-   "label": "Token",
+   "label": "WasenderApi Token",
    "reqd": 1
   },
   {
    "fieldname": "np_url",
    "fieldtype": "Data",
-   "label": "URL",
+   "label": "WasenderApi URL",
    "reqd": 1
   },
   {
@@ -125,18 +127,26 @@
   {
    "fieldname": "np_webhook_verify_token",
    "fieldtype": "Data",
-   "label": "Webhook Verify Token"
+   "label": "WasenderApi Webhook Verify Token"
   },
   {
    "fieldname": "pat_token",
    "fieldtype": "Data",
-   "label": "Personal Access Token"
+   "label": "WasenderApi Personal Access Token"
+  },
+  {
+   "fieldname": "section_break_renr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_oxjo",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-09 21:17:42.243303",
+ "modified": "2026-03-10 01:11:20.137337",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Setup",

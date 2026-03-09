@@ -167,7 +167,7 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 		
 		group = frappe.get_doc("Whatsapp Group Profile", chat_doc.to_group) if chat_doc.to_group_message else None
 
-		send_to = formart_number(chat_doc.to) if not chat_doc.is_group_message else group.group_id
+		send_to = formart_number(chat_doc.to) if not chat_doc.to_group_message else group.group_id
 
 		data = {"to": send_to}
 
