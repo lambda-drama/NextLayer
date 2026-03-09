@@ -1,6 +1,8 @@
 import json
 import mimetypes
 
+from click import group
+
 import frappe
 from frappe.integrations.utils import make_post_request, make_get_request
 
@@ -161,12 +163,14 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 		if chat_doc.type != "Outgoing":
 			return {"success": False, "error": "Can only send outgoing messages"}
 
-		if not chat_doc.to:
+		if not chat_doc.to and not chat_doc.to_group:
 			return {"success": False, "error": "Recipient phone number (TO) is required"}
+		
+		group = frappe.get_doc("Whatsapp Group Profile", chat_doc.to_group) if chat_doc.is_group_message else None
 
-		formatted_number = formart_number(chat_doc.to)
+		send_to = formart_number(chat_doc.to) if not chat_doc.is_group_message else group.group_id
 
-		data = {"to": formatted_number}
+		data = {"to": send_to}
 
 		FILE_TYPES = {
 			"application/pdf": "documentUrl",
