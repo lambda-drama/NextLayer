@@ -11,7 +11,9 @@
   "label",
   "type",
   "status",
+  "to_group_message",
   "to",
+  "to_group",
   "from",
   "profile_name",
   "use_template",
@@ -60,7 +62,7 @@
   },
   {
    "allow_in_quick_entry": 1,
-   "depends_on": "eval:(doc.type==\"Outgoing\");",
+   "depends_on": "eval:doc.type==\"Outgoing\" && !doc.to_group_message",
    "description": "Mobile number with country code",
    "fieldname": "to",
    "fieldtype": "Data",
@@ -194,11 +196,28 @@
    "fieldtype": "Dynamic Link",
    "label": "Reference name",
    "options": "reference_doctype"
+  },
+  {
+   "depends_on": "eval:doc.type==\"Outgoing\" && doc.to_group_message",
+   "description": "Select group",
+   "fieldname": "to_group",
+   "fieldtype": "Link",
+   "label": "TO",
+   "options": "Whatsapp Group Profile",
+   "set_only_once": 1
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval:!doc.status",
+   "fieldname": "to_group_message",
+   "fieldtype": "Check",
+   "label": "To Group Message"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-24 19:13:21.741979",
+ "modified": "2026-03-09 20:22:40.359820",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Chat",

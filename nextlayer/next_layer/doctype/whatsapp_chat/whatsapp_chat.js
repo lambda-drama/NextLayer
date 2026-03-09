@@ -43,7 +43,7 @@ function open_reply_form(frm) {
 
 function send_whatsapp_message(frm, provider) {
 	// Validate required fields
-	if (!frm.doc.to) {
+	if (!frm.doc.to && !frm.doc.to_group) {
 		frappe.msgprint(__("Please enter the recipient phone number (TO field)"));
 		frm.set_focus("to");
 		return;
