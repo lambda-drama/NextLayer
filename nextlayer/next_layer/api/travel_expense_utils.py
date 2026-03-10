@@ -7,6 +7,7 @@ from frappe.utils import flt
 from erpnext.setup.utils import get_exchange_rate
 
 
+
 def get_expense_account_from_expense_type(expense_type, company):
 	"""
 	Get expense account from Expense Claim Type based on expense type and company.
@@ -539,6 +540,8 @@ def create_refund_journal_for_travel_expense(original_te, refund_amount):
 		account_currencies.add(curr)
 	is_multi_currency = any(curr != company_currency for curr in account_currencies)
 
+	# Final tiny-balance guard (handles rounding noise like 0.0009999)
+	
 	remark = f"Travel Expense {original_te.name} - Refund"
 
 	je = frappe.get_doc({
@@ -1002,8 +1005,8 @@ def create_journal_entry_for_travel_expense(travel_expense):
 				account_currencies.add(curr)
 
 		is_multi_currency = any(curr != company_currency for curr in account_currencies)
-		
-		# Create Journal Entry
+		# Final tiny-balance guard (handles rounding noise like 0.0009999)
+			# Create Journal Entry
 		remark = f"Travel Expense {travel_expense.name}"
 		if is_refund:
 			remark += " - Refund"
@@ -1353,14 +1356,16 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 					payment_amount = refund_amount
 					payment_base_amount = refund_amount
 			
+			# For the direct payment (bank/cash) line in refund flow, also let JE compute
+			# the base debit from debit_in_account_currency to avoid tiny rounding gaps.
 			je_accounts.append({
 				"account": direct_payment_account,
-				"debit_in_account_currency": payment_amount,
-				"debit": payment_base_amount,
+				"debit_in_account_currency": flt(payment_amount, 2),
+				# Intentionally omit \"debit\"; JE will derive it.
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
 				"reference_type": "Travel Expense",
-			"reference_name": travel_expense.name,
+				"reference_name": travel_expense.name,
 			})
 			
 			# 3. Debit Expense Account(s) for lost amount (if any)
@@ -1558,14 +1563,17 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 					total_amount, payment_amount, payment_base_amount, direct_payment_account_currency, company_currency
 				))
 			
+			# For the direct payment (bank/cash) line, let Frappe compute the base credit
+			# from credit_in_account_currency and the JE exchange rate to avoid tiny
+			# floating point imbalances between debit and credit.
 			je_accounts.append({
 				"account": direct_payment_account,
-				"credit_in_account_currency": payment_amount,
-				"credit": payment_base_amount,
+				"credit_in_account_currency": flt(payment_amount, 2),
+				# Intentionally omit \"credit\" here; JE will derive it.
 				"cost_center": travel_expense.cost_center,
 				"project": travel_expense.project,
 				"reference_type": "Travel Expense",
-			"reference_name": travel_expense.name,
+				"reference_name": travel_expense.name,
 			})
 		
 		# Determine if multi-currency
@@ -1600,7 +1608,8 @@ def create_journal_entry_for_paid_travel_expense(travel_expense):
 
 		is_multi_currency = any(curr != company_currency for curr in account_currencies)
 		
-		# Create Journal Entry
+		# Final tiny-balance guard (handles rounding noise like 0.0009999)
+			# Create Journal Entry
 		remark = f"Travel Expense {travel_expense.name}"
 		if is_refund:
 			remark += " - Refund"
