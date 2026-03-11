@@ -274,19 +274,26 @@ def get_data(filters):
 		more_list = more_info_map.get(te_name, [])
 		# Additional = add to total; Refund = subtract (money returned)
 		more_info_net = 0
+		more_info_company_net = 0
 		if te_name not in te_more_info_applied and more_list:
 			te_more_info_applied.add(te_name)
 			for m in more_list:
 				amt = m.get("amount") or 0
+				amt_company = m.get("amount_company_currency") or amt or 0
 				if (m.get("entry_type") or "").strip() == "Refund":
 					more_info_net -= amt
+					more_info_company_net -= amt_company
 				else:
 					more_info_net += amt
+					more_info_company_net += amt_company
 		# Refund docs (separate TE with refund=1): amount represents money returned, show as negative
 		base_amount = row.get("amount") or 0
+		base_amount_company = row.get("amount_company_currency") or base_amount
 		if row.get("is_refund"):
 			base_amount = -abs(base_amount)
+			base_amount_company = -abs(base_amount_company)
 		row["amount"] = base_amount + more_info_net
+		row["amount_company_currency"] = base_amount_company + more_info_company_net
 		row["additional_info"] = ", ".join(m.get("entry_type", "") + " " + (m.get("journal_entry") or "") for m in more_list) if more_list else None
 		row["currency"] = row.get("currency") or row["company_currency"]
 		row["amount_converted"] = convert_currency(
@@ -422,7 +429,7 @@ def fetch_travel_expense_rows(filters):
 
 
 def fetch_more_information_totals():
-	"""Return per parent Travel Expense: list of more_information rows (Additional/Refund) with amount and journal_entry."""
+	"""Return per parent Travel Expense: list of more_information rows (Additional/Refund) with amount, amount_company_currency and journal_entry."""
 	TM = DocType("Travel Expense More Information")
 	data = (
 		frappe.qb.from_(TM)
@@ -430,6 +437,7 @@ def fetch_more_information_totals():
 			TM.parent,
 			TM.entry_type,
 			TM.amount,
+			TM.amount_company_currency,
 			TM.journal_entry,
 		)
 		.where(TM.amount != 0)

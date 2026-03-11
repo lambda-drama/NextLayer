@@ -198,7 +198,7 @@
    "options": "reference_doctype"
   },
   {
-   "depends_on": "eval:doc.type==\"Outgoing\" && doc.to_group_message",
+   "depends_on": "eval:doc.type==\"Outgoing\"",
    "description": "Select group",
    "fieldname": "to_group",
    "fieldtype": "Link",
@@ -217,7 +217,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-09 20:22:40.359820",
+ "modified": "2026-03-10 01:18:09.074521",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Chat",
