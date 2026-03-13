@@ -15,7 +15,8 @@
   "contractor",
   "contractor_description",
   "amount",
-  "cost"
+  "cost",
+  "expense_account"
  ],
  "fields": [
   {
@@ -89,11 +90,18 @@
    "fieldtype": "Link",
    "label": "Contractor",
    "options": "Supplier"
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account",
+   "reqd": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-03-07 20:12:21.022157",
+ "modified": "2026-03-14 00:06:49.900334",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate Labor",

@@ -3128,6 +3128,15 @@ export default function IntercompanyReconciliation() {
                 <span>Import/Export</span>
               </Button>
             </Link>
+            <Link to="/cost-estimate-vs-consumed">
+              <Button
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>CEC</span>
+              </Button>
+            </Link>
           </div>
         </div>
 
