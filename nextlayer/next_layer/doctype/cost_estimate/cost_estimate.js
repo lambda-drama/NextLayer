@@ -6,8 +6,56 @@ frappe.ui.form.on("Cost Estimate", {
 		frm.set_query("cost_estimate_template", function () {
 			return { filters: {} };
 		});
+		// Overhead cost type: only Expense accounts, optionally filtered by company
 		frm.set_query("cost_type", "overheads", function () {
-			return { filters: [["Account", "root_type", "=", "Expense"]] };
+			const filters = { root_type: "Expense" };
+			if (frm.doc.company) {
+				// Restrict to accounts under the selected company
+				filters["company"] = frm.doc.company;
+			}
+			return { filters };
+		});
+
+		// Labor expense account: only Expense accounts, optionally filtered by company
+		frm.set_query("expense_account", "labor", function () {
+			const filters = { root_type: "Expense" };
+			if (frm.doc.company) {
+				filters["company"] = frm.doc.company;
+			}
+			return { filters };
+		});
+
+		// Project: restrict to projects of the selected company when set
+		frm.set_query("project", function () {
+			const filters = {};
+			if (frm.doc.company) {
+				filters["company"] = frm.doc.company;
+			}
+			return { filters };
+		});
+	},
+	company: function (frm) {
+		// Re-apply queries when company changes so filters pick up the new company
+		frm.set_query("cost_type", "overheads", function () {
+			const filters = { root_type: "Expense" };
+			if (frm.doc.company) {
+				filters["company"] = frm.doc.company;
+			}
+			return { filters };
+		});
+		frm.set_query("expense_account", "labor", function () {
+			const filters = { root_type: "Expense" };
+			if (frm.doc.company) {
+				filters["company"] = frm.doc.company;
+			}
+			return { filters };
+		});
+		frm.set_query("project", function () {
+			const filters = {};
+			if (frm.doc.company) {
+				filters["company"] = frm.doc.company;
+			}
+			return { filters };
 		});
 	},
 	cost_estimate_template: function (frm) {

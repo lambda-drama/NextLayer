@@ -34,7 +34,8 @@
   "column_break_aycy",
   "profit_percent",
   "grand_total",
-  "selling_price_after_profit"
+  "selling_price_after_profit",
+  "amended_from"
  ],
  "fields": [
   {
@@ -219,11 +220,22 @@
    "fieldname": "estimate_end_date",
    "fieldtype": "Date",
    "label": "Estimate End Date"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Cost Estimate",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-03-06 02:14:14.111940",
+ "modified": "2026-03-14 00:26:49.615700",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Cost Estimate",
