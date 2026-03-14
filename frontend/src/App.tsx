@@ -3,6 +3,7 @@ import IntercompanyReconciliation from "./components/intercompany-reconciliation
 import InterCompanyLedgerSummary from "./components/intercompany-ledger-summary"
 import ImportExportExpense from "./components/import-export-expense"
 import CostEstimateVsConsumed from "./components/cost-estimate-vs-consumed"
+import QuotationStagesReport from "./components/quotation-stages-report"
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/ledger" element={<InterCompanyLedgerSummary />} />
           <Route path="/import-export" element={<ImportExportExpense />} />
           <Route path="/cost-estimate-vs-consumed" element={<CostEstimateVsConsumed />} />
+          <Route path="/quotation-stages" element={<QuotationStagesReport />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
