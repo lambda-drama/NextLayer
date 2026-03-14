@@ -9,7 +9,7 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff, ArrowUpDown, Package } from "lucide-react"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff, ArrowUpDown, Package, FileText } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -3135,6 +3135,15 @@ export default function IntercompanyReconciliation() {
               >
                 <BarChart3 className="h-4 w-4" />
                 <span>CEC</span>
+              </Button>
+            </Link>
+            <Link to="/quotation-stages">
+              <Button
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <FileText className="h-4 w-4" />
+                <span>Quotation Stages</span>
               </Button>
             </Link>
           </div>

@@ -256,21 +256,21 @@ def get_data(filters):
 	# Get company currency for each row based on the company in the row
 	presentation_currency = filters.get("currency") or "USD"
 	te_more_info_applied = set()  # Apply more_info net only once per TE (avoid over-counting)
-	
+
 	for row in rows:
 		te_name = row.get("travel_expense")
 		row["attachment"] = attachment_map.get(te_name)
-		
+
 		# Get the company currency from the row's company
 		row_company = row.get("company")
 		if row_company:
 			row["company_currency"] = frappe.get_cached_value("Company", row_company, "default_currency") or "USD"
 		else:
 			row["company_currency"] = "USD"
-		
+
 		if row.get("amount_company_currency") is None:
 			row["amount_company_currency"] = row.get("amount")
-		
+
 		more_list = more_info_map.get(te_name, [])
 		# Additional = add to total; Refund = subtract (money returned)
 		more_info_net = 0
@@ -332,13 +332,13 @@ def get_data(filters):
 		total_company_currency_code = "USD"
 		if company_for_display:
 			total_company_currency_code = frappe.get_cached_value("Company", company_for_display, "default_currency") or "USD"
-		
+
 		# Set Amount (Company Currency) to 0 if:
 		# 1. No company selected in filters, OR
 		# 2. Grouped by Company (different companies have different currencies)
 		if not filters.get("company") or group_by == "Company":
 			total_company_currency = 0
-		
+
 		total_row = {
 			"name": _("Total"),
 			"account": _("Total"),
@@ -483,7 +483,7 @@ def _collect_unique(items):
 
 def group_by_traveller_name_tree(rows):
 	"""
-	3-level tree structure: 
+	3-level tree structure:
 	Level 1 (parent): Traveller Name (total) - amounts only
 	Level 2 (child): Expense Type breakdown - amounts only
 	Level 3 (grandchild): Individual transactions - all details
@@ -496,7 +496,7 @@ def group_by_traveller_name_tree(rows):
 			"transactions": [],  # Store individual transactions
 		}),
 	})
-	
+
 	for row in rows:
 		trav = row.get("traveller_name") or _("Unspecified")
 		exp_type = row.get("expense_type") or _("Unspecified")
@@ -507,12 +507,12 @@ def group_by_traveller_name_tree(rows):
 		t["amount_company_currency"] += amt_cc
 		if not t["company_currency"]:
 			t["company_currency"] = row.get("company_currency") or "USD"
-		
+
 		c = t["children"][exp_type]
 		c["amount"] += row.get("amount") or 0
 		c["amount_converted"] += row.get("amount_converted") or 0
 		c["amount_company_currency"] += amt_cc
-		
+
 		# Store the transaction for level 3
 		c["transactions"].append(row)
 
@@ -544,7 +544,7 @@ def group_by_traveller_name_tree(rows):
 			"hotel_country": "",
 			"bold": 1,
 		})
-		
+
 		for exp_type in sorted(t["children"].keys()):
 			c = t["children"][exp_type]
 			child_name = f'<a href="/app/expense-claim-type/{exp_type}">{exp_type}</a>' if exp_type != _("Unspecified") else exp_type
@@ -572,7 +572,7 @@ def group_by_traveller_name_tree(rows):
 				"hotel_country": "",
 				"bold": 1,
 			})
-			
+
 			# Level 3: Individual Transactions (Grandchild) - ALL DETAILS
 			for transaction in c["transactions"]:
 				te_name = transaction.get("travel_expense") or ""
@@ -599,7 +599,7 @@ def group_by_traveller_name_tree(rows):
 					"hotel_location": transaction.get("hotel_location") or "",
 					"hotel_country": transaction.get("hotel_country") or "",
 				})
-	
+
 	return result
 
 
@@ -662,13 +662,13 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 	"""
 	by_group = defaultdict(lambda: {
 		"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
-		"company_currency": "", 
+		"company_currency": "",
 		"children": defaultdict(lambda: {
 			"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
 			"transactions": []
 		})
 	})
-	
+
 	for row in rows:
 		tg = row.get("travel_group") or _("Unspecified")
 		if breakdown_by == "Traveller Name":
@@ -701,14 +701,14 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 			"company_currency": t["company_currency"],
 			"bold": 1,  # Make parent bold
 		})
-		
+
 		for child_key in sorted(t["children"].keys()):
 			c = t["children"][child_key]
 			if breakdown_by == "Traveller Name":
 				child_name = f'<a href="/app/member/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
 			else:
 				child_name = f'<a href="/app/expense-claim-type/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
-			
+
 			# Level 2: Traveller/Expense Type (Child) - BOLD
 			result.append({
 				"name": child_name,
@@ -720,7 +720,7 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 				"company_currency": t["company_currency"],
 				"bold": 1,  # Make child bold
 			})
-			
+
 			# Level 3: Individual Transactions (Grandchild)
 			for transaction in c["transactions"]:
 				te_name = transaction.get("travel_expense") or ""
@@ -734,7 +734,7 @@ def group_by_travel_group_tree(rows, breakdown_by="Traveller Name"):
 					"amount_company_currency": transaction.get("amount_company_currency") or 0,
 					"company_currency": transaction.get("company_currency") or "USD",
 				})
-	
+
 	return result
 
 
@@ -747,13 +747,13 @@ def group_by_company_tree(rows, breakdown_by="Travel Group"):
 	"""
 	by_company = defaultdict(lambda: {
 		"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
-		"company_currency": "", 
+		"company_currency": "",
 		"children": defaultdict(lambda: {
 			"amount": 0.0, "amount_converted": 0.0, "amount_company_currency": 0.0,
 			"transactions": []
 		}),
 	})
-	
+
 	for row in rows:
 		company = row.get("company") or _("Unspecified")
 		if breakdown_by == "Travel Group":
@@ -788,7 +788,7 @@ def group_by_company_tree(rows, breakdown_by="Travel Group"):
 			"company_currency": t["company_currency"],
 			"bold": 1,  # Make parent bold
 		})
-		
+
 		for child_key in sorted(t["children"].keys()):
 			c = t["children"][child_key]
 			if breakdown_by == "Travel Group":
@@ -797,7 +797,7 @@ def group_by_company_tree(rows, breakdown_by="Travel Group"):
 				child_name = f'<a href="/app/member/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
 			else:
 				child_name = f'<a href="/app/expense-claim-type/{child_key}">{child_key}</a>' if child_key != _("Unspecified") else child_key
-			
+
 			# Level 2: Travel Group/Traveller/Expense Type (Child) - BOLD
 			result.append({
 				"name": child_name,
@@ -809,7 +809,7 @@ def group_by_company_tree(rows, breakdown_by="Travel Group"):
 				"company_currency": t["company_currency"],
 				"bold": 1,  # Make child bold
 			})
-			
+
 			# Level 3: Individual Transactions (Grandchild)
 			for transaction in c["transactions"]:
 				te_name = transaction.get("travel_expense") or ""
@@ -823,7 +823,7 @@ def group_by_company_tree(rows, breakdown_by="Travel Group"):
 					"amount_company_currency": transaction.get("amount_company_currency") or 0,
 					"company_currency": transaction.get("company_currency") or "USD",
 				})
-	
+
 	return result
 
 
