@@ -353,6 +353,12 @@ export default function CostEstimateVsConsumed() {
           </Alert>
         )}
 
+        {hasLoadedData && meta?.message && (
+          <Alert className="border-blue-200 bg-blue-50">
+            <AlertDescription className="text-blue-800">{meta.message}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Sticky summary + labour/overhead cards */}
         {hasLoadedData && meta && totals && (
           <div className="sticky top-0 z-20 space-y-4 pb-4 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
@@ -383,21 +389,40 @@ export default function CostEstimateVsConsumed() {
               />
             </div>
 
-            {/* Labour & Overhead summary (totals only) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <SummaryCard
-                title="Labour Estimate (Total)"
-                value={meta.estimate_labor}
-                currency={displayCurrency}
-                tone="success"
-              />
-              <SummaryCard
-                title="Overhead Estimate (Total)"
-                value={meta.estimate_overhead}
-                currency={displayCurrency}
-                tone="primary"
-              />
-            </div>
+            {/* Labour & Overhead summary (only when we have a Cost Estimate) */}
+            {meta.has_cost_estimate && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <SummaryCard
+                  title="Labour Estimate (Total)"
+                  value={meta.estimate_labor}
+                  currency={displayCurrency}
+                  tone="success"
+                />
+                <SummaryCard
+                  title="Overhead Estimate (Total)"
+                  value={meta.estimate_overhead}
+                  currency={displayCurrency}
+                  tone="primary"
+                />
+              </div>
+            )}
+
+            {/* Expense total (only when no Cost Estimate — combined expense by account) */}
+            {meta.has_cost_estimate === false && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <SummaryCard
+                  title="Expense Total (Actual)"
+                  value={
+                    Object.values(meta.combined_expense_actual_by_account || {}).reduce(
+                      (sum, amt) => sum + (typeof amt === "number" ? amt : 0),
+                      0,
+                    )
+                  }
+                  currency={displayCurrency}
+                  tone="primary"
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -413,8 +438,12 @@ export default function CostEstimateVsConsumed() {
                 {meta && (
                   <span className="text-xs text-blue-100">
                     Project:{" "}
-                    <span className="font-semibold text-white">{meta.project}</span>{" "}
-                    · Estimate: <span className="font-mono">{meta.estimate_name}</span>
+                    <span className="font-semibold text-white">{meta.project || "—"}</span>
+                    {meta.has_cost_estimate && meta.estimate_name ? (
+                      <> · Estimate: <span className="font-mono">{meta.estimate_name}</span></>
+                    ) : (
+                      <> · <span className="text-blue-200">No Cost Estimate</span></>
+                    )}
                   </span>
                 )}
               </div>
@@ -457,9 +486,9 @@ export default function CostEstimateVsConsumed() {
                           colSpan={8}
                           className="text-center text-gray-500 py-10 text-sm"
                         >
-                          No data found. Ensure there is a Cost Estimate linked to this
-                          project and that Purchase Invoices / Stock Entries exist in the
-                          selected period.
+                          {meta?.has_cost_estimate === false
+                            ? "No consumption data for this project in the selected period."
+                            : "No data found. Add a Cost Estimate and/or ensure Purchase Invoices / Stock Entries exist for the selected period."}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -577,8 +606,64 @@ export default function CostEstimateVsConsumed() {
           </Card>
         )}
 
-        {/* Detailed Labour & Overhead breakdown tables */}
-        {hasLoadedData && meta && (
+        {/* When no Cost Estimate: single Expense by account (actual only) */}
+        {hasLoadedData && meta && meta.has_cost_estimate === false && (
+          <Card className="border-blue-200 shadow-sm mt-4">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg py-3 px-5">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                Expense by Account (Actual)
+              </CardTitle>
+              <p className="text-xs text-blue-100 mt-1">
+                No Cost Estimate — labour/overhead cannot be split; showing actual expense by account for the project.
+              </p>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead className="text-blue-800 text-xs font-semibold">
+                        Expense Account
+                      </TableHead>
+                      <TableHead className="text-blue-800 text-xs font-semibold text-right">
+                        Actual Amount
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {meta.combined_expense_actual_by_account &&
+                    Object.keys(meta.combined_expense_actual_by_account).length > 0 ? (
+                      Object.entries(meta.combined_expense_actual_by_account).map(
+                        ([account, amount]) => (
+                          <TableRow key={account}>
+                            <TableCell className="text-xs text-gray-800">
+                              {account}
+                            </TableCell>
+                            <TableCell className="text-xs text-right font-mono text-blue-900">
+                              {fmt(amount, displayCurrency)}
+                            </TableCell>
+                          </TableRow>
+                        ),
+                      )
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={2}
+                          className="text-center text-xs text-gray-500 py-4"
+                        >
+                          No expense GL entries for this project in the selected period.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Detailed Labour & Overhead breakdown (only when Cost Estimate exists) */}
+        {hasLoadedData && meta && meta.has_cost_estimate && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <Card className="border-emerald-200 shadow-sm">
               <CardHeader className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-t-lg py-3 px-5">

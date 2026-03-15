@@ -28,7 +28,8 @@ export interface CostEstimateVsConsumedMeta {
   project: string
   display_currency: string
   company_currency: string
-  estimate_name: string
+  has_cost_estimate?: boolean
+  estimate_name?: string | null
   estimate_grand_total: number
   estimate_selling_price_after_profit: number
   estimate_labor: number
@@ -40,6 +41,8 @@ export interface CostEstimateVsConsumedMeta {
   overhead_by_expense_account?: Record<string, number>
   overhead_actual_by_expense_account?: Record<string, number>
   overhead_variance_by_expense_account?: Record<string, number>
+  /** When no cost estimate: actual expense amounts by account (no labour/overhead split). */
+  combined_expense_actual_by_account?: Record<string, number>
   group_items?: Record<
     string,
     {
