@@ -235,14 +235,32 @@ def _aggregate_stock_entries(stock_details: List[Dict]) -> Dict[Tuple[str, str],
 	return aggregated
 
 
+def _get_expense_accounts_for_company(company: str) -> List[str]:
+	"""Return list of account names with root_type Expense for the company."""
+	if not company:
+		return []
+	accounts = frappe.get_all(
+		"Account",
+		filters={"company": company, "root_type": "Expense"},
+		pluck="name",
+	)
+	return list(accounts or [])
+
+
 @frappe.whitelist()
 def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 	"""
 	Compare Cost Estimate (materials) against actual project consumption.
 
+	- If only consumption data: show consumed amounts with estimate = 0.
+	- If only cost estimate: show estimate with consumed = 0.
+	- If both: show comparison as now. Labour/overhead split only when cost estimate exists;
+	  when no estimate, show combined expense-by-account (actual only).
+
 	Filters:
 	    - company (required)
-	    - project (required)
+	    - project (optional; required to show consumption when no cost estimate)
+	    - project_type (optional)
 	    - from_date (optional)
 	    - to_date (optional)
 	    - currency: display currency; if empty or "all", company currency is used
@@ -288,7 +306,12 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 			order_by="modified desc",
 		)
 
-		if not estimate_row:
+		has_estimate = bool(estimate_row)
+		if has_estimate and not project:
+			project = estimate_row.get("project")
+
+		# When no cost estimate, we need project from filter to fetch consumption
+		if not has_estimate and not project:
 			return {
 				"success": True,
 				"entries": [],
@@ -302,123 +325,130 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 				},
 				"meta": {
 					"company": company,
-					"project": project or "",
+					"project": "",
 					"display_currency": display_currency,
-					"message": _("No Cost Estimate found for the selected filters."),
+					"company_currency": company_currency,
+					"has_cost_estimate": False,
+					"estimate_name": None,
+					"estimate_grand_total": 0.0,
+					"estimate_selling_price_after_profit": 0.0,
+					"estimate_labor": 0.0,
+					"estimate_overhead": 0.0,
+					"consumed_total": 0.0,
+					"labor_by_expense_account": {},
+					"labor_actual_by_expense_account": {},
+					"labor_variance_by_expense_account": {},
+					"overhead_by_expense_account": {},
+					"overhead_actual_by_expense_account": {},
+					"overhead_variance_by_expense_account": {},
+					"combined_expense_actual_by_account": {},
+					"group_items": {},
+					"message": _("Select a project to see consumption without a Cost Estimate, or ensure a Cost Estimate exists for the filters."),
 				},
 			}
 
-		# If project was not explicitly provided, infer it from the matching estimate
-		if not project:
-			project = estimate_row.get("project")
-
-		estimate_name = estimate_row.get("name")
-
-		estimate_doc = frappe.get_doc("Cost Estimate", estimate_name)
-		estimate_currency = estimate_doc.currency or company_currency
-		estimate_by = (estimate_doc.estimate_by or "Item Group").strip()
-
-		# ------------------------------------------------------------------ #
-		# Prepare estimate rows keyed by item_group or item_code
-		# ------------------------------------------------------------------ #
 		estimate_map: Dict[str, Dict] = {}
-
-		for row in (estimate_doc.items or []):
-			item_group = row.get("item_group")
-			item_code = row.get("item_code")
-			if not item_group and not item_code:
-				continue
-
-			if estimate_by == "Item":
-				if not item_code:
-					continue
-				key = item_code
-				label = item_code
-			else:
-				# Default: group by Item Group
-				if not item_group:
-					continue
-				key = item_group
-				label = item_group
-
-			if key not in estimate_map:
-				estimate_map[key] = {
-					"key": key,
-					"label": label,
-					"estimate_qty": 0.0,
-					"estimate_amount_ccy": 0.0,  # company currency
-				}
-
-			qty = flt(row.get("qty"))
-			amount = flt(row.get("amount"))
-
-			# Convert estimate row amount to company currency first
-			if estimate_currency != company_currency:
-				amount = _convert(amount, estimate_currency, company_currency, estimate_doc.estimate_date or nowdate())
-
-			estimate_map[key]["estimate_qty"] += qty
-			estimate_map[key]["estimate_amount_ccy"] += amount
-
-		# Totals for non-material sections (labor/overheads) at header level only
-		# And labor split by expense account
 		labor_by_account_ccy: Dict[str, float] = {}
-		for row in (estimate_doc.labor or []):
-			expense_account = (row.get("expense_account") or "").strip()
-			if not expense_account:
-				continue
-
-			calc_type = row.get("calculation_type") or "Per Day"
-			if calc_type == "Per Day":
-				qty = flt(row.get("qty") or 1)
-				cost_native = qty * flt(row.get("days")) * flt(row.get("daily_rate"))
-			else:
-				# Lump Sum
-				cost_native = flt(row.get("amount"))
-
-			cost_ccy = _convert(
-				cost_native,
-				estimate_currency,
-				company_currency,
-				estimate_doc.estimate_date or nowdate(),
-			)
-			labor_by_account_ccy[expense_account] = labor_by_account_ccy.get(expense_account, 0.0) + cost_ccy
-
-		estimate_labor_ccy = sum(labor_by_account_ccy.values())
-		# Overheads split by expense account
 		overhead_by_account_ccy: Dict[str, float] = {}
-		for row in (estimate_doc.overheads or []):
-			expense_account = (row.get("cost_type") or "").strip()
-			if not expense_account:
-				continue
-			cost_native = flt(row.get("amount"))
-			cost_ccy = _convert(
-				cost_native,
+		estimate_labor_ccy = 0.0
+		estimate_overhead_ccy = 0.0
+		estimate_name = None
+		estimate_by = "Item Group"
+		estimate_doc = None
+		estimate_currency = company_currency
+
+		if has_estimate:
+			estimate_name = estimate_row.get("name")
+			estimate_doc = frappe.get_doc("Cost Estimate", estimate_name)
+			estimate_currency = estimate_doc.currency or company_currency
+			estimate_by = (estimate_doc.estimate_by or "Item Group").strip()
+
+			for row in (estimate_doc.items or []):
+				item_group = row.get("item_group")
+				item_code = row.get("item_code")
+				if not item_group and not item_code:
+					continue
+
+				if estimate_by == "Item":
+					if not item_code:
+						continue
+					key = item_code
+					label = item_code
+				else:
+					if not item_group:
+						continue
+					key = item_group
+					label = item_group
+
+				if key not in estimate_map:
+					estimate_map[key] = {
+						"key": key,
+						"label": label,
+						"estimate_qty": 0.0,
+						"estimate_amount_ccy": 0.0,
+					}
+
+				qty = flt(row.get("qty"))
+				amount = flt(row.get("amount"))
+				if estimate_currency != company_currency:
+					amount = _convert(amount, estimate_currency, company_currency, estimate_doc.estimate_date or nowdate())
+
+				estimate_map[key]["estimate_qty"] += qty
+				estimate_map[key]["estimate_amount_ccy"] += amount
+
+			for row in (estimate_doc.labor or []):
+				expense_account = (row.get("expense_account") or "").strip()
+				if not expense_account:
+					continue
+				calc_type = row.get("calculation_type") or "Per Day"
+				if calc_type == "Per Day":
+					qty = flt(row.get("qty") or 1)
+					cost_native = qty * flt(row.get("days")) * flt(row.get("daily_rate"))
+				else:
+					cost_native = flt(row.get("amount"))
+				cost_ccy = _convert(
+					cost_native,
+					estimate_currency,
+					company_currency,
+					estimate_doc.estimate_date or nowdate(),
+				)
+				labor_by_account_ccy[expense_account] = labor_by_account_ccy.get(expense_account, 0.0) + cost_ccy
+
+			estimate_labor_ccy = sum(labor_by_account_ccy.values())
+
+			for row in (estimate_doc.overheads or []):
+				expense_account = (row.get("cost_type") or "").strip()
+				if not expense_account:
+					continue
+				cost_native = flt(row.get("amount"))
+				cost_ccy = _convert(
+					cost_native,
+					estimate_currency,
+					company_currency,
+					estimate_doc.estimate_date or nowdate(),
+				)
+				overhead_by_account_ccy[expense_account] = overhead_by_account_ccy.get(expense_account, 0.0) + cost_ccy
+
+			estimate_overhead_ccy = _convert(
+				flt(estimate_doc.overhead_cost),
 				estimate_currency,
 				company_currency,
 				estimate_doc.estimate_date or nowdate(),
 			)
-			overhead_by_account_ccy[expense_account] = overhead_by_account_ccy.get(expense_account, 0.0) + cost_ccy
-
-		estimate_overhead_ccy = _convert(
-			flt(estimate_doc.overhead_cost),
-			estimate_currency,
-			company_currency,
-			estimate_doc.estimate_date or nowdate(),
-		)
 
 		# ------------------------------------------------------------------ #
-		# Compute actual consumption using Purchase Invoices + Stock Entries
+		# Compute actual consumption (only when we have a project)
 		# ------------------------------------------------------------------ #
-		purchase_items = _get_purchase_invoice_items(project, company, from_date, to_date)
-		stock_details = _get_stock_entry_details(project, company, from_date, to_date)
+		purchase_items = _get_purchase_invoice_items(project, company, from_date, to_date) if project else []
+		stock_details = _get_stock_entry_details(project, company, from_date, to_date) if project else []
 
 		purchase_data = _aggregate_purchase_items(purchase_items, company_currency)
 		stock_data = _aggregate_stock_entries(stock_details)
 
-		# Build consumption map keyed by same key as estimate_map (item_group or item_code)
-		# And also keep item-level breakdown per group for UI dropdowns
+		# Build consumption map keyed by item_group or item_code (use same key style as estimate when we have estimate)
 		consumption_map: Dict[str, Dict] = {}
 		group_items_map: Dict[str, List[Dict]] = {}
+		key_type = estimate_by if has_estimate else "Item Group"
 
 		all_keys: List[Tuple[str, str]] = list(purchase_data.keys())
 		for k in stock_data.keys():
@@ -432,11 +462,10 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 			purchase_qty = flt(pd.get("purchased_qty"))
 			purchased_amount = flt(pd.get("purchased_amount"))
 
-			# Consumed = stock entries + non-stock PIs
 			consumed_qty = flt(sd.get("consumed_qty")) + flt(pd.get("update_stock_consumed"))
 			consumed_amount = flt(sd.get("consumed_amount")) + flt(pd.get("update_stock_amount"))
 
-			if estimate_by == "Item":
+			if key_type == "Item":
 				key = item_code
 				label = item_code
 			else:
@@ -461,7 +490,6 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 			consumption_map[key]["consumed_qty"] += consumed_qty
 			consumption_map[key]["consumed_amount_ccy"] += consumed_amount
 
-			# Build item-level breakdown per group key for UI
 			item_entry = {
 				"item_code": item_code,
 				"item_group": item_group,
@@ -507,8 +535,8 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 			variance_amount = estimate_amount_disp - consumed_amount_disp
 
 			entry = {
-				"project": project,
-				"key_type": "Item" if estimate_by == "Item" else "Item Group",
+				"project": project or "",
+				"key_type": "Item" if key_type == "Item" else "Item Group",
 				"key": key,
 				"label": e.get("label") or c.get("label") or key,
 				"estimate_qty": estimate_qty,
@@ -532,11 +560,13 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 			totals[k] = flt(totals[k], 2)
 
 		# Header-level meta totals in display currency
-		estimate_grand_total_ccy = (
-			flt(estimate_doc.total_material_cost)
-			+ estimate_labor_ccy
-			+ estimate_overhead_ccy
-		)
+		estimate_grand_total_ccy = 0.0
+		if has_estimate and estimate_doc:
+			estimate_grand_total_ccy = (
+				flt(estimate_doc.total_material_cost)
+				+ estimate_labor_ccy
+				+ estimate_overhead_ccy
+			)
 		estimate_grand_total_disp = _convert(
 			estimate_grand_total_ccy,
 			company_currency,
@@ -552,29 +582,33 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 		)
 
 		# ------------------------------------------------------------------ #
-		# Actual expense per account from GL (labour & overhead)
+		# Actual expense per account from GL
+		# When has_estimate: only labour + overhead accounts (split labour/overhead).
+		# When no estimate: all expense accounts for project (combined, no split).
 		# ------------------------------------------------------------------ #
 		actual_by_account_ccy: Dict[str, float] = {}
-		all_expense_accounts = list(labor_by_account_ccy.keys()) + [
-			a for a in overhead_by_account_ccy.keys() if a not in labor_by_account_ccy
-		]
+		combined_expense_actual_by_account: Dict[str, float] = {}
 
-		if all_expense_accounts:
+		if has_estimate:
+			all_expense_accounts = list(labor_by_account_ccy.keys()) + [
+				a for a in overhead_by_account_ccy.keys() if a not in labor_by_account_ccy
+			]
+		else:
+			all_expense_accounts = _get_expense_accounts_for_company(company)
+
+		if all_expense_accounts and project:
 			gl_filters = {
 				"company": company,
 				"account": ["in", all_expense_accounts],
 				"docstatus": 1,
 			}
-			# Date range on posting_date
 			if from_date and to_date:
 				gl_filters["posting_date"] = ["between", [from_date, to_date]]
 			elif from_date:
 				gl_filters["posting_date"] = [">=", from_date]
 			elif to_date:
 				gl_filters["posting_date"] = ["<=", to_date]
-
-			if project:
-				gl_filters["project"] = project
+			gl_filters["project"] = project
 
 			gl_rows = frappe.db.get_all(
 				"GL Entry",
@@ -586,11 +620,20 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 				account = row.get("account")
 				if not account:
 					continue
-				# For Expense accounts, expense = debit - credit
 				net = flt(row.get("debit")) - flt(row.get("credit"))
 				actual_by_account_ccy[account] = actual_by_account_ccy.get(account, 0.0) + net
 
-		# Convert labor/overhead per expense account to display currency and compute actuals/variance
+		# When no cost estimate: combined expense by account (actual only)
+		if not has_estimate:
+			for account, amount_ccy in actual_by_account_ccy.items():
+				if amount_ccy == 0:
+					continue
+				combined_expense_actual_by_account[account] = flt(
+					_convert(amount_ccy, company_currency, display_currency, effective_date),
+					2,
+				)
+
+		# When has estimate: labour/overhead split with estimate, actual, variance
 		labor_by_expense_account = {
 			account: flt(
 				_convert(amount, company_currency, display_currency, effective_date),
@@ -622,14 +665,9 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 			overhead_actual_by_expense_account[account] = flt(actual_disp, 2)
 			overhead_variance_by_expense_account[account] = flt(est_disp - actual_disp, 2)
 
-		meta = {
-			"company": company,
-			"project": project,
-			"display_currency": display_currency,
-			"company_currency": company_currency,
-			"estimate_name": estimate_name,
-			"estimate_grand_total": flt(estimate_grand_total_disp, 2),
-			"estimate_selling_price_after_profit": flt(
+		estimate_selling_disp = 0.0
+		if has_estimate and estimate_doc:
+			estimate_selling_disp = flt(
 				_convert(
 					estimate_doc.selling_price_after_profit or 0.0,
 					estimate_currency,
@@ -637,7 +675,17 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 					estimate_doc.estimate_date or nowdate(),
 				),
 				2,
-			),
+			)
+
+		meta = {
+			"company": company,
+			"project": project or "",
+			"display_currency": display_currency,
+			"company_currency": company_currency,
+			"has_cost_estimate": has_estimate,
+			"estimate_name": estimate_name,
+			"estimate_grand_total": flt(estimate_grand_total_disp, 2),
+			"estimate_selling_price_after_profit": estimate_selling_disp,
 			"estimate_labor": flt(
 				_convert(estimate_labor_ccy, company_currency, display_currency, effective_date),
 				2,
@@ -655,6 +703,7 @@ def get_cost_estimate_vs_consumed(filters=None) -> Dict:
 			"overhead_by_expense_account": overhead_by_expense_account,
 			"overhead_actual_by_expense_account": overhead_actual_by_expense_account,
 			"overhead_variance_by_expense_account": overhead_variance_by_expense_account,
+			"combined_expense_actual_by_account": combined_expense_actual_by_account,
 			"group_items": group_items_map,
 		}
 
