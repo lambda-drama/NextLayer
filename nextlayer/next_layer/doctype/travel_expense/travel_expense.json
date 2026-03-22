@@ -26,6 +26,7 @@
   "flight_no",
   "flight_no_2",
   "custom_booked_by",
+  "traveller_name",
   "section_break_travel",
   "custom_departure_airport",
   "custom_arrival_airport",
@@ -131,10 +132,9 @@
   },
   {
    "fieldname": "traveler_name",
-   "fieldtype": "Table MultiSelect",
+   "fieldtype": "Link",
    "label": "Traveler Name",
-   "options": "Traveller TableMultiselect",
-   "reqd": 1
+   "options": "Member"
   },
   {
    "default": "0",
@@ -746,6 +746,14 @@
    "fieldtype": "Check",
    "hidden": 1,
    "label": "Historical"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "traveller_name",
+   "fieldtype": "Table MultiSelect",
+   "ignore_user_permissions": 1,
+   "label": "Traveller Name",
+   "options": "Traveller TableMultiselect"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -760,7 +768,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-03-22 22:25:50.177965",
+ "modified": "2026-03-23 00:11:24.518926",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",

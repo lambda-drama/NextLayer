@@ -356,7 +356,85 @@ def get_data(filters):
 	return rows
 
 
+# def fetch_travel_expense_rows(filters):
+# 	TE = DocType("Travel Expense")
+# 	TED = DocType("Travel Expense Detail")
+
+# 	query = (
+# 		frappe.qb.from_(TED)
+# 		.join(TE)
+# 		.on(TE.name == TED.parent)
+# 		.select(
+# 			TE.name.as_("travel_expense"),
+# 			TED.expense_date.as_("booking_date"),
+# 			TE.company.as_("company"),
+# 			TE.travel_group.as_("travel_group"),
+# 			TE.traveler_name.as_("traveller_name"),
+# 			TED.expense_type.as_("expense_type"),
+# 			TED.amount.as_("amount"),
+# 			TED.amount_company_currency.as_("amount_company_currency"),
+# 			TE.refund.as_("is_refund"),
+# 			TE.company_group.as_("company_group"),
+# 			TED.custom_airlines.as_("airline"),
+# 			TED.custom_date_of_travel.as_("departure_date"),
+# 			TED.custom_departure_airport.as_("departure_airport"),
+# 			TED.custom_date_of_arrival.as_("arrival_date"),
+# 			TED.custom_arrival_airport.as_("arrival_airport"),
+# 			TED.custom_booked_by.as_("booked_by"),
+# 			TED.custom_travel_type.as_("travel_type"),
+# 			TED.custom_prn_number.as_("voucher_no"),
+# 			TE.currency.as_("currency"),
+# 			TED.hotel_checkin_date.as_("hotel_checkin_date"),
+# 			TED.hotel_checkout_date.as_("hotel_checkout_date"),
+# 			TED.hotel_days.as_("hotel_days"),
+# 			TED.custom_hotel_name.as_("hotel_name"),
+# 			TED.hotel_location.as_("hotel_location"),
+# 			TED.hotel_country.as_("hotel_country"),
+# 		)
+# 	)
+
+# 	# Include all TEs (additions are in more_information child table on the original)
+# 	# Cancellation behaviour:
+# 	# - By default: show only NOT cancelled (is_cancelled = 0 or null)
+# 	# - If "Show Fully Cancelled Expenses" is ticked: show ONLY fully cancelled (is_cancelled = 1)
+# 	if filters.get("show_fully_cancelled_expenses"):
+# 		query = query.where(TE.is_cancelled == 1)
+# 	else:
+# 		query = query.where((TE.is_cancelled == 0) | (TE.is_cancelled.isnull()))
+
+# 	# Only include submitted Travel Expenses (exclude Draft and Cancelled docstatus)
+# 	query = query.where(TE.docstatus == 1)
+
+# 	if filters.get("company"):
+# 		query = query.where(TE.company == filters["company"])
+# 	if filters.get("company_group"):
+# 		query = query.where(TE.company_group == filters["company_group"])
+# 	if filters.get("booked_by"):
+# 		query = query.where(TED.custom_booked_by == filters["booked_by"])
+# 	if filters.get("travel_expense"):
+# 		query = query.where(TE.name == filters["travel_expense"])
+# 	if filters.get("traveller_name"):
+# 		query = query.where(TE.traveler_name == filters["traveller_name"])
+# 	if filters.get("travel_type"):
+# 		query = query.where(TED.custom_travel_type == filters["travel_type"])
+# 	if filters.get("from_date") and filters.get("to_date"):
+# 		query = query.where(
+# 			TE.posting_date.between(
+# 				getdate(filters["from_date"]), getdate(filters["to_date"])
+# 			)
+# 		)
+
+# 	query = query.orderby(TE.posting_date, order=frappe.qb.desc)
+# 	return query.run(as_dict=True)
+
 def fetch_travel_expense_rows(filters):
+	"""
+	Fetch travel expense rows with traveller_name resolution from Table MultiSelect
+	
+	LOGIC:
+	- If traveller_name (Table MultiSelect) has 1 member → Use that member directly
+	- If traveller_name has N members (N > 1) → Use child table's traveller_name field
+	"""
 	TE = DocType("Travel Expense")
 	TED = DocType("Travel Expense Detail")
 
@@ -369,7 +447,7 @@ def fetch_travel_expense_rows(filters):
 			TED.expense_date.as_("booking_date"),
 			TE.company.as_("company"),
 			TE.travel_group.as_("travel_group"),
-			TE.traveler_name.as_("traveller_name"),
+			TED.traveller_name.as_("traveller_name_detail"),  # Child table field
 			TED.expense_type.as_("expense_type"),
 			TED.amount.as_("amount"),
 			TED.amount_company_currency.as_("amount_company_currency"),
@@ -413,8 +491,17 @@ def fetch_travel_expense_rows(filters):
 		query = query.where(TED.custom_booked_by == filters["booked_by"])
 	if filters.get("travel_expense"):
 		query = query.where(TE.name == filters["travel_expense"])
+	
+	# Filter by traveller_name Table MultiSelect (not old traveler_name Link field)
 	if filters.get("traveller_name"):
-		query = query.where(TE.traveler_name == filters["traveller_name"])
+		# Join with Traveller TableMultiselect to filter by member
+		TTM = DocType("Traveller TableMultiselect")
+		query = (
+			query
+			.join(TTM)
+			.on((TTM.parent == TE.name) & (TTM.member == filters["traveller_name"]))
+		)
+	
 	if filters.get("travel_type"):
 		query = query.where(TED.custom_travel_type == filters["travel_type"])
 	if filters.get("from_date") and filters.get("to_date"):
@@ -425,8 +512,46 @@ def fetch_travel_expense_rows(filters):
 		)
 
 	query = query.orderby(TE.posting_date, order=frappe.qb.desc)
-	return query.run(as_dict=True)
+	raw_rows = query.run(as_dict=True)
 
+	# POST-PROCESS: Resolve traveller_name based on Table MultiSelect count
+	processed_rows = []
+	te_cache = {}
+	
+	for row in raw_rows:
+		te_name = row["travel_expense"]
+		
+		# Load TE document once and cache it
+		if te_name not in te_cache:
+			try:
+				te_cache[te_name] = frappe.get_cached_doc("Travel Expense", te_name)
+			except:
+				te_cache[te_name] = None
+		
+		te_doc = te_cache[te_name]
+		resolved_traveler = None
+		
+		# CHECK: traveller_name Table MultiSelect on main document
+		if te_doc and hasattr(te_doc, "traveller_name") and te_doc.traveller_name:
+			travellers_list = te_doc.traveller_name
+			num_travelers = len(travellers_list)
+			
+			if num_travelers == 1:
+				# CASE 1: Only 1 member in Table MultiSelect
+				# Use that member directly
+				member = travellers_list[0]
+				resolved_traveler = member.member if hasattr(member, 'member') else str(member)
+			
+			else:  # num_travelers > 1
+				# CASE 2: Multiple members in Table MultiSelect
+				# Use child table's traveller_name field (from auto-division)
+				resolved_traveler = row.get("traveller_name_detail")
+		
+		# Final fallback
+		row["traveller_name"] = resolved_traveler or _("Unspecified")
+		processed_rows.append(row)
+
+	return processed_rows
 
 def fetch_more_information_totals():
 	"""Return per parent Travel Expense: list of more_information rows (Additional/Refund) with amount, amount_company_currency and journal_entry."""

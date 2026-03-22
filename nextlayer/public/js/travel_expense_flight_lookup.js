@@ -5,6 +5,35 @@
 let flight_lookup_in_progress = false;
 
 frappe.ui.form.on("Travel Expense", {
+		onload: function(frm) {
+		// Only show button for Admin users (change as needed)
+		if (frappe.user_roles.includes("Administrator")) {
+			// Add button to form toolbar
+			frm.add_custom_button("Migrate Traveler Names", function() {
+				// Confirm before running migration
+				frappe.confirm(
+					"This will copy traveler_name (Link field) to traveller_name (Table MultiSelect) for ALL Travel Expenses. Continue?",
+					function() {
+						// Call server-side function
+						frappe.call({
+							method: "nextlayer.next_layer.doctype.travel_expense.travel_expense.migrate_traveler_names",
+							callback: function(r) {
+								if (r.message) {
+									frappe.msgprint(r.message);
+									// Refresh the form
+									frm.reload_doc();
+								}
+							},
+							error: function(r) {
+								frappe.msgprint("Migration failed. Check error logs.");
+							}
+						});
+					}
+				);
+			}, "Tools");
+		}
+	},
+	
 	travel_amount: function(frm) {
 		convert_and_update_amount(frm);
 	},

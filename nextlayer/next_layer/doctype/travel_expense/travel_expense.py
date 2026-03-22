@@ -192,11 +192,11 @@ def travel_expense_on_save(doc):
     """
     
     # Check if we have traveler_name (Table MultiSelect)
-    if not doc.traveler_name or len(doc.traveler_name) == 0:
+    if not doc.traveller_name or len(doc.traveller_name) == 0:
         return
     
     # Get the list of members from traveller_name
-    members_in_multiselect = [row.member for row in doc.traveler_name]
+    members_in_multiselect = [row.member for row in doc.traveller_name]
     number_of_travelers = len(members_in_multiselect)
     
     # Get current expense rows
@@ -314,3 +314,98 @@ def travel_expense_on_save(doc):
             f"✓ Successfully created {number_of_travelers} expense rows (one per traveler) with divided amounts.",
             alert=True
         )
+
+import frappe
+
+
+@frappe.whitelist()
+def migrate_traveler_names():
+	"""
+	Migrate all Travel Expense traveler_name (Link field) to traveller_name (Table MultiSelect field)
+	
+	Called from a button on Travel Expense doctype
+	"""
+	try:
+		# Get all submitted Travel Expenses
+		travel_expenses = frappe.get_all(
+			"Travel Expense",
+			filters={"docstatus": 1},  # Only submitted documents
+			fields=["name", "traveler_name"]
+		)
+		
+		total = len(travel_expenses)
+		success_count = 0
+		error_count = 0
+		errors = []
+		
+		frappe.msgprint(f"Starting migration of {total} Travel Expenses...")
+		
+		for idx, te in enumerate(travel_expenses):
+			try:
+				# Load the document
+				te_doc = frappe.get_doc("Travel Expense", te.name)
+				
+				# If traveler_name (Link field) has a value
+				if te.traveler_name:
+					# Clear existing traveller_name table entries
+					te_doc.traveller_name = []
+					
+					# Add the member to traveller_name table
+					te_doc.append("traveller_name", {
+						"member": te.traveler_name
+					})
+					
+					# IMPORTANT: Save the document properly (not db_update)
+					# Use db_update_needing_parent=False to avoid docstatus issues
+					te_doc.save(ignore_permissions=True)
+					
+					success_count += 1
+					
+					# Show progress every 10 records
+					if (idx + 1) % 10 == 0:
+						frappe.publish_realtime(
+							"method_progress",
+							{"progress": f"Migrated {idx + 1}/{total}"},
+							user=frappe.session.user
+						)
+				
+			except Exception as e:
+				error_count += 1
+				error_msg = f"{te.name}: {str(e)}"
+				errors.append(error_msg)
+				frappe.log_error(error_msg, "Travel Expense Migration Error")
+		
+		# Commit all changes
+		frappe.db.commit()
+		
+		# Clear cache for Travel Expense
+		frappe.clear_cache(doctype="Travel Expense")
+		
+		# Show final result
+		result_msg = f"""
+		<h3>Migration Complete</h3>
+		<p><strong>Total Processed:</strong> {total}</p>
+		<p><strong>Successful:</strong> {success_count}</p>
+		<p><strong>Errors:</strong> {error_count}</p>
+		"""
+		
+		if errors:
+			result_msg += "<h4>Errors:</h4><ul>"
+			for err in errors[:10]:  # Show first 10 errors
+				result_msg += f"<li>{err}</li>"
+			if len(errors) > 10:
+				result_msg += f"<li>... and {len(errors) - 10} more</li>"
+			result_msg += "</ul>"
+		
+		frappe.msgprint(result_msg, title="Migration Results", indicator="green")
+		
+		return {
+			"status": "success",
+			"total": total,
+			"success": success_count,
+			"errors": error_count
+		}
+		
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Travel Expense Migration Error")
+		frappe.throw(f"Migration failed: {str(e)}")

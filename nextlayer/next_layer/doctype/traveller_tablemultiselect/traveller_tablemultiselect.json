@@ -9,8 +9,11 @@
  ],
  "fields": [
   {
+   "allow_on_submit": 1,
    "fieldname": "member",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "in_global_search": 1,
    "label": "Member",
    "options": "Member"
   }
@@ -19,7 +22,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-22 22:25:47.361474",
+ "modified": "2026-03-23 00:04:06.213392",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Traveller TableMultiselect",
