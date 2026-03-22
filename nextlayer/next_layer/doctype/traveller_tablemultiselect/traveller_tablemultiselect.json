@@ -1,0 +1,36 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-22 22:23:56.100173",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "member"
+ ],
+ "fields": [
+  {
+   "allow_on_submit": 1,
+   "fieldname": "member",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "in_global_search": 1,
+   "label": "Member",
+   "options": "Member"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-23 00:04:06.213392",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Traveller TableMultiselect",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

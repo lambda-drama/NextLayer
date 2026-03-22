@@ -6,12 +6,15 @@ from frappe.model.document import Document
 from frappe import _
 from frappe.utils import flt
 
+from frappe.utils import cint
+from decimal import Decimal
 
 class TravelExpense(Document):
 	def validate(self):
 		"""Calculate totals and sync multi-city to expenses when applicable"""
 		self._sync_multi_city_to_expenses()
 		self.calculate_totals()
+		travel_expense_on_save(self)
 
 	def _sync_multi_city_to_expenses(self):
 		"""When trip_type is Multi City, ensure one Travel expense row and fill it from multi_city_segments (first segment = departure/PRN/dates, last = arrival)."""
@@ -181,226 +184,228 @@ class TravelExpense(Document):
 					indicator="orange",
 					alert=True
 				)
+
+def travel_expense_on_save(doc):
+    """
+    Hook: on_save
+    Automatically divides expenses among travelers if conditions are met
+    """
+    
+    # Check if we have traveler_name (Table MultiSelect)
+    if not doc.traveller_name or len(doc.traveller_name) == 0:
+        return
+    
+    # Get the list of members from traveller_name
+    members_in_multiselect = [row.member for row in doc.traveller_name]
+    number_of_travelers = len(members_in_multiselect)
+    
+    # Get current expense rows
+    current_expenses = doc.expenses if hasattr(doc, 'expenses') else []
+    number_of_expense_rows = len(current_expenses)
+    
+    # SKIP auto-division if:
+    # 1. Number of travelers equals number of expense rows
+    if number_of_expense_rows == number_of_travelers:
+        # Check if all travelers are already represented in expense rows
+        members_in_rows = [row.traveller_name for row in current_expenses if hasattr(row, 'traveller_name')]
+        
+        if all(member in members_in_rows for member in members_in_multiselect):
+            frappe.msgprint(
+                f"✓ Each of the {number_of_travelers} travelers is already assigned to expense rows. "
+                "Skipping auto-division. You can manually adjust amounts as needed.",
+                alert=True
+            )
+            return
+    
+    # 2. Skip if there are more expense rows than travelers (user already divided)
+    if number_of_expense_rows >= number_of_travelers:
+        frappe.msgprint(
+            f"Note: Found {number_of_expense_rows} expense rows for {number_of_travelers} travelers. "
+            "Not auto-dividing. You can adjust amounts manually.",
+            alert=True
+        )
+        return
+    
+    # AUTO-DIVIDE: If we have fewer expense rows than travelers
+    if number_of_expense_rows > 0 and number_of_travelers > number_of_expense_rows:
+        frappe.msgprint(
+            f"Auto-dividing {number_of_expense_rows} expense row(s) among {number_of_travelers} travelers...",
+            alert=True
+        )
+        
+        # Get the first (source) row
+        source_row = current_expenses[0]
+        
+        # Calculate divided amount (for currency fields)
+        original_amount = Decimal(str(source_row.amount or 0))
+        original_amount_company = Decimal(str(source_row.amount_company_currency or 0))
+        
+        divided_amount = original_amount / number_of_travelers
+        divided_amount_company = original_amount_company / number_of_travelers
+        
+        # Clear existing rows (we'll rebuild from scratch)
+        doc.expenses = []
+        
+        # Create one row per traveler
+        for idx, member in enumerate(members_in_multiselect):
+            expense_row = frappe.new_doc('Travel Expense Detail')
+            
+            # Copy all fields from source row
+            expense_row.expense_type = source_row.expense_type
+            expense_row.expense_date = source_row.expense_date
+            expense_row.description = source_row.description
+            
+            expense_row.traveller_name = member
+            
+            expense_row.amount = float(divided_amount)
+            expense_row.amount_company_currency = float(divided_amount_company)
+            
+            if hasattr(source_row, 'sanctioned_amount') and source_row.sanctioned_amount:
+                expense_row.sanctioned_amount = float(Decimal(str(source_row.sanctioned_amount)) / number_of_travelers)
+            
+            # Copy hotel-related fields if present
+            if hasattr(source_row, 'hotel_checkin_date'):
+                expense_row.hotel_checkin_date = source_row.hotel_checkin_date
+            if hasattr(source_row, 'hotel_checkout_date'):
+                expense_row.hotel_checkout_date = source_row.hotel_checkout_date
+            if hasattr(source_row, 'custom_hotel_name'):
+                expense_row.custom_hotel_name = source_row.custom_hotel_name
+            if hasattr(source_row, 'hotel_territory'):
+                expense_row.hotel_territory = source_row.hotel_territory
+            if hasattr(source_row, 'hotel_location'):
+                expense_row.hotel_location = source_row.hotel_location
+            if hasattr(source_row, 'rate_per_day'):
+                expense_row.rate_per_day = source_row.rate_per_day
+            if hasattr(source_row, 'hotel_city'):
+                expense_row.hotel_city = source_row.hotel_city
+            if hasattr(source_row, 'hotel_country'):
+                expense_row.hotel_country = source_row.hotel_country
+            if hasattr(source_row, 'purpose'):
+                expense_row.purpose = source_row.purpose
+            
+            # Copy travel-related fields if present
+            if hasattr(source_row, 'custom_prn_number'):
+                expense_row.custom_prn_number = source_row.custom_prn_number
+            if hasattr(source_row, 'custom_date_of_purchase'):
+                expense_row.custom_date_of_purchase = source_row.custom_date_of_purchase
+            if hasattr(source_row, 'custom_travel_type'):
+                expense_row.custom_travel_type = source_row.custom_travel_type
+            if hasattr(source_row, 'custom_booked_by'):
+                expense_row.custom_booked_by = source_row.custom_booked_by
+            if hasattr(source_row, 'custom_departure_airport'):
+                expense_row.custom_departure_airport = source_row.custom_departure_airport
+            if hasattr(source_row, 'custom_arrival_airport'):
+                expense_row.custom_arrival_airport = source_row.custom_arrival_airport
+            if hasattr(source_row, 'custom_airlines'):
+                expense_row.custom_airlines = source_row.custom_airlines
+            if hasattr(source_row, 'custom_date_of_travel'):
+                expense_row.custom_date_of_travel = source_row.custom_date_of_travel
+            if hasattr(source_row, 'custom_date_of_arrival'):
+                expense_row.custom_date_of_arrival = source_row.custom_date_of_arrival
+            
+            if hasattr(source_row, 'cost_center'):
+                expense_row.cost_center = source_row.cost_center
+            if hasattr(source_row, 'project'):
+                expense_row.project = source_row.project
+            
+            doc.append('expenses', expense_row)
+        
+        frappe.msgprint(
+            f"✓ Successfully created {number_of_travelers} expense rows (one per traveler) with divided amounts.",
+            alert=True
+        )
+
+import frappe
+
+
+@frappe.whitelist()
+def migrate_traveler_names():
+	"""
+	Migrate all Travel Expense traveler_name (Link field) to traveller_name (Table MultiSelect field)
 	
-	# def create_expense_claim(self):
-	# 	"""Create an Expense Claim from Travel Expense
+	Called from a button on Travel Expense doctype
+	"""
+	try:
+		# Get all submitted Travel Expenses
+		travel_expenses = frappe.get_all(
+			"Travel Expense",
+			filters={"docstatus": 1},  # Only submitted documents
+			fields=["name", "traveler_name"]
+		)
 		
-	# 	Returns:
-	# 		str: Expense Claim name if created successfully, None otherwise
-	# 	"""
-	# 	try:
-	# 		# Get employee from traveler_name (Member)
-	# 		# Note: Member is a standalone doctype and may not be linked to Employee
-	# 		employee = None
-	# 		if self.traveler_name:
-	# 			# Try different methods to find employee linked to member
-	# 			# Method 1: Check if Member doctype has employee field
-	# 			try:
-	# 				member_doc = frappe.get_doc("Member", self.traveler_name)
-	# 				if hasattr(member_doc, 'employee') and member_doc.employee:
-	# 					employee = member_doc.employee
-	# 				elif hasattr(member_doc, 'custom_employee') and member_doc.custom_employee:
-	# 					employee = member_doc.custom_employee
-	# 			except Exception:
-	# 				pass
-				
-	# 			# Method 2: Try to find employee by name matching (if member name matches employee name)
-	# 			if not employee:
-	# 				try:
-	# 					employee_list = frappe.get_all(
-	# 						"Employee",
-	# 						filters={"employee_name": self.traveler_name},
-	# 						fields=["name"],
-	# 						limit=1
-	# 					)
-	# 					if employee_list:
-	# 						employee = employee_list[0].name
-	# 				except Exception:
-	# 					pass
-				
-	# 			# Method 3: Try custom_member field if it exists (for backward compatibility)
-	# 			if not employee:
-	# 				try:
-	# 					# Check if custom_member field exists first
-	# 					employee_fields = frappe.get_meta("Employee").get_fieldnames()
-	# 					if "custom_member" in employee_fields:
-	# 						employee_list = frappe.get_all(
-	# 							"Employee",
-	# 							filters={"custom_member": self.traveler_name},
-	# 							fields=["name"],
-	# 							limit=1
-	# 						)
-	# 						if employee_list:
-	# 							employee = employee_list[0].name
-	# 				except Exception:
-	# 					pass
-			
-	# 		# If no employee found, use default employee (Administrator)
-	# 		if not employee:
-	# 			# Try to get Administrator employee first
-	# 			try:
-	# 				admin_employee = frappe.db.get_value("Employee", {"user_id": "Administrator"}, "name")
-	# 				if admin_employee:
-	# 					employee = admin_employee
-	# 				else:
-	# 					# If Administrator employee doesn't exist, get any active employee
-	# 					employee_list = frappe.get_all(
-	# 						"Employee",
-	# 						filters={"status": "Active"},
-	# 						fields=["name"],
-	# 						limit=1
-	# 					)
-	# 					if employee_list:
-	# 						employee = employee_list[0].name
-	# 					else:
-	# 						# Last resort: get any employee
-	# 						employee_list = frappe.get_all(
-	# 							"Employee",
-	# 							fields=["name"],
-	# 							limit=1
-	# 						)
-	# 						if employee_list:
-	# 							employee = employee_list[0].name
-	# 			except Exception:
-	# 				pass
-			
-	# 		# If still no employee found, throw error
-	# 		if not employee:
-	# 			frappe.throw(_("Could not find an Employee. Please create at least one Employee in the system."))
-			
-	# 		# Create Expense Claim
-	# 		expense_claim = frappe.get_doc({
-	# 			"doctype": "Expense Claim",
-	# 			"employee": employee,
-	# 			"company": self.company,
-	# 			"expense_claim_date": self.posting_date,
-	# 			"custom_traveller_name": self.traveler_name,
-	# 			"custom_travel_group": self.travel_group,
-	# 			"custom_is_addition": self.is_addition,
-	# 			"company_group": self.company_group,
-	# 			"branch": self.branch,
-	# 			"marka": self.marka,
-	# 			"cost_center": self.cost_center,
-	# 			"project": self.project,
-	# 			"payable_account": self.payable_account if not self.is_paid else None,
-	# 			"is_paid": self.is_paid if hasattr(self, 'is_paid') else 0,
-	# 			"direct_payment_account": self.direct_payment_account if (hasattr(self, 'is_paid') and self.is_paid and hasattr(self, 'direct_payment_account')) else None,
-	# 			# Copy travel details
-	# 			"custom_flight_no": self.flight_no,
-	# 			"custom_departure_airport": self.custom_departure_airport,
-	# 			"custom_arrival_airport": self.custom_arrival_airport,
-	# 			"custom_airlines": self.custom_airlines,
-	# 			"custom_date_of_travel": self.custom_date_of_travel,
-	# 			"custom_date_of_arrival": self.custom_date_of_arrival,
-	# 			"custom_date_of_purchase": self.custom_date_of_purchase,
-	# 			"custom_booked_by": self.custom_booked_by,
-	# 			"custom_travel_type": self.custom_travel_type,
-	# 			"custom_pnr_number_": self.custom_pnr_number_,
-	# 		})
-			
-	# 		# Add expenses from child table
-	# 		if self.expenses:
-	# 			for expense_row in self.expenses:
-	# 				# Expense Claim uses company currency, so use amount_company_currency if available
-	# 				# Otherwise use amount (which might be in transaction currency)
-	# 				expense_amount = getattr(expense_row, 'amount_company_currency', None) or expense_row.amount or 0
-					
-	# 				# Sanctioned amount should not exceed amount
-	# 				# Use amount_company_currency for sanctioned_amount if available, otherwise use amount
-	# 				sanctioned_amount_value = getattr(expense_row, 'sanctioned_amount', None)
-	# 				if sanctioned_amount_value:
-	# 					# If sanctioned_amount is set, ensure it doesn't exceed amount
-	# 					sanctioned_amount_value = min(flt(sanctioned_amount_value), flt(expense_amount))
-	# 				else:
-	# 					# If not set, use the same as amount
-	# 					sanctioned_amount_value = expense_amount
-					
-	# 				expense_detail = {
-	# 					"expense_type": expense_row.expense_type,
-	# 					"expense_date": expense_row.expense_date,
-	# 					"amount": expense_amount,
-	# 					"sanctioned_amount": sanctioned_amount_value,
-	# 					"description": expense_row.description,
-	# 					"cost_center": expense_row.cost_center or self.cost_center,
-	# 					"project": expense_row.project or self.project,
-	# 					# Hotel fields
-	# 					"hotel_checkin_date": expense_row.hotel_checkin_date,
-	# 					"hotel_checkout_date": expense_row.hotel_checkout_date,
-	# 					"custom_hotel_name": expense_row.custom_hotel_name,
-	# 					"hotel_territory": expense_row.hotel_territory,
-	# 					"hotel_location": expense_row.hotel_location,
-	# 					"hotel_city": expense_row.hotel_city,
-	# 					"hotel_country": expense_row.hotel_country,
-	# 					"purpose": expense_row.purpose,
-	# 					"rate_per_day": expense_row.rate_per_day,
-	# 					"total_nights": expense_row.get("total_nights"),
-	# 					# Travel fields
-	# 					"custom_prn_number": expense_row.custom_prn_number,
-	# 					"custom_date_of_purchase": expense_row.custom_date_of_purchase,
-	# 					"custom_travel_type": expense_row.custom_travel_type,
-	# 					"custom_booked_by": expense_row.custom_booked_by,
-	# 					"custom_departure_airport": expense_row.custom_departure_airport,
-	# 					"custom_arrival_airport": expense_row.custom_arrival_airport,
-	# 					"custom_airlines": expense_row.custom_airlines,
-	# 					"custom_date_of_travel": expense_row.custom_date_of_travel,
-	# 					"custom_date_of_arrival": expense_row.custom_date_of_arrival,
-	# 				}
-	# 				# Remove None values
-	# 				expense_detail = {k: v for k, v in expense_detail.items() if v is not None}
-	# 				expense_claim.append("expenses", expense_detail)
-			
-	# 		# Add taxes and charges if any
-	# 		if self.taxes_and_charges:
-	# 			for tax_row in self.taxes_and_charges:
-	# 				expense_claim.append("taxes", {
-	# 					"account_head": tax_row.account_head,
-	# 					"rate": tax_row.rate,
-	# 					"description": tax_row.description,
-	# 					"tax_amount": tax_row.tax_amount,
-	# 					"total": tax_row.total,
-	# 					"cost_center": tax_row.cost_center or self.cost_center,
-	# 				})
-			
-	# 		# Add advances if any
-	# 		if self.advances:
-	# 			for advance_row in self.advances:
-	# 				expense_claim.append("advances", {
-	# 					"employee_advance": advance_row.employee_advance,
-	# 					"posting_date": advance_row.posting_date,
-	# 					"advance_paid": advance_row.advance_paid,
-	# 					"unclaimed_amount": advance_row.unclaimed_amount,
-	# 					"allocated_amount": advance_row.allocated_amount,
-	# 				})
-			
-	# 		# Insert expense claim first (before submitting)
-	# 		expense_claim.insert(ignore_permissions=True)
-	# 		frappe.db.commit()
-			
-	# 		# Get the expense claim name
-	# 		expense_claim_name = expense_claim.name
-			
-	# 		# Submit the expense claim
-	# 		expense_claim.submit()
-	# 		frappe.db.commit()
-			
-	# 		frappe.msgprint(
-	# 			_("Expense Claim {0} has been created and submitted.").format(
-	# 				frappe.bold(expense_claim_name)
-	# 			),
-	# 			indicator="green",
-	# 			alert=True
-	# 		)
-	# 		print("Huku ni noma", expense_claim_name)
-	# 		# Return the expense claim name
-	# 		return expense_claim_name
-			
-	# 	except Exception as e:
-	# 		frappe.log_error(
-	# 			f"Error creating Expense Claim from Travel Expense {self.name}: {str(e)}",
-	# 			"Travel Expense Error"
-	# 		)
-	# 		frappe.throw(_("Error creating Expense Claim: {0}").format(str(e)))
+		total = len(travel_expenses)
+		success_count = 0
+		error_count = 0
+		errors = []
 		
-	# 	# Return None if something went wrong
-	# 	return None
-   
+		frappe.msgprint(f"Starting migration of {total} Travel Expenses...")
+		
+		for idx, te in enumerate(travel_expenses):
+			try:
+				# Load the document
+				te_doc = frappe.get_doc("Travel Expense", te.name)
+				
+				# If traveler_name (Link field) has a value
+				if te.traveler_name:
+					# Clear existing traveller_name table entries
+					te_doc.traveller_name = []
+					
+					# Add the member to traveller_name table
+					te_doc.append("traveller_name", {
+						"member": te.traveler_name
+					})
+					
+					# IMPORTANT: Save the document properly (not db_update)
+					# Use db_update_needing_parent=False to avoid docstatus issues
+					te_doc.save(ignore_permissions=True)
+					
+					success_count += 1
+					
+					# Show progress every 10 records
+					if (idx + 1) % 10 == 0:
+						frappe.publish_realtime(
+							"method_progress",
+							{"progress": f"Migrated {idx + 1}/{total}"},
+							user=frappe.session.user
+						)
+				
+			except Exception as e:
+				error_count += 1
+				error_msg = f"{te.name}: {str(e)}"
+				errors.append(error_msg)
+				frappe.log_error(error_msg, "Travel Expense Migration Error")
+		
+		# Commit all changes
+		frappe.db.commit()
+		
+		# Clear cache for Travel Expense
+		frappe.clear_cache(doctype="Travel Expense")
+		
+		# Show final result
+		result_msg = f"""
+		<h3>Migration Complete</h3>
+		<p><strong>Total Processed:</strong> {total}</p>
+		<p><strong>Successful:</strong> {success_count}</p>
+		<p><strong>Errors:</strong> {error_count}</p>
+		"""
+		
+		if errors:
+			result_msg += "<h4>Errors:</h4><ul>"
+			for err in errors[:10]:  # Show first 10 errors
+				result_msg += f"<li>{err}</li>"
+			if len(errors) > 10:
+				result_msg += f"<li>... and {len(errors) - 10} more</li>"
+			result_msg += "</ul>"
+		
+		frappe.msgprint(result_msg, title="Migration Results", indicator="green")
+		
+		return {
+			"status": "success",
+			"total": total,
+			"success": success_count,
+			"errors": error_count
+		}
+		
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Travel Expense Migration Error")
+		frappe.throw(f"Migration failed: {str(e)}")
