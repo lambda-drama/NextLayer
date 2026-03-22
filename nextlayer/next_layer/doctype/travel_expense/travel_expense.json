@@ -131,11 +131,9 @@
   },
   {
    "fieldname": "traveler_name",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
+   "fieldtype": "Table MultiSelect",
    "label": "Traveler Name",
-   "options": "Member",
+   "options": "Traveller TableMultiselect",
    "reqd": 1
   },
   {
@@ -762,7 +760,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-02-12 23:15:44.234517",
+ "modified": "2026-03-22 22:25:50.177965",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",

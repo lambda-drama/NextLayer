@@ -13,6 +13,7 @@
   "sanctioned_amount",
   "column_break_1",
   "description",
+  "traveller_name",
   "section_break_hotel",
   "hotel_checkin_date",
   "hotel_checkout_date",
@@ -270,12 +271,18 @@
    "fieldtype": "Link",
    "label": "Project",
    "options": "Project"
+  },
+  {
+   "fieldname": "traveller_name",
+   "fieldtype": "Link",
+   "label": "Traveller Name",
+   "options": "Member"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-06 15:09:30.946383",
+ "modified": "2026-03-22 22:32:02.840419",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense Detail",
