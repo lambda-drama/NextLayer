@@ -251,6 +251,7 @@ doctype_js = {
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
 	"Journal Entry":"public/js/journal_entry.js",
     "Quotation":"public/js/quotation.js",
+    "Contract":"public/js/contract.js"
 }
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
