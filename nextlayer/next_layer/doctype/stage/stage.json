@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:stage",
  "creation": "2026-03-06 01:46:51.679072",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -14,7 +15,8 @@
   {
    "fieldname": "stage",
    "fieldtype": "Data",
-   "label": "Stage"
+   "label": "Stage",
+   "unique": 1
   },
   {
    "fieldname": "stage_type",
@@ -37,10 +39,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-06 01:48:14.154851",
+ "modified": "2026-03-27 23:47:15.660116",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Stage",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
