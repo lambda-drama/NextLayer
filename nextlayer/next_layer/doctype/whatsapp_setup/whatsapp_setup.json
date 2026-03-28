@@ -39,7 +39,7 @@
    "fieldname": "token",
    "fieldtype": "Password",
    "in_list_view": 1,
-   "label": "WasenderApi Token",
+   "label": "Token",
    "length": 250,
    "reqd": 1
   },
@@ -146,7 +146,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-10 01:11:20.137337",
+ "modified": "2026-03-28 16:40:04.892649",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Setup",
