@@ -122,7 +122,7 @@ fixtures = [
                     "Contract-custom_column_break_bn8oc",
                     "Contract-custom_length",
                     "Contract-custom_width",
-                    "Contract-custom_area"
+                    "Contract-custom_area",
                     
                     #Project
                     "Project-custom_attachment",
