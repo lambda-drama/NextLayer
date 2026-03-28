@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-28 13:58:00.936233",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "details_section",
+  "project",
+  "stage",
+  "contract",
+  "column_break_uzgu",
+  "status",
+  "posting_date",
+  "completion",
+  "section_break_efks",
+  "start_date",
+  "actual_completion_date",
+  "column_break_xndw",
+  "end_date",
+  "tasks_section",
+  "task_item",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "stage",
+   "fieldtype": "Link",
+   "label": "Stage",
+   "options": "Stage"
+  },
+  {
+   "fieldname": "contract",
+   "fieldtype": "Link",
+   "label": "Contract",
+   "options": "Contract"
+  },
+  {
+   "fieldname": "column_break_uzgu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nDraft\nIn Progress\nPending Approval\nCompleted"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date"
+  },
+  {
+   "fieldname": "completion",
+   "fieldtype": "Percent",
+   "label": "Completion"
+  },
+  {
+   "fieldname": "section_break_efks",
+   "fieldtype": "Section Break",
+   "label": "Dates"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date"
+  },
+  {
+   "fieldname": "column_break_xndw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date"
+  },
+  {
+   "fieldname": "actual_completion_date",
+   "fieldtype": "Date",
+   "label": "Actual Completion Date"
+  },
+  {
+   "fieldname": "tasks_section",
+   "fieldtype": "Section Break",
+   "label": "Tasks"
+  },
+  {
+   "fieldname": "task_item",
+   "fieldtype": "Table",
+   "label": "Task Item",
+   "options": "Stage Tasks"
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Construction Phase Tracker",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-03-28 14:09:37.006504",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Construction Phase Tracker",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
