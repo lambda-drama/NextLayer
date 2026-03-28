@@ -15,6 +15,18 @@
   "currency",
   "start_date",
   "end_date",
+  "accounting_dimensions_section",
+  "branch",
+  "company_group",
+  "column_break_awft",
+  "marka",
+  "cost_center",
+  "accounting_section",
+  "default_expense_account",
+  "column_break_mmjy",
+  "default_payable_account",
+  "work_breakdown_section",
+  "type_of_work",
   "wage_breakdown_section",
   "wages",
   "section_break_uzhv",
@@ -22,7 +34,8 @@
   "column_break_nerr",
   "total_amount",
   "section_break_wqsw",
-  "description"
+  "description",
+  "amended_from"
  ],
  "fields": [
   {
@@ -123,12 +136,103 @@
    "fieldtype": "Link",
    "label": "Stage",
    "options": "Stage"
+  },
+  {
+   "fieldname": "work_breakdown_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "Work Breakdown"
+  },
+  {
+   "fieldname": "type_of_work",
+   "fieldtype": "Link",
+   "label": "Type of Work",
+   "options": "Activity Type"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "default_expense_account",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Default Expense Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_mmjy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "default_payable_account",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Default Payable Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Wage Entry",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "accounting_dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Dimensions"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "company_group",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Company Group",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_awft",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "marka",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Marka",
+   "options": "Marka"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Cost Center",
+   "options": "Cost Center"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-03-06 02:06:08.557506",
+ "modified": "2026-03-28 04:06:34.231922",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",

@@ -111,6 +111,18 @@ fixtures = [
                     "Contract-custom_payment_details",
                     "Contract-custom_payment_terms",
                     "Contract-custom_payment_term",
+                    "Contract Template-custom_contract_terms_somali",
+                    "Contract-custom_contract_terms_somali",
+                    "Contract-custom_amount_per_stage",
+                    "Contract-custom_stages",
+                    "Contract-custom_payment_terms_somali",
+                    "Contract-custom_amount",
+                    "Contract-custom_rate",
+                    "Contract-custom_aream2",
+                    "Contract-custom_column_break_bn8oc",
+                    "Contract-custom_length",
+                    "Contract-custom_width",
+                    "Contract-custom_area"
                     
                     #Project
                     "Project-custom_attachment",
@@ -251,6 +263,7 @@ doctype_js = {
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
 	"Journal Entry":"public/js/journal_entry.js",
     "Quotation":"public/js/quotation.js",
+    "Contract":"public/js/contract.js"
 }
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
