@@ -25,10 +25,11 @@
   "default_expense_account",
   "column_break_mmjy",
   "default_payable_account",
-  "work_breakdown_section",
-  "type_of_work",
   "wage_breakdown_section",
+  "add_type_of_work",
   "wages",
+  "work_breakdown_section",
+  "type_of_work_breakdown",
   "section_break_uzhv",
   "total_qty",
   "column_break_nerr",
@@ -140,14 +141,7 @@
   {
    "fieldname": "work_breakdown_section",
    "fieldtype": "Section Break",
-   "hidden": 1,
    "label": "Work Breakdown"
-  },
-  {
-   "fieldname": "type_of_work",
-   "fieldtype": "Link",
-   "label": "Type of Work",
-   "options": "Activity Type"
   },
   {
    "collapsible": 1,
@@ -226,13 +220,24 @@
    "ignore_user_permissions": 1,
    "label": "Cost Center",
    "options": "Cost Center"
+  },
+  {
+   "fieldname": "add_type_of_work",
+   "fieldtype": "Button",
+   "label": "Add Type of Work"
+  },
+  {
+   "fieldname": "type_of_work_breakdown",
+   "fieldtype": "Table",
+   "label": "Type of Work Breakdown",
+   "options": "Work Type Detail"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-28 04:06:34.231922",
+ "modified": "2026-03-29 01:59:43.909588",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",

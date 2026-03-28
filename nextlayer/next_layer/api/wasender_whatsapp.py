@@ -213,7 +213,7 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 			file_type, _ = mimetypes.guess_type(attachment_url)
 			if file_type and file_type in FILE_TYPES:
 				data[FILE_TYPES[file_type]] = attachment_url
-
+	frappe.throw(f"Attach field: {chat_doc.attach}\nResolved URL: {attachment_url}")
 	return make_wasender_api_call(data, "send-message", update_existing_chat=chat_doc)
 
 
