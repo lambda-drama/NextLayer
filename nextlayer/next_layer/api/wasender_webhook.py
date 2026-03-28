@@ -41,26 +41,55 @@ def handle_webhook_event(payload: dict):
             frappe.log_error(f"Unknown event type: {event}", "Wasender Webhook")
 
 
-def handle_message_received(payload: dict):
-    """
-        Handle incoming messages from WASender
-        Args:
-            payload (dict): Parsed JSON payload from WASender webhook
-        """
+# def handle_message_received(payload: dict):
+#     """
+#         Handle incoming messages from WASender
+#         Args:
+#             payload (dict): Parsed JSON payload from WASender webhook
+#         """
    
-    message = payload.get("data", {}).get("message", {})
-    sender = message.get("key", {}).get("remoteJid", "")
-    message_body = message.get("messageBody", "")
+#     message = payload.get("data", {}).get("message", {})
+#     sender = message.get("key", {}).get("remoteJid", "")
+#     message_body = message.get("messageBody", "")
 
-    # Create a new WhatsApp Chat document for the incoming message
-    chat_doc = frappe.new_doc("WhatsApp Chat")
-    chat_doc.type = "Incoming"
-    chat_doc.to = sender
-    chat_doc.message = message_body
-    chat_doc.status = "Received"
-    chat_doc.insert(ignore_permissions=True)
-    frappe.db.commit()
+#     # Create a new WhatsApp Chat document for the incoming message
+#     chat_doc = frappe.new_doc("WhatsApp Chat")
+#     chat_doc.type = "Incoming"
+#     chat_doc.to = sender
+#     chat_doc.message = message_body
+#     chat_doc.status = "Received"
+#     chat_doc.insert(ignore_permissions=True)
+#     frappe.db.commit()
+def handle_message_received(payload: dict):
+    try:
+        message = payload.get("data", {}).get("messages", {})
 
+        sender = message.get("key", {}).get("remoteJid", "")
+        message_id = message.get("key", {}).get("id", "")
+        clean_number = message.get("key", {}).get("cleanedSenderPn", "")
+        message_body = message.get("messageBody") or message.get("message", {}).get("conversation", "")
+
+        frappe.log_error(
+            f"Sender: {sender}\nMessage ID: {message_id}\nBody: {message_body}",
+            "WASender Debug Incoming"
+        )
+
+        chat_doc = frappe.new_doc("WhatsApp Chat")
+        chat_doc.type = "Incoming"
+        chat_doc.set("from", sender)
+        chat_doc.profile_name = clean_number
+        chat_doc.message = message_body
+        chat_doc.message_id = message_id
+        chat_doc.status = "Received"
+        chat_doc.content_type = "text"  # required field
+        chat_doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+    except Exception as e:
+        frappe.log_error(
+            f"Error: {str(e)}\nTraceback: {frappe.get_traceback()}\nPayload: {json.dumps(payload, indent=2)}",
+            "WASender Incoming Message Error"
+        )
 def handle_message_sent(payload: dict):
     """
     Handle message sent event from WASender

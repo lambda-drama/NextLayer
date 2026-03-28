@@ -274,6 +274,7 @@ def sync_groups() -> dict:
 
 	response = make_get_request(url, headers=headers)
 
+	
 	if not response.get("success"):
 		return {"success": False, "error": response.get("message")}
 
