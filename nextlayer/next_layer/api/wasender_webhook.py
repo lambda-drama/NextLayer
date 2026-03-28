@@ -41,25 +41,6 @@ def handle_webhook_event(payload: dict):
             frappe.log_error(f"Unknown event type: {event}", "Wasender Webhook")
 
 
-# def handle_message_received(payload: dict):
-#     """
-#         Handle incoming messages from WASender
-#         Args:
-#             payload (dict): Parsed JSON payload from WASender webhook
-#         """
-   
-#     message = payload.get("data", {}).get("message", {})
-#     sender = message.get("key", {}).get("remoteJid", "")
-#     message_body = message.get("messageBody", "")
-
-#     # Create a new WhatsApp Chat document for the incoming message
-#     chat_doc = frappe.new_doc("WhatsApp Chat")
-#     chat_doc.type = "Incoming"
-#     chat_doc.to = sender
-#     chat_doc.message = message_body
-#     chat_doc.status = "Received"
-#     chat_doc.insert(ignore_permissions=True)
-#     frappe.db.commit()
 def handle_message_received(payload: dict):
     try:
         message = payload.get("data", {}).get("messages", {})
@@ -81,7 +62,7 @@ def handle_message_received(payload: dict):
         chat_doc.message = message_body
         chat_doc.message_id = message_id
         chat_doc.status = "Received"
-        chat_doc.content_type = "text"  # required field
+        chat_doc.content_type = "text"
         chat_doc.insert(ignore_permissions=True)
         frappe.db.commit()
 
