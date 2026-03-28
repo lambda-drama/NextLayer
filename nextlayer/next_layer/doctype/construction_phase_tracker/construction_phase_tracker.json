@@ -1,11 +1,13 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:CPT-{MM}-{#####}",
  "creation": "2026-03-28 13:58:00.936233",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "details_section",
+  "company",
   "project",
   "stage",
   "contract",
@@ -26,14 +28,20 @@
   {
    "fieldname": "project",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Project",
-   "options": "Project"
+   "options": "Project",
+   "reqd": 1
   },
   {
    "fieldname": "stage",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Stage",
-   "options": "Stage"
+   "options": "Stage",
+   "reqd": 1
   },
   {
    "fieldname": "contract",
@@ -48,6 +56,8 @@
   {
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "options": "\nDraft\nIn Progress\nPending Approval\nCompleted"
   },
@@ -110,16 +120,24 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-28 14:09:37.006504",
+ "modified": "2026-03-28 14:56:12.053032",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Construction Phase Tracker",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

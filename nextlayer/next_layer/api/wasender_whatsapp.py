@@ -6,6 +6,29 @@ from .whatsapp_utils import get_custom_attachment_url, get_document_attachment_u
 import json
 import mimetypes
 import pyqrcode
+import requests
+
+
+def get_wasender_settings() -> frappe._dict:
+	"""
+	Get WASender settings from WhatsApp Setup document.
+	Returns a _dict with all relevant fields including decrypted password fields.
+
+	Returns:
+		frappe._dict: Settings object with fields:
+			- np_enabled (bool)
+			- np_url (str)
+			- np_token (str): decrypted API token
+			- pat_token (str): decrypted PAT token
+	"""
+	settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+
+	return frappe._dict({
+		"np_enabled": settings.np_enabled,
+		"np_url": settings.np_url,
+		"np_token": settings.get_password("np_token"),
+		"pat_token": settings.get_password("pat_token"),
+	})
 
 
 def make_wasender_api_call(
@@ -17,15 +40,15 @@ def make_wasender_api_call(
 ) -> dict:
 	"""Make the actual API call to WASender
 	Args:
-	    data (dict): Payload to send to WASender API
-	    endpoint (str): WASender API endpoint (e.g. "send-message")
-	    reference_doctype (str, optional): DocType for linking the chat message. Defaults to None.
-	    reference_name (str, optional): Doc name for linking the chat message. Defaults to None.
-	    update_existing_chat (frappe._dict, optional): Existing WhatsApp Chat document to update instead of creating a new one. Defaults to None.
+		data (dict): Payload to send to WASender API
+		endpoint (str): WASender API endpoint (e.g. "send-message")
+		reference_doctype (str, optional): DocType for linking the chat message. Defaults to None.
+		reference_name (str, optional): Doc name for linking the chat message. Defaults to None.
+		update_existing_chat (frappe._dict, optional): Existing WhatsApp Chat document to update instead of creating a new one. Defaults to None.
 	Returns:
-	    dict: Response with success status and message details
+		dict: Response with success status and message details
 	"""
-	settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+	settings = get_wasender_settings()
 
 	if not settings.np_enabled:
 		return {"success": False, "error": "WASender integration is disabled."}
@@ -39,9 +62,11 @@ def make_wasender_api_call(
 		"Authorization": f"Bearer {settings.np_token}",
 		"Content-Type": "application/json",
 	}
-
+	
 	try:
-		response = make_post_request(url, json=data, headers=headers)
+		resp = requests.post(url, json=data, headers=headers)
+		resp.raise_for_status()
+		response = resp.json()
 
 		message_id = response.get("msgId") if isinstance(response, dict) else None
 
@@ -102,15 +127,15 @@ def send_whatsapp_message(
 	"""
 	Send WhatsApp message using the WASender API.
 	Args:
-	    to (str): Recipient phone number (with country code, e.g. +1234567890) or Group Id
-	    message (str): Text message to send
-	    attach_document (bool): Whether to attach a document from Frappe
-	    reference_doctype (str): DocType of the document to attach
-	    reference_name (str): Name of the document to attach
-	    letterhead (bool): Whether to use letterhead for the document attachment
-	    custom_attachment (str): URL of a custom attachment to include in the message
+		to (str): Recipient phone number (with country code, e.g. +1234567890) or Group Id
+		message (str): Text message to send
+		attach_document (bool): Whether to attach a document from Frappe
+		reference_doctype (str): DocType of the document to attach
+		reference_name (str): Name of the document to attach
+		letterhead (bool): Whether to use letterhead for the document attachment
+		custom_attachment (str): URL of a custom attachment to include in the message
 	Returns:
-	    dict: Response from the WASender API call
+		dict: Response from the WASender API call
 	"""
 	FILE_TYPES = {
 		"application/pdf": "documentUrl",
@@ -144,6 +169,7 @@ def send_whatsapp_message(
 		reference_name=reference_name,
 	)
 
+
 @frappe.whitelist()
 def send_whatsapp_from_chat(chat_name: str) -> dict:
 	"""
@@ -151,71 +177,62 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 	using the WASender API.
 
 	Args:
-	    chat_name (str): Name of the WhatsApp Chat document
+		chat_name (str): Name of the WhatsApp Chat document
 
 	Returns:
-	    dict: Response with success status and message details
+		dict: Response with success status and message details
 	"""
-	try:
-		chat_doc = frappe.get_doc("WhatsApp Chat", chat_name)
+	chat_doc = frappe.get_doc("WhatsApp Chat", chat_name)
 
-		if chat_doc.type != "Outgoing":
-			return {"success": False, "error": "Can only send outgoing messages"}
+	if chat_doc.type != "Outgoing":
+		return {"success": False, "error": "Can only send outgoing messages"}
 
-		if not chat_doc.to and not chat_doc.to_group:
-			return {"success": False, "error": "Recipient phone number (TO) is required"}
-		
-		group = frappe.get_doc("Whatsapp Group Profile", chat_doc.to_group) if chat_doc.to_group_message else None
+	if not chat_doc.to and not chat_doc.to_group:
+		return {"success": False, "error": "Recipient phone number (TO) is required"}
 
-		send_to = formart_number(chat_doc.to) if not chat_doc.to_group_message else group.group_id
+	group = frappe.get_doc("Whatsapp Group Profile", chat_doc.to_group) if chat_doc.to_group_message else None
 
-		data = {"to": send_to}
+	send_to = formart_number(chat_doc.to) if not chat_doc.to_group_message else group.group_id
 
-		FILE_TYPES = {
-			"application/pdf": "documentUrl",
-			"image/jpeg": "imageUrl",
-			"image/png": "imageUrl",
-			"video/mp4": "videoUrl",
-			"audio/mpeg": "audioUrl",
-		}
+	data = {"to": send_to}
 
-		if chat_doc.message:
-			data["text"] = chat_doc.message
+	FILE_TYPES = {
+		"application/pdf": "documentUrl",
+		"image/jpeg": "imageUrl",
+		"image/png": "imageUrl",
+		"video/mp4": "videoUrl",
+		"audio/mpeg": "audioUrl",
+	}
 
-		if chat_doc.attach:
-			attachment_url = get_custom_attachment_url(chat_doc.attach)
-			if attachment_url:
-				file_type, _ = mimetypes.guess_type(attachment_url)
-				if file_type and file_type in FILE_TYPES:
-					data[FILE_TYPES[file_type]] = attachment_url
-				
+	if chat_doc.message:
+		data["text"] = chat_doc.message
 
-		return make_wasender_api_call(data, "send-message", update_existing_chat=chat_doc)
+	if chat_doc.attach:
+		attachment_url = get_custom_attachment_url(chat_doc.attach)
+		if attachment_url:
+			file_type, _ = mimetypes.guess_type(attachment_url)
+			if file_type and file_type in FILE_TYPES:
+				data[FILE_TYPES[file_type]] = attachment_url
 
-	except Exception as e:
-		frappe.log_error(
-			f"Error sending WhatsApp from chat (WASender): {str(e)}\nTraceback: {frappe.get_traceback()}",
-			"WASender WhatsApp Send from Chat",
-		)
-		return {"success": False, "error": str(e)}
+	return make_wasender_api_call(data, "send-message", update_existing_chat=chat_doc)
 
 
 def send_bulk_messages(
-		recipients: list,
-		message: str,
-		reference_doctype: str = None,
-		reference_name: str = None,
-	) -> dict:
+	recipients: list,
+	message: str,
+	reference_doctype: str = None,
+	reference_name: str = None,
+) -> dict:
 	"""
 	Send bulk WhatsApp messages using WASender API
 	Args:
-	    recipients (list): List of phone numbers
-	    message (str): Message content
-	    reference_doctype (str, optional): Reference DocType
-	    reference_name (str, optional): Reference DocName
+		recipients (list): List of phone numbers
+		message (str): Message content
+		reference_doctype (str, optional): Reference DocType
+		reference_name (str, optional): Reference DocName
 
 	Returns:
-	    dict: Response with success status and message details
+		dict: Response with success status and message details
 	"""
 	results = []
 	for recipient in recipients:
@@ -229,122 +246,119 @@ def send_bulk_messages(
 		frappe.sleep(2)
 
 	return {
-	"total_sent": len([r for r in results if r["result"].get("success")]),
-	"total_failed": len([r for r in results if not r["result"].get("success")]),
-	"details": results,
+		"total_sent": len([r for r in results if r["result"].get("success")]),
+		"total_failed": len([r for r in results if not r["result"].get("success")]),
+		"details": results,
 	}
+
 
 def formart_number(number: str) -> str:
 	if not number.startswith("+"):
 		number = f"+{number}"
 	return number
 
+
 @frappe.whitelist()
 def sync_groups() -> dict:
-    """Fetch groups from WASender and store group metadata only"""
+	"""Fetch groups from WASender and store group metadata only"""
 
-    settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+	settings = get_wasender_settings()
 
-    if not settings.np_enabled:
-        return {"success": False, "error": "WASender integration disabled"}
+	if not settings.np_enabled:
+		return {"success": False, "error": "WASender integration disabled"}
 
-    url = f"{settings.np_url}groups"
+	url = f"{settings.np_url}groups"
+	headers = {
+		"Authorization": f"Bearer {settings.np_token}"
+	}
 
-    headers = {
-        "Authorization": f"Bearer {settings.np_token}"
-    }
+	response = make_get_request(url, headers=headers)
 
-    response = make_get_request(url, headers=headers)
+	if not response.get("success"):
+		return {"success": False, "error": response.get("message")}
 
-    if not response.get("success"):
-        return {"success": False, "error": response.get("message")}
+	groups = response.get("data", [])
 
-    groups = response.get("data", [])
-	
-    existing = set(
-        frappe.get_all(
-            "Whatsapp Group Profile",
-            pluck="group_id"
-        )
-    )
+	existing = set(
+		frappe.get_all(
+			"Whatsapp Group Profile",
+			pluck="group_id"
+		)
+	)
 
-    for group in groups:
+	for group in groups:
+		if group["id"] in existing:
+			continue
 
-        if group["id"] in existing:
-            continue
+		doc = frappe.new_doc("Whatsapp Group Profile")
+		doc.group_name = group.get("name") or "Unnamed Group"
+		doc.group_id = group["id"]
+		doc.profile_picture = group.get("imgUrl")
+		doc.insert(ignore_permissions=True)
 
-        doc = frappe.new_doc("Whatsapp Group Profile")
-        doc.group_name = group.get("name") or "Unnamed Group"
-        doc.group_id = group["id"]
-        doc.profile_picture = group.get("imgUrl")
+	frappe.db.commit()
 
-        doc.insert(ignore_permissions=True)
+	return {"success": True, "groups_synced": len(groups)}
 
-    frappe.db.commit()
-
-    return {"success": True, "groups_synced": len(groups)}
 
 @frappe.whitelist()
 def update_group_members(group_id):
-    """
-    Fetch members for a WhatsApp group and append only new members
-    without creating duplicates.
-    """
+	"""
+	Fetch members for a WhatsApp group and append only new members
+	without creating duplicates.
+	"""
+	group = frappe.get_doc("Whatsapp Group Profile", {"group_id": group_id})
 
-    group = frappe.get_doc("Whatsapp Group Profile", {"group_id": group_id})
+	response = get_group_members(group_id)
 
-    response = get_group_members(group_id)
+	if not response.get("success"):
+		return response
 
-    if not response.get("success"):
-        return response
+	members = response.get("members", [])
 
-    members = response.get("members", [])
+	existing_members = {m.phone_number for m in group.members}
 
-    # Existing phone numbers in child table
-    existing_members = {m.phone_number for m in group.members}
-    print("Existing members:", existing_members)
-    print("Members from API:", members)
+	added = 0
 
-    added = 0
+	for m in members:
+		phone = m.get("pn", "")
 
-    for m in members:
-        phone = m.get("pn", "")
+		if phone in existing_members:
+			continue
 
-        if phone in existing_members:
-            continue
+		group.append(
+			"members",
+			{
+				"phone_number": phone,
+				"is_admin": m.get("Admin", False),
+			}
+		)
 
-        group.append(
-            "members",
-            {
-                "phone_number": phone,
-                "is_admin": m.get("Admin", False),
-            }
-        )
+		existing_members.add(phone)
+		added += 1
 
-        existing_members.add(phone)
-        added += 1
+	if added:
+		group.save(ignore_permissions=True)
+		frappe.db.commit()
 
-    if added:
-        group.save(ignore_permissions=True)
-        frappe.db.commit()
+	return {
+		"success": True,
+		"members_added": added,
+		"total_members": len(group.members)
+	}
 
-    return {
-        "success": True,
-        "members_added": added,
-        "total_members": len(group.members)
-    }
-	
+
 def get_group_members(group_id: str) -> dict:
 	"""
 	Get members of a WhatsApp group from WASender API
 
 	Args:
-	    group_id (str): ID of the WhatsApp group
-		
+		group_id (str): ID of the WhatsApp group
+
 	Returns:
-	    dict: Response with success status and list of members or error message
+		dict: Response with success status and list of members or error message
 	"""
-	settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+	settings = get_wasender_settings()
 
 	if not settings.np_enabled:
 		return {"success": False, "error": "WASender integration is disabled."}
@@ -357,7 +371,7 @@ def get_group_members(group_id: str) -> dict:
 	headers = {
 		"Authorization": f"Bearer {settings.np_token}",
 	}
-	
+
 	try:
 		response = make_get_request(url, headers=headers)
 		if not response.get("success"):
@@ -366,7 +380,6 @@ def get_group_members(group_id: str) -> dict:
 		return {"success": True, "members": response.get("data", []).get("participants", [])}
 
 	except Exception as e:
-		frappe.throw(f"Failed to fetch group members: {str(e)}")
 		frappe.log_error(
 			f"WASender API Error while fetching group members:\n"
 			f"URL: {url}\n"
@@ -381,14 +394,14 @@ def get_whatsapp_session_qr_code() -> dict:
 	"""
 	Get WhatsApp session QR code from WASender API for authentication
 	Returns:
-	    dict: Response with success status and QR code URL or error message
+		dict: Response with success status and QR code URL or error message
 	"""
-	settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
+	settings = get_wasender_settings()
 
 	if not settings.np_enabled:
 		return {"success": False, "error": "WASender integration is disabled."}
 	if not settings.pat_token:
-		return {"success": False, "error": "WASender token not configured."}
+		return {"success": False, "error": "WASender PAT token not configured."}
 	if not settings.np_url:
 		return {"success": False, "error": "WASender URL not configured."}
 
@@ -416,10 +429,11 @@ def get_whatsapp_session_qr_code() -> dict:
 		)
 		return {"success": False, "error": str(e)}
 
+
 @frappe.whitelist()
 def qr_code_to_image(qr_code: str, scale: int = 5) -> str:
-    """
-    Convert a string to a base64 QR code data URL.
-    Uses pyqrcode, which is already a Frappe/ERPNext dependency.
-    """
-    return "data:image/png;base64," + pyqrcode.create(qr_code).png_as_base64_str(scale=scale, quiet_zone=1)
+	"""
+	Convert a string to a base64 QR code data URL.
+	Uses pyqrcode, which is already a Frappe/ERPNext dependency.
+	"""
+	return "data:image/png;base64," + pyqrcode.create(qr_code).png_as_base64_str(scale=scale, quiet_zone=1)
