@@ -125,3 +125,48 @@ def make_journal_entry(wage_entry_name):
 	frappe.db.set_value("Wage Entry", wage_entry_name, "journal_entry", jv.name)
 
 	return jv.name
+
+
+@frappe.whitelist()
+def get_allowed_whatsapp_groups() -> list:
+	"""
+	Return WhatsApp groups the current user is permitted to message.
+ 
+	Rules:
+	  - System Manager sees all groups.
+	  - If a group's user_permissions table is EMPTY → accessible by everyone.
+	  - If a group's user_permissions table has rows → only listed users can see it.
+	"""
+	current_user = frappe.session.user
+	
+	# System Manager bypass
+	if "System Manager" in frappe.get_roles(current_user):
+		return frappe.get_all(
+			"Whatsapp Group Profile",
+			fields=["name", "group_name"],
+			order_by="group_name asc",
+		)
+ 
+	all_groups = frappe.get_all(
+		"Whatsapp Group Profile",
+		fields=["name", "group_name"],
+		order_by="group_name asc",
+	)
+ 
+	allowed = []
+	for group in all_groups:
+		total_permissions = frappe.db.count(
+			"WhatsApp Group Access",
+			filters={"parent": group["name"]},
+		)
+ 
+		if total_permissions == 0:
+			# No restrictions — everyone can access
+			allowed.append(group)
+		elif frappe.db.exists(
+			"WhatsApp Group Access",
+			{"parent": group["name"], "user": current_user},
+		):
+			allowed.append(group)
+	return allowed
+ 

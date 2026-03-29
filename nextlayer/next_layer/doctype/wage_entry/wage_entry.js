@@ -372,31 +372,28 @@ function render_accounting_buttons(frm) {
 
 
 function open_whatsapp_dialog(frm) {
-	// Fetch groups that the current user has access to
+	// Fetch only groups the current user is permitted to access
 	frappe.call({
-		method: "frappe.client.get_list",
-		args: {
-			doctype: "Whatsapp Group Profile",
-			fields: ["name", "group_name", "group_id"],
-			filters: [],
-			limit: 100,
-		},
+		method: "nextlayer.next_layer.doctype.wage_entry.wage_entry.get_allowed_whatsapp_groups",
 		callback(r) {
 			const groups = r.message || [];
-
+ 
 			if (!groups.length) {
-				frappe.msgprint(__("No WhatsApp groups found. Please sync groups first."));
+				frappe.msgprint({
+					title: __("No Groups Available"),
+					message: __("You do not have access to any WhatsApp groups. Please contact your administrator."),
+					indicator: "orange",
+				});
 				return;
 			}
-
+ 
 			const group_options = groups.map((g) => ({
 				label: g.group_name,
-				value: g.name,
+				value: g.name,   // doc name (primary key) used when calling send
 			}));
-
-			// Build default message from Wage Entry details
+ 
 			const default_message = build_default_message(frm);
-
+ 
 			const d = new frappe.ui.Dialog({
 				title: __("Send WhatsApp Message"),
 				fields: [
@@ -435,18 +432,15 @@ function open_whatsapp_dialog(frm) {
 				],
 				primary_action_label: __("Send"),
 				primary_action(values) {
-					// Resolve selected group name → group doc name
-					const selected_group = group_options.find(
-						(o) => o.label === values.group
-					);
-					const group_name = selected_group ? selected_group.value : values.group;
-
+					// Resolve label → doc name
+					const selected = group_options.find((o) => o.label === values.group);
+					const group_name = selected ? selected.value : values.group;
+ 
 					d.hide();
-					frappe.show_progress(__("Sending WhatsApp message..."), 0, 100);
-
+					frappe.show_progress(__("Sending..."), 0, 100, __("Sending WhatsApp message..."));
+ 
 					frappe.call({
-						method:
-							"nextlayer.next_layer.api.wasender_whatsapp.send_whatsapp_from_wage_entry",
+						method: "nextlayer.next_layer.api.wasender_whatsapp.send_whatsapp_from_wage_entry",
 						args: {
 							wage_entry_name: frm.doc.name,
 							group_name: group_name,
@@ -459,18 +453,13 @@ function open_whatsapp_dialog(frm) {
 							frappe.hide_progress();
 							if (r.message && r.message.success) {
 								frappe.show_alert(
-									{
-										message: __("WhatsApp message sent successfully!"),
-										indicator: "green",
-									},
+									{ message: __("WhatsApp message sent!"), indicator: "green" },
 									5
 								);
 							} else {
-								const err =
-									(r.message && r.message.error) ||
-									__("Unknown error occurred.");
+								const err = (r.message && r.message.error) || __("Unknown error.");
 								frappe.msgprint({
-									title: __("WhatsApp Send Failed"),
+									title: __("Send Failed"),
 									message: err,
 									indicator: "red",
 								});
@@ -480,32 +469,39 @@ function open_whatsapp_dialog(frm) {
 							frappe.hide_progress();
 							frappe.msgprint({
 								title: __("Error"),
-								message: __("Failed to send WhatsApp message. Check error logs."),
+								message: __("Failed to send. Check error logs."),
 								indicator: "red",
 							});
 						},
 					});
 				},
 			});
-
+ 
 			d.show();
 		},
 	});
 }
-
+ 
 function build_default_message(frm) {
 	const doc = frm.doc;
-	let msg = `*Wage Entry: ${doc.name}*\n`;
-
+    const user = frappe.session.user;
+	const user_info = frappe.boot.user_info?.[user];
+	const full_name = user_info?.full_name 
+		|| user_info?.fullname 
+		|| frappe.boot.full_name 
+		|| user;
+    let msg = `*Wage Entry: ${doc.name}*\n`;
 	if (doc.date) msg += `Date: ${doc.date}\n`;
 	if (doc.wage_type) msg += `Type: ${doc.wage_type}\n`;
 	if (doc.project) msg += `Project: ${doc.project}\n`;
 	if (doc.stage) msg += `Stage: ${doc.stage}\n`;
 	if (doc.total_amount) msg += `Total Amount: ${format_currency(doc.total_amount, doc.currency)}\n`;
 
+    msg += `\nSent by: ${full_name}`;
+
 	return msg.trim();
 }
-
+ 
 function format_currency(amount, currency) {
 	if (!amount) return "0";
 	const formatted = parseFloat(amount).toLocaleString(undefined, {
@@ -514,3 +510,4 @@ function format_currency(amount, currency) {
 	});
 	return currency ? `${currency} ${formatted}` : formatted;
 }
+ 
