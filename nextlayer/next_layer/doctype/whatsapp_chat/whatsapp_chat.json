@@ -32,9 +32,11 @@
   "reply_to_message_id",
   "section_break_dhba",
   "reference_doctype",
+  "reference_name",
   "bulk_message_reference",
   "column_break_efrb",
-  "reference_name"
+  "sender_email",
+  "sender_name"
  ],
  "fields": [
   {
@@ -66,7 +68,7 @@
    "description": "Mobile number with country code",
    "fieldname": "to",
    "fieldtype": "Data",
-   "label": "TO ",
+   "label": "To ",
    "set_only_once": 1
   },
   {
@@ -172,8 +174,10 @@
    "label": "Reply To Message ID"
   },
   {
+   "collapsible": 1,
    "fieldname": "section_break_dhba",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "References"
   },
   {
    "fieldname": "reference_doctype",
@@ -202,7 +206,7 @@
    "description": "Select group",
    "fieldname": "to_group",
    "fieldtype": "Link",
-   "label": "TO",
+   "label": "To",
    "options": "Whatsapp Group Profile",
    "set_only_once": 1
   },
@@ -213,11 +217,23 @@
    "fieldname": "to_group_message",
    "fieldtype": "Check",
    "label": "To Group Message"
+  },
+  {
+   "fieldname": "sender_email",
+   "fieldtype": "Link",
+   "label": "Sender Email",
+   "options": "User"
+  },
+  {
+   "fetch_from": "sender_email.full_name",
+   "fieldname": "sender_name",
+   "fieldtype": "Data",
+   "label": "Sender Name"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-10 01:18:09.074521",
+ "modified": "2026-03-29 23:38:20.462109",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "WhatsApp Chat",

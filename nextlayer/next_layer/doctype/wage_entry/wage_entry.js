@@ -6,6 +6,13 @@ frappe.ui.form.on("Wage Entry", {
 		update_wage_totals(frm);
 		create_journal(frm);
 		apply_filters(frm);
+        if (frm.doc.docstatus >= 0) {
+			frm.add_custom_button(
+				__("Send WhatsApp"),
+				() => open_whatsapp_dialog(frm),
+				__("Actions")
+			);
+		}
         
 	},
     add_type_of_work: function (frm) {
@@ -69,7 +76,7 @@ function apply_filters(frm){
 }
 function create_journal(frm) {
         if (frm.doc.docstatus === 1 && !frm.doc.journal_entry) {
-            frm.add_custom_button('Book Journal Entry', function() {
+            frm.add_custom_button('Journal Entry', function() {
                 frappe.confirm(
                     'Create Journal Entry for <b>' + frm.doc.name + '</b>?',
                     function() {
@@ -90,14 +97,14 @@ function create_journal(frm) {
                         });
                     }
                 );
-            }, 'Accounting');
+            }, 'Create');
         }
 
         // Show link if already booked
         if (frm.doc.journal_entry) {
             frm.add_custom_button('View Journal Entry', function() {
                 frappe.set_route('Form', 'Journal Entry', frm.doc.journal_entry);
-            }, 'Accounting');
+            }, 'View');
         }
     }
 
@@ -352,7 +359,7 @@ function render_accounting_buttons(frm) {
                     });
                 }
             );
-        }, 'Accounting');
+        }, 'Create');
     }
 
     if (frm.doc.journal_entry) {
@@ -360,4 +367,150 @@ function render_accounting_buttons(frm) {
             frappe.set_route('Form', 'Journal Entry', frm.doc.journal_entry);
         }, 'Accounting');
     }
+}
+
+
+
+function open_whatsapp_dialog(frm) {
+	// Fetch groups that the current user has access to
+	frappe.call({
+		method: "frappe.client.get_list",
+		args: {
+			doctype: "Whatsapp Group Profile",
+			fields: ["name", "group_name", "group_id"],
+			filters: [],
+			limit: 100,
+		},
+		callback(r) {
+			const groups = r.message || [];
+
+			if (!groups.length) {
+				frappe.msgprint(__("No WhatsApp groups found. Please sync groups first."));
+				return;
+			}
+
+			const group_options = groups.map((g) => ({
+				label: g.group_name,
+				value: g.name,
+			}));
+
+			// Build default message from Wage Entry details
+			const default_message = build_default_message(frm);
+
+			const d = new frappe.ui.Dialog({
+				title: __("Send WhatsApp Message"),
+				fields: [
+					{
+						fieldname: "group",
+						fieldtype: "Select",
+						label: __("WhatsApp Group"),
+						options: group_options.map((o) => o.label).join("\n"),
+						reqd: 1,
+					},
+					{
+						fieldname: "message",
+						fieldtype: "Small Text",
+						label: __("Message"),
+						default: default_message,
+						reqd: 1,
+					},
+					{
+						fieldname: "attach_document",
+						fieldtype: "Check",
+						label: __("Attach Wage Entry Document (PDF)"),
+						default: 0,
+					},
+					{
+						fieldname: "letterhead",
+						fieldtype: "Check",
+						label: __("Use Letterhead"),
+						default: 0,
+						depends_on: "eval:doc.attach_document == 1",
+					},
+					{
+						fieldname: "custom_attachment",
+						fieldtype: "Attach",
+						label: __("Custom Attachment (optional)"),
+					},
+				],
+				primary_action_label: __("Send"),
+				primary_action(values) {
+					// Resolve selected group name → group doc name
+					const selected_group = group_options.find(
+						(o) => o.label === values.group
+					);
+					const group_name = selected_group ? selected_group.value : values.group;
+
+					d.hide();
+					frappe.show_progress(__("Sending WhatsApp message..."), 0, 100);
+
+					frappe.call({
+						method:
+							"nextlayer.next_layer.api.wasender_whatsapp.send_whatsapp_from_wage_entry",
+						args: {
+							wage_entry_name: frm.doc.name,
+							group_name: group_name,
+							message: values.message,
+							attach_document: values.attach_document ? 1 : 0,
+							letterhead: values.letterhead ? 1 : 0,
+							custom_attachment: values.custom_attachment || "",
+						},
+						callback(r) {
+							frappe.hide_progress();
+							if (r.message && r.message.success) {
+								frappe.show_alert(
+									{
+										message: __("WhatsApp message sent successfully!"),
+										indicator: "green",
+									},
+									5
+								);
+							} else {
+								const err =
+									(r.message && r.message.error) ||
+									__("Unknown error occurred.");
+								frappe.msgprint({
+									title: __("WhatsApp Send Failed"),
+									message: err,
+									indicator: "red",
+								});
+							}
+						},
+						error() {
+							frappe.hide_progress();
+							frappe.msgprint({
+								title: __("Error"),
+								message: __("Failed to send WhatsApp message. Check error logs."),
+								indicator: "red",
+							});
+						},
+					});
+				},
+			});
+
+			d.show();
+		},
+	});
+}
+
+function build_default_message(frm) {
+	const doc = frm.doc;
+	let msg = `*Wage Entry: ${doc.name}*\n`;
+
+	if (doc.date) msg += `Date: ${doc.date}\n`;
+	if (doc.wage_type) msg += `Type: ${doc.wage_type}\n`;
+	if (doc.project) msg += `Project: ${doc.project}\n`;
+	if (doc.stage) msg += `Stage: ${doc.stage}\n`;
+	if (doc.total_amount) msg += `Total Amount: ${format_currency(doc.total_amount, doc.currency)}\n`;
+
+	return msg.trim();
+}
+
+function format_currency(amount, currency) {
+	if (!amount) return "0";
+	const formatted = parseFloat(amount).toLocaleString(undefined, {
+		minimumFractionDigits: 2,
+		maximumFractionDigits: 2,
+	});
+	return currency ? `${currency} ${formatted}` : formatted;
 }
