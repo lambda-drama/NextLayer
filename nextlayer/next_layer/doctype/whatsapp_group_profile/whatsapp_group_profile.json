@@ -11,7 +11,9 @@
   "column_break_wtyr",
   "group_id",
   "section_break_buvz",
-  "members"
+  "members",
+  "user_access_section",
+  "user_permissions"
  ],
  "fields": [
   {
@@ -46,12 +48,23 @@
    "fieldtype": "Table",
    "label": "Members",
    "options": "Whatsapp Group Members"
+  },
+  {
+   "fieldname": "user_access_section",
+   "fieldtype": "Section Break",
+   "label": "User Access"
+  },
+  {
+   "fieldname": "user_permissions",
+   "fieldtype": "Table MultiSelect",
+   "label": "User Permissions",
+   "options": "WhatsApp Group Access"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-09 10:24:59.640306",
+ "modified": "2026-03-29 23:52:13.848697",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Whatsapp Group Profile",

@@ -438,3 +438,211 @@ def qr_code_to_image(qr_code: str, scale: int = 5) -> str:
 	Uses pyqrcode, which is already a Frappe/ERPNext dependency.
 	"""
 	return "data:image/png;base64," + pyqrcode.create(qr_code).png_as_base64_str(scale=scale, quiet_zone=1)
+
+
+@frappe.whitelist()
+
+def get_wage_entry_pdf_url(wage_entry_name: str, letterhead: bool = False) -> str:
+	"""
+	Build a publicly accessible PDF URL for a Wage Entry print format.
+	Uses Frappe's /api/method/frappe.utils.print_format.download_pdf endpoint
+	with an API key so WASender can fetch it without a session.
+ 
+	Returns the full URL string, or None if it cannot be built.
+	"""
+	try:
+		# Get the site base URL
+		site_url = frappe.utils.get_url()
+ 
+		# Find the default print format for Wage Entry (or fall back to "Standard")
+		print_format = (
+			frappe.db.get_value(
+				"Print Format",
+				{"doc_type": "Wage Entry", "disabled": 0},
+				"name",
+				order_by="creation desc",
+			)
+			or "Standard"
+		)
+ 
+		# Use the API-key-authenticated print endpoint so the URL is accessible
+		# without a browser session (required for WASender to download it)
+		api_key = frappe.db.get_value("User", frappe.session.user, "api_key")
+		api_secret = frappe.utils.password.get_decrypted_password(
+			"User", frappe.session.user, "api_secret", raise_exception=False
+		)
+ 
+		params = (
+			f"doctype=Wage Entry"
+			f"&name={frappe.utils.quote(wage_entry_name)}"
+			f"&format={frappe.utils.quote(print_format)}"
+			f"&no_letterhead={0 if letterhead else 1}"
+			f"&letterhead={'Default' if letterhead else 'No Letterhead'}"
+			f"&settings=%7B%7D"
+			f"&_lang=en"
+		)
+ 
+		if api_key and api_secret:
+			# Authenticated URL — WASender can fetch this directly
+			pdf_url = (
+				f"{site_url}/api/method/frappe.utils.print_format.download_pdf"
+				f"?{params}&api_key={api_key}&api_secret={api_secret}"
+			)
+		else:
+			# Fallback: generate the PDF as a file and return its public URL
+			pdf_url = generate_pdf_as_file(wage_entry_name, print_format, letterhead)
+ 
+		return pdf_url
+ 
+	except Exception as e:
+		frappe.log_error(
+			f"Failed to build PDF URL for Wage Entry {wage_entry_name}:\n{str(e)}",
+			"Wage Entry WhatsApp PDF URL",
+		)
+		return None
+ 
+ 
+def generate_pdf_as_file(wage_entry_name: str, print_format: str, letterhead: bool) -> str:
+	"""
+	Fallback: generate the PDF, save it as a Frappe File, and return its public URL.
+	This is used when the user has no API key/secret configured.
+	"""
+	from frappe.utils.pdf import get_pdf
+	from frappe.utils.print_format import get_html as get_print_html
+ 
+	html = get_print_html(
+		doctype="Wage Entry",
+		name=wage_entry_name,
+		print_format=print_format,
+		no_letterhead=0 if letterhead else 1,
+	)
+ 
+	pdf_content = get_pdf(html)
+	file_name = f"WageEntry-{wage_entry_name}.pdf"
+ 
+	# Save as a public File document
+	file_doc = frappe.get_doc(
+		{
+			"doctype": "File",
+			"file_name": file_name,
+			"content": pdf_content,
+			"is_private": 0,
+			"attached_to_doctype": "Wage Entry",
+			"attached_to_name": wage_entry_name,
+		}
+	)
+	file_doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+ 
+	return frappe.utils.get_url(file_doc.file_url)
+ 
+ 
+@frappe.whitelist()
+def send_whatsapp_from_wage_entry(
+	wage_entry_name: str,
+	group_name: str,
+	message: str,
+	attach_document: bool = False,
+	letterhead: bool = False,
+	custom_attachment: str = None,
+) -> dict:
+ 
+	import mimetypes
+ 
+	# ── Validate inputs ───────────────────────────────────────────────────────
+	if not frappe.db.exists("Wage Entry", wage_entry_name):
+		return {"success": False, "error": f"Wage Entry '{wage_entry_name}' not found."}
+ 
+	if not frappe.db.exists("Whatsapp Group Profile", group_name):
+		return {"success": False, "error": f"WhatsApp Group '{group_name}' not found."}
+ 
+	group_doc = frappe.get_doc("Whatsapp Group Profile", group_name)
+ 
+	if not group_doc.group_id:
+		return {"success": False, "error": "Selected group has no Group ID configured."}
+ 
+	FILE_TYPES = {
+		"application/pdf": "documentUrl",
+		"image/jpeg": "imageUrl",
+		"image/png": "imageUrl",
+		"video/mp4": "videoUrl",
+		"audio/mpeg": "audioUrl",
+	}
+ 
+	_CONTENT_TYPE_MAP = {
+		"application/pdf": "document",
+		"image/jpeg": "image",
+		"image/png": "image",
+		"video/mp4": "video",
+		"audio/mpeg": "audio",
+	}
+ 
+	# ── Resolve attachment URLs BEFORE creating the chat doc ─────────────────
+	doc_attachment_url = None
+	custom_attachment_url = None
+	custom_file_type = None
+ 
+	# Convert string "1"/"0" booleans from JS frappe.call args
+	attach_document = frappe.utils.cint(attach_document)
+	letterhead = frappe.utils.cint(letterhead)
+ 
+	if attach_document:
+		doc_attachment_url = get_wage_entry_pdf_url(wage_entry_name, bool(letterhead))
+ 
+	if custom_attachment:
+		custom_attachment_url = get_custom_attachment_url(custom_attachment)
+		if custom_attachment_url:
+			custom_file_type, _ = mimetypes.guess_type(custom_attachment_url)
+ 
+	# ── Determine content_type and attach field for the chat doc ─────────────
+	if custom_attachment_url and custom_file_type:
+		content_type = _CONTENT_TYPE_MAP.get(custom_file_type, "document")
+		attach_field = custom_attachment_url
+	elif doc_attachment_url:
+		content_type = "document"
+		attach_field = doc_attachment_url
+	else:
+		content_type = "text"
+		attach_field = None
+ 
+	# ── Build and insert the WhatsApp Chat document ───────────────────────────
+	chat_doc = frappe.new_doc("WhatsApp Chat")
+	chat_doc.type = "Outgoing"
+	chat_doc.to_group_message = 1
+	chat_doc.to_group = group_name
+	chat_doc.message = message
+	chat_doc.content_type = content_type
+	chat_doc.status = "Pending"
+	chat_doc.reference_doctype = "Wage Entry"
+	chat_doc.reference_name = wage_entry_name
+	chat_doc.sender_email = frappe.session.user
+ 
+	if attach_field:
+		chat_doc.attach = attach_field
+ 
+	chat_doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+ 
+	# ── Build WASender payload ────────────────────────────────────────────────
+	data = {
+		"to": group_doc.group_id,
+		"text": message,
+	}
+ 
+	if doc_attachment_url:
+		data["documentUrl"] = doc_attachment_url
+
+	if custom_attachment_url and custom_file_type and custom_file_type in FILE_TYPES:
+		data[FILE_TYPES[custom_file_type]] = custom_attachment_url
+ 
+	# ── Fire the API call ─────────────────────────────────────────────────────
+	result = make_wasender_api_call(
+		data,
+		"send-message",
+		reference_doctype="Wage Entry",
+		reference_name=wage_entry_name,
+		update_existing_chat=chat_doc,
+	)
+ 
+	return result
+ 

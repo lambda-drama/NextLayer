@@ -126,7 +126,9 @@ fixtures = [
                     
                     #Project
                     "Project-custom_attachment",
-                    "Project-custom_project_attachments"
+                    "Project-custom_project_attachments",
+                    "Project-custom_project_stages",
+                    "Project-custom_stages",
                 ),
             ]
         ],

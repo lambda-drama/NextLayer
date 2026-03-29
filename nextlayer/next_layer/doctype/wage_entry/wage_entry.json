@@ -222,6 +222,7 @@
    "options": "Cost Center"
   },
   {
+   "depends_on": "eval:doc.docstatus==0",
    "fieldname": "add_type_of_work",
    "fieldtype": "Button",
    "label": "Add Type of Work"
@@ -237,7 +238,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-29 01:59:43.909588",
+ "modified": "2026-03-29 23:05:46.403413",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",
