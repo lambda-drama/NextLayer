@@ -646,3 +646,199 @@ def send_whatsapp_from_wage_entry(
  
 	return result
  
+
+
+def get_contract_pdf_url(contract_name: str, letterhead: bool = False) -> str:
+	"""
+	Build a publicly accessible PDF URL for a Contract print format.
+	Primary: authenticated download_pdf URL using the user's API key.
+	Fallback: generate PDF as a public Frappe File and return its URL.
+	"""
+	try:
+		site_url = frappe.utils.get_url()
+ 
+		print_format = (
+			frappe.db.get_value(
+				"Print Format",
+				{"doc_type": "Contract", "disabled": 0},
+				"name",
+				order_by="creation desc",
+			)
+			or "Standard"
+		)
+ 
+		api_key = frappe.db.get_value("User", frappe.session.user, "api_key")
+		api_secret = frappe.utils.password.get_decrypted_password(
+			"User", frappe.session.user, "api_secret", raise_exception=False
+		)
+ 
+		params = (
+			f"doctype=Contract"
+			f"&name={frappe.utils.quote(contract_name)}"
+			f"&format={frappe.utils.quote(print_format)}"
+			f"&no_letterhead={0 if letterhead else 1}"
+			f"&letterhead={'Default' if letterhead else 'No Letterhead'}"
+			f"&settings=%7B%7D"
+			f"&_lang=en"
+		)
+ 
+		if api_key and api_secret:
+			return (
+				f"{site_url}/api/method/frappe.utils.print_format.download_pdf"
+				f"?{params}&api_key={api_key}&api_secret={api_secret}"
+			)
+		else:
+			return _generate_pdf_as_file(contract_name, print_format, letterhead)
+ 
+	except Exception as e:
+		frappe.log_error(
+			f"Failed to build PDF URL for Contract {contract_name}:\n{str(e)}",
+			"Contract WhatsApp PDF URL",
+		)
+		return None
+ 
+ 
+def _generate_pdf_as_file(contract_name: str, print_format: str, letterhead: bool) -> str:
+	"""Fallback: render PDF → save as public File → return URL."""
+	from frappe.utils.pdf import get_pdf
+	from frappe.utils.print_format import get_html as get_print_html
+ 
+	html = get_print_html(
+		doctype="Contract",
+		name=contract_name,
+		print_format=print_format,
+		no_letterhead=0 if letterhead else 1,
+	)
+	pdf_content = get_pdf(html)
+	file_doc = frappe.get_doc({
+		"doctype": "File",
+		"file_name": f"Contract-{contract_name}.pdf",
+		"content": pdf_content,
+		"is_private": 0,
+		"attached_to_doctype": "Contract",
+		"attached_to_name": contract_name,
+	})
+	file_doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+	return frappe.utils.get_url(file_doc.file_url)
+
+@frappe.whitelist()
+def send_whatsapp_from_contract(
+	contract_name: str,
+	group_name: str,
+	message: str,
+	attach_document: bool = False,
+	letterhead: bool = False,
+	custom_attachment: str = None,
+) -> dict:
+	"""
+	Send a WhatsApp message to a group from a Contract document.
+	Creates a WhatsApp Chat record and triggers the WASender API.
+	"""
+	# ── Validate inputs ───────────────────────────────────────────────────────
+	if not frappe.db.exists("Contract", contract_name):
+		return {"success": False, "error": f"Contract '{contract_name}' not found."}
+ 
+	if not frappe.db.exists("Whatsapp Group Profile", group_name):
+		return {"success": False, "error": f"WhatsApp Group '{group_name}' not found."}
+ 
+	group_doc = frappe.get_doc("Whatsapp Group Profile", group_name)
+ 
+	if not group_doc.group_id:
+		return {"success": False, "error": "Selected group has no Group ID configured."}
+ 
+	# ── Server-side permission re-check ──────────────────────────────────────
+	current_user = frappe.session.user
+	if "System Manager" not in frappe.get_roles(current_user):
+		total_permissions = frappe.db.count(
+			"WhatsApp Group Access", filters={"parent": group_name}
+		)
+		if total_permissions > 0 and not frappe.db.exists(
+			"WhatsApp Group Access", {"parent": group_name, "user": current_user}
+		):
+			frappe.throw(
+				"You do not have permission to send messages to this group.",
+				frappe.PermissionError,
+			)
+ 
+	FILE_TYPES = {
+		"application/pdf": "documentUrl",
+		"image/jpeg": "imageUrl",
+		"image/png": "imageUrl",
+		"video/mp4": "videoUrl",
+		"audio/mpeg": "audioUrl",
+	}
+	_CONTENT_TYPE_MAP = {
+		"application/pdf": "document",
+		"image/jpeg": "image",
+		"image/png": "image",
+		"video/mp4": "video",
+		"audio/mpeg": "audio",
+	}
+ 
+	attach_document = frappe.utils.cint(attach_document)
+	letterhead = frappe.utils.cint(letterhead)
+ 
+	# ── Resolve attachments BEFORE creating the chat doc ─────────────────────
+	doc_attachment_url = None
+	custom_attachment_url = None
+	custom_file_type = None
+ 
+	if attach_document:
+		doc_attachment_url = get_contract_pdf_url(contract_name, bool(letterhead))
+ 
+	if custom_attachment:
+		custom_attachment_url = get_custom_attachment_url(custom_attachment)
+		if custom_attachment_url:
+			custom_file_type, _ = mimetypes.guess_type(custom_attachment_url)
+ 
+	# ── Determine content_type and attach field ───────────────────────────────
+	if custom_attachment_url and custom_file_type:
+		content_type = _CONTENT_TYPE_MAP.get(custom_file_type, "document")
+		attach_field = custom_attachment_url
+	elif doc_attachment_url:
+		content_type = "document"
+		attach_field = doc_attachment_url
+	else:
+		content_type = "text"
+		attach_field = None
+ 
+	# ── Build and insert the WhatsApp Chat document ───────────────────────────
+	chat_doc = frappe.new_doc("WhatsApp Chat")
+	chat_doc.type = "Outgoing"
+	chat_doc.to_group_message = 1
+	chat_doc.to_group = group_name
+	chat_doc.message = message
+	chat_doc.content_type = content_type
+	chat_doc.status = "Pending"
+	chat_doc.reference_doctype = "Contract"
+	chat_doc.reference_name = contract_name
+	chat_doc.sender_email = frappe.session.user
+ 
+	if attach_field:
+		chat_doc.attach = attach_field
+ 
+	chat_doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+ 
+	# ── Build WASender payload ────────────────────────────────────────────────
+	data = {
+		"to": group_doc.group_id,
+		"text": message,
+	}
+ 
+	if doc_attachment_url:
+		data["documentUrl"] = doc_attachment_url
+ 
+	if custom_attachment_url and custom_file_type and custom_file_type in FILE_TYPES:
+		data[FILE_TYPES[custom_file_type]] = custom_attachment_url
+ 
+	# ── Fire the API call ─────────────────────────────────────────────────────
+	return make_wasender_api_call(
+		data,
+		"send-message",
+		reference_doctype="Contract",
+		reference_name=contract_name,
+		update_existing_chat=chat_doc,
+	)
+ 
