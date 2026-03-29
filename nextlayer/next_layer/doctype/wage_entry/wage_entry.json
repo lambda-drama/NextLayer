@@ -21,10 +21,6 @@
   "column_break_awft",
   "marka",
   "cost_center",
-  "accounting_section",
-  "default_expense_account",
-  "column_break_mmjy",
-  "default_payable_account",
   "wage_breakdown_section",
   "add_type_of_work",
   "wages",
@@ -36,7 +32,13 @@
   "total_amount",
   "section_break_wqsw",
   "description",
-  "amended_from"
+  "amended_from",
+  "payments_tab",
+  "default_payable_account",
+  "payment_account",
+  "column_break_lksz",
+  "default_expense_account",
+  "journal_entry"
  ],
  "fields": [
   {
@@ -144,12 +146,6 @@
    "label": "Work Breakdown"
   },
   {
-   "collapsible": 1,
-   "fieldname": "accounting_section",
-   "fieldtype": "Section Break",
-   "label": "Accounting"
-  },
-  {
    "allow_on_submit": 1,
    "fieldname": "default_expense_account",
    "fieldtype": "Link",
@@ -158,15 +154,11 @@
    "options": "Account"
   },
   {
-   "fieldname": "column_break_mmjy",
-   "fieldtype": "Column Break"
-  },
-  {
    "allow_on_submit": 1,
    "fieldname": "default_payable_account",
    "fieldtype": "Link",
    "ignore_user_permissions": 1,
-   "label": "Default Payable Account",
+   "label": "Payable Account",
    "options": "Account"
   },
   {
@@ -232,13 +224,35 @@
    "fieldtype": "Table",
    "label": "Type of Work Breakdown",
    "options": "Work Type Detail"
+  },
+  {
+   "fieldname": "payments_tab",
+   "fieldtype": "Tab Break",
+   "label": "Payments"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "payment_account",
+   "fieldtype": "Link",
+   "label": "Payment Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_lksz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "options": "Journal Entry"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-30 01:22:56.842283",
+ "modified": "2026-03-30 02:58:27.611271",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",

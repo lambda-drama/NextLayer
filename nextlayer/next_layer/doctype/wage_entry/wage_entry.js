@@ -73,6 +73,16 @@ function apply_filters(frm){
                 }
             };
         });
+
+         frm.set_query("payment_account", () => {
+    return {
+      filters: {
+        company: frm.doc.company,
+        // account_currency: frm.doc.currency,
+        account_type: ["in", ["Cash", "Bank"]],
+      },
+    };
+  });
 }
 function create_journal(frm) {
         if (frm.doc.docstatus === 1 && !frm.doc.journal_entry) {
