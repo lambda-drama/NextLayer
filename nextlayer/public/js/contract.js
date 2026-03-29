@@ -62,19 +62,21 @@ function calculate_amount_per_stage(frm) {
 
 function generate_payment_terms(frm) {
     let amount = frm.doc.custom_amount_per_stage || 0;
-    if (!amount) return;
+    let stages = frm.doc.custom_stages || 0;
+
+    if (!amount || !stages) return;
 
     amount = Number(amount).toFixed(2);
 
-    let somali =
-    "1. <b>WAJIGA 1-AAD:</b> Waxaa la bixin doonaa $" + amount + " marki ladhameyo Bilindiyada Tiirarka Foundation-ka.<br>" +
-    "2. <b>WAJIGA 2-AAD:</b> Waxaa la bixin doonaa $" + amount + " marki ladhameyo Shubka Biyaanterka Iyo Tiirarka Ground Floor-ka.<br>" +
-    "3. <b>WAJIGA 3-AAD:</b> Waxaa la bixin doonaa $" + amount + " marki ladhameyo Main Besment, Jaranjarada Iyo Shubka Salootada.";
+    let somali = "";
+    let english = "";
 
-let english =
-    "1. <b>STAGE 1:</b> A Payment Of $" + amount + " Will Be Made After Completion Of The Foundation Columns.<br>" +
-    "2. <b>STAGE 2:</b> A Payment Of $" + amount + " Will Be Made After Completion Of Ground Floor Slab And Columns.<br>" +
-    "3. <b>STAGE 3:</b> A Payment Of $" + amount + " Will Be Made After Completion Of Basement, Staircase, And Roof Slab.";
+    for (let i = 1; i <= stages; i++) {
+
+        somali += i + ". <b>WAJIGA " + i + "-AAD:</b> Waxaa la bixin doonaa $" + amount + " marki ladhameyo marxaladda " + i + "-aad.<br>";
+
+        english += i + ". <b>STAGE " + i + ":</b> A Payment Of $" + amount + " Will Be Made After Completion Of Stage " + i + ".<br>";
+    }
 
     frm.set_value('custom_payment_terms_somali', somali);
     frm.set_value('custom_payment_terms', english);
