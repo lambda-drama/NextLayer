@@ -55,77 +55,164 @@ class WageEntry(Document):
 
 
 
+# @frappe.whitelist()
+# def make_journal_entry(wage_entry_name):
+# 	doc = frappe.get_doc("Wage Entry", wage_entry_name)
+
+# 	if not doc.default_expense_account:
+# 		frappe.throw(_("Please set a Default Expense Account on this Wage Entry before booking."))
+
+# 	if not doc.default_payable_account:
+# 		frappe.throw(_("Please set a Default Payable Account on this Wage Entry before booking."))
+
+# 	# Check not already booked
+# 	existing = frappe.db.exists("Journal Entry", {
+# 		"user_remark": "Wages - " + wage_entry_name,
+# 		"docstatus": 1
+# 	})
+# 	if existing:
+# 		frappe.throw(_("A Journal Entry already exists for this Wage Entry: {0}").format(existing))
+
+# 	# Group wages by type_of_work
+# 	groups = {}
+# 	for row in doc.wages:
+# 		key = row.type_of_work or "General"
+# 		groups[key] = groups.get(key, 0) + (row.amount or 0)
+
+# 	total = sum(groups.values())
+
+# 	if total <= 0:
+# 		frappe.throw(_("Total wage amount must be greater than zero."))
+
+# 	# Build journal entry accounts
+# 	accounts = []
+
+# 	# One debit row per work type
+# 	for work_type, amount in groups.items():
+# 		accounts.append({
+# 			"account": doc.default_expense_account,
+# 			"debit_in_account_currency": amount,
+# 			"credit_in_account_currency": 0,
+# 			"project": doc.project or "",
+# 			"cost_center": doc.cost_center or "",
+# 			"user_remark": work_type
+# 		})
+
+# 	# Single credit row
+# 	accounts.append({
+# 		"account": doc.default_payable_account,
+# 		"debit_in_account_currency": 0,
+# 		"credit_in_account_currency": total,
+# 		"project": doc.project or "",
+# 		"cost_center": doc.cost_center or ""
+# 	})
+
+# 	jv = frappe.get_doc({
+# 		"doctype": "Journal Entry",
+# 		"voucher_type": "Journal Entry",
+# 		"posting_date": doc.date or nowdate(),
+# 		"company": doc.company,
+# 		"user_remark": "Wages - " + wage_entry_name,
+# 		"accounts": accounts,
+# 		"multi_currency":1,
+# 		"branch":doc.branch
+# 	})
+
+# 	jv.insert(ignore_permissions=True)
+# 	jv.submit()
+
+# 	# Save reference back on Wage Entry
+# 	frappe.db.set_value("Wage Entry", wage_entry_name, "journal_entry", jv.name)
+
+# 	return jv.name
+
+from frappe.utils import nowdate
+from frappe import _
+import frappe
+
 @frappe.whitelist()
 def make_journal_entry(wage_entry_name):
-	doc = frappe.get_doc("Wage Entry", wage_entry_name)
+    doc = frappe.get_doc("Wage Entry", wage_entry_name)
 
-	if not doc.default_expense_account:
-		frappe.throw(_("Please set a Default Expense Account on this Wage Entry before booking."))
+    if not doc.default_expense_account:
+        frappe.throw(_("Please set a Default Expense Account before booking."))
 
-	if not doc.default_payable_account:
-		frappe.throw(_("Please set a Default Payable Account on this Wage Entry before booking."))
+    if not doc.default_payable_account:
+        frappe.throw(_("Please set a Default Payable Account before booking."))
 
-	# Check not already booked
-	existing = frappe.db.exists("Journal Entry", {
-		"user_remark": "Wages - " + wage_entry_name,
-		"docstatus": 1
-	})
-	if existing:
-		frappe.throw(_("A Journal Entry already exists for this Wage Entry: {0}").format(existing))
+    if doc.journal_entry:
+        frappe.throw(_("Journal Entry {0} already exists for this Wage Entry.").format(doc.journal_entry))
 
-	# Group wages by type_of_work
-	groups = {}
-	for row in doc.wages:
-		key = row.type_of_work or "General"
-		groups[key] = groups.get(key, 0) + (row.amount or 0)
+    total = sum(row.amount or 0 for row in doc.wages)
 
-	total = sum(groups.values())
+    if total <= 0:
+        frappe.throw(_("Total wage amount must be greater than zero."))
 
-	if total <= 0:
-		frappe.throw(_("Total wage amount must be greater than zero."))
+    # Currency resolution (mirrors BonusPayout pattern)
+    company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
+    expense_account_currency = frappe.db.get_value("Account", doc.default_expense_account, "account_currency")
+    payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
+    conversion_rate = getattr(doc, "conversion_rate", None) or 1
 
-	# Build journal entry accounts
-	accounts = []
+    accounts = []
 
-	# One debit row per work type
-	for work_type, amount in groups.items():
-		accounts.append({
-			"account": doc.default_expense_account,
-			"debit_in_account_currency": amount,
-			"credit_in_account_currency": 0,
-			"project": doc.project or "",
-			"cost_center": doc.cost_center or "",
-			"user_remark": work_type
-		})
+    # --- DEBIT: one row per work type on the expense account ---
+    groups = {}
+    for row in doc.wages:
+        key = row.type_of_work or "General"
+        groups[key] = groups.get(key, 0) + (row.amount or 0)
 
-	# Single credit row
-	accounts.append({
-		"account": doc.default_payable_account,
-		"debit_in_account_currency": 0,
-		"credit_in_account_currency": total,
-		"project": doc.project or "",
-		"cost_center": doc.cost_center or ""
-	})
+    for work_type, amount in groups.items():
+        accounts.append({
+            "account": doc.default_expense_account,
+            "debit_in_account_currency": amount,
+            "credit_in_account_currency": 0,
+            "project": doc.project or "",
+            "cost_center": doc.cost_center or "",
+            "user_remark": work_type,
+            "exchange_rate": conversion_rate if company_currency != expense_account_currency else 1,
+            "company_group": doc.company_group or "",
+        })
 
-	jv = frappe.get_doc({
-		"doctype": "Journal Entry",
-		"voucher_type": "Journal Entry",
-		"posting_date": doc.date or nowdate(),
-		"company": doc.company,
-		"user_remark": "Wages - " + wage_entry_name,
-		"accounts": accounts,
-		"multi_currency":1,
-		"branch":doc.branch
-	})
+    # --- CREDIT: payable account row, with party if provided ---
+    credit_row = {
+        "account": doc.default_payable_account,
+        "debit_in_account_currency": 0,
+        "credit_in_account_currency": total,
+        "project": doc.project or "",
+        "cost_center": doc.cost_center or "",
+        "exchange_rate": conversion_rate if company_currency != payable_account_currency else 1,
+        "company_group": doc.company_group or "",
+        "reference_type": doc.doctype,   # links JE back to Wage Entry
+        "reference_name": doc.name,
+    }
 
-	jv.insert(ignore_permissions=True)
-	jv.submit()
+    # Attach party only if both fields are filled (mirrors BonusPayout per-party rows)
+    if doc.party_type and doc.party:
+        credit_row["party_type"] = doc.party_type
+        credit_row["party"] = doc.party
 
-	# Save reference back on Wage Entry
-	frappe.db.set_value("Wage Entry", wage_entry_name, "journal_entry", jv.name)
+    accounts.append(credit_row)
 
-	return jv.name
+    jv = frappe.get_doc({
+        "doctype": "Journal Entry",
+        "voucher_type": "Journal Entry",
+        "posting_date": doc.date or nowdate(),
+        "company": doc.company,
+        "title": doc.default_payable_account,
+        "user_remark": "Wages - " + wage_entry_name,
+        "accounts": accounts,
+        # Only enable multi_currency when doc currency differs from company currency
+        "multi_currency": 1 if (doc.currency and doc.currency != company_currency) else 0,
+        "branch": doc.branch or "",
+    })
 
+    jv.insert(ignore_permissions=True)
+    jv.submit()
+
+    frappe.db.set_value("Wage Entry", wage_entry_name, "journal_entry", jv.name)
+
+    return jv.name
 
 @frappe.whitelist()
 def get_allowed_whatsapp_groups() -> list:

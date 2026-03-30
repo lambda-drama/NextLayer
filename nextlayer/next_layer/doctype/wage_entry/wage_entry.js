@@ -17,7 +17,17 @@ frappe.ui.form.on("Wage Entry", {
 	},
     add_type_of_work: function (frm) {
         open_work_type_modal(frm);
-    }
+    },
+     default_payable_account: function (frm) {
+    frm.set_query("party_type", function () {
+      return {
+        query: "erpnext.setup.doctype.party_type.party_type.get_party_type",
+        filters: {
+          account: frm.doc.default_payable_account,
+        },
+      };
+    });
+  },
 });
 
 frappe.ui.form.on("Wage Breakdown Detail", {
@@ -83,6 +93,15 @@ function apply_filters(frm){
       },
     };
   });
+
+   frm.set_query("cost_center", function () {
+      return {
+        filters: {
+          company: frm.doc.company,
+          is_group: 0,
+        },
+      };
+    });
 }
 function create_journal(frm) {
         if (frm.doc.docstatus === 1 && !frm.doc.journal_entry) {
