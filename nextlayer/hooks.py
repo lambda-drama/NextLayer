@@ -123,6 +123,21 @@ fixtures = [
                     "Contract-custom_length",
                     "Contract-custom_width",
                     "Contract-custom_area",
+                    "Contract-custom_cost_center",
+                    "Contract-custom_marka",
+                    "Contract-custom_column_break_pvkfi",
+                    "Contract-custom_company_group",
+                    "Contract-custom_branch",
+                    "Contract-custom_accounting_dimensions",
+                    "Contract-custom_payment",
+                    "Contract-custom_stages_payment",
+                    "Contract-custom_conversion_rate",
+                    "Contract-custom_expense_account",
+                    "Contract-custom_column_break_wxfft",
+                    "Contract-custom_payment_account",
+                    "Contract-custom_payable_account",
+                    "Contract-custom_payments",
+                    
                     
                     #Project
                     "Project-custom_attachment",
