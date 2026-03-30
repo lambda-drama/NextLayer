@@ -581,6 +581,8 @@ def send_whatsapp_from_wage_entry(
 	doc_attachment_url = None
 	custom_attachment_url = None
 	custom_file_type = None
+	custom_attachment_path = None
+	
  
 	# Convert string "1"/"0" booleans from JS frappe.call args
 	attach_document = frappe.utils.cint(attach_document)
@@ -589,18 +591,18 @@ def send_whatsapp_from_wage_entry(
 	if attach_document:
 		doc_attachment_url = get_wage_entry_pdf_url(wage_entry_name, bool(letterhead))
  
-	if custom_attachment:
-		custom_attachment_url = get_custom_attachment_url(custom_attachment)
-		if custom_attachment_url:
-			custom_file_type, _ = mimetypes.guess_type(custom_attachment_url)
- 
-	# ── Determine content_type and attach field for the chat doc ─────────────
-	if custom_attachment_url and custom_file_type:
+	# if custom_attachment:
+	# 	custom_attachment_url = get_custom_attachment_url(custom_attachment)
+	# 	if custom_attachment_url:
+	# 		custom_file_type, _ = mimetypes.guess_type(custom_attachment_url)
+	if custom_attachment_path and custom_file_type:
 		content_type = _CONTENT_TYPE_MAP.get(custom_file_type, "document")
-		attach_field = custom_attachment_url
+		attach_field = custom_attachment_path         # relative path
 	elif doc_attachment_url:
 		content_type = "document"
-		attach_field = doc_attachment_url
+		# Strip site URL → store relative path in chat doc, keep full URL for API
+		site_url = frappe.utils.get_url()
+		attach_field = doc_attachment_url.replace(site_url, "")  # ← fix
 	else:
 		content_type = "text"
 		attach_field = None
