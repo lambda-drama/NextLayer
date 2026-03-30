@@ -1,5 +1,5 @@
 import frappe
-from frappe.integrations.utils import make_post_request, make_get_request
+from frappe.integrations.utils import make_get_request
 
 from .whatsapp_utils import get_custom_attachment_url, get_document_attachment_url
 
@@ -213,7 +213,6 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 			file_type, _ = mimetypes.guess_type(attachment_url)
 			if file_type and file_type in FILE_TYPES:
 				data[FILE_TYPES[file_type]] = attachment_url
-	frappe.throw(f"Attach field: {chat_doc.attach}\nResolved URL: {attachment_url}")
 	return make_wasender_api_call(data, "send-message", update_existing_chat=chat_doc)
 
 
@@ -724,6 +723,7 @@ def _generate_pdf_as_file(contract_name: str, print_format: str, letterhead: boo
 	frappe.db.commit()
 	return frappe.utils.get_url(file_doc.file_url)
 
+
 @frappe.whitelist()
 def send_whatsapp_from_contract(
 	contract_name: str,
@@ -737,18 +737,20 @@ def send_whatsapp_from_contract(
 	Send a WhatsApp message to a group from a Contract document.
 	Creates a WhatsApp Chat record and triggers the WASender API.
 	"""
+	import mimetypes
+
 	# ── Validate inputs ───────────────────────────────────────────────────────
 	if not frappe.db.exists("Contract", contract_name):
 		return {"success": False, "error": f"Contract '{contract_name}' not found."}
- 
+
 	if not frappe.db.exists("Whatsapp Group Profile", group_name):
 		return {"success": False, "error": f"WhatsApp Group '{group_name}' not found."}
- 
+
 	group_doc = frappe.get_doc("Whatsapp Group Profile", group_name)
- 
+
 	if not group_doc.group_id:
 		return {"success": False, "error": "Selected group has no Group ID configured."}
- 
+
 	# ── Server-side permission re-check ──────────────────────────────────────
 	current_user = frappe.session.user
 	if "System Manager" not in frappe.get_roles(current_user):
@@ -762,7 +764,7 @@ def send_whatsapp_from_contract(
 				"You do not have permission to send messages to this group.",
 				frappe.PermissionError,
 			)
- 
+
 	FILE_TYPES = {
 		"application/pdf": "documentUrl",
 		"image/jpeg": "imageUrl",
@@ -777,34 +779,38 @@ def send_whatsapp_from_contract(
 		"video/mp4": "video",
 		"audio/mpeg": "audio",
 	}
- 
+
 	attach_document = frappe.utils.cint(attach_document)
 	letterhead = frappe.utils.cint(letterhead)
- 
+
 	# ── Resolve attachments BEFORE creating the chat doc ─────────────────────
 	doc_attachment_url = None
 	custom_attachment_url = None
+	custom_attachment_path = None  # relative path → for chat_doc.attach
 	custom_file_type = None
- 
+
 	if attach_document:
 		doc_attachment_url = get_contract_pdf_url(contract_name, bool(letterhead))
- 
+
 	if custom_attachment:
-		custom_attachment_url = get_custom_attachment_url(custom_attachment)
+		custom_attachment_path = custom_attachment  # relative path, e.g. /files/xyz.pdf
+		custom_attachment_url = get_custom_attachment_url(custom_attachment)  # full URL for API
 		if custom_attachment_url:
 			custom_file_type, _ = mimetypes.guess_type(custom_attachment_url)
- 
+
 	# ── Determine content_type and attach field ───────────────────────────────
-	if custom_attachment_url and custom_file_type:
+	if custom_attachment_path and custom_file_type:
 		content_type = _CONTENT_TYPE_MAP.get(custom_file_type, "document")
-		attach_field = custom_attachment_url
+		attach_field = custom_attachment_path  # relative path, not full URL
 	elif doc_attachment_url:
 		content_type = "document"
-		attach_field = doc_attachment_url
+		# Strip site URL → store relative path in chat doc, keep full URL for API
+		site_url = frappe.utils.get_url()
+		attach_field = doc_attachment_url.replace(site_url, "")
 	else:
 		content_type = "text"
 		attach_field = None
- 
+
 	# ── Build and insert the WhatsApp Chat document ───────────────────────────
 	chat_doc = frappe.new_doc("WhatsApp Chat")
 	chat_doc.type = "Outgoing"
@@ -816,25 +822,25 @@ def send_whatsapp_from_contract(
 	chat_doc.reference_doctype = "Contract"
 	chat_doc.reference_name = contract_name
 	chat_doc.sender_email = frappe.session.user
- 
+
 	if attach_field:
 		chat_doc.attach = attach_field
- 
+
 	chat_doc.insert(ignore_permissions=True)
 	frappe.db.commit()
- 
+
 	# ── Build WASender payload ────────────────────────────────────────────────
 	data = {
 		"to": group_doc.group_id,
 		"text": message,
 	}
- 
+
 	if doc_attachment_url:
 		data["documentUrl"] = doc_attachment_url
- 
+
 	if custom_attachment_url and custom_file_type and custom_file_type in FILE_TYPES:
 		data[FILE_TYPES[custom_file_type]] = custom_attachment_url
- 
+
 	# ── Fire the API call ─────────────────────────────────────────────────────
 	return make_wasender_api_call(
 		data,
@@ -843,4 +849,3 @@ def send_whatsapp_from_contract(
 		reference_name=contract_name,
 		update_existing_chat=chat_doc,
 	)
- 

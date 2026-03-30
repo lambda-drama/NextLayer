@@ -20,6 +20,39 @@ frappe.ui.form.on('Contract', {
     custom_amount_per_stage: function(frm) {
         generate_payment_terms(frm); // 🔥 THIS is the key
     },
+		custom_company: function (frm){
+		
+
+		set_all_queries(frm);
+
+		frm.trigger("get_currency_exchange");
+
+	},
+	get_currency_exchange: function (frm) {
+    const company_currency = erpnext.get_currency(frm.doc.company);
+    if (!company_currency) {
+      return;
+    }
+
+    frappe.call({
+      method: "erpnext.setup.utils.get_exchange_rate",
+      args: {
+        transaction_date: frm.doc.posting_date,
+        from_currency: frm.doc.custom_currency,
+        to_currency: company_currency,
+      },
+      freeze: true,
+      freeze_message: __("Fetching exchange rates ..."),
+      callback: function (r) {
+        const exchange_rate = flt(r.message);
+        if (exchange_rate != frm.doc.conversion_rate) {
+          frm.set_value("custom_conversion_rate", exchange_rate);
+        }
+      },
+    });
+  },
+
+
     refresh(frm) {
 		if (frm.doc.docstatus >= 0) {
 			frm.add_custom_button(
@@ -28,9 +61,67 @@ frappe.ui.form.on('Contract', {
 				__("Actions")
 			);
 		}
+
+		render_stage_payment_button(frm);
+
+
 	},
 
+	setup: function (frm){
+		set_account_query(frm);
+		 set_all_queries(frm);
+		frm.trigger("get_currency_exchange");
+	}
+
 });
+
+
+function set_all_queries(frm) {
+
+    // Payment Account (Cash / Bank)
+    frm.set_query("custom_payment_account", () => {
+        return {
+            filters: {
+                company: frm.doc.custom_company,
+                account_type: ["in", ["Cash", "Bank"]],
+            },
+        };
+    });
+
+    // Expense Account
+    frm.set_query("custom_expense_account", () => {
+        return {
+            filters: {
+                company: frm.doc.custom_company,
+                account_type: "Expense Account",
+            },
+        };
+    });
+
+	frm.set_query("custom_cost_center", function () {
+      return {
+        filters: {
+          company: frm.doc.company,
+          is_group: 0,
+        },
+      };
+    });
+}
+
+function set_account_query(frm, acc_type = "Payable") {
+  frm.set_query(
+    acc_type === "Expense" ? "custom_expense_account" : "custom_payable_account",
+    () => {
+      return {
+        filters: {
+          company: frm.doc.custom_company,
+          account_currency: frm.doc.custom_currency,
+          account_type: acc_type === "Expense" ? "Expense Account" : "Payable",
+        },
+      };
+    },
+  );
+}
 
 function calculate_area(frm) {
     let width = frm.doc.custom_width || 0;
@@ -221,4 +312,67 @@ function format_currency(amount, currency) {
 		maximumFractionDigits: 2,
 	});
 	return currency ? `${currency} ${formatted}` : formatted;
+}
+
+
+function render_stage_payment_button(frm) {
+    // Only on submitted documents
+    if (frm.doc.docstatus !== 1) return;
+
+    const stages_paid  = frm.doc.custom_stages_payment || 0;
+    const total_stages = frm.doc.custom_stages          || 0;
+
+    // Hide button when all stages are done
+    if (stages_paid >= total_stages) return;
+
+    frm.add_custom_button(__('Stage Payment Journal Entry'), function () {
+
+        let d = new frappe.ui.Dialog({
+            title: __('Create Stage Payment — Stage {0} of {1}', [stages_paid + 1, total_stages]),
+            fields: [
+                {
+                    fieldname:  'stage_no',
+                    fieldtype:  'Int',
+                    label:      __('Stage Number'),
+                    default:    stages_paid + 1,
+                    read_only:  1,
+                },
+                {
+                    fieldname:  'amount',
+                    fieldtype:  'Currency',
+                    label:      __('Amount'),
+                    // default to per-stage amount; user can override
+                    default:    frm.doc.custom_amount_per_stage || 0,
+                    reqd:       1,
+                },
+            ],
+            primary_action_label: __('Create & Submit'),
+            primary_action(values) {
+                frappe.call({
+                    // Update this path if you place contract.py somewhere else
+                    method: 'nextlayer.next_layer.api.contract.make_journal_entry',
+                    args: {
+                        contract_name: frm.doc.name,
+                        amount:        values.amount,
+                        stage_no:      values.stage_no,
+                    },
+                    freeze:         true,
+                    freeze_message: __('Creating Journal Entry...'),
+                    callback: function (r) {
+                        if (r.message) {
+                            frappe.show_alert({
+                                message:   __('Journal Entry {0} created and submitted.', [r.message]),
+                                indicator: 'green',
+                            }, 6);
+                            d.hide();
+                            frm.reload_doc();
+                        }
+                    },
+                });
+            },
+        });
+
+        d.show();
+
+    }, __('Create'));   // groups the button under a "Create" dropdown (same as Wage Entry)
 }

@@ -34,11 +34,16 @@
   "description",
   "amended_from",
   "payments_tab",
+  "section_break_hmbz",
   "default_payable_account",
   "payment_account",
-  "column_break_lksz",
   "default_expense_account",
-  "journal_entry"
+  "column_break_lksz",
+  "party_type",
+  "party",
+  "journal_entry",
+  "section_break_cqht",
+  "conversion_rate"
  ],
  "fields": [
   {
@@ -191,7 +196,7 @@
    "fieldtype": "Link",
    "ignore_user_permissions": 1,
    "label": "Company Group",
-   "options": "Company"
+   "options": "Company Group"
   },
   {
    "fieldname": "column_break_awft",
@@ -246,13 +251,38 @@
    "fieldtype": "Link",
    "label": "Journal Entry",
    "options": "Journal Entry"
+  },
+  {
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "label": "Party Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "label": "Party",
+   "options": "party_type"
+  },
+  {
+   "fieldname": "section_break_hmbz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_cqht",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-30 02:58:27.611271",
+ "modified": "2026-03-31 01:17:53.243273",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",
