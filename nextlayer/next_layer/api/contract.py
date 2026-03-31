@@ -86,5 +86,64 @@ def make_journal_entry(contract_name, amount, stage_no):
 
     # ---------- increment stages_payment counter ----------
     frappe.db.set_value("Contract", contract_name, "custom_stages_payment", stages_paid + 1)
-
+    
+    update_contract_payment_status(contract_name)
     return jv.name
+
+
+def update_contract_payment_status(contract_name):
+    """
+    After each Journal Entry is created, re-evaluate the contract's payment status.
+    
+    Logic:
+      - Fetch all submitted JEs referencing this contract
+      - Sum their credit amounts
+      - Compare total paid vs custom_amount
+      - Also compare stages_payment vs custom_stages
+      - Status → "Paid" if fully settled, "Partly Paid" if partially, else unchanged
+    """
+    doc = frappe.get_doc("Contract", contract_name)
+
+    custom_amount  = float(doc.get("custom_amount") or 0)
+    total_stages   = int(doc.get("custom_stages") or 0)
+    stages_paid    = int(doc.get("custom_stages_payment") or 0)
+
+    # ---------- sum all submitted JE credit rows linked to this contract ----------
+    linked_je_amounts = frappe.db.sql("""
+        SELECT SUM(jea.credit_in_account_currency)
+        FROM   `tabJournal Entry Account` jea
+        JOIN   `tabJournal Entry`         je  ON je.name = jea.parent
+        WHERE  jea.reference_type = 'Contract'
+        AND    jea.reference_name  = %(contract_name)s
+        AND    je.docstatus         = 1
+    """, {"contract_name": contract_name})
+
+    total_paid = float(linked_je_amounts[0][0] or 0) if linked_je_amounts else 0.0
+
+    # ---------- determine new status ----------
+    new_status = None
+
+    # Method 1 – amount-based check
+    if custom_amount > 0:
+        if total_paid >= custom_amount:
+            new_status = "Paid"
+        elif total_paid > 0:
+            new_status = "Partly Paid"
+
+    # Method 2 – stage-count check (overrides if more precise)
+    if total_stages > 0:
+        if stages_paid >= total_stages:
+            new_status = "Paid"
+        elif stages_paid > 0 and new_status != "Paid":
+            new_status = "Partly Paid"
+
+    # ---------- persist only if status changed ----------
+    if new_status and doc.get("status") != new_status:
+        frappe.db.set_value("Contract", contract_name, "status", new_status)
+        frappe.msgprint(
+            _("Contract {0} status updated to <b>{1}</b>. Total paid: {2} of {3}.").format(
+                contract_name, new_status, total_paid, custom_amount
+            ),
+            indicator="green" if new_status == "Paid" else "orange",
+            alert=True,
+        )
