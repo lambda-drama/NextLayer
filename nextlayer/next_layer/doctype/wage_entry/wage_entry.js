@@ -104,30 +104,62 @@ function apply_filters(frm){
     });
 }
 function create_journal(frm) {
-        if (frm.doc.docstatus === 1 && !frm.doc.journal_entry) {
-            frm.add_custom_button('Journal Entry', function() {
-                frappe.confirm(
-                    'Create Journal Entry for <b>' + frm.doc.name + '</b>?',
-                    function() {
-                        frappe.call({
-                            method: 'nextlayer.next_layer.doctype.wage_entry.wage_entry.make_journal_entry',
-                            args: { wage_entry_name: frm.doc.name },
-                            freeze: true,
-                            freeze_message: 'Creating Journal Entry...',
-                            callback: function(r) {
-                                if (r.message) {
-                                    frappe.show_alert({
-                                        message: 'Journal Entry ' + r.message + ' created and submitted.',
-                                        indicator: 'green'
-                                    }, 5);
-                                    frm.reload_doc();
-                                }
-                            }
-                        });
-                    }
-                );
-            }, 'Create');
-        }
+    if (frm.doc.docstatus !== 1) return;
+
+    frm.add_custom_button(__('Journal Entry'), function () {
+
+        const already_paid = frm.doc.total_paid || 0;
+        const remaining    = (frm.doc.total_amount || 0) - already_paid;
+
+        let d = new frappe.ui.Dialog({
+            title: __('Create Wage Payment Journal Entry'),
+            fields: [
+                {
+                    fieldname:  'amount',
+                    fieldtype:  'Currency',
+                    label:      __('Amount to Pay'),
+                    default:    remaining > 0 ? remaining : (frm.doc.total_amount || 0),
+                    reqd:       1,
+                    description: __('Total: {0} | Already Paid: {1} | Remaining: {2}', [
+                        format_currency(frm.doc.total_amount, frm.doc.currency),
+                        format_currency(already_paid, frm.doc.currency),
+                        format_currency(remaining, frm.doc.currency),
+                    ]),
+                },
+            ],
+            primary_action_label: __('Create & Submit'),
+            primary_action(values) {
+                if (values.amount <= 0) {
+                    frappe.msgprint(__('Amount must be greater than zero.'));
+                    return;
+                }
+
+                frappe.call({
+                    method:   'nextlayer.next_layer.doctype.wage_entry.wage_entry.make_journal_entry',
+                    args: {
+                        wage_entry_name: frm.doc.name,
+                        amount:          values.amount,
+                    },
+                    freeze:         true,
+                    freeze_message: __('Creating Journal Entry...'),
+                    callback: function (r) {
+                        if (r.message) {
+                            frappe.show_alert({
+                                message:   __('Journal Entry {0} created and submitted.', [r.message]),
+                                indicator: 'green',
+                            }, 6);
+                            d.hide();
+                            frm.reload_doc();
+                        }
+                    },
+                });
+            },
+        });
+
+        d.show();
+
+    }, __('Create'));
+
 
         // Show link if already booked
         if (frm.doc.journal_entry) {
