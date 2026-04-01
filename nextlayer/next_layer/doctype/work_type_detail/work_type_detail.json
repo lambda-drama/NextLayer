@@ -8,6 +8,7 @@
  "field_order": [
   "type_of_work",
   "no_of_workers",
+  "daily_wage",
   "column_break_nmrw",
   "total_qty",
   "total_amount"
@@ -46,13 +47,19 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Total Qty"
+  },
+  {
+   "default": "0",
+   "fieldname": "daily_wage",
+   "fieldtype": "Check",
+   "label": "Daily Wage"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-29 02:29:14.634496",
+ "modified": "2026-04-02 02:37:47.746975",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Work Type Detail",

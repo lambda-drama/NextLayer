@@ -10,6 +10,7 @@
   "name1",
   "qty",
   "rate",
+  "daily_wage",
   "column_break_pkza",
   "amount",
   "checkin",
@@ -85,13 +86,19 @@
    "fieldname": "description",
    "fieldtype": "Text Editor",
    "label": "Description"
+  },
+  {
+   "default": "0",
+   "fieldname": "daily_wage",
+   "fieldtype": "Check",
+   "label": "Daily Wage"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-06 00:22:28.630993",
+ "modified": "2026-04-02 02:37:02.589344",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Breakdown Detail",
