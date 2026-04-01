@@ -4,6 +4,7 @@
 import frappe
 from frappe import _
 from frappe.utils import nowdate
+from frappe.model.naming import make_autoname
 
 
 @frappe.whitelist()
@@ -147,3 +148,4 @@ def update_contract_payment_status(contract_name):
             indicator="green" if new_status == "Paid" else "orange",
             alert=True,
         )
+

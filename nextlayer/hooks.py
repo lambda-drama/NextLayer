@@ -244,6 +244,9 @@ doc_events = {
     "Quotation": {
         "autoname": "nextlayer.next_layer.controllers.quotation_naming.set_quotation_name",
     },
+    "Contract": {
+        "autoname": "nextlayer.next_layer.controllers.contract.get_contract_autoname",
+    },
 }
 
 # Includes in <head>
