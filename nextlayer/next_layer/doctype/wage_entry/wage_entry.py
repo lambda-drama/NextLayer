@@ -6,13 +6,17 @@ from frappe.model.document import Document
 from frappe.utils import flt, nowdate
 from frappe import _
 from frappe.model.naming import make_autoname
-
+from frappe.utils import cint
+from datetime import datetime
 class WageEntry(Document):
 	def validate(self):
 		self.calculate_totals()
   
 	def before_save(self):
 		self.generate_work_type_breakdown()
+  
+	def on_submit(self):
+		create_daily_wage_purchase_invoice(self.name)
 
 	def calculate_totals(self):
 		"""Set amount per row (qty * rate) and total_qty, total_amount on main doc."""
@@ -30,28 +34,51 @@ class WageEntry(Document):
 	def autoname(self):
 		get_wage_entry_autoname(self)
 		
-  
 	def generate_work_type_breakdown(self):
 		# Group wages by type_of_work
 		groups = {}
 		for row in self.wages:
 			key = row.type_of_work or 'Unspecified'
 			if key not in groups:
-				groups[key] = {'total_amount': 0, 'total_qty': 0, 'workers': 0}
+				groups[key] = {'total_amount': 0, 'total_qty': 0, 'workers': 0, 'daily_wage': 0}
 			groups[key]['total_amount'] += (row.amount or 0)
 			groups[key]['total_qty']    += (row.qty or 1)
 			groups[key]['workers']      += 1
-
+			if row.get('daily_wage'):
+				groups[key]['daily_wage'] = 1
+ 
 		# Clear existing breakdown and rebuild
 		self.type_of_work_breakdown = []
-
+ 
 		for work_type, data in groups.items():
 			self.append('type_of_work_breakdown', {
 				'type_of_work':  work_type,
 				'total_amount':  data['total_amount'],
 				'total_qty':     data['total_qty'],
-				'no_of_workers': data['workers']
+				'no_of_workers': data['workers'],
+				'daily_wage':    data['daily_wage'],
 			})
+	# def generate_work_type_breakdown(self):
+	# 	# Group wages by type_of_work
+	# 	groups = {}
+	# 	for row in self.wages:
+	# 		key = row.type_of_work or 'Unspecified'
+	# 		if key not in groups:
+	# 			groups[key] = {'total_amount': 0, 'total_qty': 0, 'workers': 0}
+	# 		groups[key]['total_amount'] += (row.amount or 0)
+	# 		groups[key]['total_qty']    += (row.qty or 1)
+	# 		groups[key]['workers']      += 1
+
+	# 	# Clear existing breakdown and rebuild
+	# 	self.type_of_work_breakdown = []
+
+	# 	for work_type, data in groups.items():
+	# 		self.append('type_of_work_breakdown', {
+	# 			'type_of_work':  work_type,
+	# 			'total_amount':  data['total_amount'],
+	# 			'total_qty':     data['total_qty'],
+	# 			'no_of_workers': data['workers']
+	# 		})
 
 
 
@@ -385,3 +412,143 @@ def get_allowed_whatsapp_groups() -> list:
 			allowed.append(group)
 	return allowed
  
+ 
+ 
+# Add these methods to your existing wage_entry.py
+# ─────────────────────────────────────────────────────────────────────────────
+# Place ensure_daily_labour_item() and create_daily_wage_purchase_invoice()
+# alongside your existing make_journal_entry() method.
+# ─────────────────────────────────────────────────────────────────────────────
+
+import frappe
+from frappe import _
+from frappe.utils import today
+
+
+def ensure_daily_labour_item():
+	"""Create the 'Daily Labour Charges' service item if it does not exist."""
+	if frappe.db.exists("Item", "Daily Labour Charges"):
+		return
+
+	item = frappe.new_doc("Item")
+	item.item_code          = "Daily Labour Charges"
+	item.item_name          = "Daily Labour Charges"
+	item.description        = "Daily Labour Charges"
+	item.item_group         = "Service items UAE"          # adjust to your item group if needed
+	item.stock_uom          = "Nos"               # or "Nos" — whichever fits your UOM list
+	item.is_stock_item      = 0
+	item.is_purchase_item   = 1
+	item.is_sales_item      = 0
+	item.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+def _generate_invoice_no(company):
+	"""
+	Mirror the auto_name logic to produce a custom_invoice_no
+	before the PI is inserted, so the mandatory field is always populated.
+	"""
+	company_abbr = frappe.db.get_value("Company", company, "abbr")
+	if not company_abbr:
+		frappe.throw(_("Company abbreviation not found for {0}").format(company))
+ 
+	current_year = datetime.now().year
+ 
+	if company == "CITYWALK FOOTWEAR PVT LTD":
+		base_name = make_autoname(f"{company_abbr}-JW-.###")
+	else:
+		base_name = make_autoname(f"{company_abbr}-.####")
+ 
+	return f"{base_name}-{current_year}"
+
+@frappe.whitelist()
+def create_daily_wage_purchase_invoice(wage_entry_name):
+	"""
+	Called automatically after Wage Entry submission (via JS after_submit hook).
+
+	• Collects every Wage Breakdown Detail row where daily_wage == 1.
+	• Ensures the 'Daily Labour Charges' item exists.
+	• Creates and submits a single Purchase Invoice with one line per worker.
+	• Returns the new PI name so the UI can show an alert.
+	"""
+	doc = frappe.get_doc("Wage Entry", wage_entry_name)
+
+	# ── Guard: only run on submitted docs ────────────────────────────────────
+	if doc.docstatus != 1:
+		frappe.throw(_("Wage Entry must be submitted before creating a Purchase Invoice."))
+
+	# ── Collect daily-wage rows ───────────────────────────────────────────────
+	daily_rows = [w for w in doc.wages if cint(w.get("daily_wage"))]
+	if not daily_rows:
+		frappe.throw(_("No daily wage rows found on this Wage Entry."))
+
+	# ── Ensure item exists ────────────────────────────────────────────────────
+	ensure_daily_labour_item()
+
+	# ── Resolve supplier ──────────────────────────────────────────────────────
+	# Try common field names; fall back to a generic "Daily Labour" supplier.
+	supplier = (
+		doc.get("supplier")
+		or doc.get("party") if doc.get("party_type") == "Supplier" else None
+		or _get_or_create_default_supplier()
+	)
+	invoice_no = _generate_invoice_no(doc.company)
+
+	# ── Build Purchase Invoice ────────────────────────────────────────────────
+	pi = frappe.new_doc("Purchase Invoice")
+	pi.company          = doc.company
+	pi.supplier         = supplier
+	pi.custom_invoice_no = invoice_no
+	pi.posting_date     = doc.get("date") or today()
+	pi.due_date         = today()
+	pi.cost_center      = doc.get("cost_center") or None
+	pi.remarks          = _("Auto-created from Wage Entry {0}").format(wage_entry_name)
+	pi.branch           = doc.get("branch") or None
+	pi.company_group     = doc.get("company_group") or None
+
+	# Link back to the Wage Entry (add a custom field if you want a hard link)
+	# pi.custom_wage_entry = wage_entry_name
+
+	for row in daily_rows:
+		pi.append("items", {
+			"item_code":       "Daily Labour Charges",
+			"item_name":       "Daily Labour Charges",
+			"description":     "{name} — {work}".format(
+									name=row.get("name1") or "Worker",
+									work=row.get("type_of_work") or row.get("work_group") or "",
+							   ),
+			"qty":             row.qty or 1,
+			"rate":            row.rate or 0,
+			"uom":             "Day",
+			"cost_center":     doc.get("cost_center") or None,
+			"expense_account": doc.get("default_expense_account") or None,
+		})
+
+	# Use the payable account from the Wage Entry if provided
+	if doc.get("default_payable_account"):
+		pi.credit_to = doc.default_payable_account
+
+	pi.insert(ignore_permissions=True)
+	pi.submit()
+	frappe.db.commit()
+	return pi.name
+
+
+def _get_or_create_default_supplier():
+	"""
+	Returns the name of a generic 'Daily Labour' supplier,
+	creating one if it doesn't already exist.
+	"""
+	supplier_name = "Daily Labour"
+
+	if not frappe.db.exists("Supplier", supplier_name):
+		sup = frappe.new_doc("Supplier")
+		sup.supplier_name  = supplier_name
+		sup.supplier_group = (
+			frappe.db.get_single_value("Buying Settings", "supplier_group")
+			or "All Supplier Groups"
+		)
+		sup.insert(ignore_permissions=True)
+		frappe.db.commit()
+
+	return supplier_name
+
