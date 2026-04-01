@@ -6,15 +6,15 @@ frappe.ui.form.on("Wage Entry", {
 		update_wage_totals(frm);
 		create_journal(frm);
 		apply_filters(frm);
-        if (frm.doc.docstatus >= 0) {
+        if (frm.doc.docstatus >= 0 && frappe.user.has_role("WhatsApp User")) {
 			frm.add_custom_button(
 				__("Send WhatsApp"),
 				() => open_whatsapp_dialog(frm),
 				__("Actions")
 			);
 		}
-        
 	},
+
     add_type_of_work: function (frm) {
         open_work_type_modal(frm);
     },
