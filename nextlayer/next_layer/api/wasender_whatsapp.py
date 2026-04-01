@@ -68,7 +68,8 @@ def make_wasender_api_call(
 		resp.raise_for_status()
 		response = resp.json()
 
-		message_id = response.get("msgId") if isinstance(response, dict) else None
+		raw_id = response.get("msgId") if isinstance(response, dict) else None
+		message_id = raw_id if raw_id else None  # Treat 0 as falsy → don't store it
 
 		if update_existing_chat:
 			chat_doc = update_existing_chat
