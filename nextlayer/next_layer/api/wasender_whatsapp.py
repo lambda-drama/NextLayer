@@ -214,6 +214,9 @@ def send_whatsapp_from_chat(chat_name: str) -> dict:
 			file_type, _ = mimetypes.guess_type(attachment_url)
 			if file_type and file_type in FILE_TYPES:
 				data[FILE_TYPES[file_type]] = attachment_url
+				if file_type == "application/pdf":
+                # Extract filename from the URL path
+					data["fileName"] = chat_doc.attach.split("/")[-1]
 	return make_wasender_api_call(data, "send-message", update_existing_chat=chat_doc)
 
 
@@ -441,127 +444,68 @@ def qr_code_to_image(qr_code: str, scale: int = 5) -> str:
 
 
 @frappe.whitelist()
-
-# def get_wage_entry_pdf_url(wage_entry_name: str, letterhead: bool = False) -> str:
-# 	"""
-# 	Build a publicly accessible PDF URL for a Wage Entry print format.
-# 	Uses Frappe's /api/method/frappe.utils.print_format.download_pdf endpoint
-# 	with an API key so WASender can fetch it without a session.
- 
-# 	Returns the full URL string, or None if it cannot be built.
-# 	"""
-# 	try:
-# 		# Get the site base URL
-# 		site_url = frappe.utils.get_url()
- 
-# 		# Find the default print format for Wage Entry (or fall back to "Standard")
-# 		print_format = (
-# 			frappe.db.get_value(
-# 				"Print Format",
-# 				{"doc_type": "Wage Entry", "disabled": 0},
-# 				"name",
-# 				order_by="creation desc",
-# 			)
-# 			or "Standard"
-# 		)
- 
-# 		# Use the API-key-authenticated print endpoint so the URL is accessible
-# 		# without a browser session (required for WASender to download it)
-# 		api_key = frappe.db.get_value("User", frappe.session.user, "api_key")
-# 		api_secret = frappe.utils.password.get_decrypted_password(
-# 			"User", frappe.session.user, "api_secret", raise_exception=False
-# 		)
- 
-# 		params = (
-# 			f"doctype=Wage Entry"
-# 			f"&name={frappe.utils.quote(wage_entry_name)}"
-# 			f"&format={frappe.utils.quote(print_format)}"
-# 			f"&no_letterhead={0 if letterhead else 1}"
-# 			f"&letterhead={'Default' if letterhead else 'No Letterhead'}"
-# 			f"&settings=%7B%7D"
-# 			f"&_lang=en"
-# 		)
- 
-# 		if api_key and api_secret:
-# 			# Authenticated URL — WASender can fetch this directly
-# 			pdf_url = (
-# 				f"{site_url}/api/method/frappe.utils.print_format.download_pdf"
-# 				f"?{params}&api_key={api_key}&api_secret={api_secret}"
-# 			)
-# 		else:
-# 			# Fallback: generate the PDF as a file and return its public URL
-# 			pdf_url = generate_pdf_as_file(wage_entry_name, print_format, letterhead)
- 
-# 		return pdf_url
- 
-# 	except Exception as e:
-# 		frappe.log_error(
-# 			f"Failed to build PDF URL for Wage Entry {wage_entry_name}:\n{str(e)}",
-# 			"Wage Entry WhatsApp PDF URL",
-# 		)
-# 		return None
 def get_wage_entry_pdf_url(wage_entry_name: str, letterhead: bool = False) -> str:
-    try:
-        from frappe.utils.pdf import get_pdf
-        import frappe.www.printview  # ensure print context is loaded
+	try:
+		from frappe.utils.pdf import get_pdf
+		import frappe.www.printview  # ensure print context is loaded
 
-        print_format = (
-            frappe.db.get_value(
-                "Print Format",
-                {"doc_type": "Wage Entry", "disabled": 0},
-                "name",
-                order_by="creation desc",
-            )
-            or "Standard"
-        )
+		print_format = (
+			frappe.db.get_value(
+				"Print Format",
+				{"doc_type": "Wage Entry", "disabled": 0},
+				"name",
+				order_by="creation desc",
+			)
+			or "Standard"
+		)
 
-        # More reliable way to get print HTML
-        html = frappe.get_print(
-            doctype="Wage Entry",
-            name=wage_entry_name,
-            print_format=print_format,
-            no_letterhead=0 if letterhead else 1,
-        )
+		# More reliable way to get print HTML
+		html = frappe.get_print(
+			doctype="Wage Entry",
+			name=wage_entry_name,
+			print_format=print_format,
+			no_letterhead=0 if letterhead else 1,
+		)
 
-        pdf_content = get_pdf(html)
-        file_name = f"WageEntry-{wage_entry_name}.pdf"
+		pdf_content = get_pdf(html)
+		file_name = f"{wage_entry_name}.pdf"
+		# frappe.throw(str(file_name))
+		# Clean up old files
+		existing = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": "Wage Entry",
+				"attached_to_name": wage_entry_name,
+				"is_private": 0,
+			},
+			pluck="name",
+		)
+		for f in existing:
+			frappe.delete_doc("File", f, ignore_permissions=True)
+		file_doc = frappe.get_doc({
+			"doctype": "File",
+			"file_name": file_name,
+			"content": pdf_content,
+			"is_private": 0,
+			"attached_to_doctype": "Wage Entry",
+			"attached_to_name": wage_entry_name,
+			# "file_url": f"/files/{file_name}",
+		})
+		file_doc.insert(ignore_permissions=True)
+		# frappe.throw(str(file_doc.file_url))
+		frappe.db.commit()
 
-        # Clean up old files
-        existing = frappe.get_all(
-            "File",
-            filters={
-                "file_name": file_name,
-                "attached_to_doctype": "Wage Entry",
-                "attached_to_name": wage_entry_name,
-                "is_private": 0,
-            },
-            pluck="name",
-        )
-        for f in existing:
-            frappe.delete_doc("File", f, ignore_permissions=True)
+		full_url = frappe.utils.get_url(file_doc.file_url)
+		frappe.logger().info(f"[WASender] Generated PDF URL: {full_url}")
+		return full_url
 
-        file_doc = frappe.get_doc({
-            "doctype": "File",
-            "file_name": file_name,
-            "content": pdf_content,
-            "is_private": 0,
-            "attached_to_doctype": "Wage Entry",
-            "attached_to_name": wage_entry_name,
-        })
-        file_doc.insert(ignore_permissions=True)
-        frappe.db.commit()
-
-        full_url = frappe.utils.get_url(file_doc.file_url)
-        frappe.logger().info(f"[WASender] Generated PDF URL: {full_url}")
-        return full_url
-
-    except Exception as e:
-        frappe.log_error(
-            f"Failed to generate public PDF for Wage Entry {wage_entry_name}:\n{str(e)}",
-            "Wage Entry WhatsApp PDF URL",
-        )
-        frappe.logger().error(f"[WASender] PDF generation failed: {str(e)}")
-        return None
+	except Exception as e:
+		frappe.log_error(
+			f"Failed to generate public PDF for Wage Entry {wage_entry_name}:\n{str(e)}",
+			"Wage Entry WhatsApp PDF URL",
+		)
+		frappe.logger().error(f"[WASender] PDF generation failed: {str(e)}")
+		return None
  
  
 def generate_pdf_as_file(wage_entry_name: str, print_format: str, letterhead: bool) -> str:
@@ -580,7 +524,7 @@ def generate_pdf_as_file(wage_entry_name: str, print_format: str, letterhead: bo
 	)
  
 	pdf_content = get_pdf(html)
-	file_name = f"WageEntry-{wage_entry_name}.pdf"
+	file_name = f"{wage_entry_name}.pdf"
  
 	# Save as a public File document
 	file_doc = frappe.get_doc(
@@ -695,6 +639,7 @@ def send_whatsapp_from_wage_entry(
  
 	if doc_attachment_url:
 		data["documentUrl"] = doc_attachment_url
+		data["fileName"] = f"{wage_entry_name}.pdf"
 
 	if custom_attachment_url and custom_file_type and custom_file_type in FILE_TYPES:
 		data[FILE_TYPES[custom_file_type]] = custom_attachment_url
@@ -912,7 +857,7 @@ def send_whatsapp_from_contract(
 	# ── Resolve attachments BEFORE creating the chat doc ─────────────────────
 	doc_attachment_url = None
 	custom_attachment_url = None
-	custom_attachment_path = None  # relative path → for chat_doc.attach
+	custom_attachment_path = None
 	custom_file_type = None
 
 	if attach_document:
@@ -963,6 +908,7 @@ def send_whatsapp_from_contract(
 
 	if doc_attachment_url:
 		data["documentUrl"] = doc_attachment_url
+		data["fileName"] = f"{contract_name}.pdf"
 
 	if custom_attachment_url and custom_file_type and custom_file_type in FILE_TYPES:
 		data[FILE_TYPES[custom_file_type]] = custom_attachment_url
@@ -975,3 +921,5 @@ def send_whatsapp_from_contract(
 		reference_name=contract_name,
 		update_existing_chat=chat_doc,
 	)
+ 
+ 

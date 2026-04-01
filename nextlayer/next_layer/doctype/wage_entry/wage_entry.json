@@ -41,7 +41,6 @@
   "column_break_lksz",
   "party_type",
   "party",
-  "journal_entry",
   "section_break_cqht",
   "conversion_rate"
  ],
@@ -162,7 +161,6 @@
    "allow_on_submit": 1,
    "fieldname": "default_payable_account",
    "fieldtype": "Link",
-   "ignore_user_permissions": 1,
    "label": "Payable Account",
    "options": "Account"
   },
@@ -247,20 +245,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "journal_entry",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Journal Entry",
-   "options": "Journal Entry",
-   "read_only": 1
-  },
-  {
+   "allow_on_submit": 1,
    "fieldname": "party_type",
    "fieldtype": "Link",
    "label": "Party Type",
    "options": "DocType"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "party",
    "fieldtype": "Dynamic Link",
    "label": "Party",
@@ -275,6 +267,7 @@
    "fieldtype": "Section Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "conversion_rate",
    "fieldtype": "Float",
    "label": "Exchange Rate"
@@ -297,7 +290,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2026-04-02 00:00:02.887933",
+ "modified": "2026-04-02 01:13:41.190612",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",
