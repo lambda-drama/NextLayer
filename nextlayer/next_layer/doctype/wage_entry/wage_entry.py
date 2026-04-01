@@ -5,7 +5,7 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import flt, nowdate
 from frappe import _
-
+from frappe.model.naming import make_autoname
 
 class WageEntry(Document):
 	def validate(self):
@@ -26,6 +26,10 @@ class WageEntry(Document):
 			total_amount += row.amount
 		self.total_qty = total_qty
 		self.total_amount = total_amount
+  
+	def autoname(self):
+		get_wage_entry_autoname(self)
+		
   
 	def generate_work_type_breakdown(self):
 		# Group wages by type_of_work
@@ -50,9 +54,17 @@ class WageEntry(Document):
 			})
 
 
-# In your Wage Entry doctype controller
-# File: next_layer/next_layer/doctype/wage_entry/wage_entry.py
 
+def get_wage_entry_autoname(doc):
+	"""
+	Format: {Company Abbr}-{YY}-{#####}
+	e.g. NL-25-00001, NL-25-00002
+	Resets numbering each new year.
+	"""
+	company_abbr = frappe.db.get_value("Company", doc.company, "abbr") or "CO"
+	yy = frappe.utils.nowdate()[2:4]  # e.g. "25" from "2025"
+	series = f"{company_abbr}-{yy}-.#####"
+	doc.name = make_autoname(series, doc=doc)
 
 
 # @frappe.whitelist()
@@ -216,119 +228,119 @@ import frappe
 
 @frappe.whitelist()
 def make_journal_entry(wage_entry_name, amount=None):
-    doc = frappe.get_doc("Wage Entry", wage_entry_name)
+	doc = frappe.get_doc("Wage Entry", wage_entry_name)
 
-    if not doc.default_expense_account:
-        frappe.throw(_("Please set a Default Expense Account before booking."))
-    if not doc.default_payable_account:
-        frappe.throw(_("Please set a Default Payable Account before booking."))
+	if not doc.default_expense_account:
+		frappe.throw(_("Please set a Default Expense Account before booking."))
+	if not doc.default_payable_account:
+		frappe.throw(_("Please set a Default Payable Account before booking."))
 
-    total_wages = sum(row.amount or 0 for row in doc.wages)
-    if total_wages <= 0:
-        frappe.throw(_("Total wage amount must be greater than zero."))
+	total_wages = sum(row.amount or 0 for row in doc.wages)
+	if total_wages <= 0:
+		frappe.throw(_("Total wage amount must be greater than zero."))
 
-    # Use passed amount, fallback to full total
-    payment_amount = float(amount) if amount else total_wages
-    if payment_amount <= 0:
-        frappe.throw(_("Payment amount must be greater than zero."))
+	# Use passed amount, fallback to full total
+	payment_amount = float(amount) if amount else total_wages
+	if payment_amount <= 0:
+		frappe.throw(_("Payment amount must be greater than zero."))
 
-    company_currency         = frappe.db.get_value("Company", doc.company, "default_currency")
-    expense_account_currency = frappe.db.get_value("Account", doc.default_expense_account, "account_currency")
-    payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
-    conversion_rate          = getattr(doc, "conversion_rate", None) or 1
+	company_currency         = frappe.db.get_value("Company", doc.company, "default_currency")
+	expense_account_currency = frappe.db.get_value("Account", doc.default_expense_account, "account_currency")
+	payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
+	conversion_rate          = getattr(doc, "conversion_rate", None) or 1
 
-    accounts = []
+	accounts = []
 
-    # --- DEBIT: split proportionally across work types ---
-    groups = {}
-    for row in doc.wages:
-        key = row.type_of_work or "General"
-        groups[key] = groups.get(key, 0) + (row.amount or 0)
+	# --- DEBIT: split proportionally across work types ---
+	groups = {}
+	for row in doc.wages:
+		key = row.type_of_work or "General"
+		groups[key] = groups.get(key, 0) + (row.amount or 0)
 
-    for work_type, work_amount in groups.items():
-        # Prorate this work type's share of the payment amount
-        prorated = (work_amount / total_wages) * payment_amount if total_wages else payment_amount
-        accounts.append({
-            "account":                    doc.default_expense_account,
-            "debit_in_account_currency":  prorated,
-            "credit_in_account_currency": 0,
-            "project":                    doc.project or "",
-            "cost_center":                doc.cost_center or "",
-            "user_remark":                work_type,
-            "exchange_rate":              conversion_rate if company_currency != expense_account_currency else 1,
-            "company_group":              doc.company_group or "",
-        })
+	for work_type, work_amount in groups.items():
+		# Prorate this work type's share of the payment amount
+		prorated = (work_amount / total_wages) * payment_amount if total_wages else payment_amount
+		accounts.append({
+			"account":                    doc.default_expense_account,
+			"debit_in_account_currency":  prorated,
+			"credit_in_account_currency": 0,
+			"project":                    doc.project or "",
+			"cost_center":                doc.cost_center or "",
+			"user_remark":                work_type,
+			"exchange_rate":              conversion_rate if company_currency != expense_account_currency else 1,
+			"company_group":              doc.company_group or "",
+		})
 
-    # --- CREDIT: payable account ---
-    credit_row = {
-        "account":                    doc.default_payable_account,
-        "debit_in_account_currency":  0,
-        "credit_in_account_currency": payment_amount,
-        "project":                    doc.project or "",
-        "cost_center":                doc.cost_center or "",
-        "exchange_rate":              conversion_rate if company_currency != payable_account_currency else 1,
-        "company_group":              doc.company_group or "",
-        "reference_type":             "Wage Entry",
-        "reference_name":             wage_entry_name,
-    }
+	# --- CREDIT: payable account ---
+	credit_row = {
+		"account":                    doc.default_payable_account,
+		"debit_in_account_currency":  0,
+		"credit_in_account_currency": payment_amount,
+		"project":                    doc.project or "",
+		"cost_center":                doc.cost_center or "",
+		"exchange_rate":              conversion_rate if company_currency != payable_account_currency else 1,
+		"company_group":              doc.company_group or "",
+		"reference_type":             "Wage Entry",
+		"reference_name":             wage_entry_name,
+	}
 
-    if doc.party_type and doc.party:
-        credit_row["party_type"] = doc.party_type
-        credit_row["party"]      = doc.party
+	if doc.party_type and doc.party:
+		credit_row["party_type"] = doc.party_type
+		credit_row["party"]      = doc.party
 
-    accounts.append(credit_row)
+	accounts.append(credit_row)
 
-    jv = frappe.get_doc({
-        "doctype":        "Journal Entry",
-        "voucher_type":   "Journal Entry",
-        "posting_date":   doc.date or nowdate(),
-        "company":        doc.company,
-        "title":          doc.default_payable_account,
-        "user_remark":    f"Wages – {wage_entry_name}",
-        "accounts":       accounts,
-        "multi_currency": 1 if (doc.currency and doc.currency != company_currency) else 0,
-        "branch":         doc.branch or "",
-    })
+	jv = frappe.get_doc({
+		"doctype":        "Journal Entry",
+		"voucher_type":   "Journal Entry",
+		"posting_date":   doc.date or nowdate(),
+		"company":        doc.company,
+		"title":          doc.default_payable_account,
+		"user_remark":    f"Wages – {wage_entry_name}",
+		"accounts":       accounts,
+		"multi_currency": 1 if (doc.currency and doc.currency != company_currency) else 0,
+		"branch":         doc.branch or "",
+	})
 
-    jv.insert(ignore_permissions=True)
-    jv.submit()
+	jv.insert(ignore_permissions=True)
+	jv.submit()
 
-    update_wage_entry_payment_status(wage_entry_name)
+	update_wage_entry_payment_status(wage_entry_name)
 
-    return jv.name
+	return jv.name
 
 
 def update_wage_entry_payment_status(wage_entry_name):
-    doc          = frappe.get_doc("Wage Entry", wage_entry_name)
-    total_amount = float(doc.get("total_amount") or 0)
+	doc          = frappe.get_doc("Wage Entry", wage_entry_name)
+	total_amount = float(doc.get("total_amount") or 0)
 
-    result = frappe.db.sql("""
-        SELECT COALESCE(SUM(jea.credit_in_account_currency), 0)
-        FROM   `tabJournal Entry Account` jea
-        JOIN   `tabJournal Entry`         je  ON je.name = jea.parent
-        WHERE  jea.reference_type = 'Wage Entry'
-        AND    jea.reference_name  = %(name)s
-        AND    je.docstatus         = 1
-    """, {"name": wage_entry_name})
+	result = frappe.db.sql("""
+		SELECT COALESCE(SUM(jea.credit_in_account_currency), 0)
+		FROM   `tabJournal Entry Account` jea
+		JOIN   `tabJournal Entry`         je  ON je.name = jea.parent
+		WHERE  jea.reference_type = 'Wage Entry'
+		AND    jea.reference_name  = %(name)s
+		AND    je.docstatus         = 1
+	""", {"name": wage_entry_name})
 
-    total_paid = float(result[0][0] or 0) if result else 0.0
+	total_paid = float(result[0][0] or 0) if result else 0.0
 
-    if total_amount > 0 and total_paid >= total_amount:
-        new_status = "Paid"
-    elif total_paid > 0:
-        new_status = "Partly Paid"
-    else:
-        new_status = "Unpaid"
+	if total_amount > 0 and total_paid >= total_amount:
+		new_status = "Paid"
+	elif total_paid > 0:
+		new_status = "Partly Paid"
+	else:
+		new_status = "Unpaid"
 
-    if doc.get("status") != new_status:
-        frappe.db.set_value("Wage Entry", wage_entry_name, "status", new_status)
-        frappe.msgprint(
-            _("Wage Entry {0} status updated to <b>{1}</b>. Paid: {2} of {3}.").format(
-                wage_entry_name, new_status, total_paid, total_amount
-            ),
-            indicator="green" if new_status == "Paid" else ("orange" if new_status == "Partly Paid" else "red"),
-            alert=True,
-        )
+	if doc.get("status") != new_status:
+		frappe.db.set_value("Wage Entry", wage_entry_name, "status", new_status)
+		frappe.msgprint(
+			_("Wage Entry {0} status updated to <b>{1}</b>. Paid: {2} of {3}.").format(
+				wage_entry_name, new_status, total_paid, total_amount
+			),
+			indicator="green" if new_status == "Paid" else ("orange" if new_status == "Partly Paid" else "red"),
+			alert=True,
+		)
 
 @frappe.whitelist()
 def get_allowed_whatsapp_groups() -> list:
