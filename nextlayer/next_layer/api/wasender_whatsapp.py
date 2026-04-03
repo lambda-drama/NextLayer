@@ -547,6 +547,7 @@ def generate_pdf_as_file(wage_entry_name: str, print_format: str, letterhead: bo
 def send_whatsapp_from_wage_entry(
 	wage_entry_name: str,
 	group_name: str,
+	group_label: str,
 	message: str,
 	attach_document: bool = False,
 	letterhead: bool = False,
@@ -597,10 +598,7 @@ def send_whatsapp_from_wage_entry(
 	if attach_document:
 		doc_attachment_url = get_wage_entry_pdf_url(wage_entry_name, bool(letterhead))
  
-	# if custom_attachment:
-	# 	custom_attachment_url = get_custom_attachment_url(custom_attachment)
-	# 	if custom_attachment_url:
-	# 		custom_file_type, _ = mimetypes.guess_type(custom_attachment_url)
+	
 	if custom_attachment_path and custom_file_type:
 		content_type = _CONTENT_TYPE_MAP.get(custom_file_type, "document")
 		attach_field = custom_attachment_path         # relative path
@@ -629,6 +627,21 @@ def send_whatsapp_from_wage_entry(
 		chat_doc.attach = attach_field
  
 	chat_doc.insert(ignore_permissions=True)
+ 
+	attachment_note = ""
+	if attach_field:
+		attachment_note = f"<br><i>Attachment included: <b>{attach_field}</b></i>"
+
+	wage_entry_doc = frappe.get_doc("Wage Entry", wage_entry_name)
+	wage_entry_doc.add_comment(
+		comment_type="Info",
+		text=(
+			f"WhatsApp message sent to group <b>{group_label}</b> "
+			f"by {frappe.session.user}.<br>"
+			f"<blockquote>{frappe.utils.escape_html(message)}</blockquote>"
+			f"{attachment_note}"
+		),
+	)
 	frappe.db.commit()
  
 	# ── Build WASender payload ────────────────────────────────────────────────
@@ -657,54 +670,6 @@ def send_whatsapp_from_wage_entry(
  
 
 
-# def get_contract_pdf_url(contract_name: str, letterhead: bool = False) -> str:
-# 	"""
-# 	Build a publicly accessible PDF URL for a Contract print format.
-# 	Primary: authenticated download_pdf URL using the user's API key.
-# 	Fallback: generate PDF as a public Frappe File and return its URL.
-# 	"""
-# 	try:
-# 		site_url = frappe.utils.get_url()
- 
-# 		print_format = (
-# 			frappe.db.get_value(
-# 				"Print Format",
-# 				{"doc_type": "Contract", "disabled": 0},
-# 				"name",
-# 				order_by="creation desc",
-# 			)
-# 			or "Standard"
-# 		)
- 
-# 		api_key = frappe.db.get_value("User", frappe.session.user, "api_key")
-# 		api_secret = frappe.utils.password.get_decrypted_password(
-# 			"User", frappe.session.user, "api_secret", raise_exception=False
-# 		)
- 
-# 		params = (
-# 			f"doctype=Contract"
-# 			f"&name={frappe.utils.quote(contract_name)}"
-# 			f"&format={frappe.utils.quote(print_format)}"
-# 			f"&no_letterhead={0 if letterhead else 1}"
-# 			f"&letterhead={'Default' if letterhead else 'No Letterhead'}"
-# 			f"&settings=%7B%7D"
-# 			f"&_lang=en"
-# 		)
- 
-# 		if api_key and api_secret:
-# 			return (
-# 				f"{site_url}/api/method/frappe.utils.print_format.download_pdf"
-# 				f"?{params}&api_key={api_key}&api_secret={api_secret}"
-# 			)
-# 		else:
-# 			return _generate_pdf_as_file(contract_name, print_format, letterhead)
- 
-# 	except Exception as e:
-# 		frappe.log_error(
-# 			f"Failed to build PDF URL for Contract {contract_name}:\n{str(e)}",
-# 			"Contract WhatsApp PDF URL",
-# 		)
-# 		return None
 def get_contract_pdf_url(contract_name: str, letterhead: bool = False) -> str:
 	"""
 	Generate the Contract PDF, save it as a public Frappe File,
@@ -799,6 +764,7 @@ def _generate_pdf_as_file(contract_name: str, print_format: str, letterhead: boo
 def send_whatsapp_from_contract(
 	contract_name: str,
 	group_name: str,
+	group_label: str,
 	message: str,
 	attach_document: bool = False,
 	letterhead: bool = False,
@@ -898,6 +864,21 @@ def send_whatsapp_from_contract(
 		chat_doc.attach = attach_field
 
 	chat_doc.insert(ignore_permissions=True)
+ #Contract section
+	attachment_note = ""
+	if attach_field:
+		attachment_note = f"<br><i>Attachment included: <b>{attach_field}</b></i>"
+
+	contract_doc = frappe.get_doc("Contract", contract_name)
+	contract_doc.add_comment(
+		comment_type="Info",
+		text=(
+			f"WhatsApp message sent to group <b>{group_label}</b> "
+			f"by {frappe.session.user}.<br>"
+			f"<blockquote>{frappe.utils.escape_html(message)}</blockquote>"
+			f"{attachment_note}"
+		),
+	)
 	frappe.db.commit()
 
 	# ── Build WASender payload ────────────────────────────────────────────────

@@ -150,6 +150,7 @@ fixtures = [
                 ),
             ]
         ],
+        
     },
     {
         "doctype": "Custom HTML Block",
