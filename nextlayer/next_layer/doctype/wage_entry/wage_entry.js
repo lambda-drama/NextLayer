@@ -382,7 +382,13 @@ frappe.ui.form.on("Wage Entry", {
 		update_wage_totals(frm);
 		create_journal(frm);
 		apply_filters(frm);
-        if (frm.doc.docstatus >= 0 && frappe.user.has_role("WhatsApp User")) {
+
+		const allowed_roles = ["WhatsApp User", "System Manager", "Administrator"];
+
+		if (
+			frm.doc.docstatus >= 0 &&
+			allowed_roles.some(role => frappe.user.has_role(role))
+		) {
 			frm.add_custom_button(
 				__("Send WhatsApp"),
 				() => open_whatsapp_dialog(frm),
