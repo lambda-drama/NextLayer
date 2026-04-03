@@ -479,7 +479,7 @@ def create_daily_wage_purchase_invoice(wage_entry_name):
 	# ── Collect daily-wage rows ───────────────────────────────────────────────
 	daily_rows = [w for w in doc.wages if cint(w.get("daily_wage"))]
 	if not daily_rows:
-		frappe.throw(_("No daily wage rows found on this Wage Entry."))
+		return None
 
 	# ── Ensure item exists ────────────────────────────────────────────────────
 	ensure_daily_labour_item()

@@ -54,13 +54,18 @@ frappe.ui.form.on('Contract', {
 
 
     refresh(frm) {
-		if (frm.doc.docstatus >= 0) {
-			frm.add_custom_button(
-				__("Send WhatsApp"),
-				() => open_whatsapp_dialog(frm),
-				__("Actions")
-			);
-		}
+		const allowed_roles = ["WhatsApp User", "System Manager", "Administrator"];
+
+            if (
+                frm.doc.docstatus > 0 &&
+                allowed_roles.some(role => frappe.user.has_role(role))
+            ) {
+                frm.add_custom_button(
+                    __("Send WhatsApp"),
+                    () => open_whatsapp_dialog(frm),
+                    __("Actions")
+                );
+            }
 
 		render_stage_payment_button(frm);
 
@@ -247,6 +252,7 @@ function open_whatsapp_dialog(frm) {
 						args: {
 							contract_name: frm.doc.name,
 							group_name: group_name,
+                            group_label: selected.label,
 							message: values.message,
 							attach_document: values.attach_document ? 1 : 0,
 							letterhead: values.letterhead ? 1 : 0,

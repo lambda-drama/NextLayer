@@ -15,6 +15,7 @@
   "currency",
   "start_date",
   "end_date",
+  "wage_category",
   "accounting_dimensions_section",
   "branch",
   "company_group",
@@ -279,6 +280,13 @@
    "label": "Status",
    "no_copy": 1,
    "options": "\nUnpaid\nPartly Paid\nPaid"
+  },
+  {
+   "fieldname": "wage_category",
+   "fieldtype": "Select",
+   "label": "Wage Category",
+   "options": "\nContract\nNon-Contract",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
@@ -294,7 +302,7 @@
    "link_fieldname": "custom_wage_entry"
   }
  ],
- "modified": "2026-04-03 13:21:10.740407",
+ "modified": "2026-04-04 00:20:19.316964",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",
