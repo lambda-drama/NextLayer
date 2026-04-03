@@ -504,6 +504,7 @@ def create_daily_wage_purchase_invoice(wage_entry_name):
 	pi.remarks          = _("Auto-created from Wage Entry {0}").format(wage_entry_name)
 	pi.branch           = doc.get("branch") or None
 	pi.company_group     = doc.get("company_group") or None
+	pi.custom_wage_entry = wage_entry_name
 
 	# Link back to the Wage Entry (add a custom field if you want a hard link)
 	# pi.custom_wage_entry = wage_entry_name
