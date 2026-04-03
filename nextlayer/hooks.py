@@ -144,6 +144,9 @@ fixtures = [
                     "Project-custom_project_attachments",
                     "Project-custom_project_stages",
                     "Project-custom_stages",
+                    
+                    #Purchase invoice
+                    "Purchase Invoice-custom_wage_entry",
                 ),
             ]
         ],
