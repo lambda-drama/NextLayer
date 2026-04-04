@@ -8,6 +8,8 @@ from frappe import _
 from frappe.model.naming import make_autoname
 from frappe.utils import cint
 from datetime import datetime
+from frappe.utils import nowdate
+
 class WageEntry(Document):
 	def validate(self):
 		self.calculate_totals()
@@ -35,50 +37,36 @@ class WageEntry(Document):
 		get_wage_entry_autoname(self)
 		
 	def generate_work_type_breakdown(self):
-		# Group wages by type_of_work
+    # Group wages by type_of_work
 		groups = {}
 		for row in self.wages:
 			key = row.type_of_work or 'Unspecified'
 			if key not in groups:
-				groups[key] = {'total_amount': 0, 'total_qty': 0, 'workers': 0, 'daily_wage': 0}
+				groups[key] = {
+					'total_amount': 0,
+					'total_qty': 0,
+					'workers': 0,
+					'daily_wage': 0,
+					'default_expense_account': row.get('default_expense_account') or ''  # take from first row
+				}
 			groups[key]['total_amount'] += (row.amount or 0)
 			groups[key]['total_qty']    += (row.qty or 1)
 			groups[key]['workers']      += 1
 			if row.get('daily_wage'):
 				groups[key]['daily_wage'] = 1
- 
+
 		# Clear existing breakdown and rebuild
 		self.type_of_work_breakdown = []
- 
+
 		for work_type, data in groups.items():
 			self.append('type_of_work_breakdown', {
-				'type_of_work':  work_type,
-				'total_amount':  data['total_amount'],
-				'total_qty':     data['total_qty'],
-				'no_of_workers': data['workers'],
-				'daily_wage':    data['daily_wage'],
+				'type_of_work':            work_type,
+				'total_amount':            data['total_amount'],
+				'total_qty':               data['total_qty'],
+				'no_of_workers':           data['workers'],
+				'daily_wage':              data['daily_wage'],
+				'default_expense_account': data['default_expense_account'],
 			})
-	# def generate_work_type_breakdown(self):
-	# 	# Group wages by type_of_work
-	# 	groups = {}
-	# 	for row in self.wages:
-	# 		key = row.type_of_work or 'Unspecified'
-	# 		if key not in groups:
-	# 			groups[key] = {'total_amount': 0, 'total_qty': 0, 'workers': 0}
-	# 		groups[key]['total_amount'] += (row.amount or 0)
-	# 		groups[key]['total_qty']    += (row.qty or 1)
-	# 		groups[key]['workers']      += 1
-
-	# 	# Clear existing breakdown and rebuild
-	# 	self.type_of_work_breakdown = []
-
-	# 	for work_type, data in groups.items():
-	# 		self.append('type_of_work_breakdown', {
-	# 			'type_of_work':  work_type,
-	# 			'total_amount':  data['total_amount'],
-	# 			'total_qty':     data['total_qty'],
-	# 			'no_of_workers': data['workers']
-	# 		})
 
 
 
@@ -94,248 +82,112 @@ def get_wage_entry_autoname(doc):
 	doc.name = make_autoname(series, doc=doc)
 
 
-# @frappe.whitelist()
-# def make_journal_entry(wage_entry_name):
-# 	doc = frappe.get_doc("Wage Entry", wage_entry_name)
-
-# 	if not doc.default_expense_account:
-# 		frappe.throw(_("Please set a Default Expense Account on this Wage Entry before booking."))
-
-# 	if not doc.default_payable_account:
-# 		frappe.throw(_("Please set a Default Payable Account on this Wage Entry before booking."))
-
-# 	# Check not already booked
-# 	existing = frappe.db.exists("Journal Entry", {
-# 		"user_remark": "Wages - " + wage_entry_name,
-# 		"docstatus": 1
-# 	})
-# 	if existing:
-# 		frappe.throw(_("A Journal Entry already exists for this Wage Entry: {0}").format(existing))
-
-# 	# Group wages by type_of_work
-# 	groups = {}
-# 	for row in doc.wages:
-# 		key = row.type_of_work or "General"
-# 		groups[key] = groups.get(key, 0) + (row.amount or 0)
-
-# 	total = sum(groups.values())
-
-# 	if total <= 0:
-# 		frappe.throw(_("Total wage amount must be greater than zero."))
-
-# 	# Build journal entry accounts
-# 	accounts = []
-
-# 	# One debit row per work type
-# 	for work_type, amount in groups.items():
-# 		accounts.append({
-# 			"account": doc.default_expense_account,
-# 			"debit_in_account_currency": amount,
-# 			"credit_in_account_currency": 0,
-# 			"project": doc.project or "",
-# 			"cost_center": doc.cost_center or "",
-# 			"user_remark": work_type
-# 		})
-
-# 	# Single credit row
-# 	accounts.append({
-# 		"account": doc.default_payable_account,
-# 		"debit_in_account_currency": 0,
-# 		"credit_in_account_currency": total,
-# 		"project": doc.project or "",
-# 		"cost_center": doc.cost_center or ""
-# 	})
-
-# 	jv = frappe.get_doc({
-# 		"doctype": "Journal Entry",
-# 		"voucher_type": "Journal Entry",
-# 		"posting_date": doc.date or nowdate(),
-# 		"company": doc.company,
-# 		"user_remark": "Wages - " + wage_entry_name,
-# 		"accounts": accounts,
-# 		"multi_currency":1,
-# 		"branch":doc.branch
-# 	})
-
-# 	jv.insert(ignore_permissions=True)
-# 	jv.submit()
-
-# 	# Save reference back on Wage Entry
-# 	frappe.db.set_value("Wage Entry", wage_entry_name, "journal_entry", jv.name)
-
-# 	return jv.name
-
-from frappe.utils import nowdate
-from frappe import _
-import frappe
-
-# @frappe.whitelist()
-# def make_journal_entry(wage_entry_name):
-#     doc = frappe.get_doc("Wage Entry", wage_entry_name)
-
-#     if not doc.default_expense_account:
-#         frappe.throw(_("Please set a Default Expense Account before booking."))
-
-#     if not doc.default_payable_account:
-#         frappe.throw(_("Please set a Default Payable Account before booking."))
-
-#     if doc.journal_entry:
-#         frappe.throw(_("Journal Entry {0} already exists for this Wage Entry.").format(doc.journal_entry))
-
-#     total = sum(row.amount or 0 for row in doc.wages)
-
-#     if total <= 0:
-#         frappe.throw(_("Total wage amount must be greater than zero."))
-
-#     # Currency resolution (mirrors BonusPayout pattern)
-#     company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
-#     expense_account_currency = frappe.db.get_value("Account", doc.default_expense_account, "account_currency")
-#     payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
-#     conversion_rate = getattr(doc, "conversion_rate", None) or 1
-
-#     accounts = []
-
-#     # --- DEBIT: one row per work type on the expense account ---
-#     groups = {}
-#     for row in doc.wages:
-#         key = row.type_of_work or "General"
-#         groups[key] = groups.get(key, 0) + (row.amount or 0)
-
-#     for work_type, amount in groups.items():
-#         accounts.append({
-#             "account": doc.default_expense_account,
-#             "debit_in_account_currency": amount,
-#             "credit_in_account_currency": 0,
-#             "project": doc.project or "",
-#             "cost_center": doc.cost_center or "",
-#             "user_remark": work_type,
-#             "exchange_rate": conversion_rate if company_currency != expense_account_currency else 1,
-#             "company_group": doc.company_group or "",
-#         })
-
-#     # --- CREDIT: payable account row, with party if provided ---
-#     credit_row = {
-#         "account": doc.default_payable_account,
-#         "debit_in_account_currency": 0,
-#         "credit_in_account_currency": total,
-#         "project": doc.project or "",
-#         "cost_center": doc.cost_center or "",
-#         "exchange_rate": conversion_rate if company_currency != payable_account_currency else 1,
-#         "company_group": doc.company_group or "",
-#         "reference_type": doc.doctype,   # links JE back to Wage Entry
-#         "reference_name": doc.name,
-#     }
-
-#     # Attach party only if both fields are filled (mirrors BonusPayout per-party rows)
-#     if doc.party_type and doc.party:
-#         credit_row["party_type"] = doc.party_type
-#         credit_row["party"] = doc.party
-
-#     accounts.append(credit_row)
-
-#     jv = frappe.get_doc({
-#         "doctype": "Journal Entry",
-#         "voucher_type": "Journal Entry",
-#         "posting_date": doc.date or nowdate(),
-#         "company": doc.company,
-#         "title": doc.default_payable_account,
-#         "user_remark": "Wages - " + wage_entry_name,
-#         "accounts": accounts,
-#         # Only enable multi_currency when doc currency differs from company currency
-#         "multi_currency": 1 if (doc.currency and doc.currency != company_currency) else 0,
-#         "branch": doc.branch or "",
-#     })
-
-#     jv.insert(ignore_permissions=True)
-#     jv.submit()
-
-#     frappe.db.set_value("Wage Entry", wage_entry_name, "journal_entry", jv.name)
-
-#     return jv.name
 
 @frappe.whitelist()
 def make_journal_entry(wage_entry_name, amount=None):
-	doc = frappe.get_doc("Wage Entry", wage_entry_name)
+    doc = frappe.get_doc("Wage Entry", wage_entry_name)
 
-	if not doc.default_expense_account:
-		frappe.throw(_("Please set a Default Expense Account before booking."))
-	if not doc.default_payable_account:
-		frappe.throw(_("Please set a Default Payable Account before booking."))
+    # if not doc.default_payable_account:
+    #     frappe.throw(_("Please set a Default Payable Account before booking."))
 
-	total_wages = sum(row.amount or 0 for row in doc.wages)
-	if total_wages <= 0:
-		frappe.throw(_("Total wage amount must be greater than zero."))
+    total_wages = sum(row.amount or 0 for row in doc.wages)
+    if total_wages <= 0:
+        frappe.throw(_("Total wage amount must be greater than zero."))
 
-	# Use passed amount, fallback to full total
-	payment_amount = float(amount) if amount else total_wages
-	if payment_amount <= 0:
-		frappe.throw(_("Payment amount must be greater than zero."))
+    payment_amount = float(amount) if amount else total_wages
+    if payment_amount <= 0:
+        frappe.throw(_("Payment amount must be greater than zero."))
 
-	company_currency         = frappe.db.get_value("Company", doc.company, "default_currency")
-	expense_account_currency = frappe.db.get_value("Account", doc.default_expense_account, "account_currency")
-	payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
-	conversion_rate          = getattr(doc, "conversion_rate", None) or 1
+    company_currency         = frappe.db.get_value("Company", doc.company, "default_currency")
+    payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
+    conversion_rate          = getattr(doc, "conversion_rate", None) or 1
 
-	accounts = []
+    # Build lookup from summary table: type_of_work -> summary row
+    summary_map = {
+        row.type_of_work: row
+        for row in (doc.type_of_work_breakdown or [])
+    }
 
-	# --- DEBIT: split proportionally across work types ---
-	groups = {}
-	for row in doc.wages:
-		key = row.type_of_work or "General"
-		groups[key] = groups.get(key, 0) + (row.amount or 0)
+    accounts = []
 
-	for work_type, work_amount in groups.items():
-		# Prorate this work type's share of the payment amount
-		prorated = (work_amount / total_wages) * payment_amount if total_wages else payment_amount
-		accounts.append({
-			"account":                    doc.default_expense_account,
-			"debit_in_account_currency":  prorated,
-			"credit_in_account_currency": 0,
-			"project":                    doc.project or "",
-			"cost_center":                doc.cost_center or "",
-			"user_remark":                work_type,
-			"exchange_rate":              conversion_rate if company_currency != expense_account_currency else 1,
-			"company_group":              doc.company_group or "",
-		})
+    # --- DEBIT: group wages by work type ---
+    groups = {}
+    for row in doc.wages:
+        key = row.type_of_work or "General"
+        if key not in groups:
+            groups[key] = {
+                "amount":          0,
+                "expense_account": row.get("default_expense_account") or doc.default_expense_account
+            }
+        groups[key]["amount"] += (row.amount or 0)
 
-	# --- CREDIT: payable account ---
-	credit_row = {
-		"account":                    doc.default_payable_account,
-		"debit_in_account_currency":  0,
-		"credit_in_account_currency": payment_amount,
-		"project":                    doc.project or "",
-		"cost_center":                doc.cost_center or "",
-		"exchange_rate":              conversion_rate if company_currency != payable_account_currency else 1,
-		"company_group":              doc.company_group or "",
-		"reference_type":             "Wage Entry",
-		"reference_name":             wage_entry_name,
-	}
+    for work_type, data in groups.items():
+        summary = summary_map.get(work_type)
 
-	if doc.party_type and doc.party:
-		credit_row["party_type"] = doc.party_type
-		credit_row["party"]      = doc.party
+        # Priority: summary table → wage row → main doc fallback
+        expense_account = (
+            (summary and summary.get("default_expense_account"))
+            or data["expense_account"]
+            or doc.default_expense_account
+        )
 
-	accounts.append(credit_row)
+        if not expense_account:
+            frappe.throw(_(
+                "No Expense Account found for work type <b>{0}</b>. "
+                "Please set it on the work type summary or on the wage rows."
+            ).format(work_type))
 
-	jv = frappe.get_doc({
-		"doctype":        "Journal Entry",
-		"voucher_type":   "Journal Entry",
-		"posting_date":   doc.date or nowdate(),
-		"company":        doc.company,
-		"title":          doc.default_payable_account,
-		"user_remark":    f"Wages – {wage_entry_name}",
-		"accounts":       accounts,
-		"multi_currency": 1 if (doc.currency and doc.currency != company_currency) else 0,
-		"branch":         doc.branch or "",
-	})
+        expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency")
+        prorated = (data["amount"] / total_wages) * payment_amount if total_wages else payment_amount
 
-	jv.insert(ignore_permissions=True)
-	jv.submit()
+        accounts.append({
+            "account":                    expense_account,
+            "debit_in_account_currency":  prorated,
+            "credit_in_account_currency": 0,
+            "project":                    doc.project or "",
+            "cost_center":                doc.cost_center or "",
+            "user_remark":                work_type,
+            "exchange_rate":              conversion_rate if company_currency != expense_account_currency else 1,
+            "company_group":              doc.company_group or "",
+        })
 
-	update_wage_entry_payment_status(wage_entry_name)
+    # --- CREDIT: payable account ---
+    credit_row = {
+        "account":                    doc.default_payable_account,
+        "debit_in_account_currency":  0,
+        "credit_in_account_currency": payment_amount,
+        "project":                    doc.project or "",
+        "cost_center":                doc.cost_center or "",
+        "exchange_rate":              conversion_rate if company_currency != payable_account_currency else 1,
+        "company_group":              doc.company_group or "",
+        "reference_type":             "Wage Entry",
+        "reference_name":             wage_entry_name,
+    }
 
-	return jv.name
+    if doc.party_type and doc.party:
+        credit_row["party_type"] = doc.party_type
+        credit_row["party"]      = doc.party
 
+    accounts.append(credit_row)
+
+    jv = frappe.get_doc({
+        "doctype":        "Journal Entry",
+        "voucher_type":   "Journal Entry",
+        "posting_date":   doc.date or nowdate(),
+        "company":        doc.company,
+        "title":          f"Wages – {wage_entry_name}",
+        "user_remark":    f"Wages – {wage_entry_name}",
+        "accounts":       accounts,
+        "multi_currency": 1 if (doc.currency and doc.currency != company_currency) else 0,
+        "branch":         doc.branch or "",
+    })
+
+    jv.insert(ignore_permissions=True)
+    jv.submit()
+
+    update_wage_entry_payment_status(wage_entry_name)
+
+    return jv.name
 
 def update_wage_entry_payment_status(wage_entry_name):
 	doc          = frappe.get_doc("Wage Entry", wage_entry_name)
@@ -504,6 +356,7 @@ def create_daily_wage_purchase_invoice(wage_entry_name):
 	pi.remarks          = _("Auto-created from Wage Entry {0}").format(wage_entry_name)
 	pi.branch           = doc.get("branch") or None
 	pi.company_group     = doc.get("company_group") or None
+	pi.custom_remark     = doc.get("description") or None
 	pi.custom_wage_entry = wage_entry_name
 
 	# Link back to the Wage Entry (add a custom field if you want a hard link)
