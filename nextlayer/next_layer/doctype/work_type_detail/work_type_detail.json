@@ -11,7 +11,8 @@
   "daily_wage",
   "column_break_nmrw",
   "total_qty",
-  "total_amount"
+  "total_amount",
+  "default_expense_account"
  ],
  "fields": [
   {
@@ -53,13 +54,19 @@
    "fieldname": "daily_wage",
    "fieldtype": "Check",
    "label": "Daily Wage"
+  },
+  {
+   "fieldname": "default_expense_account",
+   "fieldtype": "Link",
+   "label": "Default Expense Account",
+   "options": "Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-04-02 02:37:47.746975",
+ "modified": "2026-04-04 23:58:47.961892",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Work Type Detail",
