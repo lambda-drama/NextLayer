@@ -147,6 +147,10 @@ fixtures = [
                     
                     #Purchase invoice
                     "Purchase Invoice-custom_wage_entry",
+                    
+                    #Activity
+                    "Activity Type-custom_section_break_cprjt",
+                    "Activity Type-custom_expense_account",
                 ),
             ]
         ],
@@ -204,8 +208,6 @@ fixtures = [
     },
     
 ]
-
-
 
 doc_events = {
     "Repost Accounting Ledger": {
@@ -287,7 +289,8 @@ doctype_js = {
 	"Travel Expense":"public/js/travel_expense_flight_lookup.js",
 	"Journal Entry":"public/js/journal_entry.js",
     "Quotation":"public/js/quotation.js",
-    "Contract":"public/js/contract.js"
+    "Contract":"public/js/contract.js",
+    "Activity Type":"public/js/activity_type.js",
 }
 
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}

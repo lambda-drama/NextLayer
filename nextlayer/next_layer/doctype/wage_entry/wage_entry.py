@@ -83,12 +83,153 @@ def get_wage_entry_autoname(doc):
 
 
 
+# @frappe.whitelist()
+# def make_journal_entry(wage_entry_name, amount=None):
+#     doc = frappe.get_doc("Wage Entry", wage_entry_name)
+
+#     # if not doc.default_payable_account:
+#     #     frappe.throw(_("Please set a Default Payable Account before booking."))
+
+#     total_wages = sum(row.amount or 0 for row in doc.wages)
+#     if total_wages <= 0:
+#         frappe.throw(_("Total wage amount must be greater than zero."))
+
+#     payment_amount = float(amount) if amount else total_wages
+#     if payment_amount <= 0:
+#         frappe.throw(_("Payment amount must be greater than zero."))
+
+#     company_currency         = frappe.db.get_value("Company", doc.company, "default_currency")
+#     payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
+#     conversion_rate          = getattr(doc, "conversion_rate", None) or 1
+
+#     # Build lookup from summary table: type_of_work -> summary row
+#     summary_map = {
+#         row.type_of_work: row
+#         for row in (doc.type_of_work_breakdown or [])
+#     }
+
+#     accounts = []
+
+#     # --- DEBIT: group wages by work type ---
+#     groups = {}
+#     for row in doc.wages:
+#         key = row.type_of_work or "General"
+#         if key not in groups:
+#             groups[key] = {
+#                 "amount":          0,
+#                 "expense_account": row.get("default_expense_account") or doc.default_expense_account
+#             }
+#         groups[key]["amount"] += (row.amount or 0)
+
+#     for work_type, data in groups.items():
+#         summary = summary_map.get(work_type)
+
+#         # Priority: summary table → wage row → main doc fallback
+#         expense_account = (
+#             (summary and summary.get("default_expense_account"))
+#             or data["expense_account"]
+#             or doc.default_expense_account
+#         )
+
+#         if not expense_account:
+#             frappe.throw(_(
+#                 "No Expense Account found for work type <b>{0}</b>. "
+#                 "Please set it on the work type summary or on the wage rows."
+#             ).format(work_type))
+
+#         expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency")
+#         prorated = (data["amount"] / total_wages) * payment_amount if total_wages else payment_amount
+
+#         accounts.append({
+#             "account":                    expense_account,
+#             "debit_in_account_currency":  prorated,
+#             "credit_in_account_currency": 0,
+#             "project":                    doc.project or "",
+#             "cost_center":                doc.cost_center or "",
+#             "user_remark":                work_type,
+#             "exchange_rate":              conversion_rate if company_currency != expense_account_currency else 1,
+#             "company_group":              doc.company_group or "",
+#         })
+
+#     # --- CREDIT: payable account ---
+#     credit_row = {
+#         "account":                    doc.default_payable_account,
+#         "debit_in_account_currency":  0,
+#         "credit_in_account_currency": payment_amount,
+#         "project":                    doc.project or "",
+#         "cost_center":                doc.cost_center or "",
+#         "exchange_rate":              conversion_rate if company_currency != payable_account_currency else 1,
+#         "company_group":              doc.company_group or "",
+#         "reference_type":             "Wage Entry",
+#         "reference_name":             wage_entry_name,
+#     }
+
+#     if doc.party_type and doc.party:
+#         credit_row["party_type"] = doc.party_type
+#         credit_row["party"]      = doc.party
+
+#     accounts.append(credit_row)
+
+#     jv = frappe.get_doc({
+#         "doctype":        "Journal Entry",
+#         "voucher_type":   "Journal Entry",
+#         "posting_date":   doc.date or nowdate(),
+#         "company":        doc.company,
+#         "title":          f"Wages – {wage_entry_name}",
+#         "user_remark":    f"Wages – {wage_entry_name}",
+#         "accounts":       accounts,
+#         "multi_currency": 1 if (doc.currency and doc.currency != company_currency) else 0,
+#         "branch":         doc.branch or "",
+#     })
+
+#     jv.insert(ignore_permissions=True)
+#     jv.submit()
+
+#     update_wage_entry_payment_status(wage_entry_name)
+
+#     return jv.name
+
+def get_expense_account_for_work_type(work_type, company):
+    """
+    Fetch the expense account for a given work type (Activity Type) and company.
+    Looks inside Activity Type's custom_expense_account child table,
+    which mirrors the Expense Claim Type accounts child table structure.
+    Returns the account string, or throws a descriptive error if not found.
+    """
+    if not work_type:
+        frappe.throw(_(
+            "A wage row is missing a <b>Type of Work</b>. "
+            "Please fill in all work types before booking."
+        ))
+
+    activity = frappe.get_doc("Activity Type", work_type)
+
+    accounts_table = getattr(activity, "custom_expense_account", [])
+    if not accounts_table:
+        frappe.throw(_(
+            "Activity Type <b>{0}</b> has no expense accounts configured. "
+            "Please go to <b>Activity Type → {0}</b> and add an expense account "
+            "for company <b>{1}</b>."
+        ).format(work_type, company))
+
+    # Find the row matching the current company
+    for row in accounts_table:
+        if row.get("company") == company:
+            account = row.get("default_account") or row.get("account")
+            if account:
+                return account
+
+    # Found the table but no matching company row
+    frappe.throw(_(
+        "Activity Type <b>{0}</b> does not have an expense account set for "
+        "company <b>{1}</b>. "
+        "Please go to <b>Activity Type → {0}</b> and add a row for this company."
+    ).format(work_type, company))
+
+
 @frappe.whitelist()
 def make_journal_entry(wage_entry_name, amount=None):
     doc = frappe.get_doc("Wage Entry", wage_entry_name)
-
-    # if not doc.default_payable_account:
-    #     frappe.throw(_("Please set a Default Payable Account before booking."))
 
     total_wages = sum(row.amount or 0 for row in doc.wages)
     if total_wages <= 0:
@@ -102,40 +243,19 @@ def make_journal_entry(wage_entry_name, amount=None):
     payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
     conversion_rate          = getattr(doc, "conversion_rate", None) or 1
 
-    # Build lookup from summary table: type_of_work -> summary row
-    summary_map = {
-        row.type_of_work: row
-        for row in (doc.type_of_work_breakdown or [])
-    }
-
     accounts = []
 
-    # --- DEBIT: group wages by work type ---
+    # --- DEBIT: group wages by work type, fetch account from Activity Type ---
     groups = {}
     for row in doc.wages:
         key = row.type_of_work or "General"
         if key not in groups:
-            groups[key] = {
-                "amount":          0,
-                "expense_account": row.get("default_expense_account") or doc.default_expense_account
-            }
+            groups[key] = {"amount": 0}
         groups[key]["amount"] += (row.amount or 0)
 
     for work_type, data in groups.items():
-        summary = summary_map.get(work_type)
-
-        # Priority: summary table → wage row → main doc fallback
-        expense_account = (
-            (summary and summary.get("default_expense_account"))
-            or data["expense_account"]
-            or doc.default_expense_account
-        )
-
-        if not expense_account:
-            frappe.throw(_(
-                "No Expense Account found for work type <b>{0}</b>. "
-                "Please set it on the work type summary or on the wage rows."
-            ).format(work_type))
+        # Fetch expense account from Activity Type → custom_expense_account
+        expense_account = get_expense_account_for_work_type(work_type, doc.company)
 
         expense_account_currency = frappe.db.get_value("Account", expense_account, "account_currency")
         prorated = (data["amount"] / total_wages) * payment_amount if total_wages else payment_amount
@@ -406,3 +526,31 @@ def _get_or_create_default_supplier():
 
 	return supplier_name
 
+import frappe
+
+@frappe.whitelist()
+def get_permitted_branches(doctype, txt, searchfield, start, page_len, filters):
+    company = filters.get("company")
+
+    # Get branches the user has explicit permission for
+    user_permissions = frappe.get_all(
+        "User Permission",
+        filters={
+            "user": frappe.session.user,
+            "allow": "Branch",
+        },
+        pluck="for_value",
+    )
+
+    conditions = {"company": company}
+
+    # Only apply user permission filter if permissions exist
+    if user_permissions:
+        conditions["name"] = ["in", user_permissions]
+
+    return frappe.get_all(
+        "Branch",
+        filters=conditions,
+        fields=["name"],
+        as_list=True,
+    )
