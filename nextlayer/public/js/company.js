@@ -19,7 +19,35 @@ frappe.ui.form.on("Company", {
 				repost_ssc_for_company(frm);
 			}, __("Actions"));
 		}
+
+		 frm.add_custom_button("Migrate Traveler Names", function () {
+            frappe.confirm(
+                "This will copy <b>Traveler Name</b> into the <b>Traveller Name</b> multiselect table for <b>all Travel Expense records</b>. Continue?",
+                function () {
+                    frappe.call({
+                        method: "nextlayer.next_layer.api.traveller.migrate_all_traveler_names",
+                        freeze: true,
+                        freeze_message: "Migrating all records, please wait...",
+                        callback(r) {
+                            if (r.message) {
+                                let m = r.message;
+                                let msg = `Migration complete.<br><br>
+                                    ✅ Migrated: <b>${m.migrated}</b><br>
+                                    ⏭ Skipped (already existed): <b>${m.skipped}</b>`;
+                                if (m.errors.length) {
+                                    msg += `<br>❌ Errors: <b>${m.errors.length}</b><br>
+                                        <small>${m.errors.join("<br>")}</small>`;
+                                }
+                                frappe.msgprint({ title: "Migration Result", message: msg, indicator: "green" });
+                            }
+                        }
+                    });
+                }
+            );
+        }, "Actions");
 	}
+
+	
 });
 
 // Function to generate EAN barcodes for all items
