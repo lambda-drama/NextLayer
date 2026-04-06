@@ -696,6 +696,12 @@ function open_whatsapp_dialog(frm) {
 	});
 }
  
+function strip_html(html) {
+	const temp = document.createElement("div");
+	temp.innerHTML = html;
+	return temp.textContent || temp.innerText || "";
+}
+
 function build_default_message(frm) {
 	const doc = frm.doc;
     const user = frappe.session.user;
@@ -709,7 +715,11 @@ function build_default_message(frm) {
 	if (doc.wage_type) msg += `Type: ${doc.wage_type}\n`;
 	if (doc.project) msg += `Project: ${doc.project}\n`;
 	if (doc.stage) msg += `Stage: ${doc.stage}\n`;
-	if (doc.description) msg += `Description: ${doc.description}\n`;
+	// 🔥 FIX HERE (no frappe.utils)
+	if (doc.description) {
+		const clean_desc = strip_html(doc.description).trim();
+		msg += `Description: ${clean_desc}\n`;
+	}
 	if (doc.total_amount) msg += `Total Amount: ${format_currency(doc.total_amount, doc.currency)}\n`;
 
     msg += `\nSent by: ${full_name}`;
