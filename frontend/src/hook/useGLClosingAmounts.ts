@@ -58,13 +58,12 @@ export function useGLClosingAmounts({
           body: JSON.stringify({ filters }),
           credentials: 'include'
         })
-
+        
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
 
         const result = await response.json()
-        console.log("GL Closing Amounts Response:", result)
 
         if (result.message && result.message.success) {
           setGlClosingAmounts(result.message.gl_closing_amounts || {})

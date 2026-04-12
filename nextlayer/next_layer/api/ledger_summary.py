@@ -652,7 +652,7 @@ def get_intransit_invoice_totals(filters: Dict) -> Dict:
         original_user = frappe.session.user
         try:
             frappe.set_user("Administrator")
-            return _get_intransit_invoice_totals_impl(company, party_type, parties, from_date, to_date)
+            return _get_intransit_invoice_totals_impl(company, party_type, parties, from_date, to_date, filters.get("invoice_type"))
         finally:
             frappe.set_user(original_user)
 
@@ -666,16 +666,24 @@ def get_intransit_invoice_totals(filters: Dict) -> Dict:
         }
 
 
-def _get_intransit_invoice_totals_impl(company, party_type, parties, from_date, to_date):
+def _get_intransit_invoice_totals_impl(company, party_type, parties, from_date, to_date, invoice_type=None):
     """Implementation of in-transit invoice totals (runs as Administrator)."""
-    if party_type == "Supplier":
-        invoice_type = "Sales Invoice"
-        party_field = "company"
-        company_field = "customer"
+    if invoice_type:
+        if invoice_type == "Sales Invoice":
+            party_field = "customer"
+            company_field = "company"
+        else:
+            party_field = "supplier"
+            company_field = "company"
     else:
-        invoice_type = "Purchase Invoice"
-        party_field = "company"
-        company_field = "supplier"
+        if party_type == "Supplier":
+            invoice_type = "Sales Invoice"
+            party_field = "company"
+            company_field = "customer"
+        else:
+            invoice_type = "Purchase Invoice"
+            party_field = "company"
+            company_field = "supplier"
 
     intransit_totals = {}
     for party in parties:
