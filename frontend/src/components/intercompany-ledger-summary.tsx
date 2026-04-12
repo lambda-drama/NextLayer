@@ -817,7 +817,7 @@ export default function InterCompanyLedgerSummary() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Show In-Transit Columns</label>
+                    <label className="text-sm font-medium text-gray-700">Display In-Transit SI & PI</label>
                     <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
                       <input
                         type="checkbox"
