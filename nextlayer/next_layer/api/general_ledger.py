@@ -1,11 +1,34 @@
 
 # api/general_ledger.py
+import contextlib
 import frappe
 from frappe import _
 from frappe.utils import flt
 from nextlayer.next_layer.report.general_ledger_extension.general_ledger_extension import execute
 from frappe import _dict
 from frappe.utils.password import get_decrypted_password
+
+
+@contextlib.contextmanager
+def _as_user(target_user):
+	"""Switch to target_user for a block, then restore the original user and session state.
+
+	In Frappe v16, frappe.set_user() clears local.session.data (including the CSRF token
+	and last_updated timestamp).  If the session is not restored before session.update()
+	runs in after_response, the corrupted (empty) data is written back to the cache/DB,
+	making subsequent requests appear as Guest (→ 403 FORBIDDEN).
+	"""
+	current_user = frappe.session.user
+	_saved_sid  = frappe.local.session.get("sid")
+	_saved_data = dict(frappe.local.session.get("data") or {})
+	try:
+		frappe.set_user(target_user)
+		yield
+	finally:
+		frappe.set_user(current_user)
+		# Restore the session keys that set_user() corrupts
+		frappe.local.session["sid"]  = _saved_sid
+		frappe.local.session["data"] = frappe._dict(_saved_data)
 
 
 @frappe.whitelist()
@@ -59,12 +82,8 @@ def get_general_ledger_data(filters):
 		filters.setdefault("company_fb", "")
 
 		# Run with elevated permissions to bypass all restrictions
-		original_user = frappe.session.user
-		try:
-			frappe.set_user("Administrator")
+		with _as_user("Administrator"):
 			columns, data = execute(filters)
-		finally:
-			frappe.set_user(original_user)
 
 		# Filter data - show_opening_entries is handled by the standard GL report
 		filtered_data = []
@@ -158,13 +177,9 @@ def get_permission_aware_gl_data(filters):
 
 		# Run with elevated permissions to bypass all restrictions
 		original_user = frappe.session.user
-
-		try:
-			frappe.set_user("Administrator")
+		with _as_user("Administrator"):
 			# Get all GL data first
 			columns, all_data = execute(filters)
-		finally:
-			frappe.set_user(original_user)
 
 		# Filter based on document sharing permissions for display
 		# Run permission checks as the original user to respect sharing permissions
@@ -249,13 +264,9 @@ def check_document_permission_as_original_user(voucher_type, voucher_no, origina
 			return False
 
 		# Temporarily switch to the original user to check permissions
-		current_user = frappe.session.user
-		try:
-			frappe.set_user(original_user)
+		with _as_user(original_user):
 			doc = frappe.get_doc(voucher_type, voucher_no)
 			return frappe.has_permission(doc, ptype="read")
-		finally:
-			frappe.set_user(current_user)
 
 	except frappe.PermissionError:
 		return False
@@ -1296,11 +1307,8 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 			})
 
 			original_user = frappe.session.user
-			try:
-				frappe.set_user("Administrator")
+			with _as_user("Administrator"):
 				columns_a, all_data_a = execute(filters_a)
-			finally:
-				frappe.set_user(original_user)
 
 			for entry in all_data_a:
 				# Skip summary rows
@@ -1342,11 +1350,8 @@ def verify_admin_password_and_get_hidden_transactions(admin_password, company_a,
 
 			# Get all GL data for Company B (including hidden ones)
 			original_user = frappe.session.user
-			try:
-				frappe.set_user("Administrator")
+			with _as_user("Administrator"):
 				columns_b, all_data_b = execute(filters_b)
-			finally:
-				frappe.set_user(original_user)
 
 			for entry in all_data_b:
 				# Skip summary rows

@@ -1,8 +1,31 @@
+import contextlib
 import frappe
 from frappe import _
 from frappe.utils import flt, getdate, today
 from typing import Dict, List, Optional, Tuple
 import json
+
+
+@contextlib.contextmanager
+def _as_user(target_user):
+	"""Switch to target_user for a block, then restore the original user and session state.
+
+	In Frappe v16, frappe.set_user() clears local.session.data (including the CSRF token
+	and last_updated timestamp).  If the session is not restored before session.update()
+	runs in after_response, the corrupted (empty) data is written back to the cache/DB,
+	making subsequent requests appear as Guest (→ 403 FORBIDDEN).
+	"""
+	current_user = frappe.session.user
+	_saved_sid  = frappe.local.session.get("sid")
+	_saved_data = dict(frappe.local.session.get("data") or {})
+	try:
+		frappe.set_user(target_user)
+		yield
+	finally:
+		frappe.set_user(current_user)
+		# Restore the session keys that set_user() corrupts
+		frappe.local.session["sid"]  = _saved_sid
+		frappe.local.session["data"] = frappe._dict(_saved_data)
 
 # Import the report extensions
 from nextlayer.next_layer.report.customer_ledger_summary_extension.customer_ledger_summary_extension import execute as customer_ledger_execute
@@ -120,12 +143,8 @@ def get_customer_ledger_summary(filters: Dict) -> Dict:
         }
 
         # Intercompany Ledger Summary: ignore user permissions and fetch everything
-        original_user = frappe.session.user
-        try:
-            frappe.set_user("Administrator")
+        with _as_user("Administrator"):
             return _get_customer_ledger_summary_impl(company, from_date, to_date, show_intercompany_only, filters)
-        finally:
-            frappe.set_user(original_user)
 
     except Exception as e:
         frappe.log_error(f"Error in get_customer_ledger_summary: {str(e)}")
@@ -292,12 +311,8 @@ def get_supplier_ledger_summary(filters: Dict) -> Dict:
         }
 
         # Intercompany Ledger Summary: ignore user permissions and fetch everything
-        original_user = frappe.session.user
-        try:
-            frappe.set_user("Administrator")
+        with _as_user("Administrator"):
             return _get_supplier_ledger_summary_impl(company, from_date, to_date, show_intercompany_only, report_filters)
-        finally:
-            frappe.set_user(original_user)
 
     except Exception as e:
         frappe.log_error(f"Error in get_supplier_ledger_summary: {str(e)}")
@@ -560,12 +575,8 @@ def get_gl_closing_amounts(filters: Dict) -> Dict:
                 gl_filters = _dict(gl_filters)
 
                 # Intercompany Ledger Summary: run as Administrator to bypass all restrictions
-                original_user = frappe.session.user
-                try:
-                    frappe.set_user("Administrator")
+                with _as_user("Administrator"):
                     columns, data = execute(gl_filters)
-                finally:
-                    frappe.set_user(original_user)
 
                 # Extract closing balance from the GL data
                 closing_balance = 0
@@ -649,12 +660,8 @@ def get_intransit_invoice_totals(filters: Dict) -> Dict:
             }
 
         # Intercompany Ledger Summary: ignore user permissions and fetch everything
-        original_user = frappe.session.user
-        try:
-            frappe.set_user("Administrator")
+        with _as_user("Administrator"):
             return _get_intransit_invoice_totals_impl(company, party_type, parties, from_date, to_date, filters.get("invoice_type"))
-        finally:
-            frappe.set_user(original_user)
 
     except Exception as e:
         frappe.log_error(f"In-Transit Invoice Totals Error: {str(e)}")
