@@ -57,7 +57,7 @@ export default function InterCompanyLedgerSummary() {
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [allowOffsetMatch, setAllowOffsetMatch] = useState<boolean>(false)
-  const [showInTransitColumns, setShowInTransitColumns] = useState<boolean>(false)
+  const [showInTransitColumns, setShowInTransitColumns] = useState<boolean>(true)
 
   // Data state
   const [error, setError] = useState<string>("")
