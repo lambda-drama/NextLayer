@@ -1,0 +1,89 @@
+{
+ "app": "nextlayer",
+ "creation": "2026-04-11 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "bar-chart",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "Data Visualizer",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "database-zap",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Inter-Company",
+   "link_to": "/frontend",
+   "link_type": "URL",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "book-open",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Ledger Summary",
+   "link_to": "/frontend/ledger",
+   "link_type": "URL",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "arrow-up-down",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Import & Export Expense",
+   "link_to": "/frontend/import-export",
+   "link_type": "URL",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "chart-column",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Cost Estimate Vs Consumed",
+   "link_to": "/frontend/cost-estimate-vs-consumed",
+   "link_type": "URL",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "chart-no-axes-column",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Quotation Stages",
+   "link_to": "/frontend/quotation-stages",
+   "link_type": "URL",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-04-11 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Data Visualizer",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Data Visualizer"
+}

@@ -1,0 +1,21 @@
+{
+ "app": "nextlayer",
+ "creation": "2026-04-11 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "home",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "Main Dashboard",
+ "link_to": "Main Dashboard",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-04-11 00:00:00.000000",
+ "modified_by": "Administrator",
+ "name": "Main Dashboard",
+ "owner": "Administrator",
+ "parent_icon": "Next Layer",
+ "restrict_removal": 0,
+ "sidebar": "",
+ "standard": 1
+}

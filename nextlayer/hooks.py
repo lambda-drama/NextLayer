@@ -4,6 +4,8 @@ app_publisher = "jr@gmail.com"
 app_description = "More improvements on ERPNext"
 app_email = "jr@gmail.com"
 app_license = "mit"
+app_logo_url = "/assets/nextlayer/images/logo.jpeg"
+app_home = "/desk/next-layer"
 
 # Apps
 # ------------------
@@ -16,10 +18,11 @@ add_to_apps_screen = [
 		"name": "nextlayer",
 		"logo": "/assets/nextlayer/images/logo.jpeg",
 		"title": "Next Layer",
-		"route": "/nextlayer",
+		"route": "/desk/next-layer",
 		# "has_permission": "nextlayer.api.permission.has_app_permission"
 	}
 ]
+
 
 fixtures = [
     {
