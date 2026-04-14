@@ -6,6 +6,7 @@ interface UseIntransitInvoiceTotalsParams {
   fromDate: string
   toDate: string
   parties: string[]
+  invoiceType?: 'Sales Invoice' | 'Purchase Invoice'
   enabled?: boolean
 }
 
@@ -15,6 +16,7 @@ export function useIntransitInvoiceTotals({
   fromDate,
   toDate,
   parties,
+  invoiceType,
   enabled = true
 }: UseIntransitInvoiceTotalsParams) {
   const [intransitTotals, setIntransitTotals] = useState<Record<string, number>>({})
@@ -35,12 +37,16 @@ export function useIntransitInvoiceTotals({
       setError(null)
 
       try {
-        const filters = {
+        const filters: Record<string, any> = {
           company,
           from_date: fromDate,
           to_date: toDate,
           party_type: partyType,
           parties
+        }
+
+        if (invoiceType) {
+          filters.invoice_type = invoiceType
         }
 
         const csrfToken = window.csrf_token || ''
@@ -79,7 +85,7 @@ export function useIntransitInvoiceTotals({
     }
 
     fetchIntransitTotals()
-  }, [company, partyType, fromDate, toDate, partiesKey, enabled])
+}, [company, partyType, fromDate, toDate, partiesKey, invoiceType, enabled])
 
   return {
     intransitTotals,

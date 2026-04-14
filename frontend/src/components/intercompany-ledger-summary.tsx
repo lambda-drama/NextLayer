@@ -57,6 +57,7 @@ export default function InterCompanyLedgerSummary() {
   const [ignoreExchangeRateRevaluation, setIgnoreExchangeRateRevaluation] = useState<boolean>(true)
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [allowOffsetMatch, setAllowOffsetMatch] = useState<boolean>(false)
+  const [showInTransitColumns, setShowInTransitColumns] = useState<boolean>(true)
 
   // Data state
   const [error, setError] = useState<string>("")
@@ -207,6 +208,27 @@ export default function InterCompanyLedgerSummary() {
     enabled: hasLoadedData && unmatchedSupplierParties.length > 0
   })
 
+  // Additional in-transit columns for the row-level summary tables
+  const { intransitTotals: customerIntransitSalesTotals } = useIntransitInvoiceTotals({
+    company: company,
+    partyType: "Customer",
+    invoiceType: "Sales Invoice",
+    fromDate,
+    toDate,
+    parties: customerParties,
+    enabled: hasLoadedData && customerParties.length > 0
+  })
+
+  const { intransitTotals: supplierIntransitPurchaseTotals } = useIntransitInvoiceTotals({
+    company: company,
+    partyType: "Supplier",
+    invoiceType: "Purchase Invoice",
+    fromDate,
+    toDate,
+    parties: supplierParties,
+    enabled: hasLoadedData && supplierParties.length > 0
+  })
+
   const isLoading = isLoadingCustomer || isLoadingSupplier || isLoadingCustomerGL || isLoadingSupplierGL || isLoadingCustomerIntransit || isLoadingSupplierIntransit
 
   // Handle load data
@@ -270,7 +292,7 @@ export default function InterCompanyLedgerSummary() {
   }
 
   // Get status based on difference, loading state, and in-transit totals
-  const getStatus = (difference: number, glClosing: number, isLoading: boolean, party: string, intransitTotal?: number) => {
+  const getStatus = (difference: number, glClosing: number, isLoading: boolean, party: string, intransitTotal?: number, showInTransitColumns?: boolean, specificIntransitTotal?: number, isCustomerTable?: boolean) => {
     // If GL data is still loading for this specific party, show pending
     if (isLoading) {
       return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
@@ -301,6 +323,15 @@ export default function InterCompanyLedgerSummary() {
       const offsetSum = difference + 2 * Math.abs(glClosing)
       if (Math.abs(offsetSum - absIntransitTotal) <= tolerance) {
         return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: true }
+      }
+    }
+
+    // New logic: Check for specific in-transit matches when checkbox is enabled and row is unmatched
+    if (showInTransitColumns && specificIntransitTotal !== undefined && specificIntransitTotal !== null) {
+      const absSpecificIntransitTotal = Math.abs(specificIntransitTotal)
+      if (Math.abs(absDifference - absSpecificIntransitTotal) <= tolerance) {
+        const statusText = isCustomerTable ? "Match with In-Transit SI" : "Match with In-Transit PI"
+        return { text: statusText, color: "text-orange-600", bgColor: "bg-orange-50" }
       }
     }
 
@@ -790,9 +821,26 @@ export default function InterCompanyLedgerSummary() {
                         <SelectItem value="All">All Entries</SelectItem>
                         <SelectItem value="Match">✓ Matched</SelectItem>
                         <SelectItem value="Match with In-Transit">✓ Match with Intransit</SelectItem>
+                        <SelectItem value="Match with In-Transit SI">✓ Match with In-Transit SI</SelectItem>
+                        <SelectItem value="Match with In-Transit PI">✓ Match with In-Transit PI</SelectItem>
                         <SelectItem value="Unmatched">✗ Unmatched</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Display In-Transit SI & PI</label>
+                    <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
+                      <input
+                        type="checkbox"
+                        id="showInTransitColumns"
+                        checked={showInTransitColumns}
+                        onChange={(e) => setShowInTransitColumns(e.target.checked)}
+                        className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="showInTransitColumns" className="text-sm text-gray-700">
+                        Enable
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <div className="text-sm text-gray-600">
@@ -824,6 +872,9 @@ export default function InterCompanyLedgerSummary() {
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
                         <TableHead className="text-gray-500 text-right">In-Transit Total</TableHead>
                         <TableHead className="text-blue-800 text-right">Status</TableHead>
+                        {showInTransitColumns && (
+                          <TableHead className="text-blue-800 text-right">In-Transit SI</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -832,7 +883,8 @@ export default function InterCompanyLedgerSummary() {
                         const difference = calculateDifference(entry.closing_balance, glClosing)
                         const isPartyGLLoaded = customerGLClosing.hasOwnProperty(entry.party)
                         const intransitTotal = customerIntransitTotals[entry.party]
-                        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
+                        const intransitSalesTotal = customerIntransitSalesTotals[entry.party]
+                        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal, showInTransitColumns, intransitSalesTotal, true)
 
                         // Show "-" for matched entries, show value for unmatched
                         const showIntransitTotal = status.text === 'Match' ? '-' :
@@ -855,6 +907,11 @@ export default function InterCompanyLedgerSummary() {
                                 {status.text}
                               </span>
                             </TableCell>
+                            {showInTransitColumns && (
+                              <TableCell className="text-right font-medium">
+                                {intransitSalesTotal !== undefined ? formatCurrency(intransitSalesTotal, entry.currency, company) : '-'}
+                              </TableCell>
+                            )}
                           </TableRow>
                         )
                       })}
@@ -884,6 +941,9 @@ export default function InterCompanyLedgerSummary() {
                         <TableHead className="text-blue-800 text-right">Difference</TableHead>
                         <TableHead className="text-gray-500 text-right">In-Transit Total</TableHead>
                         <TableHead className="text-blue-800 text-right">Status</TableHead>
+                        {showInTransitColumns && (
+                          <TableHead className="text-blue-800 text-right">In-Transit PI</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -892,7 +952,8 @@ export default function InterCompanyLedgerSummary() {
                         const difference = calculateDifference(entry.closing_balance, glClosing)
                         const isPartyGLLoaded = supplierGLClosing.hasOwnProperty(entry.party)
                         const intransitTotal = supplierIntransitTotals[entry.party]
-                        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal)
+                        const intransitPurchaseTotal = supplierIntransitPurchaseTotals[entry.party]
+                        const status = getStatus(difference, glClosing, !isPartyGLLoaded, entry.party, intransitTotal, showInTransitColumns, intransitPurchaseTotal, false)
 
                         // Show "-" for matched entries, show value for unmatched
                         const showIntransitTotal = status.text === 'Match' ? '-' :
@@ -915,6 +976,11 @@ export default function InterCompanyLedgerSummary() {
                                 {status.text}
                               </span>
                             </TableCell>
+                            {showInTransitColumns && (
+                              <TableCell className="text-right font-medium">
+                                {intransitPurchaseTotal !== undefined ? formatCurrency(intransitPurchaseTotal, entry.currency, company) : '-'}
+                              </TableCell>
+                            )}
                           </TableRow>
                         )
                       })}
