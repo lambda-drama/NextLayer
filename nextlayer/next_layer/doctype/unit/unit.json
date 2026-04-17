@@ -5,9 +5,52 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_dupa"
+  "basic_section",
+  "unit_number",
+  "unit_name",
+  "property",
+  "column_break_basic",
+  "building",
+  "floor",
+  "unit_type",
+  "dimensions_section",
+  "area",
+  "bedrooms",
+  "bathrooms",
+  "column_break_dimensions",
+  "max_occupancy",
+  "parking_spots",
+  "storage_units",
+  "ownership_section",
+  "owners",
+  "ownership_validation",
+  "rent_billing_section",
+  "standard_rent",
+  "rent_item",
+  "column_break_rent",
+  "deposit_required",
+  "late_fee_amount",
+  "services_section",
+  "assigned_services",
+  "status_section",
+  "status",
+  "is_occupied",
+  "column_break_status",
+  "current_tenant",
+  "current_contract",
+  "features_section",
+  "features",
+  "utilities_section",
+  "meters",
+  "documents_section",
+  "unit_images",
+  "floor_plan",
+  "column_break_dawc",
+  "attachments",
+  "notes_section",
+  "notes"
  ],
-"fields": [
+ "fields": [
   {
    "fieldname": "basic_section",
    "fieldtype": "Section Break",
@@ -16,19 +59,23 @@
   {
    "fieldname": "unit_number",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Unit Number",
    "reqd": 1,
    "unique": 1
   },
   {
+   "description": "e.g., 'Ocean View Suite' or 'A101 - Garden View'",
    "fieldname": "unit_name",
    "fieldtype": "Data",
-   "label": "Unit Name",
-   "description": "e.g., 'Ocean View Suite' or 'A101 - Garden View'"
+   "label": "Unit Name"
   },
   {
    "fieldname": "property",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Property",
    "options": "Property",
    "reqd": 1
@@ -38,10 +85,10 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "For multi-building properties",
    "fieldname": "building",
    "fieldtype": "Data",
-   "label": "Building",
-   "description": "For multi-building properties"
+   "label": "Building"
   },
   {
    "fieldname": "floor",
@@ -80,10 +127,10 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Number of people allowed",
    "fieldname": "max_occupancy",
    "fieldtype": "Int",
-   "label": "Maximum Occupancy",
-   "description": "Number of people allowed"
+   "label": "Maximum Occupancy"
   },
   {
    "fieldname": "parking_spots",
@@ -101,11 +148,11 @@
    "label": "Property Ownership (Multi-Owner Support)"
   },
   {
+   "description": "Support multiple owners with percentage ownership",
    "fieldname": "owners",
    "fieldtype": "Table",
    "label": "Owners",
-   "options": "Unit Owner",
-   "description": "Support multiple owners with percentage ownership"
+   "options": "Unit Owner"
   },
   {
    "fieldname": "ownership_validation",
@@ -121,32 +168,33 @@
   {
    "fieldname": "standard_rent",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Standard Rent",
    "reqd": 1
   },
   {
+   "description": "Auto-created Item for this unit",
    "fieldname": "rent_item",
    "fieldtype": "Link",
    "label": "Rent Item",
    "options": "Item",
-   "read_only": 1,
-   "description": "Auto-created Item for this unit"
+   "read_only": 1
   },
   {
    "fieldname": "column_break_rent",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Usually 1-2 months rent",
    "fieldname": "deposit_required",
    "fieldtype": "Currency",
-   "label": "Standard Deposit Required",
-   "description": "Usually 1-2 months rent"
+   "label": "Standard Deposit Required"
   },
   {
+   "description": "Override global late fee for this unit",
    "fieldname": "late_fee_amount",
    "fieldtype": "Currency",
-   "label": "Late Fee Amount",
-   "description": "Override global late fee for this unit"
+   "label": "Late Fee Amount"
   },
   {
    "fieldname": "services_section",
@@ -154,11 +202,11 @@
    "label": "Assigned Services"
   },
   {
+   "description": "Services that apply to this unit (late fees, parking, etc.)",
    "fieldname": "assigned_services",
    "fieldtype": "Table",
    "label": "Assigned Services",
-   "options": "Unit Service Item",
-   "description": "Services that apply to this unit (late fees, parking, etc.)"
+   "options": "Unit Service Item"
   },
   {
    "fieldname": "status_section",
@@ -166,32 +214,33 @@
    "label": "Status & Occupancy"
   },
   {
+   "default": "Available",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Unit Status",
    "options": "\nAvailable\nOccupied\nMaintenance\nRetired\nUnder Renovation",
-   "default": "Available",
    "reqd": 1
   },
   {
+   "default": "0",
    "fieldname": "is_occupied",
    "fieldtype": "Check",
    "label": "Is Occupied",
-   "read_only": 1,
-   "default": 0
+   "read_only": 1
   },
   {
    "fieldname": "column_break_status",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Auto-updated from active contract",
+   "fetch_from": "contract.tenant",
    "fieldname": "current_tenant",
    "fieldtype": "Link",
    "label": "Current Tenant",
    "options": "Tenant",
-   "read_only": 1,
-   "fetch_from": "contract.tenant",
-   "description": "Auto-updated from active contract"
+   "read_only": 1
   },
   {
    "fieldname": "current_contract",
@@ -209,7 +258,7 @@
    "fieldname": "features",
    "fieldtype": "Table MultiSelect",
    "label": "Unit Features",
-   "options": "Unit Feature"
+   "options": "Unit Feature Table"
   },
   {
    "fieldname": "utilities_section",
@@ -217,11 +266,11 @@
    "label": "Utilities & Meters"
   },
   {
+   "description": "Water, electricity, gas meters for this unit",
    "fieldname": "meters",
    "fieldtype": "Table",
    "label": "Meters",
    "options": "Unit Meter Link",
-   "description": "Water, electricity, gas meters for this unit",
    "read_only": 1
   },
   {
@@ -230,22 +279,22 @@
    "label": "Documents & Images"
   },
   {
+   "description": "Photos of the unit",
    "fieldname": "unit_images",
    "fieldtype": "Attach Image",
-   "label": "Unit Images",
-   "description": "Photos of the unit"
+   "label": "Unit Images"
   },
   {
+   "description": "PDF or image of floor plan",
    "fieldname": "floor_plan",
    "fieldtype": "Attach",
-   "label": "Floor Plan",
-   "description": "PDF or image of floor plan"
+   "label": "Floor Plan"
   },
   {
+   "description": "Certificates, inspection reports, etc.",
    "fieldname": "attachments",
    "fieldtype": "Attach",
-   "label": "Attachments",
-   "description": "Certificates, inspection reports, etc."
+   "label": "Attachments"
   },
   {
    "fieldname": "notes_section",
@@ -256,12 +305,16 @@
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Internal Notes"
+  },
+  {
+   "fieldname": "column_break_dawc",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 17:30:42.866666",
+ "modified": "2026-04-17 18:57:17.932237",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",

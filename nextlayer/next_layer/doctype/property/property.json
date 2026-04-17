@@ -5,9 +5,51 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_1pup"
+  "basic_section",
+  "property_name",
+  "property_type",
+  "column_break_basic",
+  "property_code",
+  "status",
+  "address_section",
+  "address_line_1",
+  "address_line_2",
+  "city",
+  "state",
+  "column_break_address",
+  "zip_code",
+  "country",
+  "latitude",
+  "longitude",
+  "property_details_section",
+  "total_units",
+  "occupied_units",
+  "vacant_units",
+  "column_break_details",
+  "total_area",
+  "year_built",
+  "amenities_section",
+  "amenities",
+  "financial_section",
+  "bank_account",
+  "tax_id",
+  "column_break_financial",
+  "default_income_account",
+  "default_expense_account",
+  "contact_section",
+  "property_manager",
+  "phone",
+  "email",
+  "column_break_contact",
+  "website",
+  "documents_section",
+  "property_image",
+  "column_break_cquk",
+  "attachments",
+  "notes_section",
+  "notes"
  ],
-"fields": [
+ "fields": [
   {
    "fieldname": "basic_section",
    "fieldtype": "Section Break",
@@ -16,6 +58,8 @@
   {
    "fieldname": "property_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Property Name",
    "reqd": 1,
    "unique": 1
@@ -23,6 +67,8 @@
   {
    "fieldname": "property_type",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Property Type",
    "options": "\nResidential\nCommercial\nIndustrial\nMixed Use",
    "reqd": 1
@@ -34,15 +80,18 @@
   {
    "fieldname": "property_code",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Property Code",
    "unique": 1
   },
   {
+   "default": "Active",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Status",
    "options": "\nActive\nInactive\nUnder Construction\nRetired",
-   "default": "Active",
    "reqd": 1
   },
   {
@@ -53,6 +102,7 @@
   {
    "fieldname": "address_line_1",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Address Line 1",
    "reqd": 1
   },
@@ -84,11 +134,11 @@
    "reqd": 1
   },
   {
+   "default": "United States",
    "fieldname": "country",
    "fieldtype": "Link",
    "label": "Country",
-   "options": "Country",
-   "default": "United States"
+   "options": "Country"
   },
   {
    "fieldname": "latitude",
@@ -108,11 +158,11 @@
    "label": "Property Details"
   },
   {
+   "description": "Auto-calculated from linked Units",
    "fieldname": "total_units",
    "fieldtype": "Int",
    "label": "Total Units",
-   "read_only": 1,
-   "description": "Auto-calculated from linked Units"
+   "read_only": 1
   },
   {
    "fieldname": "occupied_units",
@@ -124,8 +174,7 @@
    "fieldname": "vacant_units",
    "fieldtype": "Int",
    "label": "Vacant Units",
-   "read_only": 1,
-   "formula": "total_units - occupied_units"
+   "read_only": 1
   },
   {
    "fieldname": "column_break_details",
@@ -151,7 +200,7 @@
    "fieldname": "amenities",
    "fieldtype": "Table MultiSelect",
    "label": "Amenities",
-   "options": "Property Amenity"
+   "options": "Property Amenity Table"
   },
   {
    "fieldname": "financial_section",
@@ -229,10 +278,10 @@
    "label": "Property Image"
   },
   {
+   "description": "Deeds, certificates, insurance, etc.",
    "fieldname": "attachments",
    "fieldtype": "Attach",
-   "label": "Attachments",
-   "description": "Deeds, certificates, insurance, etc."
+   "label": "Attachments"
   },
   {
    "fieldname": "notes_section",
@@ -243,12 +292,16 @@
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Internal Notes"
+  },
+  {
+   "fieldname": "column_break_cquk",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 17:24:48.911833",
+ "modified": "2026-04-17 18:59:27.012580",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property",

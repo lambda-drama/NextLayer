@@ -1,13 +1,63 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "naming_series:",
  "creation": "2026-04-17 18:07:03.781372",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_we3w"
+  "basic_section",
+  "naming_series",
+  "property",
+  "unit",
+  "column_break_basic",
+  "requested_by",
+  "request_date",
+  "priority_section",
+  "priority",
+  "category",
+  "column_break_priority",
+  "status",
+  "description_section",
+  "description",
+  "images",
+  "assignment_section",
+  "assigned_to",
+  "assigned_date",
+  "column_break_assignment",
+  "scheduled_date",
+  "scheduled_time",
+  "work_section",
+  "parts_used",
+  "labor_hours",
+  "labor_rate",
+  "labor_total",
+  "column_break_work",
+  "total_parts_cost",
+  "total_cost",
+  "completion_section",
+  "completed_date",
+  "resolution_notes",
+  "after_images",
+  "column_break_completion",
+  "feedback_rating",
+  "feedback_comment",
+  "billing_section",
+  "bill_to",
+  "invoice",
+  "column_break_billing",
+  "chargeback_to_owner",
+  "owner_chargeback_amount",
+  "timeline_section",
+  "response_time",
+  "resolution_time",
+  "column_break_timeline",
+  "sla_breached",
+  "sla_notes",
+  "notes_section",
+  "internal_notes"
  ],
-"fields": [
+ "fields": [
   {
    "fieldname": "basic_section",
    "fieldtype": "Section Break",
@@ -22,6 +72,8 @@
   {
    "fieldname": "property",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Property",
    "options": "Property",
    "reqd": 1
@@ -29,6 +81,8 @@
   {
    "fieldname": "unit",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Unit",
    "options": "Unit",
    "reqd": 1
@@ -38,19 +92,21 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Tenant who submitted request",
    "fieldname": "requested_by",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Requested By",
    "options": "Customer",
-   "reqd": 1,
-   "description": "Tenant who submitted request"
+   "reqd": 1
   },
   {
+   "default": "Now",
    "fieldname": "request_date",
    "fieldtype": "Datetime",
    "label": "Request Date",
-   "reqd": 1,
-   "default": "Now"
+   "reqd": 1
   },
   {
    "fieldname": "priority_section",
@@ -58,12 +114,14 @@
    "label": "Priority & Category"
   },
   {
+   "default": "Medium",
    "fieldname": "priority",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Priority",
    "options": "\nLow\nMedium\nHigh\nEmergency",
-   "reqd": 1,
-   "default": "Medium"
+   "reqd": 1
   },
   {
    "fieldname": "category",
@@ -77,11 +135,13 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "options": "\nDraft\nSubmitted\nAssigned\nIn Progress\nAwaiting Parts\nAwaiting Approval\nCompleted\nCancelled\nRejected",
-   "default": "Draft",
    "reqd": 1
   },
   {
@@ -96,10 +156,10 @@
    "reqd": 1
   },
   {
+   "description": "Upload photos of the issue",
    "fieldname": "images",
    "fieldtype": "Attach Image",
-   "label": "Images",
-   "description": "Upload photos of the issue"
+   "label": "Images"
   },
   {
    "fieldname": "assignment_section",
@@ -107,11 +167,11 @@
    "label": "Assignment"
   },
   {
+   "description": "Technician or staff member",
    "fieldname": "assigned_to",
    "fieldtype": "Link",
    "label": "Assigned To",
-   "options": "User",
-   "description": "Technician or staff member"
+   "options": "User"
   },
   {
    "fieldname": "assigned_date",
@@ -157,8 +217,7 @@
    "fieldname": "labor_total",
    "fieldtype": "Currency",
    "label": "Labor Total",
-   "read_only": 1,
-   "formula": "labor_hours * labor_rate"
+   "read_only": 1
   },
   {
    "fieldname": "column_break_work",
@@ -174,8 +233,7 @@
    "fieldname": "total_cost",
    "fieldtype": "Currency",
    "label": "Total Cost",
-   "read_only": 1,
-   "formula": "labor_total + total_parts_cost"
+   "read_only": 1
   },
   {
    "fieldname": "completion_section",
@@ -218,35 +276,35 @@
    "label": "Billing"
   },
   {
+   "default": "Property Management",
    "fieldname": "bill_to",
    "fieldtype": "Select",
    "label": "Bill To",
-   "options": "\nOwner\nTenant\nProperty Management\nWarranty\nInsurance",
-   "default": "Property Management"
+   "options": "\nOwner\nTenant\nProperty Management\nWarranty\nInsurance"
   },
   {
+   "description": "Linked invoice if billed to tenant",
    "fieldname": "invoice",
    "fieldtype": "Link",
    "label": "Invoice",
    "options": "Sales Invoice",
-   "read_only": 1,
-   "description": "Linked invoice if billed to tenant"
+   "read_only": 1
   },
   {
    "fieldname": "column_break_billing",
    "fieldtype": "Column Break"
   },
   {
+   "default": "0",
    "fieldname": "chargeback_to_owner",
    "fieldtype": "Check",
-   "label": "Chargeback to Owner",
-   "default": 0
+   "label": "Chargeback to Owner"
   },
   {
+   "depends_on": "eval:doc.chargeback_to_owner == 1",
    "fieldname": "owner_chargeback_amount",
    "fieldtype": "Currency",
-   "label": "Owner Chargeback Amount",
-   "depends_on": "eval:doc.chargeback_to_owner == 1"
+   "label": "Owner Chargeback Amount"
   },
   {
    "fieldname": "timeline_section",
@@ -254,29 +312,29 @@
    "label": "Timeline"
   },
   {
+   "description": "Time from request to assignment",
    "fieldname": "response_time",
    "fieldtype": "Duration",
    "label": "Response Time",
-   "read_only": 1,
-   "description": "Time from request to assignment"
+   "read_only": 1
   },
   {
+   "description": "Time from request to completion",
    "fieldname": "resolution_time",
    "fieldtype": "Duration",
    "label": "Resolution Time",
-   "read_only": 1,
-   "description": "Time from request to completion"
+   "read_only": 1
   },
   {
    "fieldname": "column_break_timeline",
    "fieldtype": "Column Break"
   },
   {
+   "default": "0",
    "fieldname": "sla_breached",
    "fieldtype": "Check",
    "label": "SLA Breached",
-   "read_only": 1,
-   "default": 0
+   "read_only": 1
   },
   {
    "fieldname": "sla_notes",
@@ -290,16 +348,16 @@
    "label": "Internal Notes"
   },
   {
+   "description": "Staff-only notes",
    "fieldname": "internal_notes",
    "fieldtype": "Text Editor",
-   "label": "Internal Notes",
-   "description": "Staff-only notes"
+   "label": "Internal Notes"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 18:07:03.781372",
+ "modified": "2026-04-17 18:44:53.825697",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Maintenance Request",
