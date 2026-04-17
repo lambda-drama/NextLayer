@@ -1,0 +1,288 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-17 17:30:42.866666",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_dupa"
+ ],
+"fields": [
+  {
+   "fieldname": "basic_section",
+   "fieldtype": "Section Break",
+   "label": "Basic Information"
+  },
+  {
+   "fieldname": "unit_number",
+   "fieldtype": "Data",
+   "label": "Unit Number",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "unit_name",
+   "fieldtype": "Data",
+   "label": "Unit Name",
+   "description": "e.g., 'Ocean View Suite' or 'A101 - Garden View'"
+  },
+  {
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "label": "Property",
+   "options": "Property",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "building",
+   "fieldtype": "Data",
+   "label": "Building",
+   "description": "For multi-building properties"
+  },
+  {
+   "fieldname": "floor",
+   "fieldtype": "Int",
+   "label": "Floor Level"
+  },
+  {
+   "fieldname": "unit_type",
+   "fieldtype": "Select",
+   "label": "Unit Type",
+   "options": "\nStudio\n1 Bedroom\n2 Bedroom\n3 Bedroom\n4+ Bedroom\nCommercial Space\nStorage\nParking\nOther"
+  },
+  {
+   "fieldname": "dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Dimensions & Capacity"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Float",
+   "label": "Area (sq ft)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "bedrooms",
+   "fieldtype": "Int",
+   "label": "Bedrooms"
+  },
+  {
+   "fieldname": "bathrooms",
+   "fieldtype": "Float",
+   "label": "Bathrooms"
+  },
+  {
+   "fieldname": "column_break_dimensions",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_occupancy",
+   "fieldtype": "Int",
+   "label": "Maximum Occupancy",
+   "description": "Number of people allowed"
+  },
+  {
+   "fieldname": "parking_spots",
+   "fieldtype": "Int",
+   "label": "Parking Spots"
+  },
+  {
+   "fieldname": "storage_units",
+   "fieldtype": "Int",
+   "label": "Storage Units"
+  },
+  {
+   "fieldname": "ownership_section",
+   "fieldtype": "Section Break",
+   "label": "Property Ownership (Multi-Owner Support)"
+  },
+  {
+   "fieldname": "owners",
+   "fieldtype": "Table",
+   "label": "Owners",
+   "options": "Unit Owner",
+   "description": "Support multiple owners with percentage ownership"
+  },
+  {
+   "fieldname": "ownership_validation",
+   "fieldtype": "HTML",
+   "label": "Ownership Validation",
+   "options": "<div class='text-muted small'>Total ownership percentage must equal 100%</div>"
+  },
+  {
+   "fieldname": "rent_billing_section",
+   "fieldtype": "Section Break",
+   "label": "Rent & Billing"
+  },
+  {
+   "fieldname": "standard_rent",
+   "fieldtype": "Currency",
+   "label": "Standard Rent",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rent_item",
+   "fieldtype": "Link",
+   "label": "Rent Item",
+   "options": "Item",
+   "read_only": 1,
+   "description": "Auto-created Item for this unit"
+  },
+  {
+   "fieldname": "column_break_rent",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "deposit_required",
+   "fieldtype": "Currency",
+   "label": "Standard Deposit Required",
+   "description": "Usually 1-2 months rent"
+  },
+  {
+   "fieldname": "late_fee_amount",
+   "fieldtype": "Currency",
+   "label": "Late Fee Amount",
+   "description": "Override global late fee for this unit"
+  },
+  {
+   "fieldname": "services_section",
+   "fieldtype": "Section Break",
+   "label": "Assigned Services"
+  },
+  {
+   "fieldname": "assigned_services",
+   "fieldtype": "Table",
+   "label": "Assigned Services",
+   "options": "Unit Service Item",
+   "description": "Services that apply to this unit (late fees, parking, etc.)"
+  },
+  {
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status & Occupancy"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Unit Status",
+   "options": "\nAvailable\nOccupied\nMaintenance\nRetired\nUnder Renovation",
+   "default": "Available",
+   "reqd": 1
+  },
+  {
+   "fieldname": "is_occupied",
+   "fieldtype": "Check",
+   "label": "Is Occupied",
+   "read_only": 1,
+   "default": 0
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "current_tenant",
+   "fieldtype": "Link",
+   "label": "Current Tenant",
+   "options": "Tenant",
+   "read_only": 1,
+   "fetch_from": "contract.tenant",
+   "description": "Auto-updated from active contract"
+  },
+  {
+   "fieldname": "current_contract",
+   "fieldtype": "Link",
+   "label": "Current Contract",
+   "options": "Contract",
+   "read_only": 1
+  },
+  {
+   "fieldname": "features_section",
+   "fieldtype": "Section Break",
+   "label": "Features & Amenities"
+  },
+  {
+   "fieldname": "features",
+   "fieldtype": "Table MultiSelect",
+   "label": "Unit Features",
+   "options": "Unit Feature"
+  },
+  {
+   "fieldname": "utilities_section",
+   "fieldtype": "Section Break",
+   "label": "Utilities & Meters"
+  },
+  {
+   "fieldname": "meters",
+   "fieldtype": "Table",
+   "label": "Meters",
+   "options": "Unit Meter Link",
+   "description": "Water, electricity, gas meters for this unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "documents_section",
+   "fieldtype": "Section Break",
+   "label": "Documents & Images"
+  },
+  {
+   "fieldname": "unit_images",
+   "fieldtype": "Attach Image",
+   "label": "Unit Images",
+   "description": "Photos of the unit"
+  },
+  {
+   "fieldname": "floor_plan",
+   "fieldtype": "Attach",
+   "label": "Floor Plan",
+   "description": "PDF or image of floor plan"
+  },
+  {
+   "fieldname": "attachments",
+   "fieldtype": "Attach",
+   "label": "Attachments",
+   "description": "Certificates, inspection reports, etc."
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Internal Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-17 17:30:42.866666",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Unit",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

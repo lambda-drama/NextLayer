@@ -1,0 +1,222 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-17 17:50:39.433802",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_ntaf"
+ ],
+"fields": [
+  {
+   "fieldname": "basic_section",
+   "fieldtype": "Section Break",
+   "label": "Basic Information"
+  },
+  {
+   "fieldname": "meter_id",
+   "fieldtype": "Data",
+   "label": "Meter ID",
+   "reqd": 1,
+   "unique": 1,
+   "description": "e.g., WTR-BLDG1-UNIT101"
+  },
+  {
+   "fieldname": "meter_type",
+   "fieldtype": "Select",
+   "label": "Meter Type",
+   "options": "\nWater\nElectricity\nGas",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nActive\nMalfunction\nRetired",
+   "default": "Active",
+   "reqd": 1
+  },
+  {
+   "fieldname": "serial_number",
+   "fieldtype": "Data",
+   "label": "Serial Number",
+   "description": "Physical meter serial number"
+  },
+  {
+   "fieldname": "location_section",
+   "fieldtype": "Section Break",
+   "label": "Location"
+  },
+  {
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "label": "Property",
+   "options": "Property",
+   "reqd": 1
+  },
+  {
+   "fieldname": "unit",
+   "fieldtype": "Link",
+   "label": "Unit",
+   "options": "Unit",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_location",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "installation_date",
+   "fieldtype": "Date",
+   "label": "Installation Date"
+  },
+  {
+   "fieldname": "last_reading_date",
+   "fieldtype": "Date",
+   "label": "Last Reading Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "readings_section",
+   "fieldtype": "Section Break",
+   "label": "Meter Readings (Cumulative)"
+  },
+  {
+   "fieldname": "initial_reading",
+   "fieldtype": "Float",
+   "label": "Initial Reading",
+   "description": "Reading at installation",
+   "default": 0
+  },
+  {
+   "fieldname": "last_reading",
+   "fieldtype": "Float",
+   "label": "Last Reading",
+   "read_only": 1,
+   "description": "Previous period's ending reading"
+  },
+  {
+   "fieldname": "column_break_readings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "current_reading",
+   "fieldtype": "Float",
+   "label": "Current Reading",
+   "description": "Enter new meter reading"
+  },
+  {
+   "fieldname": "current_reading_date",
+   "fieldtype": "Date",
+   "label": "Current Reading Date"
+  },
+  {
+   "fieldname": "consumption",
+   "fieldtype": "Float",
+   "label": "Consumption",
+   "read_only": 1,
+   "description": "Current - Last (auto-calculated)",
+   "formula": "current_reading - last_reading"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing & Tariff"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Select",
+   "label": "Unit of Measurement",
+   "options": "\nCubic Meter (m³)\nGallon\nkWh\nTherm",
+   "reqd": 1,
+   "description": "Based on meter type"
+  },
+  {
+   "fieldname": "tariff_rate",
+   "fieldtype": "Currency",
+   "label": "Tariff Rate",
+   "description": "Price per unit (e.g., $0.15 per kWh)"
+  },
+  {
+   "fieldname": "column_break_pricing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "default": "USD"
+  },
+  {
+   "fieldname": "billing_section",
+   "fieldtype": "Section Break",
+   "label": "Billing Information"
+  },
+  {
+   "fieldname": "last_invoice_date",
+   "fieldtype": "Date",
+   "label": "Last Invoice Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_invoice_amount",
+   "fieldtype": "Currency",
+   "label": "Last Invoice Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_billing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estimated_consumption",
+   "fieldtype": "Check",
+   "label": "Last Reading Was Estimated",
+   "default": 0,
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes",
+   "description": "Malfunction notes, replacement info, etc."
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-17 17:50:39.433802",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Utility Meter",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
