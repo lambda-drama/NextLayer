@@ -331,7 +331,7 @@ export default function InterCompanyLedgerSummary() {
       const absSpecificIntransitTotal = Math.abs(specificIntransitTotal)
       if (Math.abs(absDifference - absSpecificIntransitTotal) <= tolerance) {
         const statusText = isCustomerTable ? "Match with In-Transit SI" : "Match with In-Transit PI"
-        return { text: statusText, color: "text-orange-600", bgColor: "bg-orange-50" }
+        return { text: statusText, color: "text-blue-400", bgColor: "bg-orange-50" }
       }
     }
 
