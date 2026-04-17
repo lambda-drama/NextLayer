@@ -209,6 +209,9 @@ fixtures = [
         "filters":[
         ]
     },
+    {
+      "doctype":"Property Amenity", 
+    },
     
 ]
 

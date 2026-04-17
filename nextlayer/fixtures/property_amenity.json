@@ -1,0 +1,34 @@
+[
+ {
+  "amenity_name": "Laundry",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "Property Amenity",
+  "modified": "2026-04-18 03:49:22.285545",
+  "name": "Laundry"
+ },
+ {
+  "amenity_name": "Elevator",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "Property Amenity",
+  "modified": "2026-04-18 03:49:32.400766",
+  "name": "Elevator"
+ },
+ {
+  "amenity_name": "Security",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "Property Amenity",
+  "modified": "2026-04-18 03:49:42.586010",
+  "name": "Security"
+ },
+ {
+  "amenity_name": "Air Condition",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "Property Amenity",
+  "modified": "2026-04-18 03:50:43.971134",
+  "name": "Air Condition"
+ }
+]

@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "PROP-.#####",
  "creation": "2026-04-17 17:24:48.911833",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -295,7 +296,7 @@
   {
    "fieldname": "property_name_tab",
    "fieldtype": "Tab Break",
-   "label": "Property Name"
+   "label": "Property Owners"
   },
   {
    "fieldname": "property_owners",
@@ -312,10 +313,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-18 03:31:11.401494",
+ "modified": "2026-04-18 03:43:14.268600",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
