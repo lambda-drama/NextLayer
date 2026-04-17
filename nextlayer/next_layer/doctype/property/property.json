@@ -11,16 +11,6 @@
   "column_break_basic",
   "property_code",
   "status",
-  "address_section",
-  "address_line_1",
-  "address_line_2",
-  "city",
-  "state",
-  "column_break_address",
-  "zip_code",
-  "country",
-  "latitude",
-  "longitude",
   "property_details_section",
   "total_units",
   "occupied_units",
@@ -36,18 +26,30 @@
   "column_break_financial",
   "default_income_account",
   "default_expense_account",
-  "contact_section",
-  "property_manager",
-  "phone",
-  "email",
-  "column_break_contact",
-  "website",
   "documents_section",
   "property_image",
   "column_break_cquk",
   "attachments",
   "notes_section",
-  "notes"
+  "notes",
+  "property_name_tab",
+  "property_owners",
+  "address_tab",
+  "address_section",
+  "address_line_1",
+  "address_line_2",
+  "city",
+  "state",
+  "column_break_address",
+  "zip_code",
+  "country",
+  "latitude",
+  "longitude",
+  "contact_section",
+  "phone",
+  "email",
+  "column_break_contact",
+  "website"
  ],
  "fields": [
   {
@@ -130,8 +132,7 @@
   {
    "fieldname": "zip_code",
    "fieldtype": "Data",
-   "label": "Zip/Postal Code",
-   "reqd": 1
+   "label": "Zip/Postal Code"
   },
   {
    "default": "United States",
@@ -240,12 +241,6 @@
    "label": "Contact Information"
   },
   {
-   "fieldname": "property_manager",
-   "fieldtype": "Link",
-   "label": "Property Manager",
-   "options": "User"
-  },
-  {
    "fieldname": "phone",
    "fieldtype": "Data",
    "label": "Phone",
@@ -296,12 +291,28 @@
   {
    "fieldname": "column_break_cquk",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "property_name_tab",
+   "fieldtype": "Tab Break",
+   "label": "Property Name"
+  },
+  {
+   "fieldname": "property_owners",
+   "fieldtype": "Table",
+   "label": "Property Owners",
+   "options": "Property Owner"
+  },
+  {
+   "fieldname": "address_tab",
+   "fieldtype": "Tab Break",
+   "label": "Address"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 18:59:27.012580",
+ "modified": "2026-04-18 03:31:11.401494",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property",
