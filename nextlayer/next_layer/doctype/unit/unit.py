@@ -4,37 +4,48 @@
 import frappe
 from frappe.model.document import Document
 
-
 class Unit(Document):
-	def validate(doc, method):
-		# Validate ownership percentage totals 100%
-		if doc.owners:
-			total_percentage = sum([owner.ownership_percentage for owner in doc.owners])
-			if total_percentage != 100:
-				frappe.throw(f"Total ownership percentage must equal 100%. Current total: {total_percentage}%")
-			
-			# Check for duplicate owners
-			owners_list = [owner.owner for owner in doc.owners]
-			if len(owners_list) != len(set(owners_list)):
-				frappe.throw("Duplicate owner found. Each owner can only appear once.")
-    
-	def before_save(self):
-		create_rent_item(self)
+    def validate(self):
+        # Validate ownership percentage totals 100%
+        if self.owners:
+            total_percentage = sum([owner.ownership_percentage for owner in self.owners])
+            if total_percentage != 100:
+                frappe.throw(f"Total ownership percentage must equal 100%. Current total: {total_percentage}%")
+            
+            owners_list = [owner.owner for owner in self.owners]
+            if len(owners_list) != len(set(owners_list)):
+                frappe.throw("Duplicate owner found. Each owner can only appear once.")
+
+    def before_save(self):
+        ensure_rent_item(self)
 
 
+def ensure_rent_item(doc):
+    # 1. Ensure Item Group exists
+    if not frappe.db.exists("Item Group", "Rent"):
+        item_group = frappe.get_doc({
+            "doctype": "Item Group",
+            "item_group_name": "Rent",
+            "is_group": 0,
+            "parent_item_group": "All Item Groups",
+        })
+        item_group.insert(ignore_permissions=True)
 
-def create_rent_item(doc):
-	if not doc.rent_item:
-		# Create Item for rent
-		item = frappe.get_doc({
-			"doctype": "Item",
-			"item_code": f"RENT-{doc.unit_number}",
-			"item_name": f"Monthly Rent - {doc.unit_number}",
-			"item_group": "Rent",
-			"is_stock_item": 0,
-			"standard_rate": doc.standard_rent,
-			"description": f"Monthly rent for unit {doc.unit_number} at {doc.property}"
-		})
-		item.insert(ignore_permissions=True)
-		doc.rent_item = item.name
-		frappe.db.set_value("Unit", doc.name, "rent_item", item.name)
+    item_code = "RENT"
+
+    if frappe.db.exists("Item", item_code):
+        doc.rent_item = item_code
+    else:
+        item = frappe.get_doc({
+            "doctype": "Item",
+            "item_code": item_code,
+            "item_name": "Rent",
+            "item_group": "Rent",
+            "is_stock_item": 0,
+            "is_sales_item": 1,
+            "description": "Monthly Rent",
+            "stock_uom": "Nos"
+        })
+        item.insert(ignore_permissions=True)
+
+        doc.rent_item = item.name

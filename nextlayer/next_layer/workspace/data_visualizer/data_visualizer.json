@@ -41,6 +41,13 @@
    "label": "Inter-Company",
    "type": "URL",
    "url": "/frontend"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Ledger Summary",
+   "type": "URL",
+   "url": "/frontend/ledger"
   }
  ],
  "title": "Data Visualizer"

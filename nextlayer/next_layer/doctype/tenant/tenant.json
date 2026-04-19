@@ -1,11 +1,44 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "TT-.#####",
  "creation": "2026-04-17 16:47:59.609739",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "full_name"
+  "tenant_section",
+  "tenant_name",
+  "link_existing_customer",
+  "customer",
+  "column_break_1",
+  "status",
+  "customer_group",
+  "current_unit_section",
+  "current_unit",
+  "column_break_current",
+  "move_in_date",
+  "move_out_date",
+  "emergency_section",
+  "emergency_contact_name",
+  "emergency_phone",
+  "phone",
+  "column_break_emergency",
+  "email",
+  "emergency_relationship",
+  "deposit_section",
+  "security_deposit",
+  "other_deposit",
+  "column_break_deposit",
+  "total_deposit",
+  "identification_section",
+  "government_id_type",
+  "government_id_number",
+  "column_break_id",
+  "tax_id",
+  "additional_section",
+  "notes",
+  "documents_section",
+  "attachments"
  ],
  "fields": [
   {
@@ -16,25 +49,30 @@
   {
    "fieldname": "tenant_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Tenant Name",
    "reqd": 1,
    "unique": 1
   },
   {
+   "description": "Link to ERPNext Customer for billing",
    "fieldname": "customer",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Customer",
+   "mandatory_depends_on": "link_existing_customer",
    "options": "Customer",
-   "reqd": 1,
-   "unique": 1,
-   "description": "Link to ERPNext Customer for billing"
+   "read_only": 1
   },
   {
+   "default": "Active",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "options": "\nActive\nInactive\nPast",
-   "default": "Active",
    "reqd": 1
   },
   {
@@ -42,11 +80,14 @@
    "fieldtype": "Column Break"
   },
   {
+   "fetch_from": "customer.customer_group",
+   "fetch_if_empty": 1,
    "fieldname": "customer_group",
    "fieldtype": "Read Only",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Customer Group",
-   "fetch_from": "customer.customer_group",
-   "fetch_if_empty": 1
+   "read_only": 1
   },
   {
    "fieldname": "email",
@@ -66,11 +107,11 @@
    "label": "Current Unit Information"
   },
   {
+   "description": "Currently occupied unit",
    "fieldname": "current_unit",
    "fieldtype": "Link",
    "label": "Current Unit",
-   "options": "Utility Unit",
-   "description": "Currently occupied unit"
+   "options": "Unit"
   },
   {
    "fieldname": "column_break_current",
@@ -123,11 +164,6 @@
    "label": "Security Deposit"
   },
   {
-   "fieldname": "pet_deposit",
-   "fieldtype": "Currency",
-   "label": "Pet Deposit"
-  },
-  {
    "fieldname": "column_break_deposit",
    "fieldtype": "Column Break"
   },
@@ -140,8 +176,7 @@
    "fieldname": "total_deposit",
    "fieldtype": "Currency",
    "label": "Total Deposit",
-   "read_only": 1,
-   "formula": "security_deposit + pet_deposit + other_deposit"
+   "read_only": 1
   },
   {
    "fieldname": "identification_section",
@@ -184,21 +219,26 @@
    "label": "Documents"
   },
   {
+   "description": "Lease agreement, ID copy, etc.",
    "fieldname": "attachments",
    "fieldtype": "Attach",
-   "label": "Attachments",
-   "description": "Lease agreement, ID copy, etc."
+   "label": "Attachments"
+  },
+  {
+   "default": "0",
+   "fieldname": "link_existing_customer",
+   "fieldtype": "Check",
+   "label": "Link Existing Customer"
   }
-
-
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 17:17:54.492952",
+ "modified": "2026-04-20 00:44:10.540396",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
