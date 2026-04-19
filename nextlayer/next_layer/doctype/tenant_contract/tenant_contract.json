@@ -17,7 +17,9 @@
   "section_break_parties",
   "party_type",
   "party_name",
+  "column_break_pxxk",
   "primary_tenant",
+  "section_break_jnur",
   "additional_tenants",
   "section_break_property",
   "property",
@@ -42,8 +44,10 @@
   "security_deposit_paid",
   "section_break_fees",
   "service_fee",
+  "section_break_evwr",
   "late_fee_grace_days",
   "late_fee_amount",
+  "column_break_vfoo",
   "early_termination_fee",
   "nsf_fee",
   "section_break_utilities",
@@ -432,12 +436,28 @@
   {
    "fieldname": "column_break_egej",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_pxxk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_jnur",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_evwr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_vfoo",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-20 01:54:40.568659",
+ "modified": "2026-04-20 02:08:16.367230",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",

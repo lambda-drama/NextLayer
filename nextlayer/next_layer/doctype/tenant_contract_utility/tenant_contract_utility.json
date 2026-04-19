@@ -6,70 +6,97 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "section_break_zrqj"
+  "utility_type",
+  "meter",
+  "tenant_pays",
+  "billing_method",
+  "flat_fee_amount",
+  "column_break_fbrx",
+  "tariff",
+  "account",
+  "notes"
  ],
-"fields": [
+ "fields": [
   {
    "fieldname": "utility_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Utility Type",
-   "fieldtype": "Select",
-   "options": "\nWater\nElectricity\nGas\nSewer\nTrash\nInternet\nCable",
+   "options": "Utility Type",
    "reqd": 1
   },
   {
+   "description": "Link to specific meter for this utility",
    "fieldname": "meter",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Meter",
-   "fieldtype": "Link",
-   "options": "Meter",
-   "description": "Link to specific meter for this utility"
+   "options": "Utility Meter"
   },
   {
+   "default": "1",
+   "description": "If unchecked, owner pays",
    "fieldname": "tenant_pays",
-   "label": "Tenant Pays",
    "fieldtype": "Check",
-   "default": 1,
-   "description": "If unchecked, owner pays"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tenant Pays"
   },
   {
+   "default": "Metered - Consumption Based",
    "fieldname": "billing_method",
-   "label": "Billing Method",
    "fieldtype": "Select",
-   "options": "\nMetered - Consumption Based\nFlat Fee\nActual Bill Reimbursement",
-   "default": "Metered - Consumption Based"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Billing Method",
+   "options": "\nMetered - Consumption Based\nFlat Fee\nActual Bill Reimbursement"
   },
   {
+   "description": "Used if billing_method is Flat Fee",
    "fieldname": "flat_fee_amount",
-   "label": "Flat Fee Amount",
    "fieldtype": "Currency",
-   "mandatory_depends_on": "eval:doc.billing_method == 'Flat Fee'",
-   "description": "Used if billing_method is Flat Fee"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Flat Fee Amount",
+   "mandatory_depends_on": "eval:doc.billing_method == 'Flat Fee'"
   },
   {
+   "description": "Price per unit for metered billing",
    "fieldname": "tariff",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Tariff",
-   "fieldtype": "Link",
-   "options": "Item Price",
-   "description": "Price per unit for metered billing"
+   "options": "Item Price"
   },
   {
+   "description": "Income account for this utility",
    "fieldname": "account",
-   "label": "Account",
    "fieldtype": "Link",
-   "options": "Account",
-   "description": "Income account for this utility"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Account",
+   "options": "Account"
   },
   {
+   "description": "Special terms or agreements",
    "fieldname": "notes",
-   "label": "Notes",
    "fieldtype": "Small Text",
-   "description": "Special terms or agreements"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Notes"
+  },
+  {
+   "fieldname": "column_break_fbrx",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-04-20 01:46:00.245134",
+ "modified": "2026-04-20 02:09:02.440939",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract Utility",
