@@ -1,0 +1,465 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-04-20 01:17:02.902718",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "contract_number",
+  "status",
+  "company",
+  "column_break_egej",
+  "posting_date",
+  "project",
+  "currency",
+  "section_break_parties",
+  "party_type",
+  "party_name",
+  "primary_tenant",
+  "additional_tenants",
+  "section_break_property",
+  "property",
+  "unit",
+  "column_break_xdmq",
+  "unit_area",
+  "section_break_lease",
+  "lease_type",
+  "start_date",
+  "column_break_rygg",
+  "end_date",
+  "notice_period_days",
+  "auto_renew",
+  "section_break_billing",
+  "monthly_rent",
+  "rent_due_day",
+  "column_break_yyqj",
+  "invoice_grouping",
+  "payment_method",
+  "section_break_deposits",
+  "security_deposit",
+  "security_deposit_paid",
+  "section_break_fees",
+  "service_fee",
+  "late_fee_grace_days",
+  "late_fee_amount",
+  "early_termination_fee",
+  "nsf_fee",
+  "section_break_utilities",
+  "utility",
+  "section_break_move",
+  "actual_move_in_date",
+  "move_in_inspection_completed",
+  "move_in_inspection_notes",
+  "actual_move_out_date",
+  "move_out_inspection_completed",
+  "move_out_inspection_notes",
+  "deposit_refund_amount",
+  "deposit_refund_date",
+  "section_break_documents",
+  "signed_lease_pdf",
+  "move_in_checklist",
+  "move_out_checklist",
+  "tenant_id_proof",
+  "income_proof",
+  "section_break_signatures",
+  "tenant_signature",
+  "owner_signature",
+  "witness_signature",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Naming Series",
+   "options": "TC-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "contract_number",
+   "fieldtype": "Data",
+   "label": "Contract Number",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "\nDraft\nActive\nExpired\nTerminated\nRenewed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "default": "USD",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_parties",
+   "fieldtype": "Section Break",
+   "label": "Parties"
+  },
+  {
+   "default": "Customer",
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "label": "Party Type",
+   "options": "DocType",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "party_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Party Name",
+   "options": "party_type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "primary_tenant",
+   "fieldtype": "Link",
+   "label": "Primary Tenant",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "additional_tenants",
+   "fieldtype": "Table",
+   "label": "Additional Tenants",
+   "options": "Tenant Contract Additional Tenant"
+  },
+  {
+   "fieldname": "section_break_property",
+   "fieldtype": "Section Break",
+   "label": "Property & Unit"
+  },
+  {
+   "fetch_from": "unit.property",
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "label": "Property",
+   "options": "Property",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "property.unit",
+   "fieldname": "unit",
+   "fieldtype": "Link",
+   "label": "Unit",
+   "options": "Unit",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "unit.area",
+   "fieldname": "unit_area",
+   "fieldtype": "Data",
+   "label": "Unit Area",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_lease",
+   "fieldtype": "Section Break",
+   "label": "Lease Terms"
+  },
+  {
+   "default": "Fixed Term",
+   "fieldname": "lease_type",
+   "fieldtype": "Select",
+   "label": "Lease Type",
+   "options": "\nFixed Term\nMonth-to-Month\nSublease"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date",
+   "reqd": 1
+  },
+  {
+   "default": "30",
+   "fieldname": "notice_period_days",
+   "fieldtype": "Int",
+   "label": "Notice Period (Days)"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_renew",
+   "fieldtype": "Check",
+   "label": "Auto-renew"
+  },
+  {
+   "fieldname": "section_break_billing",
+   "fieldtype": "Section Break",
+   "label": "Rent & Billing"
+  },
+  {
+   "fieldname": "monthly_rent",
+   "fieldtype": "Currency",
+   "label": "Monthly Rent",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "rent_due_day",
+   "fieldtype": "Int",
+   "label": "Rent Due Day"
+  },
+  {
+   "fieldname": "invoice_grouping",
+   "fieldtype": "Select",
+   "label": "Invoice Grouping",
+   "options": "\nCombined - All in one\nRent + Services combined, Utilities separate\nRent separate, Services + Utilities combined\nFully separate\nMetered items only separate"
+  },
+  {
+   "fieldname": "payment_method",
+   "fieldtype": "Select",
+   "label": "Payment Method",
+   "options": "\nBank Transfer\nCheck\nCash\nCredit Card"
+  },
+  {
+   "fieldname": "section_break_deposits",
+   "fieldtype": "Section Break",
+   "label": "Deposits"
+  },
+  {
+   "fieldname": "security_deposit",
+   "fieldtype": "Currency",
+   "label": "Security Deposit"
+  },
+  {
+   "default": "0",
+   "fieldname": "security_deposit_paid",
+   "fieldtype": "Check",
+   "label": "Security Deposit Paid"
+  },
+  {
+   "fieldname": "section_break_fees",
+   "fieldtype": "Section Break",
+   "label": "Fees & Penalties"
+  },
+  {
+   "description": "Link to Service Item doctype for recurring or one-time fees",
+   "fieldname": "service_fee",
+   "fieldtype": "Table",
+   "label": "Service Fees",
+   "options": "Unit Service Item"
+  },
+  {
+   "default": "3",
+   "fieldname": "late_fee_grace_days",
+   "fieldtype": "Int",
+   "label": "Late Fee Grace Days"
+  },
+  {
+   "default": "50",
+   "fieldname": "late_fee_amount",
+   "fieldtype": "Currency",
+   "label": "Late Fee Amount"
+  },
+  {
+   "fieldname": "early_termination_fee",
+   "fieldtype": "Currency",
+   "label": "Early Termination Fee"
+  },
+  {
+   "default": "35",
+   "fieldname": "nsf_fee",
+   "fieldtype": "Currency",
+   "label": "NSF Fee"
+  },
+  {
+   "fieldname": "section_break_utilities",
+   "fieldtype": "Section Break",
+   "label": "Utilities"
+  },
+  {
+   "fieldname": "section_break_move",
+   "fieldtype": "Section Break",
+   "label": "Move In/Out"
+  },
+  {
+   "fieldname": "actual_move_in_date",
+   "fieldtype": "Date",
+   "label": "Actual Move-in Date"
+  },
+  {
+   "default": "0",
+   "fieldname": "move_in_inspection_completed",
+   "fieldtype": "Check",
+   "label": "Move-in Inspection Completed"
+  },
+  {
+   "fieldname": "move_in_inspection_notes",
+   "fieldtype": "Text",
+   "label": "Move-in Inspection Notes"
+  },
+  {
+   "fieldname": "actual_move_out_date",
+   "fieldtype": "Date",
+   "label": "Actual Move-out Date"
+  },
+  {
+   "default": "0",
+   "fieldname": "move_out_inspection_completed",
+   "fieldtype": "Check",
+   "label": "Move-out Inspection Completed"
+  },
+  {
+   "fieldname": "move_out_inspection_notes",
+   "fieldtype": "Text",
+   "label": "Move-out Inspection Notes"
+  },
+  {
+   "fieldname": "deposit_refund_amount",
+   "fieldtype": "Currency",
+   "label": "Deposit Refund Amount"
+  },
+  {
+   "fieldname": "deposit_refund_date",
+   "fieldtype": "Date",
+   "label": "Deposit Refund Date"
+  },
+  {
+   "fieldname": "section_break_documents",
+   "fieldtype": "Section Break",
+   "label": "Documents"
+  },
+  {
+   "fieldname": "signed_lease_pdf",
+   "fieldtype": "Attach",
+   "label": "Signed Lease PDF"
+  },
+  {
+   "fieldname": "move_in_checklist",
+   "fieldtype": "Attach",
+   "label": "Move-in Checklist"
+  },
+  {
+   "fieldname": "move_out_checklist",
+   "fieldtype": "Attach",
+   "label": "Move-out Checklist"
+  },
+  {
+   "fieldname": "tenant_id_proof",
+   "fieldtype": "Attach",
+   "label": "Tenant ID Proof"
+  },
+  {
+   "fieldname": "income_proof",
+   "fieldtype": "Attach",
+   "label": "Income Proof"
+  },
+  {
+   "fieldname": "section_break_signatures",
+   "fieldtype": "Section Break",
+   "label": "Signatures"
+  },
+  {
+   "fieldname": "tenant_signature",
+   "fieldtype": "Attach Image",
+   "label": "Tenant Signature"
+  },
+  {
+   "fieldname": "owner_signature",
+   "fieldtype": "Attach Image",
+   "label": "Property Owner Signature"
+  },
+  {
+   "fieldname": "witness_signature",
+   "fieldtype": "Attach Image",
+   "label": "Witness Signature"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Tenant Contract",
+   "read_only": 1
+  },
+  {
+   "fieldname": "utility",
+   "fieldtype": "Table",
+   "label": "Utility",
+   "options": "Tenant Contract Utility"
+  },
+  {
+   "fieldname": "column_break_yyqj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_rygg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_xdmq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_egej",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-20 01:54:40.568659",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Tenant Contract",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
