@@ -19,8 +19,6 @@
   "column_break_pxxk",
   "primary_tenant",
   "customer",
-  "section_break_jnur",
-  "additional_tenants",
   "section_break_property",
   "property",
   "unit",
@@ -77,7 +75,11 @@
   "witness_sign",
   "witness_sign_date",
   "section_break_ayxp",
-  "amended_from"
+  "amended_from",
+  "guarantors_tab",
+  "guarantors",
+  "additional_tenants_tab",
+  "additional_tenants"
  ],
  "fields": [
   {
@@ -424,10 +426,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "section_break_jnur",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "section_break_evwr",
    "fieldtype": "Section Break"
   },
@@ -493,12 +491,28 @@
    "fieldtype": "Link",
    "label": "Customer",
    "options": "Customer"
+  },
+  {
+   "fieldname": "guarantors_tab",
+   "fieldtype": "Tab Break",
+   "label": "Guarantors"
+  },
+  {
+   "fieldname": "guarantors",
+   "fieldtype": "Table",
+   "label": "Guarantors",
+   "options": "Tenant Guarantors"
+  },
+  {
+   "fieldname": "additional_tenants_tab",
+   "fieldtype": "Tab Break",
+   "label": "Additional Tenants"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-20 02:32:13.498846",
+ "modified": "2026-04-20 02:40:34.650442",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",
