@@ -7,7 +7,6 @@
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
-  "contract_number",
   "status",
   "company",
   "column_break_egej",
@@ -19,6 +18,7 @@
   "party_name",
   "column_break_pxxk",
   "primary_tenant",
+  "customer",
   "section_break_jnur",
   "additional_tenants",
   "section_break_property",
@@ -56,21 +56,27 @@
   "actual_move_in_date",
   "move_in_inspection_completed",
   "move_in_inspection_notes",
+  "column_break_qvcu",
   "actual_move_out_date",
   "move_out_inspection_completed",
   "move_out_inspection_notes",
   "deposit_refund_amount",
   "deposit_refund_date",
   "section_break_documents",
-  "signed_lease_pdf",
-  "move_in_checklist",
-  "move_out_checklist",
-  "tenant_id_proof",
-  "income_proof",
+  "document",
   "section_break_signatures",
   "tenant_signature",
+  "tenant_sign",
+  "tenant_sign_date",
+  "column_break_gzmt",
   "owner_signature",
+  "property_owner_sign",
+  "property_owner_sign_date",
+  "column_break_lrvb",
   "witness_signature",
+  "witness_sign",
+  "witness_sign_date",
+  "section_break_ayxp",
   "amended_from"
  ],
  "fields": [
@@ -78,22 +84,17 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Naming Series",
    "options": "TC-.YYYY.-",
    "reqd": 1
-  },
-  {
-   "fieldname": "contract_number",
-   "fieldtype": "Data",
-   "label": "Contract Number",
-   "read_only": 1,
-   "unique": 1
   },
   {
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "options": "\nDraft\nActive\nExpired\nTerminated\nRenewed",
    "reqd": 1
@@ -102,6 +103,7 @@
    "fieldname": "company",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Company",
    "options": "Company",
    "reqd": 1
@@ -111,12 +113,15 @@
    "fieldname": "posting_date",
    "fieldtype": "Date",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Posting Date",
    "reqd": 1
   },
   {
    "fieldname": "project",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Project",
    "options": "Project"
   },
@@ -124,6 +129,8 @@
    "default": "USD",
    "fieldname": "currency",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Currency",
    "options": "Currency",
    "reqd": 1
@@ -153,7 +160,7 @@
    "fieldname": "primary_tenant",
    "fieldtype": "Link",
    "label": "Primary Tenant",
-   "options": "Customer",
+   "options": "Tenant",
    "reqd": 1
   },
   {
@@ -364,31 +371,6 @@
    "label": "Documents"
   },
   {
-   "fieldname": "signed_lease_pdf",
-   "fieldtype": "Attach",
-   "label": "Signed Lease PDF"
-  },
-  {
-   "fieldname": "move_in_checklist",
-   "fieldtype": "Attach",
-   "label": "Move-in Checklist"
-  },
-  {
-   "fieldname": "move_out_checklist",
-   "fieldtype": "Attach",
-   "label": "Move-out Checklist"
-  },
-  {
-   "fieldname": "tenant_id_proof",
-   "fieldtype": "Attach",
-   "label": "Tenant ID Proof"
-  },
-  {
-   "fieldname": "income_proof",
-   "fieldtype": "Attach",
-   "label": "Income Proof"
-  },
-  {
    "fieldname": "section_break_signatures",
    "fieldtype": "Section Break",
    "label": "Signatures"
@@ -452,12 +434,71 @@
   {
    "fieldname": "column_break_vfoo",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_qvcu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "document",
+   "fieldtype": "Table",
+   "label": "Document",
+   "options": "Tenants Documents"
+  },
+  {
+   "fieldname": "tenant_sign",
+   "fieldtype": "Signature",
+   "label": "Tenant Sign"
+  },
+  {
+   "fieldname": "tenant_sign_date",
+   "fieldtype": "Date",
+   "label": "Tenant Sign Date"
+  },
+  {
+   "fieldname": "column_break_gzmt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "property_owner_sign",
+   "fieldtype": "Signature",
+   "label": "Property Owner Sign"
+  },
+  {
+   "fieldname": "property_owner_sign_date",
+   "fieldtype": "Date",
+   "label": "Property Owner Sign Date"
+  },
+  {
+   "fieldname": "column_break_lrvb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "witness_sign",
+   "fieldtype": "Signature",
+   "label": "Witness Sign"
+  },
+  {
+   "fieldname": "witness_sign_date",
+   "fieldtype": "Date",
+   "label": "Witness Sign Date"
+  },
+  {
+   "fieldname": "section_break_ayxp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fetch_from": "primary_tenant.customer",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-20 02:08:16.367230",
+ "modified": "2026-04-20 02:32:13.498846",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",
