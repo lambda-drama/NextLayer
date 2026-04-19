@@ -1,0 +1,222 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-17 16:47:59.609739",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "full_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "tenant_section",
+   "fieldtype": "Section Break",
+   "label": "Tenant Information"
+  },
+  {
+   "fieldname": "tenant_name",
+   "fieldtype": "Data",
+   "label": "Tenant Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1,
+   "unique": 1,
+   "description": "Link to ERPNext Customer for billing"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nActive\nInactive\nPast",
+   "default": "Active",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_group",
+   "fieldtype": "Read Only",
+   "label": "Customer Group",
+   "fetch_from": "customer.customer_group",
+   "fetch_if_empty": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "current_unit_section",
+   "fieldtype": "Section Break",
+   "label": "Current Unit Information"
+  },
+  {
+   "fieldname": "current_unit",
+   "fieldtype": "Link",
+   "label": "Current Unit",
+   "options": "Utility Unit",
+   "description": "Currently occupied unit"
+  },
+  {
+   "fieldname": "column_break_current",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "move_in_date",
+   "fieldtype": "Date",
+   "label": "Move In Date"
+  },
+  {
+   "fieldname": "move_out_date",
+   "fieldtype": "Date",
+   "label": "Move Out Date"
+  },
+  {
+   "fieldname": "emergency_section",
+   "fieldtype": "Section Break",
+   "label": "Emergency Contact"
+  },
+  {
+   "fieldname": "emergency_contact_name",
+   "fieldtype": "Data",
+   "label": "Emergency Contact Name"
+  },
+  {
+   "fieldname": "column_break_emergency",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "emergency_phone",
+   "fieldtype": "Data",
+   "label": "Emergency Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "emergency_relationship",
+   "fieldtype": "Select",
+   "label": "Relationship",
+   "options": "\nSpouse\nParent\nSibling\nFriend\nOther"
+  },
+  {
+   "fieldname": "deposit_section",
+   "fieldtype": "Section Break",
+   "label": "Deposit Information"
+  },
+  {
+   "fieldname": "security_deposit",
+   "fieldtype": "Currency",
+   "label": "Security Deposit"
+  },
+  {
+   "fieldname": "pet_deposit",
+   "fieldtype": "Currency",
+   "label": "Pet Deposit"
+  },
+  {
+   "fieldname": "column_break_deposit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "other_deposit",
+   "fieldtype": "Currency",
+   "label": "Other Deposit"
+  },
+  {
+   "fieldname": "total_deposit",
+   "fieldtype": "Currency",
+   "label": "Total Deposit",
+   "read_only": 1,
+   "formula": "security_deposit + pet_deposit + other_deposit"
+  },
+  {
+   "fieldname": "identification_section",
+   "fieldtype": "Section Break",
+   "label": "Identification"
+  },
+  {
+   "fieldname": "government_id_type",
+   "fieldtype": "Select",
+   "label": "Government ID Type",
+   "options": "\nPassport\nDriver's License\nNational ID\nOther"
+  },
+  {
+   "fieldname": "government_id_number",
+   "fieldtype": "Data",
+   "label": "Government ID Number"
+  },
+  {
+   "fieldname": "column_break_id",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tax_id",
+   "fieldtype": "Data",
+   "label": "Tax ID / SSN"
+  },
+  {
+   "fieldname": "additional_section",
+   "fieldtype": "Section Break",
+   "label": "Additional Information"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "documents_section",
+   "fieldtype": "Section Break",
+   "label": "Documents"
+  },
+  {
+   "fieldname": "attachments",
+   "fieldtype": "Attach",
+   "label": "Attachments",
+   "description": "Lease agreement, ID copy, etc."
+  }
+
+
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-17 17:17:54.492952",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Tenant",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

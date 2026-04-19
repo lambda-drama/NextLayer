@@ -14,5 +14,13 @@
   "name": "Foundation",
   "stage_group": "Sub Structure",
   "type_name": "Foundation"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Stage Type",
+  "modified": "2026-03-26 16:35:49.738781",
+  "name": "G Floor",
+  "stage_group": "Super Structure",
+  "type_name": "G Floor"
  }
 ]

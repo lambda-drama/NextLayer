@@ -1,0 +1,68 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-17 17:33:45.892823",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_bxxa"
+ ],
+ "fields": [
+  {
+   "fieldname": "owner",
+   "fieldtype": "Link",
+   "label": "Owner",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "owner_name",
+   "fieldtype": "Read Only",
+   "label": "Owner Name",
+   "fetch_from": "owner.customer_name"
+  },
+  {
+   "fieldname": "ownership_percentage",
+   "fieldtype": "Percent",
+   "label": "Ownership Percentage",
+   "reqd": 1,
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_owner",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "owner_role",
+   "fieldtype": "Select",
+   "label": "Owner Role",
+   "options": "\nOwner\nCo-owner\nInvestor\nTrust"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Ownership Start Date"
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "Ownership End Date"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-17 17:33:45.892823",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Unit Owner",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

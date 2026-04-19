@@ -1,5 +1,24 @@
 [
  {
+  "allow_guest": 0,
+  "api_method": null,
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Insert",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2026-03-12 12:37:59.975357",
+  "module": null,
+  "name": "Make Item Image Mandatory For Footwear Group",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": "Item",
+  "script": "def is_under_footwear(group):\n    \"\"\"Return True if the group or any ancestor is 'Footwear'.\"\"\"\n    while group:\n        if group == \"Footwear\":\n            return True\n        group = frappe.db.get_value(\"Item Group\", group, \"parent_item_group\")\n    return False\n\n\nif is_under_footwear(doc.item_group):\n    if not doc.image:\n        frappe.throw(\"Item Image is mandatory for items under the Footwear group.\")",
+  "script_type": "DocType Event"
+ },
+ {
   "allow_guest": 1,
   "api_method": "generate_custom_invoice_no",
   "cron_format": null,

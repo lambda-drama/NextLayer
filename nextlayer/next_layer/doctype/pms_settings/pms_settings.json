@@ -1,0 +1,539 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-17 18:33:22.213589",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "invoice_section",
+  "invoice_grouping",
+  "invoice_generation_day",
+  "rent_due_day",
+  "column_break_invoice",
+  "generate_invoice_for_zero_consumption",
+  "combine_services_single_line",
+  "send_invoice_automatically",
+  "late_fee_section",
+  "enable_late_fees",
+  "late_fee_grace_days",
+  "default_late_fee_amount",
+  "late_fee_type",
+  "late_fee_percentage",
+  "column_break_late_fee",
+  "late_fee_max_per_lease",
+  "apply_late_fee_every_days",
+  "late_fee_item",
+  "deposit_section",
+  "default_deposit_liability_account",
+  "default_security_deposit_months",
+  "column_break_deposit",
+  "deposit_interest_rate",
+  "require_move_inspection_for_deposit",
+  "maintenance_section",
+  "emergency_response_hours",
+  "high_priority_response_hours",
+  "medium_priority_response_hours",
+  "low_priority_response_hours",
+  "column_break_maintenance",
+  "maintenance_auto_approve_threshold",
+  "require_owner_approval_above_threshold",
+  "notify_tenant_on_maintenance_status_change",
+  "meter_section",
+  "allow_estimated_readings",
+  "estimated_reading_grace_days",
+  "abnormal_consumption_warning_percentage",
+  "column_break_meter",
+  "default_water_tariff",
+  "default_electricity_tariff",
+  "default_gas_tariff",
+  "tenant_section",
+  "enable_tenant_portal",
+  "tenant_can_submit_maintenance",
+  "tenant_can_view_invoices",
+  "tenant_can_make_payments",
+  "column_break_tenant",
+  "tenant_can_view_documents",
+  "tenant_can_request_lease_renewal",
+  "tenant_notification_email_template",
+  "notification_section",
+  "send_rent_reminder_days_before",
+  "send_overdue_notification_days_after",
+  "column_break_notification",
+  "send_maintenance_status_updates",
+  "send_contract_expiry_reminder_days",
+  "accounting_section",
+  "default_rent_income_account",
+  "default_utility_income_account",
+  "default_service_fee_account",
+  "column_break_accounting",
+  "default_maintenance_expense_account",
+  "default_damage_income_account",
+  "cost_center",
+  "integration_section",
+  "payment_gateway",
+  "payment_gateway_api_key",
+  "column_break_integration",
+  "webhook_secret",
+  "enable_smart_meter_api",
+  "smart_meter_api_endpoint"
+ ],
+ "fields": [
+  {
+   "fieldname": "invoice_section",
+   "fieldtype": "Section Break",
+   "label": "Invoice Settings"
+  },
+  {
+   "default": "Combined - All in one invoice",
+   "description": "How invoices should be grouped for tenants",
+   "fieldname": "invoice_grouping",
+   "fieldtype": "Select",
+   "label": "Invoice Grouping Preference",
+   "options": "\nCombined - All in one invoice\nRent + Services combined, Utilities separate\nRent separate, Services + Utilities combined\nFully separate (Rent, Services, Utilities)\nMetered items only separate, rest combined"
+  },
+  {
+   "default": "1",
+   "description": "Day of month to generate invoices (1-28)",
+   "fieldname": "invoice_generation_day",
+   "fieldtype": "Int",
+   "label": "Monthly Invoice Generation Day"
+  },
+  {
+   "default": "5",
+   "description": "Day when rent is due",
+   "fieldname": "rent_due_day",
+   "fieldtype": "Int",
+   "label": "Rent Due Day of Month"
+  },
+  {
+   "fieldname": "column_break_invoice",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "If unchecked, zero consumption utilities are skipped",
+   "fieldname": "generate_invoice_for_zero_consumption",
+   "fieldtype": "Check",
+   "label": "Generate Utility Invoice for Zero Consumption"
+  },
+  {
+   "default": "0",
+   "description": "Show one line for all services instead of separate lines",
+   "fieldname": "combine_services_single_line",
+   "fieldtype": "Check",
+   "label": "Combine All Services into Single Invoice Line"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_invoice_automatically",
+   "fieldtype": "Check",
+   "label": "Send Invoices Automatically via Email"
+  },
+  {
+   "fieldname": "late_fee_section",
+   "fieldtype": "Section Break",
+   "label": "Late Fee Settings"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_late_fees",
+   "fieldtype": "Check",
+   "label": "Enable Late Fees"
+  },
+  {
+   "default": "3",
+   "depends_on": "enable_late_fees",
+   "description": "Days after due date before late fee applies",
+   "fieldname": "late_fee_grace_days",
+   "fieldtype": "Int",
+   "label": "Grace Period (Days)"
+  },
+  {
+   "default": "50",
+   "depends_on": "enable_late_fees",
+   "fieldname": "default_late_fee_amount",
+   "fieldtype": "Currency",
+   "label": "Default Late Fee Amount"
+  },
+  {
+   "default": "Fixed Amount",
+   "depends_on": "enable_late_fees",
+   "fieldname": "late_fee_type",
+   "fieldtype": "Select",
+   "label": "Late Fee Type",
+   "options": "\nFixed Amount\nPercentage of Rent"
+  },
+  {
+   "default": "5",
+   "depends_on": "eval:doc.late_fee_type == 'Percentage of Rent'",
+   "fieldname": "late_fee_percentage",
+   "fieldtype": "Percent",
+   "label": "Late Fee Percentage"
+  },
+  {
+   "fieldname": "column_break_late_fee",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "depends_on": "enable_late_fees",
+   "description": "0 = unlimited",
+   "fieldname": "late_fee_max_per_lease",
+   "fieldtype": "Int",
+   "label": "Maximum Late Fees Per Lease"
+  },
+  {
+   "default": "30",
+   "depends_on": "enable_late_fees",
+   "description": "0 = apply once only",
+   "fieldname": "apply_late_fee_every_days",
+   "fieldtype": "Int",
+   "label": "Apply Late Fee Every X Days"
+  },
+  {
+   "depends_on": "enable_late_fees",
+   "description": "Service Item to use for late fees",
+   "fieldname": "late_fee_item",
+   "fieldtype": "Link",
+   "label": "Late Fee Service Item",
+   "options": "Service Item"
+  },
+  {
+   "fieldname": "deposit_section",
+   "fieldtype": "Section Break",
+   "label": "Deposit Settings"
+  },
+  {
+   "description": "Account where deposits are held",
+   "fieldname": "default_deposit_liability_account",
+   "fieldtype": "Link",
+   "label": "Default Deposit Liability Account",
+   "options": "Account"
+  },
+  {
+   "default": "1",
+   "description": "How many months rent to collect as deposit",
+   "fieldname": "default_security_deposit_months",
+   "fieldtype": "Int",
+   "label": "Default Security Deposit (Months of Rent)"
+  },
+  {
+   "fieldname": "column_break_deposit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "If required by law",
+   "fieldname": "deposit_interest_rate",
+   "fieldtype": "Percent",
+   "label": "Deposit Interest Rate (%)"
+  },
+  {
+   "default": "1",
+   "fieldname": "require_move_inspection_for_deposit",
+   "fieldtype": "Check",
+   "label": "Require Move-In Inspection for Deposit"
+  },
+  {
+   "fieldname": "maintenance_section",
+   "fieldtype": "Section Break",
+   "label": "Maintenance Settings"
+  },
+  {
+   "default": "2",
+   "fieldname": "emergency_response_hours",
+   "fieldtype": "Int",
+   "label": "Emergency Response SLA (Hours)"
+  },
+  {
+   "default": "24",
+   "fieldname": "high_priority_response_hours",
+   "fieldtype": "Int",
+   "label": "High Priority Response SLA (Hours)"
+  },
+  {
+   "default": "72",
+   "fieldname": "medium_priority_response_hours",
+   "fieldtype": "Int",
+   "label": "Medium Priority Response SLA (Hours)"
+  },
+  {
+   "default": "168",
+   "fieldname": "low_priority_response_hours",
+   "fieldtype": "Int",
+   "label": "Low Priority Response SLA (Hours)"
+  },
+  {
+   "fieldname": "column_break_maintenance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "500",
+   "description": "Requests under this amount auto-approved",
+   "fieldname": "maintenance_auto_approve_threshold",
+   "fieldtype": "Currency",
+   "label": "Auto-Approve Maintenance Threshold"
+  },
+  {
+   "default": "1",
+   "fieldname": "require_owner_approval_above_threshold",
+   "fieldtype": "Check",
+   "label": "Require Owner Approval Above Threshold"
+  },
+  {
+   "default": "1",
+   "fieldname": "notify_tenant_on_maintenance_status_change",
+   "fieldtype": "Check",
+   "label": "Notify Tenant on Status Change"
+  },
+  {
+   "fieldname": "meter_section",
+   "fieldtype": "Section Break",
+   "label": "Meter & Utility Settings"
+  },
+  {
+   "default": "1",
+   "fieldname": "allow_estimated_readings",
+   "fieldtype": "Check",
+   "label": "Allow Estimated Meter Readings"
+  },
+  {
+   "default": "5",
+   "description": "Days after period end to allow actual reading",
+   "fieldname": "estimated_reading_grace_days",
+   "fieldtype": "Int",
+   "label": "Estimated Reading Grace Days"
+  },
+  {
+   "default": "200",
+   "description": "Warn if consumption > X% of average",
+   "fieldname": "abnormal_consumption_warning_percentage",
+   "fieldtype": "Percent",
+   "label": "Abnormal Consumption Warning Threshold"
+  },
+  {
+   "fieldname": "column_break_meter",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "fieldname": "default_water_tariff",
+   "fieldtype": "Currency",
+   "label": "Default Water Tariff (per m\u00b3)"
+  },
+  {
+   "default": "0.15",
+   "fieldname": "default_electricity_tariff",
+   "fieldtype": "Currency",
+   "label": "Default Electricity Tariff (per kWh)"
+  },
+  {
+   "default": "1",
+   "fieldname": "default_gas_tariff",
+   "fieldtype": "Currency",
+   "label": "Default Gas Tariff (per Therm)"
+  },
+  {
+   "fieldname": "tenant_section",
+   "fieldtype": "Section Break",
+   "label": "Tenant Portal Settings"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_tenant_portal",
+   "fieldtype": "Check",
+   "label": "Enable Tenant Portal"
+  },
+  {
+   "default": "1",
+   "depends_on": "enable_tenant_portal",
+   "fieldname": "tenant_can_submit_maintenance",
+   "fieldtype": "Check",
+   "label": "Tenant Can Submit Maintenance Requests"
+  },
+  {
+   "default": "1",
+   "depends_on": "enable_tenant_portal",
+   "fieldname": "tenant_can_view_invoices",
+   "fieldtype": "Check",
+   "label": "Tenant Can View Invoices"
+  },
+  {
+   "default": "1",
+   "depends_on": "enable_tenant_portal",
+   "fieldname": "tenant_can_make_payments",
+   "fieldtype": "Check",
+   "label": "Tenant Can Make Online Payments"
+  },
+  {
+   "fieldname": "column_break_tenant",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "depends_on": "enable_tenant_portal",
+   "fieldname": "tenant_can_view_documents",
+   "fieldtype": "Check",
+   "label": "Tenant Can View Documents"
+  },
+  {
+   "default": "1",
+   "depends_on": "enable_tenant_portal",
+   "fieldname": "tenant_can_request_lease_renewal",
+   "fieldtype": "Check",
+   "label": "Tenant Can Request Lease Renewal"
+  },
+  {
+   "default": "Default",
+   "fieldname": "tenant_notification_email_template",
+   "fieldtype": "Select",
+   "label": "Tenant Notification Email Template",
+   "options": "\nDefault\nProfessional\nFriendly"
+  },
+  {
+   "fieldname": "notification_section",
+   "fieldtype": "Section Break",
+   "label": "Notification Settings"
+  },
+  {
+   "default": "3",
+   "fieldname": "send_rent_reminder_days_before",
+   "fieldtype": "Int",
+   "label": "Send Rent Reminder (Days Before Due)"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_overdue_notification_days_after",
+   "fieldtype": "Int",
+   "label": "Send Overdue Notification (Days After Due)"
+  },
+  {
+   "fieldname": "column_break_notification",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_maintenance_status_updates",
+   "fieldtype": "Check",
+   "label": "Send Maintenance Status Updates"
+  },
+  {
+   "default": "30",
+   "fieldname": "send_contract_expiry_reminder_days",
+   "fieldtype": "Int",
+   "label": "Send Contract Expiry Reminder (Days Before)"
+  },
+  {
+   "fieldname": "accounting_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Settings"
+  },
+  {
+   "fieldname": "default_rent_income_account",
+   "fieldtype": "Link",
+   "label": "Default Rent Income Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "default_utility_income_account",
+   "fieldtype": "Link",
+   "label": "Default Utility Income Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "default_service_fee_account",
+   "fieldtype": "Link",
+   "label": "Default Service Fee Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_accounting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_maintenance_expense_account",
+   "fieldtype": "Link",
+   "label": "Default Maintenance Expense Account",
+   "options": "Account"
+  },
+  {
+   "description": "For deposit deductions kept as income",
+   "fieldname": "default_damage_income_account",
+   "fieldtype": "Link",
+   "label": "Default Damage Income Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Default Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "integration_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "Integration Settings"
+  },
+  {
+   "fieldname": "payment_gateway",
+   "fieldtype": "Select",
+   "label": "Payment Gateway",
+   "options": "\nNone\nStripe\nPayPal\nRazorpay\nOther"
+  },
+  {
+   "depends_on": "eval:doc.payment_gateway != 'None'",
+   "fieldname": "payment_gateway_api_key",
+   "fieldtype": "Password",
+   "label": "Payment Gateway API Key"
+  },
+  {
+   "fieldname": "column_break_integration",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.payment_gateway != 'None'",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_smart_meter_api",
+   "fieldtype": "Check",
+   "label": "Enable Smart Meter API Integration"
+  },
+  {
+   "depends_on": "enable_smart_meter_api",
+   "fieldname": "smart_meter_api_endpoint",
+   "fieldtype": "Data",
+   "label": "Smart Meter API Endpoint"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-04-17 18:38:27.419616",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "PMS Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

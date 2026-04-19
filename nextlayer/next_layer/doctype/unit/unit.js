@@ -1,7 +1,7 @@
-// Copyright (c) 2025, jr@gmail.com and contributors
+// Copyright (c) 2026, jr@gmail.com and contributors
 // For license information, please see license.txt
 
-// frappe.ui.form.on("Test", {
+// frappe.ui.form.on("Unit", {
 // 	refresh(frm) {
 
 // 	},
