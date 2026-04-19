@@ -6,9 +6,9 @@
  "engine": "InnoDB",
  "field_order": [
   "basic_section",
+  "property",
   "unit_number",
   "unit_name",
-  "property",
   "column_break_basic",
   "building",
   "floor",
@@ -27,9 +27,11 @@
   "rent_billing_section",
   "standard_rent",
   "rent_item",
-  "column_break_rent",
   "deposit_required",
+  "column_break_rent",
   "late_fee_amount",
+  "rentmonthly",
+  "rentyearly",
   "services_section",
   "assigned_services",
   "status_section",
@@ -61,7 +63,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Unit Number",
+   "label": "Unit No",
    "reqd": 1,
    "unique": 1
   },
@@ -97,9 +99,9 @@
   },
   {
    "fieldname": "unit_type",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "label": "Unit Type",
-   "options": "\nStudio\n1 Bedroom\n2 Bedroom\n3 Bedroom\n4+ Bedroom\nCommercial Space\nStorage\nParking\nOther"
+   "options": "Unit Type"
   },
   {
    "fieldname": "dimensions_section",
@@ -309,12 +311,22 @@
   {
    "fieldname": "column_break_dawc",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rentmonthly",
+   "fieldtype": "Currency",
+   "label": "Rent(Monthly)"
+  },
+  {
+   "fieldname": "rentyearly",
+   "fieldtype": "Currency",
+   "label": "Rent(Yearly)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 18:57:17.932237",
+ "modified": "2026-04-18 04:01:01.563123",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",

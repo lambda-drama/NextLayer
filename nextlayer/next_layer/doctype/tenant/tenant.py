@@ -2,86 +2,101 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 
-
 class Tenant(Document):
-	pass
-
-
+	
+	def before_save(self):
+		"""Auto-create customer before saving if not linked"""
+		if not self.customer:
+			self.customer = self.create_customer_for_tenant()
+	
+	def after_save(self):
+		"""Sync to customer after save"""
+		if self.customer:
+			self.sync_to_customer()
+	
 	@frappe.whitelist()
-	def create_customer_for_tenant(tenant_name, email=None, phone=None):
-		"""Create Customer from Tenant data and flag as tenant"""
+	def create_customer_for_tenant(self):
+		"""Create Customer from Tenant data"""
 		
-		# Check if customer already exists
-		existing_customer = frappe.db.get_value("Customer", {"customer_name": tenant_name})
+		# Check if customer with same name exists
+		existing_customer = frappe.db.get_value("Customer", 
+			{"customer_name": self.tenant_name})
+		
 		if existing_customer:
 			# Update existing customer
 			customer = frappe.get_doc("Customer", existing_customer)
 			customer.customer_group = "Tenant"
 			customer.custom_is_tenant = 1
-			if email:
-				customer.email_id = email
-			if phone:
-				customer.mobile_no = phone
+			customer.email_id = self.email
+			customer.mobile_no = self.phone
 			customer.save()
 			return customer.name
 		
 		# Create new customer
 		customer = frappe.get_doc({
 			"doctype": "Customer",
-			"customer_name": tenant_name,
+			"customer_name": self.tenant_name,
 			"customer_group": "Tenant",
 			"customer_type": "Individual",
-			"email_id": email,
-			"mobile_no": phone,
-			"custom_is_tenant": 1  # Custom field
+			"email_id": self.email,
+			"mobile_no": self.phone,
+			"custom_is_tenant": 1
 		})
-		customer.insert(ignore_permissions=True)
+		customer.insert()
+		return customer.name
+	
+	def sync_to_customer(self):
+		"""Sync Tenant data to Customer"""
+		if not self.customer:
+			return
+		
+		customer = frappe.get_doc("Customer", self.customer)
+		customer.customer_name = self.tenant_name
+		customer.email_id = self.email
+		customer.mobile_no = self.phone
+		customer.save()
+	
+	@frappe.whitelist()
+	def create_customer_for_tenant(self):
+		"""Create Customer from Tenant data"""
+		
+		# Ensure Tenant customer group exists
+		if not frappe.db.exists("Customer Group", "Tenant"):
+			customer_group = frappe.get_doc({
+				"doctype": "Customer Group",
+				"customer_group_name": "Tenant",
+				"parent_customer_group": "All Customer Groups",
+				"is_group": 0
+			})
+			customer_group.insert()
+		
+		# Check if customer with same name exists
+		existing_customer = frappe.db.get_value("Customer", 
+			{"customer_name": self.tenant_name})
+		
+		if existing_customer:
+			# Update existing customer
+			customer = frappe.get_doc("Customer", existing_customer)
+			customer.customer_group = "Tenant"
+			customer.custom_is_tenant = 1
+			customer.email_id = self.email
+			customer.mobile_no = self.phone
+			customer.save()
+			return customer.name
+		
+		# Create new customer
+		customer = frappe.get_doc({
+			"doctype": "Customer",
+			"customer_name": self.tenant_name,
+			"customer_group": "Tenant",
+			"customer_type": "Individual",
+			"email_id": self.email,
+			"mobile_no": self.phone,
+			"custom_is_tenant": 1
+		})
+		customer.insert()
 		
 		return customer.name
-
-	@frappe.whitelist()
-	def create_tenant_from_customer(customer):
-		"""Create Tenant record from existing Customer"""
-		
-		# Get customer details
-		customer_doc = frappe.get_doc("Customer", customer)
-		
-		# Check if tenant already exists
-		existing_tenant = frappe.db.get_value("Tenant", {"customer": customer})
-		if existing_tenant:
-			frappe.throw(_("Tenant record already exists for this customer: {0}").format(existing_tenant))
-		
-		# Create tenant
-		tenant = frappe.get_doc({
-			"doctype": "Tenant",
-			"tenant_name": customer_doc.customer_name,
-			"customer": customer_doc.name,
-			"email": customer_doc.email_id,
-			"phone": customer_doc.mobile_no,
-			"status": "Active"
-		})
-		tenant.insert(ignore_permissions=True)
-		
-		# Flag customer as tenant
-		customer_doc.custom_is_tenant = 1
-		customer_doc.save()
-		
-		return tenant.name
-
-	@frappe.whitelist()
-	def sync_tenant_to_customer(tenant):
-		"""Sync Tenant changes back to Customer"""
-		
-		tenant_doc = frappe.get_doc("Tenant", tenant)
-		
-		if tenant_doc.customer:
-			customer = frappe.get_doc("Customer", tenant_doc.customer)
-			customer.customer_name = tenant_doc.tenant_name
-			customer.email_id = tenant_doc.email
-			customer.mobile_no = tenant_doc.phone
-			customer.custom_is_tenant = 1
-			customer.save()
-		
-		return True
