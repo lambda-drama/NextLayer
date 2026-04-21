@@ -3,6 +3,7 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe.model.naming import make_autoname
 
 class Unit(Document):
     def validate(self):
@@ -18,7 +19,11 @@ class Unit(Document):
 
     def before_save(self):
         ensure_rent_item(self)
-
+        
+    def autoname(self):
+        unit = self.unit_number or "UNIT"
+        property_code = self.property or "GEN"
+        self.name = make_autoname(f"{unit}-{property_code}")
 
 def ensure_rent_item(doc):
     # 1. Ensure Item Group exists

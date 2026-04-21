@@ -11,14 +11,11 @@
   "company",
   "column_break_egej",
   "posting_date",
-  "project",
   "currency",
   "section_break_parties",
   "party_type",
-  "party_name",
   "column_break_pxxk",
-  "primary_tenant",
-  "customer",
+  "party_name",
   "section_break_property",
   "property",
   "unit",
@@ -98,7 +95,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "\nDraft\nActive\nExpired\nTerminated\nRenewed",
+   "options": "\nDraft\nSigned\nActive\nExpired\nTerminated\nRenewed",
    "reqd": 1
   },
   {
@@ -120,14 +117,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "project",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Project",
-   "options": "Project"
-  },
-  {
    "default": "USD",
    "fieldname": "currency",
    "fieldtype": "Link",
@@ -143,7 +132,7 @@
    "label": "Parties"
   },
   {
-   "default": "Customer",
+   "default": "Tenant",
    "fieldname": "party_type",
    "fieldtype": "Link",
    "label": "Party Type",
@@ -159,13 +148,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "primary_tenant",
-   "fieldtype": "Link",
-   "label": "Primary Tenant",
-   "options": "Tenant",
-   "reqd": 1
-  },
-  {
    "fieldname": "additional_tenants",
    "fieldtype": "Table",
    "label": "Additional Tenants",
@@ -177,7 +159,6 @@
    "label": "Property & Unit"
   },
   {
-   "fetch_from": "unit.property",
    "fieldname": "property",
    "fieldtype": "Link",
    "label": "Property",
@@ -185,7 +166,6 @@
    "reqd": 1
   },
   {
-   "fetch_from": "property.unit",
    "fieldname": "unit",
    "fieldtype": "Link",
    "label": "Unit",
@@ -486,13 +466,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "fetch_from": "primary_tenant.customer",
-   "fieldname": "customer",
-   "fieldtype": "Link",
-   "label": "Customer",
-   "options": "Customer"
-  },
-  {
    "fieldname": "guarantors_tab",
    "fieldtype": "Tab Break",
    "label": "Guarantors"
@@ -511,8 +484,9 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-04-20 02:40:34.650442",
+ "modified": "2026-04-22 01:49:21.028849",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",
@@ -536,5 +510,30 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [
+  {
+   "color": "Orange",
+   "title": "Draft"
+  },
+  {
+   "color": "Blue",
+   "title": "Signed"
+  },
+  {
+   "color": "Green",
+   "title": "Active"
+  },
+  {
+   "color": "Red",
+   "title": "Terminated"
+  },
+  {
+   "color": "Green",
+   "title": "Renewed"
+  },
+  {
+   "color": "Red",
+   "title": "Expired"
+  }
+ ]
 }

@@ -160,3 +160,4 @@ def get_due_date():
     from frappe.utils import add_days, nowdate
     # Default: due in 15 days
     return add_days(nowdate(), 15)
+

@@ -6,12 +6,12 @@ from frappe.model.document import Document
 
 
 class UtilityMeter(Document):
-	def validate(doc, method):
-		if doc.current_reading and doc.last_reading:
+	def validate(self):
+		if self.current_reading and self.last_reading:
 			# Validate no negative consumption
-			if doc.current_reading < doc.last_reading:
-				frappe.throw(f"Current reading ({doc.current_reading}) cannot be less than last reading ({doc.last_reading})")
+			if self.current_reading < self.last_reading:
+				frappe.throw(f"Current reading ({self.current_reading}) cannot be less than last reading ({self.last_reading})")
 			
 			# Auto-calculate consumption
-			doc.consumption = doc.current_reading - doc.last_reading
+			self.consumption = self.current_reading - self.last_reading
 	

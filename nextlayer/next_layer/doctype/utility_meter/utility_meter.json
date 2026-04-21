@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:meter_id",
  "creation": "2026-04-17 17:50:39.433802",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -55,11 +56,11 @@
   },
   {
    "fieldname": "meter_type",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Meter Type",
-   "options": "\nWater\nElectricity\nGas",
+   "options": "Meter Type",
    "reqd": 1
   },
   {
@@ -138,8 +139,7 @@
    "description": "Previous period's ending reading",
    "fieldname": "last_reading",
    "fieldtype": "Float",
-   "label": "Last Reading",
-   "read_only": 1
+   "label": "Last Reading"
   },
   {
    "fieldname": "column_break_readings",
@@ -171,11 +171,11 @@
   {
    "description": "Based on meter type",
    "fieldname": "uom",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Unit of Measurement",
-   "options": "\nCubic Meter (m\u00b3)\nGallon\nkWh\nTherm",
+   "options": "UOM",
    "reqd": 1
   },
   {
@@ -244,10 +244,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 18:41:41.528602",
+ "modified": "2026-04-22 02:29:57.313569",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Utility Meter",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {

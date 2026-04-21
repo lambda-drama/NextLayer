@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:unit_number",
  "creation": "2026-04-17 17:30:42.866666",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -147,12 +148,14 @@
   {
    "fieldname": "ownership_section",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Property Ownership (Multi-Owner Support)"
   },
   {
    "description": "Support multiple owners with percentage ownership",
    "fieldname": "owners",
    "fieldtype": "Table",
+   "hidden": 1,
    "label": "Owners",
    "options": "Unit Owner"
   },
@@ -326,10 +329,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-18 04:01:01.563123",
+ "modified": "2026-04-22 01:24:21.772475",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
