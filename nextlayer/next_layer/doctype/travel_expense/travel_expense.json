@@ -479,22 +479,26 @@
   {
    "fieldname": "resident_id_no",
    "fieldtype": "Data",
-   "label": "ID No"
+   "label": "ID No",
+   "mandatory_depends_on": "eval:[\"Residence and Iqama\", \"All\"].includes(doc.expense_category)"
   },
   {
    "fieldname": "resident_issue_date",
    "fieldtype": "Date",
-   "label": "Issue Date"
+   "label": "Issue Date",
+   "mandatory_depends_on": "eval:[\"Residence and Iqama\", \"All\"].includes(doc.expense_category)"
   },
   {
    "fieldname": "resident_expiry_date",
    "fieldtype": "Date",
-   "label": "Expiry Date"
+   "label": "Expiry Date",
+   "mandatory_depends_on": "eval:[\"Residence and Iqama\", \"All\"].includes(doc.expense_category)"
   },
   {
    "fieldname": "resident_nationality",
    "fieldtype": "Link",
    "label": "Nationality",
+   "mandatory_depends_on": "eval:[\"Residence and Iqama\", \"All\"].includes(doc.expense_category)",
    "options": "Country"
   },
   {
@@ -748,7 +752,6 @@
    "label": "Historical"
   },
   {
-   "allow_on_submit": 1,
    "fieldname": "traveller_name",
    "fieldtype": "Table MultiSelect",
    "ignore_user_permissions": 1,
@@ -768,7 +771,7 @@
    "link_fieldname": "original_expense"
   }
  ],
- "modified": "2026-03-23 00:11:24.518926",
+ "modified": "2026-04-23 00:55:13.792008",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Travel Expense",
