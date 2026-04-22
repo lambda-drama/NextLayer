@@ -9,6 +9,7 @@
   "basic_section",
   "property_name",
   "property_type",
+  "company",
   "column_break_basic",
   "property_code",
   "status",
@@ -308,12 +309,23 @@
    "fieldname": "address_tab",
    "fieldtype": "Tab Break",
    "label": "Address"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-04-18 03:43:14.268600",
+ "links": [
+  {
+   "link_doctype": "Unit",
+   "link_fieldname": "property"
+  }
+ ],
+ "modified": "2026-04-22 20:38:34.475947",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property",

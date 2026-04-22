@@ -1,8 +1,11 @@
-
-
 import frappe
+import calendar
 from frappe.model.document import Document
-from frappe.utils import nowdate, add_days, flt
+from frappe.utils import nowdate, flt, getdate, add_days
+
+RENT_ITEM_CODE = "RENT-CHARGES"
+RENT_ITEM_NAME = "Rent Charges"
+
 
 class TenantContract(Document):
 	def before_save(self):
@@ -13,367 +16,587 @@ class TenantContract(Document):
 		if self.status != "Signed":
 			frappe.throw("Cannot submit contract. Both tenant and property owner must sign the contract.")
 		self.db_set("status", "Active")
-		self.set_unit_status("Occupied")
+		self._update_unit_on_activation()
 
 	def on_cancel(self):
-		self.set_unit_status("Available")
+		self._update_unit_on_deactivation()
 
-	def set_unit_status(self, status):
+	def _update_unit_on_activation(self):
 		if self.unit:
-			frappe.db.set_value("Unit", self.unit, "status", status)
+			frappe.db.set_value("Unit", self.unit, {
+				"status": "Occupied",
+				"is_occupied": 1,
+				"current_tenant": self.party_name,
+				"current_contract": self.name
+			})
+
+	def _update_unit_on_deactivation(self):
+		if self.unit:
+			frappe.db.set_value("Unit", self.unit, {
+				"status": "Available",
+				"is_occupied": 0,
+				"current_tenant": None,
+				"current_contract": None
+			})
+
+	@frappe.whitelist()
+	def activate_contract(self):
+		"""Admin override: manually activate contract without signature requirement."""
+		if self.docstatus == 1 and self.status == "Active":
+			frappe.throw("Contract is already active.")
+		self.db_set("status", "Active")
+		self._update_unit_on_activation()
+		frappe.msgprint("Contract activated successfully.")
 
 	@frappe.whitelist()
 	def end_contract(self):
 		if self.status != "Active":
 			frappe.throw("Only active contracts can be ended.")
 		self.db_set("status", "Expired")
-		self.set_unit_status("Available")
+		self._update_unit_on_deactivation()
 
 	@frappe.whitelist()
 	def terminate_contract(self):
 		if self.status != "Active":
 			frappe.throw("Only active contracts can be terminated.")
 		self.db_set("status", "Terminated")
-		self.set_unit_status("Available")
+		self._update_unit_on_deactivation()
 
-	# ============== NEW INVOICE METHODS ==============
+	# ──────────────────────────────────────────
+	#  INVOICE GENERATION
+	# ──────────────────────────────────────────
 
 	@frappe.whitelist()
 	def generate_sales_invoice(self):
-		"""Generate sales invoice from this contract"""
+		"""Generate sales invoice(s) from this contract, respecting PMS Settings grouping."""
 		if self.status != "Active":
 			frappe.throw("Only active contracts can generate invoices.")
-		
-		# Ensure Rent item exists
-		self.create_rent_item_if_not_exists()
-		
-		# Get customer from Tenant doctype
+
+		settings = _get_pms_settings()
 		customer = self.get_customer_from_tenant()
-		
-		items = []
-		
-		# 1. Rent item
-		items.append({
-			"item_code": "RENT",
-			"item_name": "Monthly Rent",
+		self._ensure_rent_item()
+
+		grouping = self.invoice_grouping or (
+			settings.invoice_grouping if settings else "Combined - All in one invoice"
+		)
+
+		invoices = []
+
+		if grouping == "Combined - All in one invoice":
+			inv = self._create_combined_invoice(customer, settings)
+			if inv:
+				invoices.append(inv)
+
+		elif grouping in (
+			"Rent + Services combined, Utilities separate",
+			"Metered items only separate, rest combined",
+		):
+			inv = self._create_rent_services_invoice(customer, settings)
+			if inv:
+				invoices.append(inv)
+			invoices.extend(self._create_utility_invoices_separate(customer, settings))
+
+		elif grouping == "Rent separate, Services + Utilities combined":
+			inv = self._create_rent_only_invoice(customer, settings)
+			if inv:
+				invoices.append(inv)
+			inv = self._create_services_utilities_invoice(customer, settings)
+			if inv:
+				invoices.append(inv)
+
+		elif grouping == "Fully separate (Rent, Services, Utilities)":
+			inv = self._create_rent_only_invoice(customer, settings)
+			if inv:
+				invoices.append(inv)
+			inv = self._create_services_only_invoice(customer, settings)
+			if inv:
+				invoices.append(inv)
+			invoices.extend(self._create_utility_invoices_separate(customer, settings))
+
+		else:
+			inv = self._create_combined_invoice(customer, settings)
+			if inv:
+				invoices.append(inv)
+
+		if not invoices:
+			frappe.throw(
+				"No items to invoice. Ensure rent is set, recurring service fees exist, "
+				"or utility meters have current readings."
+			)
+
+		msg = (
+			f"Invoice {invoices[0]} created successfully"
+			if len(invoices) == 1
+			else f"{len(invoices)} invoices created: {', '.join(invoices)}"
+		)
+		frappe.msgprint(msg)
+		return invoices[0] if invoices else None
+
+	# ── invoice-building helpers ──
+
+	def _create_combined_invoice(self, customer, settings):
+		items = (
+			self._get_rent_items(settings)
+			+ self._get_service_items(settings)
+			+ self._get_utility_items(settings)
+		)
+		return self._make_invoice(customer, items, settings) if items else None
+
+	def _create_rent_services_invoice(self, customer, settings):
+		items = self._get_rent_items(settings) + self._get_service_items(settings)
+		return self._make_invoice(customer, items, settings) if items else None
+
+	def _create_rent_only_invoice(self, customer, settings):
+		items = self._get_rent_items(settings)
+		return self._make_invoice(customer, items, settings) if items else None
+
+	def _create_services_only_invoice(self, customer, settings):
+		items = self._get_service_items(settings)
+		return self._make_invoice(customer, items, settings) if items else None
+
+	def _create_services_utilities_invoice(self, customer, settings):
+		items = self._get_service_items(settings) + self._get_utility_items(settings)
+		return self._make_invoice(customer, items, settings) if items else None
+
+	def _create_utility_invoices_separate(self, customer, settings):
+		"""One invoice per utility row that has items."""
+		invoices = []
+		for utility in (self.utility or []):
+			if not utility.tenant_pays:
+				continue
+			items = self._get_utility_items_for_row(utility, settings)
+			if items:
+				inv = self._make_invoice(customer, items, settings)
+				if inv:
+					invoices.append(inv)
+		return invoices
+
+	# ── line-item builders ──
+
+	def _get_rent_items(self, settings):
+		income_account = settings.default_rent_income_account if settings else None
+		row = {
+			"item_code": RENT_ITEM_CODE,
+			"item_name": RENT_ITEM_NAME,
 			"qty": 1,
-			"rate": self.monthly_rent,
-			"description": f"Rent for {self.unit} - {nowdate()}",
-			"uom": "Month"
-		})
-		
-		# 2. Service fees (recurring only)
-		if self.service_fee:
-			for fee in self.service_fee:
-				if fee.is_recurring:
-					items.append({
-						"item_code": fee.service_item,
-						"item_name": fee.service_name or fee.service_item,
+			"rate": flt(self.monthly_rent),
+			"description": f"Monthly Rent - {self.unit}",
+			"uom": "Month",
+		}
+		if income_account:
+			row["income_account"] = income_account
+		return [row]
+
+	def _get_service_items(self, settings):
+		if not self.service_fee:
+			return []
+
+		income_account = settings.default_service_fee_account if settings else None
+		combine = settings.combine_services_single_line if settings else 0
+		rows = []
+
+		for fee in self.service_fee:
+			if not fee.apply_recurring:
+				continue
+			item_code = self._get_service_item_erpnext_code(fee)
+			if not item_code:
+				continue
+			rows.append({
+				"item_code": item_code,
+				"item_name": fee.service_name or fee.service_item,
+				"qty": 1,
+				"rate": flt(fee.amount),
+				"description": f"Service Fee: {fee.service_name or fee.service_item}",
+				"income_account": income_account,
+			})
+
+		if combine and rows:
+			total = sum(r["rate"] for r in rows)
+			return [{
+				"item_code": rows[0]["item_code"],
+				"item_name": "Monthly Services",
+				"qty": 1,
+				"rate": total,
+				"description": "Combined monthly service fees",
+				"income_account": income_account,
+			}]
+
+		return rows
+
+	def _get_utility_items(self, settings):
+		items = []
+		for utility in (self.utility or []):
+			if utility.tenant_pays:
+				items.extend(self._get_utility_items_for_row(utility, settings))
+		return items
+
+	def _get_utility_items_for_row(self, utility, settings):
+		income_account = settings.default_utility_income_account if settings else None
+		generate_zero = settings.generate_invoice_for_zero_consumption if settings else 0
+		items = []
+
+		if utility.billing_method == "Flat Fee":
+			item_code = self._get_utility_item_code_safe(utility.utility_type)
+			if item_code and flt(utility.flat_fee_amount) > 0:
+				row = {
+					"item_code": item_code,
+					"item_name": f"{utility.utility_type} - Flat Fee",
+					"qty": 1,
+					"rate": flt(utility.flat_fee_amount),
+					"description": f"{utility.utility_type} flat fee",
+				}
+				if income_account:
+					row["income_account"] = income_account
+				items.append(row)
+
+		elif utility.billing_method == "Metered - Consumption Based":
+			if not utility.meter:
+				return items
+			consumption, amount = self.calculate_utility_consumption(utility.meter)
+			if consumption <= 0 and not generate_zero:
+				return items
+			item_code = self._get_utility_item_code_safe(utility.utility_type)
+			if item_code:
+				uom = self.get_utility_uom(utility.utility_type)
+				row = {
+					"item_code": item_code,
+					"item_name": f"{utility.utility_type} - {self.unit}",
+					"qty": consumption if consumption > 0 else 0,
+					"rate": self.get_meter_rate(utility.meter),
+					"description": f"{utility.utility_type} consumption for {nowdate()}",
+					"uom": uom,
+				}
+				if income_account:
+					row["income_account"] = income_account
+				items.append(row)
+
+		elif utility.billing_method == "Actual Bill Reimbursement":
+			if flt(utility.flat_fee_amount) > 0:
+				item_code = self._get_utility_item_code_safe(utility.utility_type)
+				if item_code:
+					row = {
+						"item_code": item_code,
+						"item_name": f"{utility.utility_type} - Actual Bill",
 						"qty": 1,
-						"rate": fee.amount,
-						"description": f"Recurring fee: {fee.service_item}"
-					})
-		
-		# 3. Utilities (metered)
-		if self.utility:
-			for utility in self.utility:
-				if utility.tenant_pays and utility.billing_method == "Metered - Consumption Based":
-					consumption, amount = self.calculate_utility_consumption(utility.meter)
-					if consumption > 0:
-						items.append({
-							"item_code": self.get_utility_item_code(utility.utility_type),
-							"item_name": f"{utility.utility_type} - {self.unit}",
-							"qty": consumption,
-							"rate": self.get_meter_rate(utility.meter),
-							"description": f"{utility.utility_type} consumption for {nowdate()}",
-							"uom": self.get_utility_uom(utility.utility_type)
-						})
-		
+						"rate": flt(utility.flat_fee_amount),
+						"description": f"{utility.utility_type} actual bill reimbursement",
+					}
+					if income_account:
+						row["income_account"] = income_account
+					items.append(row)
+
+		return items
+
+	def _make_invoice(self, customer, items, settings):
+		"""Build, insert and submit a Sales Invoice."""
 		if not items:
-			frappe.throw("No items to invoice. Check rent, service fees, and utilities.")
-		
-		# Create invoice
+			return None
+
+		cost_center = settings.cost_center if settings else None
+		if cost_center:
+			for item in items:
+				if not item.get("cost_center"):
+					item["cost_center"] = cost_center
+
 		invoice = frappe.get_doc({
 			"doctype": "Sales Invoice",
 			"custom_invoice_no": self.generate_invoice_number(),
 			"company": self.company,
 			"customer": customer,
 			"posting_date": nowdate(),
-			"due_date": self.get_due_date(),
-			"items": items
+			"due_date": self.get_due_date(settings),
+			"items": items,
+			"currency":self.currency,
 		})
-		
 		invoice.insert()
 		invoice.submit()
-		
-		frappe.msgprint(f"Invoice {invoice.name} created successfully")
+
+		if settings and settings.send_invoice_automatically:
+			try:
+				invoice.send_emails()
+			except Exception:
+				pass
+
 		return invoice.name
+
+	# ──────────────────────────────────────────
+	#  DAILY UTILITIES
+	# ──────────────────────────────────────────
 
 	@frappe.whitelist()
 	def process_daily_utilities(self):
-		"""Process daily utilities for this contract"""
 		if self.status != "Active":
 			frappe.throw("Only active contracts can process utilities.")
-		
-		# Get customer from Tenant doctype
+
+		settings = _get_pms_settings()
 		customer = self.get_customer_from_tenant()
-		
+		income_account = settings.default_utility_income_account if settings else None
 		results = []
-		
-		for utility in self.utility:
-			if utility.tenant_pays and utility.billing_method == "Metered - Consumption Based" and utility.get("is_daily", 0):
-				consumption, amount = self.calculate_daily_utility_consumption(utility.meter)
-				
-				if consumption > 0:
-					invoice_name = self.create_utility_invoice(utility, consumption, amount, customer)
-					results.append({
-						"utility": utility.utility_type,
-						"consumption": consumption,
-						"amount": amount,
-						"invoice": invoice_name
-					})
-		
-		if results:
-			frappe.msgprint(f"Processed {len(results)} daily utilities")
-		else:
-			frappe.msgprint("No daily utilities to process")
-		
-		return results
 
-	# ============== ITEM CREATION METHODS ==============
+		for utility in (self.utility or []):
+			if not (utility.tenant_pays and utility.billing_method == "Metered - Consumption Based"):
+				continue
+			if not utility.get("is_daily", 0):
+				continue
 
-	def create_rent_item_if_not_exists(self):
-		"""Create Rent item if it doesn't exist"""
-		
-		# Check if Service item group exists
-		self.create_service_item_group()
-		
-		# Check if Rent item exists
-		if not frappe.db.exists("Item", "RENT"):
-			rent_item = frappe.get_doc({
-				"doctype": "Item",
-				"item_code": "RENT",
-				"item_name": "Monthly Rent",
-				"item_group": "Service",
-				"is_stock_item": 0,
-				"description": "Monthly Rent Charge",
-				"standard_rate": 0
-			})
-			rent_item.insert()
-			frappe.db.commit()
+			consumption, amount = self.calculate_daily_utility_consumption(utility.meter)
+			if consumption <= 0:
+				continue
 
-	def create_service_item_group(self):
-		"""Create 'Service' item group if it doesn't exist"""
-		if not frappe.db.exists("Item Group", "Service"):
-			item_group = frappe.get_doc({
-				"doctype": "Item Group",
-				"item_group_name": "Service",
-				"parent_item_group": "All Item Groups"
-			})
-			item_group.insert()
-			frappe.db.commit()
+			item_code = self._get_utility_item_code_safe(utility.utility_type)
+			if not item_code:
+				continue
 
-	def get_customer_from_tenant(self):
-		"""Get customer from Tenant doctype"""
-		if not self.party_name:
-			frappe.throw("No tenant selected in contract.")
-		
-		tenant = frappe.get_doc("Tenant", self.party_name)
-		
-		if not tenant.customer:
-			frappe.throw(f"Tenant {self.party_name} does not have a linked customer.")
-		
-		return tenant.customer
-
-	# ============== HELPER METHODS ==============
-
-	def calculate_utility_consumption(self, meter_name):
-		"""Calculate consumption for a meter (monthly)"""
-		meter = frappe.get_doc("Utility Meter", meter_name)
-		
-		if not meter.current_reading:
-			frappe.throw(f"No current reading for meter {meter_name}")
-		
-		if not meter.last_reading:
-			frappe.throw(f"No last reading for meter {meter_name}. Please set initial reading.")
-		
-		consumption = flt(meter.current_reading) - flt(meter.last_reading)
-		
-		if consumption < 0:
-			frappe.log_error(
-				f"Negative consumption for meter {meter.meter_id}. "
-				f"Last: {meter.last_reading}, Current: {meter.current_reading}",
-				"Utility Billing Error"
-			)
-			frappe.throw(f"Negative consumption detected for meter {meter_name}")
-		
-		amount = consumption * flt(meter.tariff_rate)
-		
-		# Update meter for next period
-		meter.last_reading = meter.current_reading
-		meter.last_reading_date = meter.current_reading_date or nowdate()
-		meter.current_reading = 0
-		meter.current_reading_date = None
-		meter.save()
-		
-		return consumption, amount
-
-	def calculate_daily_utility_consumption(self, meter_name):
-		"""Calculate consumption for a meter (daily)"""
-		meter = frappe.get_doc("Utility Meter", meter_name)
-		
-		if not meter.current_reading:
-			return 0, 0
-		
-		if not meter.last_reading:
-			frappe.throw(f"No last reading for meter {meter_name}. Please set initial reading.")
-		
-		consumption = flt(meter.current_reading) - flt(meter.last_reading)
-		
-		if consumption < 0:
-			frappe.log_error(
-				f"Negative daily consumption for meter {meter.meter_id}. "
-				f"Last: {meter.last_reading}, Current: {meter.current_reading}",
-				"Daily Utility Billing Error"
-			)
-			return 0, 0
-		
-		amount = consumption * flt(meter.tariff_rate)
-		
-		# Update meter for next day
-		meter.last_reading = meter.current_reading
-		meter.last_reading_date = meter.current_reading_date or nowdate()
-		meter.current_reading = 0
-		meter.current_reading_date = None
-		meter.save()
-		
-		return consumption, amount
-
-	def create_utility_invoice(self, utility, consumption, amount, customer):
-		"""Create a utility invoice"""
-		invoice = frappe.get_doc({
-			"doctype": "Sales Invoice",
-			"customer": customer,
-			"posting_date": nowdate(),
-			"due_date": self.get_due_date(),
-			"items": [{
-				"item_code": self.get_utility_item_code(utility.utility_type),
+			row = {
+				"item_code": item_code,
 				"item_name": f"{utility.utility_type} - {self.unit}",
 				"qty": consumption,
 				"rate": self.get_meter_rate(utility.meter),
 				"description": f"{utility.utility_type} daily consumption for {nowdate()}",
-				"uom": self.get_utility_uom(utility.utility_type)
-			}]
-		})
-		
-		invoice.insert()
-		invoice.submit()
-		
-		return invoice.name
+				"uom": self.get_utility_uom(utility.utility_type),
+			}
+			if income_account:
+				row["income_account"] = income_account
 
-	def get_due_date(self):
-		"""Calculate due date based on rent due day"""
-		due_day = self.rent_due_day or 1
-		from frappe.utils import getdate
-		today = getdate(nowdate())
-		
-		if today.day <= due_day:
-			due_date = today.replace(day=due_day)
+			inv_name = self._make_invoice(customer, [row], settings)
+			results.append({
+				"utility": utility.utility_type,
+				"consumption": consumption,
+				"amount": amount,
+				"invoice": inv_name,
+			})
+
+		if results:
+			frappe.msgprint(f"Processed {len(results)} daily utilities")
 		else:
-			# Next month
-			if today.month == 12:
-				due_date = today.replace(year=today.year + 1, month=1, day=due_day)
-			else:
-				due_date = today.replace(month=today.month + 1, day=due_day)
-		
-		return due_date
+			frappe.msgprint("No daily utilities to process")
+
+		return results
+
+	# ──────────────────────────────────────────
+	#  ITEM & CUSTOMER HELPERS
+	# ──────────────────────────────────────────
+
+	def _ensure_rent_item(self):
+		"""Ensure Rent Charges ERPNext item exists."""
+		if not frappe.db.exists("Item Group", "Rent"):
+			frappe.get_doc({
+				"doctype": "Item Group",
+				"item_group_name": "Rent",
+				"is_group": 0,
+				"parent_item_group": "All Item Groups",
+			}).insert(ignore_permissions=True)
+
+		if not frappe.db.exists("UOM", "Month"):
+			frappe.get_doc({"doctype": "UOM", "uom_name": "Month"}).insert(
+				ignore_permissions=True
+			)
+
+		if not frappe.db.exists("Item", RENT_ITEM_CODE):
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": RENT_ITEM_CODE,
+				"item_name": RENT_ITEM_NAME,
+				"item_group": "Rent",
+				"is_stock_item": 0,
+				"is_sales_item": 1,
+				"description": "Monthly Rent Charge",
+				"stock_uom": "Month",
+			}).insert(ignore_permissions=True)
+			frappe.db.commit()
+
+	def _get_service_item_erpnext_code(self, fee_row):
+		"""Return ERPNext item_code for a service fee child row.
+		Uses the linked Service Item's `item` field if set; otherwise auto-creates one.
+		"""
+		try:
+			svc = frappe.get_doc("Service Item", fee_row.service_item)
+		except Exception:
+			return None
+
+		if getattr(svc, "item", None):
+			return svc.item
+
+		# Auto-create/get ERPNext Item using service_item name as item_code
+		item_code = fee_row.service_item
+		if not frappe.db.exists("Item", item_code):
+			if not frappe.db.exists("Item Group", "Services"):
+				frappe.get_doc({
+					"doctype": "Item Group",
+					"item_group_name": "Services",
+					"is_group": 0,
+					"parent_item_group": "All Item Groups",
+				}).insert(ignore_permissions=True)
+
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": svc.service_name or item_code,
+				"item_group": "Services",
+				"is_stock_item": 0,
+				"is_sales_item": 1,
+				"description": getattr(svc, "description", None) or svc.service_name or item_code,
+				"stock_uom": "Nos",
+			}).insert(ignore_permissions=True)
+			frappe.db.commit()
+
+		return item_code
+
+	def _get_utility_item_code_safe(self, utility_type):
+		"""Like get_utility_item_code but returns None instead of throwing."""
+		try:
+			return self.get_utility_item_code(utility_type)
+		except Exception as e:
+			frappe.log_error(str(e), "Utility Item Code Error")
+			return None
 
 	def get_utility_item_code(self, utility_type):
-		"""Get item code for utility type"""
-		# First try to get from Meter Type doctype
-		meter_type = frappe.db.exists("Meter Type", utility_type)
-		if meter_type:
-			item = frappe.db.get_value("Meter Type", meter_type, "item")
-			if item:
-				return item
-		
-		# Fallback to hardcoded map
-		item_map = {
-			"Water": "UTIL-WATER",
-			"Electricity": "UTIL-ELECTRICITY",
-			"Gas": "UTIL-GAS",
-			"Sewer": "UTIL-SEWER",
-			"Trash": "UTIL-TRASH"
-		}
-		return item_map.get(utility_type, "UTIL-OTHER")
+		"""Get ERPNext item linked to Meter Type."""
+		if not frappe.db.exists("Meter Type", utility_type):
+			frappe.throw(
+				f"Meter Type '{utility_type}' not found. "
+				"Please create it in the Meter Type list and link an Item."
+			)
+		item = frappe.db.get_value("Meter Type", utility_type, "item")
+		if not item:
+			frappe.throw(
+				f"Meter Type '{utility_type}' has no linked ERPNext Item. "
+				"Please open the Meter Type record and set an Item."
+			)
+		return item
+
+	def get_customer_from_tenant(self):
+		if not self.party_name:
+			frappe.throw("No tenant (Party Name) selected in this contract.")
+		customer = frappe.db.get_value("Tenant", self.party_name, "customer")
+		if not customer:
+			frappe.throw(
+				f"Tenant '{self.party_name}' has no linked Customer. "
+				"Open the Tenant record and link a Customer."
+			)
+		return customer
+
+	# ──────────────────────────────────────────
+	#  METER CALCULATION HELPERS
+	# ──────────────────────────────────────────
+
+	def calculate_utility_consumption(self, meter_name):
+		"""Calculate monthly consumption and reset meter readings."""
+		meter = frappe.get_doc("Utility Meter", meter_name)
+
+		if not meter.current_reading:
+			frappe.throw(
+				f"No current reading for meter '{meter_name}'. "
+				"Please enter a reading before generating the invoice."
+			)
+		if meter.last_reading is None:
+			frappe.throw(
+				f"No last reading for meter '{meter_name}'. "
+				"Please set an initial reading on the meter."
+			)
+
+		consumption = flt(meter.current_reading) - flt(meter.last_reading)
+		if consumption < 0:
+			frappe.log_error(
+				f"Negative consumption for {meter.meter_id}: "
+				f"last={meter.last_reading}, current={meter.current_reading}",
+				"Utility Billing Error",
+			)
+			frappe.throw(
+				f"Negative consumption detected for meter '{meter_name}'. "
+				"Current reading must be ≥ last reading."
+			)
+
+		amount = consumption * flt(meter.tariff_rate)
+
+		meter.db_set({
+			"last_reading": meter.current_reading,
+			"last_reading_date": meter.current_reading_date or nowdate(),
+			"current_reading": 0,
+			"current_reading_date": None,
+			"last_invoice_date": nowdate(),
+			"last_invoice_amount": amount,
+		})
+		return consumption, amount
+
+	def calculate_daily_utility_consumption(self, meter_name):
+		"""Calculate daily consumption (soft – returns 0, 0 on edge cases)."""
+		meter = frappe.get_doc("Utility Meter", meter_name)
+		if not meter.current_reading:
+			return 0, 0
+		if meter.last_reading is None:
+			frappe.throw(f"No last reading for meter '{meter_name}'.")
+
+		consumption = flt(meter.current_reading) - flt(meter.last_reading)
+		if consumption < 0:
+			return 0, 0
+
+		amount = consumption * flt(meter.tariff_rate)
+		meter.db_set({
+			"last_reading": meter.current_reading,
+			"last_reading_date": meter.current_reading_date or nowdate(),
+			"current_reading": 0,
+			"current_reading_date": None,
+		})
+		return consumption, amount
 
 	def get_utility_uom(self, utility_type):
-		"""Get UOM for utility type"""
-		# First try to get from Meter Type doctype
-		meter_type = frappe.db.exists("Meter Type", utility_type)
-		if meter_type:
-			uom = frappe.db.get_value("Meter Type", meter_type, "unit_of_measure")
-			if uom:
-				return uom
-		
-		# Fallback to hardcoded map
-		uom_map = {
-			"Water": "Cubic Meter",
-			"Electricity": "kWh",
-			"Gas": "Therm",
-			"Sewer": "Cubic Meter",
-			"Trash": "Unit"
-		}
-		return uom_map.get(utility_type, "Unit")
+		uom = frappe.db.get_value("Meter Type", utility_type, "unit_of_measure")
+		if uom:
+			return uom
+		fallback = {"Water": "Cubic Meter", "Electricity": "kWh", "Gas": "Therm"}
+		return fallback.get(utility_type, "Nos")
 
 	def get_meter_rate(self, meter_name):
-		"""Get tariff rate from meter"""
-		return frappe.db.get_value("Utility Meter", meter_name, "tariff_rate")
-	
-	def generate_invoice_number(self):
-		"""Generate invoice number in format: COMPANY-YYYY-XXXXX"""
-		
-		# Get company abbreviation
-		company_abbr = self.get_company_abbreviation()
-		
-		# Get current year
-		year = nowdate().split("-")[0]  # "2026"
-		
-		# Get next sequence number for this year
-		sequence = self.get_next_invoice_sequence(year)
-		
-		# Format: COMPANY-2026-00001
-		invoice_number = f"{company_abbr}-{year}-{sequence:05d}"
-		
-		return invoice_number
+		return flt(frappe.db.get_value("Utility Meter", meter_name, "tariff_rate"))
 
+	# ──────────────────────────────────────────
+	#  DUE DATE & INVOICE NUMBER
+	# ──────────────────────────────────────────
+
+	def get_due_date(self, settings=None):
+		due_day = int(self.rent_due_day or (settings.rent_due_day if settings else 0) or 5)
+		today = getdate(nowdate())
+		max_day = calendar.monthrange(today.year, today.month)[1]
+		due_day = min(due_day, max_day)
+
+		if today.day <= due_day:
+			return today.replace(day=due_day)
+
+		if today.month == 12:
+			return today.replace(year=today.year + 1, month=1, day=min(due_day, 31))
+		next_month = today.month + 1
+		return today.replace(
+			month=next_month,
+			day=min(due_day, calendar.monthrange(today.year, next_month)[1]),
+		)
+
+	def generate_invoice_number(self):
+		abbr = self.get_company_abbreviation()
+		year = nowdate()[:4]
+		seq = self.get_next_invoice_sequence(abbr, year)
+		return f"{abbr}-{year}-{seq:05d}"
 
 	def get_company_abbreviation(self):
-		"""Get company abbreviation from Company doctype"""
-		
 		if not self.company:
 			frappe.throw("Company is required on the contract.")
-		
-		company = frappe.get_doc("Company", self.company)
-		
-		# Try to get abbreviation from custom field or use first letters
-		if hasattr(company, "abbreviation") and company.abbreviation:
-			return company.abbreviation.upper()
-		
-		# Default: Take first 3 letters of company name, uppercase
-		abbr = ''.join(word[0] for word in company.company_name.split()[:2])
-		return abbr.upper()[:5]  # Max 5 characters
+		abbr = frappe.db.get_value("Company", self.company, "abbr")
+		return (abbr or self.company[:3]).upper()
+
+	def get_next_invoice_sequence(self, company_abbr, year):
+		pattern = f"{company_abbr}-{year}-%"
+		count = frappe.db.count(
+			"Sales Invoice", filters={"custom_invoice_no": ["like", pattern]}
+		)
+		return (count or 0) + 1
 
 
-	def get_next_invoice_sequence(self, year):
-		"""Get next sequence number for invoices in given year"""
-		
-		# Count existing invoices with this year's prefix
-		pattern = f"{self.get_company_abbreviation()}-{year}-%"
-		
-		existing_invoices = frappe.db.count("Sales Invoice", {
-			"name": ["like", pattern]
-		})
-		
-		# Next sequence = existing count + 1
-		return existing_invoices + 1
+# ──────────────────────────────────────────
+#  MODULE-LEVEL HELPERS
+# ──────────────────────────────────────────
+
+def _get_pms_settings():
+	try:
+		return frappe.get_single("PMS Settings")
+	except Exception:
+		return None

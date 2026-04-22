@@ -400,23 +400,14 @@ override_doctype_class = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"nextlayer.tasks.all"
-# 	],
-# 	"daily": [
-# 		"nextlayer.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"nextlayer.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"nextlayer.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"nextlayer.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"nextlayer.tasks.daily"
+	],
+	"monthly": [
+		"nextlayer.tasks.monthly"
+	],
+}
 
 # Testing
 # -------

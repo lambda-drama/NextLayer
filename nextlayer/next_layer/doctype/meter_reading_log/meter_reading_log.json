@@ -1,22 +1,176 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "naming_series:",
  "creation": "2026-04-17 17:51:36.256441",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_rm4d"
+  "naming_series",
+  "meter",
+  "meter_id",
+  "meter_type",
+  "column_break_basic",
+  "unit",
+  "property",
+  "section_break_period",
+  "period_start",
+  "period_end",
+  "column_break_readings",
+  "previous_reading",
+  "current_reading",
+  "consumption",
+  "section_break_billing",
+  "uom",
+  "tariff_rate",
+  "invoice_amount",
+  "column_break_invoice",
+  "invoice",
+  "is_estimated",
+  "section_break_notes",
+  "notes"
  ],
  "fields": [
   {
-   "fieldname": "section_break_rm4d",
-   "fieldtype": "Section Break"
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "MRL-.YYYY.-.####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "meter",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Meter",
+   "options": "Utility Meter",
+   "reqd": 1
+  },
+  {
+   "fieldname": "meter_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Meter ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "meter_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Meter Type",
+   "options": "Meter Type"
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "unit",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Unit",
+   "options": "Unit"
+  },
+  {
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Property",
+   "options": "Property"
+  },
+  {
+   "fieldname": "section_break_period",
+   "fieldtype": "Section Break",
+   "label": "Billing Period"
+  },
+  {
+   "fieldname": "period_start",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Period Start"
+  },
+  {
+   "fieldname": "period_end",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Period End"
+  },
+  {
+   "fieldname": "column_break_readings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "previous_reading",
+   "fieldtype": "Float",
+   "label": "Previous Reading"
+  },
+  {
+   "fieldname": "current_reading",
+   "fieldtype": "Float",
+   "label": "Current Reading"
+  },
+  {
+   "fieldname": "consumption",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Consumption"
+  },
+  {
+   "fieldname": "section_break_billing",
+   "fieldtype": "Section Break",
+   "label": "Billing Details"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "tariff_rate",
+   "fieldtype": "Currency",
+   "label": "Tariff Rate"
+  },
+  {
+   "fieldname": "invoice_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Invoice Amount"
+  },
+  {
+   "fieldname": "column_break_invoice",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_estimated",
+   "fieldtype": "Check",
+   "label": "Was Estimated Reading"
+  },
+  {
+   "fieldname": "section_break_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 17:51:36.256441",
+ "modified": "2026-04-22 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Meter Reading Log",
