@@ -24,20 +24,13 @@
   "apply_late_fee_every_days",
   "late_fee_item",
   "deposit_section",
+  "company_deposit_settings",
+  "deposit_global_defaults_section",
   "default_deposit_liability_account",
   "default_security_deposit_months",
   "column_break_deposit",
   "deposit_interest_rate",
   "require_move_inspection_for_deposit",
-  "maintenance_section",
-  "emergency_response_hours",
-  "high_priority_response_hours",
-  "medium_priority_response_hours",
-  "low_priority_response_hours",
-  "column_break_maintenance",
-  "maintenance_auto_approve_threshold",
-  "require_owner_approval_above_threshold",
-  "notify_tenant_on_maintenance_status_change",
   "meter_section",
   "allow_estimated_readings",
   "estimated_reading_grace_days",
@@ -55,12 +48,6 @@
   "tenant_can_view_documents",
   "tenant_can_request_lease_renewal",
   "tenant_notification_email_template",
-  "notification_section",
-  "send_rent_reminder_days_before",
-  "send_overdue_notification_days_after",
-  "column_break_notification",
-  "send_maintenance_status_updates",
-  "send_contract_expiry_reminder_days",
   "accounting_section",
   "default_rent_income_account",
   "default_utility_income_account",
@@ -69,13 +56,22 @@
   "default_maintenance_expense_account",
   "default_damage_income_account",
   "cost_center",
-  "integration_section",
-  "payment_gateway",
-  "payment_gateway_api_key",
-  "column_break_integration",
-  "webhook_secret",
-  "enable_smart_meter_api",
-  "smart_meter_api_endpoint"
+  "notification_tab",
+  "maintenance_section",
+  "emergency_response_hours",
+  "high_priority_response_hours",
+  "medium_priority_response_hours",
+  "low_priority_response_hours",
+  "column_break_maintenance",
+  "maintenance_auto_approve_threshold",
+  "require_owner_approval_above_threshold",
+  "notify_tenant_on_maintenance_status_change",
+  "notification_section",
+  "send_rent_reminder_days_before",
+  "send_overdue_notification_days_after",
+  "column_break_notification",
+  "send_maintenance_status_updates",
+  "send_contract_expiry_reminder_days"
  ],
  "fields": [
   {
@@ -202,6 +198,18 @@
    "fieldname": "deposit_section",
    "fieldtype": "Section Break",
    "label": "Deposit Settings"
+  },
+  {
+   "description": "Per-company deposit account settings. These override the global defaults below.",
+   "fieldname": "company_deposit_settings",
+   "fieldtype": "Table",
+   "label": "Per-Company Deposit Settings",
+   "options": "PMS Deposit Company Setting"
+  },
+  {
+   "fieldname": "deposit_global_defaults_section",
+   "fieldtype": "Section Break",
+   "label": "Global Deposit Defaults"
   },
   {
    "description": "Account where deposits are held",
@@ -470,51 +478,16 @@
    "options": "Cost Center"
   },
   {
-   "fieldname": "integration_section",
-   "fieldtype": "Section Break",
-   "hidden": 1,
-   "label": "Integration Settings"
-  },
-  {
-   "fieldname": "payment_gateway",
-   "fieldtype": "Select",
-   "label": "Payment Gateway",
-   "options": "\nNone\nStripe\nPayPal\nRazorpay\nOther"
-  },
-  {
-   "depends_on": "eval:doc.payment_gateway != 'None'",
-   "fieldname": "payment_gateway_api_key",
-   "fieldtype": "Password",
-   "label": "Payment Gateway API Key"
-  },
-  {
-   "fieldname": "column_break_integration",
-   "fieldtype": "Column Break"
-  },
-  {
-   "depends_on": "eval:doc.payment_gateway != 'None'",
-   "fieldname": "webhook_secret",
-   "fieldtype": "Password",
-   "label": "Webhook Secret"
-  },
-  {
-   "default": "0",
-   "fieldname": "enable_smart_meter_api",
-   "fieldtype": "Check",
-   "label": "Enable Smart Meter API Integration"
-  },
-  {
-   "depends_on": "enable_smart_meter_api",
-   "fieldname": "smart_meter_api_endpoint",
-   "fieldtype": "Data",
-   "label": "Smart Meter API Endpoint"
+   "fieldname": "notification_tab",
+   "fieldtype": "Tab Break",
+   "label": "More info"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-17 18:38:27.419616",
+ "modified": "2026-04-22 21:16:40.082364",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "PMS Settings",

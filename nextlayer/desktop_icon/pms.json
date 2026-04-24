@@ -9,6 +9,7 @@
  "label": "PMS",
  "link": "/desk/pms",
  "link_type": "External",
+  "logo_url": "/assets/nextlayer/images/pms.jpg",
  "modified": "2026-04-11 00:00:00.000000",
  "modified_by": "Administrator",
  "name": "PMS",

@@ -22,7 +22,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Utility Type",
-   "options": "Utility Type",
+   "options": "Meter Type",
    "reqd": 1
   },
   {

@@ -1,6 +1,7 @@
 {
+ "app": "nextlayer",
  "charts": [],
- "content": "[{\"id\":\"05AaTdNAip\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Data Visualizer</span>\",\"col\":12}},{\"id\":\"p0C-rVDAzv\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Inter-Company\",\"col\":3}}]",
+ "content": "[{\"id\":\"dv-h1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Data Visualizer</b></span>\",\"col\":12}},{\"id\":\"dv-s1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Inter-Company\",\"col\":3}},{\"id\":\"dv-s2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ledger Summary\",\"col\":3}},{\"id\":\"dv-s3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Import Export\",\"col\":3}},{\"id\":\"dv-s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Cost Estimate vs Consumed\",\"col\":3}},{\"id\":\"dv-s5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Quotation Stages\",\"col\":3}}]",
  "creation": "2025-08-29 18:21:44.570664",
  "custom_blocks": [],
  "docstatus": 0,
@@ -13,7 +14,7 @@
  "is_hidden": 0,
  "label": "Data Visualizer",
  "links": [],
- "modified": "2025-09-15 23:15:51.448426",
+ "modified": "2026-04-22 23:18:56.044127",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Data Visualizer",
@@ -36,19 +37,41 @@
  "sequence_id": 39.0,
  "shortcuts": [
   {
-   "color": "Grey",
+   "color": "Blue",
    "doc_view": "List",
    "label": "Inter-Company",
    "type": "URL",
    "url": "/frontend"
   },
   {
-   "color": "Grey",
+   "color": "Blue",
    "doc_view": "List",
    "label": "Ledger Summary",
    "type": "URL",
    "url": "/frontend/ledger"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Import Export",
+   "type": "URL",
+   "url": "/frontend/import-export"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Cost Estimate vs Consumed",
+   "type": "URL",
+   "url": "/frontend/cost-estimate-vs-consumed"
+  },
+  {
+   "color": "Purple",
+   "doc_view": "List",
+   "label": "Quotation Stages",
+   "type": "URL",
+   "url": "/frontend/quotation-stages"
   }
  ],
- "title": "Data Visualizer"
+ "title": "Data Visualizer",
+ "type": "Workspace"
 }

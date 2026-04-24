@@ -131,6 +131,82 @@ class TravelExpense(Document):
 				_("At least one attachment is required to submit this Travel Expense. Please attach a file and try again.")
 			)
 	
+	def before_cancel(self):
+		"""
+		Tell Frappe's link checker to ignore GL Entry / Payment Ledger Entry.
+		We handle the accounting reversal ourselves in on_cancel.
+		"""
+		self.ignore_linked_doctypes = ["GL Entry", "Payment Ledger Entry"]
+
+	def on_cancel(self):
+		"""Cancel all submitted Journal Entries linked to this Travel Expense."""
+		self._cancel_linked_journal_entries()
+
+	def before_trash(self):
+		"""Allow deletion even when cancelled JEs still carry a reference back to this doc."""
+		self.ignore_linked_doctypes = ["GL Entry", "Payment Ledger Entry"]
+
+	def on_trash(self):
+		"""When this document is deleted, also delete any linked Journal Entries."""
+		self._delete_linked_journal_entries()
+
+	# ── internal helpers ──────────────────────────────────────
+
+	def _get_linked_journal_entries(self, submitted_only=False):
+		"""Return a list of dicts {name, docstatus} for all JEs referencing this Travel Expense."""
+		filters = "AND je.docstatus = 1" if submitted_only else "AND je.docstatus IN (0,1,2)"
+		return frappe.db.sql(f"""
+			SELECT DISTINCT je.name, je.docstatus
+			FROM `tabJournal Entry` je
+			INNER JOIN `tabJournal Entry Account` jea ON jea.parent = je.name
+			WHERE jea.reference_type = 'Travel Expense'
+			  AND jea.reference_name = %s
+			  {filters}
+		""", (self.name,), as_dict=True)
+
+	def _cancel_linked_journal_entries(self):
+		"""Cancel every submitted Journal Entry that references this Travel Expense."""
+		linked = self._get_linked_journal_entries(submitted_only=True)
+		cancelled = []
+		for row in linked:
+			try:
+				je_doc = frappe.get_doc("Journal Entry", row.name)
+				je_doc.cancel()
+				cancelled.append(row.name)
+			except Exception as e:
+				frappe.log_error(
+					f"Could not cancel Journal Entry {row.name} linked to "
+					f"Travel Expense {self.name}: {e}",
+					"Travel Expense – Cancel JE Error",
+				)
+		if cancelled:
+			frappe.msgprint(
+				_("Cancelled {0} Journal Entr{1}: {2}").format(
+					len(cancelled),
+					"y" if len(cancelled) == 1 else "ies",
+					", ".join(cancelled),
+				),
+				alert=True,
+			)
+
+	def _delete_linked_journal_entries(self):
+		"""Cancel (if still submitted) and then delete all linked Journal Entries."""
+		linked = self._get_linked_journal_entries()
+		for row in linked:
+			try:
+				if row.docstatus == 1:
+					frappe.get_doc("Journal Entry", row.name).cancel()
+				frappe.delete_doc(
+					"Journal Entry", row.name,
+					ignore_permissions=True,
+					force=True,
+				)
+			except Exception as e:
+				frappe.log_error(
+					f"Could not delete Journal Entry {row.name}: {e}",
+					"Travel Expense – Delete JE Error",
+				)
+
 	def on_submit(self):
 		"""Create Expense Claim and Journal Entry when Travel Expense is submitted"""
 		self._validate_attachment_if_enforced()

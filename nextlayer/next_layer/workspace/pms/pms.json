@@ -1,0 +1,180 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"pms-h1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Property Management</b></span>\",\"col\":12}},{\"id\":\"pms-s1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tenant Contract\",\"col\":3}},{\"id\":\"pms-s2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unit\",\"col\":3}},{\"id\":\"pms-s3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Property\",\"col\":3}},{\"id\":\"pms-s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tenant\",\"col\":3}},{\"id\":\"pms-h2\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Utilities & Meters</b></span>\",\"col\":12}},{\"id\":\"pms-s5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Utility Meter\",\"col\":3}},{\"id\":\"pms-s6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Meter Type\",\"col\":3}},{\"id\":\"pms-s7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Meter Reading Log\",\"col\":3}},{\"id\":\"pms-sp1\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"pms-h3\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Configuration</b></span>\",\"col\":12}},{\"id\":\"pms-s8\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"PMS Settings\",\"col\":3}},{\"id\":\"pms-s9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Service Item\",\"col\":3}},{\"id\":\"pms-s10\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Property Amenity\",\"col\":3}}]",
+ "creation": "2026-04-22 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "home",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "PMS",
+ "links": [
+  {
+   "hidden": 0,
+   "label": "Tenant Contract",
+   "link_to": "Tenant Contract",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "Unit",
+   "link_to": "Unit",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "Property",
+   "link_to": "Property",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "Tenant",
+   "link_to": "Tenant",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "Utility Meter",
+   "link_to": "Utility Meter",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "Meter Type",
+   "link_to": "Meter Type",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "Meter Reading Log",
+   "link_to": "Meter Reading Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "Service Item",
+   "link_to": "Service Item",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "label": "PMS Settings",
+   "link_to": "PMS Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-04-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "PMS",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Administrator"
+  }
+ ],
+ "sequence_id": 50.0,
+ "shortcuts": [
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Tenant Contract",
+   "link_to": "Tenant Contract",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Unit",
+   "link_to": "Unit",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Property",
+   "link_to": "Property",
+   "type": "DocType"
+  },
+  {
+   "color": "Purple",
+   "doc_view": "List",
+   "label": "Tenant",
+   "link_to": "Tenant",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Utility Meter",
+   "link_to": "Utility Meter",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Meter Type",
+   "link_to": "Meter Type",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Meter Reading Log",
+   "link_to": "Meter Reading Log",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "Single",
+   "label": "PMS Settings",
+   "link_to": "PMS Settings",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Service Item",
+   "link_to": "Service Item",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Property Amenity",
+   "link_to": "Property Amenity",
+   "type": "DocType"
+  }
+ ],
+ "title": "PMS"
+}

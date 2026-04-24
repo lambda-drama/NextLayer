@@ -26,6 +26,12 @@ add_to_apps_screen = [
 
 fixtures = [
     {
+        "doctype": "Workspace",
+        "filters": [
+            ["name", "in", ["PMS", "Main Dashboard", "Data Visualizer"]]
+        ]
+    },
+    {
         "doctype": "Custom Field",
         "filters": [
             [
@@ -58,7 +64,7 @@ fixtures = [
                     "Expense Claim-custom_date_of_travel",
                     "Expense Claim-custom_date_of_arrival",
                     "Expense Claim-custom_date_of_purchase",
-                   
+
                     # "Expense Claim-custom_pnr_number_",
                     "Expense Claim-custom_amountcompany_currency",
                     "Expense Claim-custom_column_break_ajbxm",
@@ -73,13 +79,13 @@ fixtures = [
                     "Sales Invoice-custom_model",
                     "Sales Invoice-custom_color",
                     "Sales Invoice-custom_owner_information",
-                    
+
                     "Sales Invoice-custom_assembled_by",
                     "Sales Invoice-custom_registered_owner",
                     "Customer Group-custom_unique_gl_series",
                     "Journal Entry Account-custom_travel_expense_ref",
                     "Journal Entry-custom_intercompany_match_details",
-                    
+
                     #Sales Order
                     "Sales Order-custom_engine",
                     "Sales Order-custom_chassis_no",
@@ -89,13 +95,13 @@ fixtures = [
                     "Sales Order-custom_registered_owner",
                     "Sales Order-custom_assembled_by",
                     "Sales Order-custom_owner_information",
-                    
+
                     #Quotation
                     "Quotation-custom_revision_type",
                     "Quotation-custom_parent_quotation",
                     "Quotation-custom_site_visit_date",
                     "Quotation-custom_is_revision",
-                    
+
                     #Contract
                     "Contract-custom_type_of_work",
                     "Contract-custom_column_break_9d5n8",
@@ -140,24 +146,24 @@ fixtures = [
                     "Contract-custom_payment_account",
                     "Contract-custom_payable_account",
                     "Contract-custom_payments",
-                    
-                    
+
+
                     #Project
                     "Project-custom_attachment",
                     "Project-custom_project_attachments",
                     "Project-custom_project_stages",
                     "Project-custom_stages",
-                    
+
                     #Purchase invoice
                     "Purchase Invoice-custom_wage_entry",
-                    
+
                     #Activity
                     "Activity Type-custom_section_break_cprjt",
                     "Activity Type-custom_expense_account",
                 ),
             ]
         ],
-        
+
     },
     {
         "doctype": "Custom HTML Block",
@@ -174,13 +180,13 @@ fixtures = [
     {
         "doctype": "Server Script",
         "filters": [
-            
+
         ]
     },
      {
         "doctype": "Receipt Entry Remark",
         "filters": [
-            
+
         ]
     },
      {
@@ -210,9 +216,9 @@ fixtures = [
         ]
     },
     {
-      "doctype":"Property Amenity", 
+      "doctype":"Property Amenity",
     },
-    
+
 ]
 
 doc_events = {
@@ -400,23 +406,14 @@ override_doctype_class = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"nextlayer.tasks.all"
-# 	],
-# 	"daily": [
-# 		"nextlayer.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"nextlayer.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"nextlayer.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"nextlayer.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"nextlayer.tasks.daily"
+	],
+	"monthly": [
+		"nextlayer.tasks.monthly"
+	],
+}
 
 # Testing
 # -------

@@ -1,11 +1,36 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:service_name",
  "creation": "2026-04-17 18:03:24.570582",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_aush"
+  "basic_section",
+  "service_name",
+  "service_type",
+  "column_break_basic",
+  "status",
+  "description",
+  "pricing_section",
+  "amount",
+  "calculation_method",
+  "percentage_value",
+  "column_break_pricing",
+  "currency",
+  "tax_rate",
+  "accounting_section",
+  "item",
+  "income_account",
+  "column_break_accounting",
+  "liability_account",
+  "behavior_section",
+  "is_refundable",
+  "is_recurring",
+  "column_break_behavior",
+  "trigger_condition",
+  "grace_days",
+  "max_per_lease"
  ],
  "fields": [
   {
@@ -16,6 +41,7 @@
   {
    "fieldname": "service_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Service Name",
    "reqd": 1,
    "unique": 1
@@ -23,6 +49,7 @@
   {
    "fieldname": "service_type",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Service Type",
    "options": "\nFee\nDeposit\nCharge\nDiscount\nLate Fee",
    "reqd": 1
@@ -32,11 +59,11 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "Active",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "\nActive\nInactive",
-   "default": "Active"
+   "options": "\nActive\nInactive"
   },
   {
    "fieldname": "description",
@@ -51,38 +78,39 @@
   {
    "fieldname": "amount",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Amount",
    "reqd": 1
   },
   {
+   "default": "Fixed",
    "fieldname": "calculation_method",
    "fieldtype": "Select",
    "label": "Calculation Method",
-   "options": "\nFixed\nPercentage of Rent\nFormula",
-   "default": "Fixed"
+   "options": "\nFixed\nPercentage of Rent\nFormula"
   },
   {
+   "depends_on": "eval:doc.calculation_method == 'Percentage of Rent'",
    "fieldname": "percentage_value",
    "fieldtype": "Percent",
-   "label": "Percentage Value",
-   "depends_on": "eval:doc.calculation_method == 'Percentage of Rent'"
+   "label": "Percentage Value"
   },
   {
    "fieldname": "column_break_pricing",
    "fieldtype": "Column Break"
   },
   {
+   "default": "USD",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
-   "options": "Currency",
-   "default": "USD"
+   "options": "Currency"
   },
   {
+   "description": "If applicable",
    "fieldname": "tax_rate",
    "fieldtype": "Percent",
-   "label": "Tax Rate",
-   "description": "If applicable"
+   "label": "Tax Rate"
   },
   {
    "fieldname": "accounting_section",
@@ -90,23 +118,29 @@
    "label": "Accounting"
   },
   {
+   "description": "Linked ERPNext Item used for invoicing. Auto-created if left blank.",
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "ERPNext Item",
+   "options": "Item"
+  },
+  {
    "fieldname": "income_account",
    "fieldtype": "Link",
    "label": "Income Account",
-   "options": "Account",
-   "reqd": 1
+   "options": "Account"
   },
   {
    "fieldname": "column_break_accounting",
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval:doc.service_type == 'Deposit'",
+   "description": "For deposits only",
    "fieldname": "liability_account",
    "fieldtype": "Link",
    "label": "Liability Account",
-   "options": "Account",
-   "depends_on": "eval:doc.service_type == 'Deposit'",
-   "description": "For deposits only"
+   "options": "Account"
   },
   {
    "fieldname": "behavior_section",
@@ -114,51 +148,52 @@
    "label": "Behavior Rules"
   },
   {
+   "default": "0",
+   "depends_on": "eval:doc.service_type == 'Deposit'",
    "fieldname": "is_refundable",
    "fieldtype": "Check",
-   "label": "Is Refundable",
-   "default": 0,
-   "depends_on": "eval:doc.service_type == 'Deposit'"
+   "label": "Is Refundable"
   },
   {
+   "default": "0",
+   "description": "Include in monthly invoices automatically",
    "fieldname": "is_recurring",
    "fieldtype": "Check",
-   "label": "Is Recurring",
-   "default": 0,
-   "description": "Include in monthly invoices automatically"
+   "label": "Is Recurring"
   },
   {
    "fieldname": "column_break_behavior",
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval:doc.service_type == 'Late Fee'",
    "fieldname": "trigger_condition",
    "fieldtype": "Select",
    "label": "Trigger Condition",
-   "options": "\nNone\nPayment Due Date + Grace Period\nContract Start\nContract End\nMove Out",
-   "depends_on": "eval:doc.service_type == 'Late Fee'"
+   "options": "\nNone\nPayment Due Date + Grace Period\nContract Start\nContract End\nMove Out"
   },
   {
+   "depends_on": "eval:doc.trigger_condition == 'Payment Due Date + Grace Period'",
+   "description": "Days after due date to apply",
    "fieldname": "grace_days",
    "fieldtype": "Int",
-   "label": "Grace Days",
-   "depends_on": "eval:doc.trigger_condition == 'Payment Due Date + Grace Period'",
-   "description": "Days after due date to apply"
+   "label": "Grace Days"
   },
   {
+   "description": "How many times this can be charged (0 = unlimited)",
    "fieldname": "max_per_lease",
    "fieldtype": "Int",
-   "label": "Maximum Per Lease",
-   "description": "How many times this can be charged (0 = unlimited)"
+   "label": "Maximum Per Lease"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-17 18:03:24.570582",
+ "modified": "2026-04-22 21:12:51.769149",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Service Item",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
