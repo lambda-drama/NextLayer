@@ -14,8 +14,9 @@
   "currency",
   "section_break_parties",
   "party_type",
-  "column_break_pxxk",
   "party_name",
+  "column_break_pxxk",
+  "party_name_",
   "section_break_property",
   "property",
   "unit",
@@ -47,6 +48,11 @@
   "nsf_fee",
   "section_break_utilities",
   "utility",
+  "section_break_vrws",
+  "durationmonths",
+  "payment_circle",
+  "column_break_jhhj",
+  "no_of_payments",
   "section_break_move",
   "actual_move_in_date",
   "move_in_inspection_completed",
@@ -63,14 +69,18 @@
   "tenant_signature",
   "tenant_sign",
   "tenant_sign_date",
-  "column_break_gzmt",
-  "owner_signature",
-  "property_owner_sign",
-  "property_owner_sign_date",
   "column_break_lrvb",
   "witness_signature",
   "witness_sign",
   "witness_sign_date",
+  "section_break_froj",
+  "owner_signature",
+  "property_owner_sign",
+  "property_owner_sign_date",
+  "column_break_xrde",
+  "caretaker_signature",
+  "caretaker_sign",
+  "caretaker_sign_date",
   "section_break_ayxp",
   "amended_from",
   "guarantors_tab",
@@ -143,7 +153,7 @@
   {
    "fieldname": "party_name",
    "fieldtype": "Dynamic Link",
-   "label": "Party Name",
+   "label": "Party",
    "options": "party_type",
    "reqd": 1
   },
@@ -434,10 +444,6 @@
    "label": "Tenant Sign Date"
   },
   {
-   "fieldname": "column_break_gzmt",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "property_owner_sign",
    "fieldtype": "Signature",
    "label": "Property Owner Sign"
@@ -480,13 +486,66 @@
    "fieldname": "additional_tenants_tab",
    "fieldtype": "Tab Break",
    "label": "Additional Tenants"
+  },
+  {
+   "fieldname": "party_name_",
+   "fieldtype": "Data",
+   "label": "Party Name"
+  },
+  {
+   "fieldname": "section_break_froj",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_xrde",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "caretaker_signature",
+   "fieldtype": "Attach",
+   "label": "Caretaker Signature"
+  },
+  {
+   "fieldname": "caretaker_sign",
+   "fieldtype": "Signature",
+   "label": "Caretaker Sign"
+  },
+  {
+   "fieldname": "caretaker_sign_date",
+   "fieldtype": "Date",
+   "label": "Caretaker Sign Date"
+  },
+  {
+   "fieldname": "section_break_vrws",
+   "fieldtype": "Section Break",
+   "label": "Payment Details"
+  },
+  {
+   "fieldname": "durationmonths",
+   "fieldtype": "Data",
+   "label": "Duration(Months)"
+  },
+  {
+   "fieldname": "payment_circle",
+   "fieldtype": "Select",
+   "label": "Payment Circle",
+   "options": "\nMonthly\nYearly"
+  },
+  {
+   "fieldname": "column_break_jhhj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "no_of_payments",
+   "fieldtype": "Data",
+   "label": "No of Payments"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-22 01:49:21.028849",
+ "modified": "2026-04-24 11:25:45.362743",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",

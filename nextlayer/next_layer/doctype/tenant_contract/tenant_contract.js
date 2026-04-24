@@ -72,5 +72,15 @@ frappe.ui.form.on('Tenant Contract', {
         frm.set_query("unit", () => ({
             filters: { property: frm.doc.property }
         }));
+    },
+
+    party_name(frm){
+        if (frm.doc.party_name) {
+            frappe.db.get_doc("Tenant", frm.doc.party_name).then(tenant => {
+                if (tenant) {
+                    frm.set_value("party_name_", tenant.tenant_name);
+                }
+            });
     }
+}
 });

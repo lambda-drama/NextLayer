@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "PROP-.#####",
+ "autoname": "field:property_name",
  "creation": "2026-04-17 17:24:48.911833",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -325,11 +325,11 @@
    "link_fieldname": "property"
   }
  ],
- "modified": "2026-04-22 20:38:34.475947",
+ "modified": "2026-04-24 11:14:40.314544",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property",
- "naming_rule": "Expression",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
