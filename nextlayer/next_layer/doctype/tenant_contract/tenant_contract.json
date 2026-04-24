@@ -147,7 +147,6 @@
    "fieldtype": "Link",
    "label": "Party Type",
    "options": "DocType",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -545,7 +544,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-24 11:25:45.362743",
+ "modified": "2026-04-24 12:23:44.162673",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",

@@ -416,7 +416,7 @@ class TenantContract(Document):
 
 		if getattr(svc, "item", None):
 			return svc.item
-
+        
 		# Auto-create/get ERPNext Item using service_item name as item_code
 		item_code = fee_row.service_item
 		if not frappe.db.exists("Item", item_code):
