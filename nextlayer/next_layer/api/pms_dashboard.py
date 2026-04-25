@@ -359,8 +359,260 @@ def get_unit_detail(unit_name):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  HELPER: Available months that have invoices (for the filter dropdown)
+#  PROPERTIES FINANCIAL OVERVIEW
 # ─────────────────────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_properties_financial():
+	"""
+	Return per-property financial summary:
+	  name, total_units, occupied, vacant, total_monthly_rent,
+	  total_outstanding, total_overdue, unit_count_by_status
+	"""
+	today = getdate(nowdate())
+	properties = frappe.db.get_all(
+		"Property",
+		fields=["name", "property_name", "address"],
+		limit=200,
+	)
+
+	results = []
+	for p in properties:
+		units = frappe.db.get_all(
+			"Unit",
+			filters={"property": p.name},
+			fields=["name", "status", "standard_rent"],
+		)
+		total_units   = len(units)
+		occupied      = sum(1 for u in units if u.status == "Occupied")
+		vacant        = total_units - occupied
+
+		unit_names = [u.name for u in units]
+		if not unit_names:
+			results.append({
+				"name": p.name,
+				"property_name": p.get("property_name") or p.name,
+				"address": p.get("address", ""),
+				"total_units": 0, "occupied": 0, "vacant": 0,
+				"total_monthly_rent": 0, "total_outstanding": 0, "total_overdue": 0,
+				"units": [],
+			})
+			continue
+
+		# Active contracts for units in this property
+		contracts = frappe.db.get_all(
+			"Tenant Contract",
+			filters={"unit": ["in", unit_names], "status": "Active", "docstatus": 1},
+			fields=["name", "unit", "party_name", "monthly_rent"],
+		)
+		total_monthly_rent = sum(flt(c.monthly_rent) for c in contracts)
+		contract_map = {c.unit: c for c in contracts}
+
+		# Outstanding invoices for this property's units
+		if unit_names:
+			outstanding_rows = frappe.db.get_all(
+				"Sales Invoice",
+				filters={
+					"custom_unit": ["in", unit_names],
+					"docstatus": 1,
+					"outstanding_amount": [">", 0],
+				},
+				fields=["custom_unit", "outstanding_amount", "due_date"],
+			)
+		else:
+			outstanding_rows = []
+
+		total_outstanding = sum(flt(r.outstanding_amount) for r in outstanding_rows)
+		total_overdue = sum(
+			flt(r.outstanding_amount)
+			for r in outstanding_rows
+			if r.due_date and getdate(r.due_date) < today
+		)
+
+		# Build per-unit summary for the property detail view
+		unit_summaries = []
+		for u in units:
+			u_outstanding = sum(flt(r.outstanding_amount) for r in outstanding_rows if r.custom_unit == u.name)
+			u_overdue = sum(
+				flt(r.outstanding_amount)
+				for r in outstanding_rows
+				if r.custom_unit == u.name and r.due_date and getdate(r.due_date) < today
+			)
+			c = contract_map.get(u.name)
+			tenant_name = ""
+			if c:
+				tenant_name = frappe.db.get_value("Tenant", c.party_name, "tenant_name") or c.party_name
+			unit_summaries.append({
+				"name": u.name,
+				"status": u.status,
+				"tenant_name": tenant_name,
+				"monthly_rent": flt(c.monthly_rent) if c else 0,
+				"outstanding": round(u_outstanding, 2),
+				"overdue": round(u_overdue, 2),
+			})
+
+		results.append({
+			"name": p.name,
+			"property_name": p.get("property_name") or p.name,
+			"address": p.get("address", ""),
+			"total_units": total_units,
+			"occupied": occupied,
+			"vacant": vacant,
+			"total_monthly_rent": round(total_monthly_rent, 2),
+			"total_outstanding": round(total_outstanding, 2),
+			"total_overdue": round(total_overdue, 2),
+			"units": unit_summaries,
+		})
+
+	results.sort(key=lambda x: x["total_outstanding"], reverse=True)
+	return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  UNITS OVERVIEW  (for the Units tab)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_units_overview():
+	"""
+	Return every unit with its financial status and current tenant.
+	"""
+	today = getdate(nowdate())
+
+	units = frappe.db.get_all(
+		"Unit",
+		fields=["name", "property", "status", "standard_rent", "area", "floor"],
+		limit=500,
+	)
+
+	# Batch-fetch active contracts
+	contracts = frappe.db.get_all(
+		"Tenant Contract",
+		filters={"status": "Active", "docstatus": 1},
+		fields=["name", "unit", "party_name", "monthly_rent", "start_date", "end_date", "company"],
+	)
+	contract_map = {c.unit: c for c in contracts}
+
+	# Batch-fetch all outstanding invoices
+	outstanding_rows = frappe.db.get_all(
+		"Sales Invoice",
+		filters={"docstatus": 1, "outstanding_amount": [">", 0]},
+		fields=["custom_unit", "outstanding_amount", "due_date"],
+	) if units else []
+	outstanding_by_unit: dict = {}
+	for r in outstanding_rows:
+		k = r.custom_unit or ""
+		if k:
+			outstanding_by_unit.setdefault(k, []).append(r)
+
+	results = []
+	for u in units:
+		c = contract_map.get(u.name)
+		tenant_name = ""
+		if c:
+			tenant_name = frappe.db.get_value("Tenant", c.party_name, "tenant_name") or c.party_name
+
+		rows = outstanding_by_unit.get(u.name, [])
+		outstanding = sum(flt(r.outstanding_amount) for r in rows)
+		overdue = sum(
+			flt(r.outstanding_amount)
+			for r in rows
+			if r.due_date and getdate(r.due_date) < today
+		)
+
+		if outstanding == 0:
+			pay_status = "paid"
+		elif overdue > 0:
+			pay_status = "overdue"
+		else:
+			pay_status = "outstanding"
+
+		if u.status != "Occupied":
+			pay_status = "vacant"
+
+		results.append({
+			"unit": u.name,
+			"property": u.property or "",
+			"unit_status": u.status,
+			"area": u.get("area", ""),
+			"floor": u.get("floor", ""),
+			"tenant_name": tenant_name,
+			"tenant_id": c.party_name if c else "",
+			"monthly_rent": flt(c.monthly_rent) if c else 0,
+			"outstanding": round(outstanding, 2),
+			"overdue": round(overdue, 2),
+			"pay_status": pay_status,
+			"contract": c.name if c else "",
+			"contract_start": str(c.start_date) if c else "",
+			"contract_end": str(c.end_date) if c else "",
+		})
+
+	results.sort(key=lambda x: (
+		0 if x["pay_status"] == "overdue" else
+		1 if x["pay_status"] == "outstanding" else
+		2 if x["pay_status"] == "paid" else 3,
+		x["unit"]
+	))
+	return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  UNIT MONTH BREAKDOWN  (12-month payment history for a unit)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_unit_month_breakdown(unit_name):
+	"""
+	Return a 12-month payment breakdown for a single unit.
+	Each entry: month_label, month_start, invoiced, paid, outstanding, status
+	"""
+	today = getdate(nowdate())
+	breakdown = []
+
+	for i in range(11, -1, -1):
+		ref = add_months(today, -i)
+		m_start = get_first_day(ref)
+		m_end   = get_last_day(ref)
+
+		invoices = frappe.db.get_all(
+			"Sales Invoice",
+			filters={
+				"custom_unit": unit_name,
+				"docstatus": ["!=", 2],
+				"posting_date": ["between", [m_start, m_end]],
+			},
+			fields=["name", "grand_total", "outstanding_amount", "docstatus", "due_date"],
+		)
+
+		invoiced    = sum(flt(inv.grand_total) for inv in invoices if inv.docstatus == 1)
+		outstanding = sum(flt(inv.outstanding_amount) for inv in invoices if inv.docstatus == 1)
+		paid        = invoiced - outstanding
+
+		if invoiced == 0:
+			status = "no_invoice"
+		elif outstanding == 0:
+			status = "paid"
+		else:
+			# Check if overdue
+			is_overdue = any(
+				inv.due_date and getdate(inv.due_date) < today and flt(inv.outstanding_amount) > 0
+				for inv in invoices if inv.docstatus == 1
+			)
+			status = "overdue" if is_overdue else "outstanding"
+
+		breakdown.append({
+			"month_label": m_start.strftime("%b %Y"),
+			"month_short": m_start.strftime("%b"),
+			"year": m_start.year,
+			"is_current": (m_start.year == today.year and m_start.month == today.month),
+			"invoiced": round(invoiced, 2),
+			"paid": round(paid, 2),
+			"outstanding": round(outstanding, 2),
+			"status": status,
+			"invoice_count": len([inv for inv in invoices if inv.docstatus == 1]),
+		})
+
+	return breakdown
 
 @frappe.whitelist()
 def get_available_months():
