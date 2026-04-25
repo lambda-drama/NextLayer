@@ -306,6 +306,7 @@ def get_deposit_settings_for_company(company):
 	for row in (settings.company_deposit_settings or []):
 		if row.company == company:
 			return {
+				"price_list": row.price_list or None,
 				"deposit_liability_account": row.deposit_liability_account,
 				"security_deposit_months": row.security_deposit_months or 1,
 				"deposit_interest_rate": flt(row.deposit_interest_rate),
@@ -313,6 +314,7 @@ def get_deposit_settings_for_company(company):
 			}
 
 	return {
+		"price_list": None,
 		"deposit_liability_account": settings.default_deposit_liability_account,
 		"security_deposit_months": settings.default_security_deposit_months or 1,
 		"deposit_interest_rate": flt(settings.deposit_interest_rate),

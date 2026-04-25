@@ -198,13 +198,13 @@
   {
    "fieldname": "deposit_section",
    "fieldtype": "Section Break",
-   "label": "Deposit Settings"
+   "label": "Default Settings"
   },
   {
    "description": "Per-company deposit account settings. These override the global defaults below.",
    "fieldname": "company_deposit_settings",
    "fieldtype": "Table",
-   "label": "Per-Company Deposit Settings",
+   "label": "Per-Company Settings",
    "options": "PMS Deposit Company Setting"
   },
   {
@@ -494,7 +494,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-25 18:32:55.060758",
+ "modified": "2026-04-25 19:44:42.151344",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "PMS Settings",

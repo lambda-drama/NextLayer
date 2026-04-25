@@ -74,6 +74,25 @@ class TenantContract(Document):
 			frappe.throw("Only active contracts can generate invoices.")
 
 		settings = _get_pms_settings()
+
+		# ── Price list guard ──────────────────────────────────────────────────
+		# Look up the price list configured for this contract's company in the
+		# PMS Deposit Company Setting child table.  Alert the user if it is
+		# missing so they know invoices will fall back to ERPNext defaults.
+		price_list = _get_price_list_for_company(self.company, settings)
+		if not price_list:
+			frappe.msgprint(
+				f"No Price List is configured for company <b>{self.company}</b> in "
+				"PMS Settings → Company Deposit Settings. "
+				"Invoices will use the customer's default price list. "
+				"Please set a Price List to ensure correct pricing.",
+				title="Price List Not Set",
+				indicator="orange",
+				alert=True,
+			)
+		# Store on self so _make_invoice can pick it up without re-fetching
+		self._pms_price_list = price_list
+
 		customer = self.get_customer_from_tenant()
 		self._ensure_rent_item()
 
@@ -287,8 +306,7 @@ class TenantContract(Document):
 					items.append(row)
 
 		return items
-
-	def _make_invoice(self, customer, items, settings):
+	def _make_invoice(self, customer, items, settings, period_start=None, period_end=None):
 		"""Build, insert and submit a Sales Invoice."""
 		if not items:
 			return None
@@ -300,30 +318,52 @@ class TenantContract(Document):
 					item["cost_center"] = cost_center
 
 		due_date = self.get_due_date(settings)
-		invoice = frappe.get_doc({
+		price_list = _get_price_list_for_company(self.company, settings)
+
+		invoice_data = {
 			"doctype": "Sales Invoice",
 			"custom_invoice_no": self.generate_invoice_number(),
 			"company": self.company,
 			"customer": customer,
-			"posting_date": nowdate(),
-			"due_date": due_date,
+			"posting_date": period_end or nowdate(),
+			"due_date": add_days(period_end, 7) or due_date,  # Default due date 7 days after period end or posting date
 			"items": items,
 			"currency": self.currency,
 			"custom_unit": self.unit,
 			"custom_tenant_contract": self.name,
+			"custom_period_start": period_start,
+			"custom_period_end": period_end,
 			"set_posting_time": 1,
-			# Clear any customer/company default payment terms to prevent
-			# the ERPNext validator from auto-creating a payment schedule with
-			# duplicate due dates that clash with the due_date we set above.
 			"payment_terms_template": None,
 			"payment_schedule": [],
-		})
+		}
+		if price_list:
+			invoice_data["selling_price_list"] = price_list
+
+		invoice = frappe.get_doc(invoice_data)
 		invoice.insert()
-		# After insert ERPNext may still populate payment_schedule from the
-		# customer master; wipe it again and force our single due date.
+
+		# ── Fix items: delete whatever ERPNext stored, re-insert correct ones ──
+		frappe.db.delete("Sales Invoice Item", {"parent": invoice.name})
+		invoice.items = []
+		for idx, item in enumerate(items, start=1):
+			invoice.append("items", {**item, "idx": idx})
+
+		# ── Fix payment schedule: same pattern ──
+		frappe.db.delete("Payment Schedule", {"parent": invoice.name})
 		invoice.payment_terms_template = None
 		invoice.payment_schedule = []
 		invoice.due_date = due_date
+
+		amount = flt(invoice.rounded_total or invoice.grand_total)
+		if amount:
+			invoice.append("payment_schedule", {
+				"due_date": due_date,
+				"invoice_portion": 100,
+				"payment_amount": amount,
+				"outstanding": amount,
+			})
+
 		invoice.submit()
 
 		if settings and settings.send_invoice_automatically:
@@ -333,7 +373,80 @@ class TenantContract(Document):
 				pass
 
 		return invoice.name
+	# def _make_invoice(self, customer, items, settings):
+	# 	"""Build, insert and submit a Sales Invoice."""
+	# 	if not items:
+	# 		return None
 
+	# 	cost_center = settings.cost_center if settings else None
+	# 	if cost_center:
+	# 		for item in items:
+	# 			if not item.get("cost_center"):
+	# 				item["cost_center"] = cost_center
+
+	# 	due_date = self.get_due_date(settings)
+	# 	price_list = _get_price_list_for_company(self.company, settings)
+
+
+	# 	invoice_data = {
+	# 		"doctype": "Sales Invoice",
+	# 		"custom_invoice_no": self.generate_invoice_number(),
+	# 		"company": self.company,
+	# 		"customer": customer,
+	# 		"posting_date": nowdate(),
+	# 		"due_date": due_date,
+	# 		"items": items,
+	# 		"currency": self.currency,
+	# 		"custom_unit": self.unit,
+	# 		"custom_tenant_contract": self.name,
+	# 		"set_posting_time": 1,
+   	# 		# "selling_price_list": price_list,
+	# 		# Clear any customer/company default payment terms to prevent
+	# 		# the ERPNext validator from auto-creating a payment schedule with
+	# 		# duplicate due dates that clash with the due_date we set above.
+	# 		"payment_terms_template": None,
+	# 		"payment_schedule": [],
+			
+	# 	}
+	# 	if price_list:
+	# 		invoice_data["selling_price_list"] = price_list
+
+	# 	invoice = frappe.get_doc(invoice_data)
+	# 	invoice.insert()
+		
+	# 	# ── Payment schedule fix ─────────────────────────────────────────────
+	# 	# ERPNext's validate() (called during both insert AND submit) runs
+	# 	# set_payment_schedule(), which re-creates rows from the customer's
+	# 	# payment terms template.  On the second pass (submit) this produces
+	# 	# either duplicate-date rows or an amount mismatch.
+	# 	#
+	# 	# Fix: after insert we know the exact grand_total.  Purge every stale
+	# 	# payment_schedule row from the DB *and* memory, then add back exactly
+	# 	# one row that satisfies both validators (no duplicates, sum == total).
+	# 	# frappe.db.delete("Payment Schedule", {"parent": invoice.name})
+	# 	# invoice.payment_terms_template = None
+	# 	# invoice.payment_schedule = []
+	# 	# invoice.due_date = due_date
+
+	# 	# amount = flt(invoice.rounded_total or invoice.grand_total)
+	# 	# if amount:
+	# 	# 	invoice.append("payment_schedule", {
+	# 	# 		"due_date": due_date,
+	# 	# 		"invoice_portion": 100,
+	# 	# 		"payment_amount": amount,
+	# 	# 		"outstanding": amount,
+	# 	# 	})
+
+	# 	invoice.submit()
+
+	# 	if settings and settings.send_invoice_automatically:
+	# 		try:
+	# 			invoice.send_emails()
+	# 		except Exception:
+	# 			pass
+
+	# 	return invoice.name
+	
 	# ──────────────────────────────────────────
 	#  DAILY UTILITIES
 	# ──────────────────────────────────────────
@@ -643,23 +756,20 @@ class TenantContract(Document):
 
 	def _generate_single_invoice_for_period(self, period_start, period_end):
 		"""Generate one invoice for a specific period"""
-		
+
 		settings = _get_pms_settings()
 		customer = self.get_customer_from_tenant()
 		self._ensure_rent_item()
-		
-		grouping = self.invoice_grouping or (
-			settings.invoice_grouping if settings else "Combined - All in one invoice"
-		)
+
 		posting_date = period_end
 		if self._check_existing_rent_invoice_for_month(posting_date):
 			frappe.throw(
 				f"Rent invoice already exists for {posting_date.strftime('%B %Y')}. "
 				"Cannot create duplicate rent invoice."
 			)
-			
+
 		items = []
-		
+
 		# Rent
 		items.append({
 			"item_code": RENT_ITEM_CODE,
@@ -669,7 +779,7 @@ class TenantContract(Document):
 			"description": f"Rent for {self.unit} - {period_start} to {period_end}",
 			"uom": "Month",
 		})
-		
+
 		# Service fees (recurring)
 		if self.service_fee:
 			for fee in self.service_fee:
@@ -683,7 +793,7 @@ class TenantContract(Document):
 							"rate": flt(fee.amount),
 							"description": f"Service Fee: {fee.service_name or fee.service_item} - {period_start} to {period_end}",
 						})
-		
+
 		# Utilities
 		if self.utility:
 			for utility in self.utility:
@@ -698,7 +808,6 @@ class TenantContract(Document):
 								"rate": flt(utility.flat_fee_amount),
 								"description": f"{utility.utility_type} flat fee - {period_start} to {period_end}",
 							})
-					
 					elif utility.billing_method == "Metered - Consumption Based":
 						if utility.meter:
 							consumption, amount = self.calculate_utility_consumption_for_period(
@@ -713,35 +822,13 @@ class TenantContract(Document):
 										"qty": consumption,
 										"rate": self.get_meter_rate(utility.meter),
 										"description": f"{utility.utility_type} consumption for {period_start} to {period_end}",
-										"uom": self.get_utility_uom(utility.utility_type)
+										"uom": self.get_utility_uom(utility.utility_type),
 									})
-		
+
 		if not items:
 			return None
-		
-		# Create invoice
-		invoice = frappe.get_doc({
-			"doctype": "Sales Invoice",
-			"custom_invoice_no": self.generate_invoice_number(),
-			"company": self.company,
-			"customer": customer,
-			"set_posting_time": 1,
-			"posting_date": period_end,
-			"due_date": add_days(period_end, 15),  # Simple due date logic for bulk invoices
-			"items": items,
-			"currency": self.currency,
-			"custom_unit": self.unit,
-			"custom_tenant_contract": self.name,
-			"custom_period_start": period_start,
-			"custom_period_end": period_end,
-		})
-		
-
-		invoice.insert()
-		invoice.submit()
-		
-		return invoice.name
-
+		# ── Reuse _make_invoice which already handles payment schedule correctly ──
+		return self._make_invoice(customer, items, settings, period_start=period_start, period_end=period_end)
 	def _check_existing_rent_invoice_for_month(self, posting_date):
 		"""Check if a rent invoice already exists for the given month.
 		
@@ -827,4 +914,28 @@ def _get_pms_settings():
 		return frappe.get_single("PMS Settings")
 	except Exception:
 		return None
+
+
+def _get_price_list_for_company(company, settings=None):
+	"""
+	Return the Price List configured for *company* in PMS Settings →
+	Company Deposit Settings child table.  Returns None if not set.
+	"""
+	
+	if not settings:
+		settings = _get_pms_settings()
+	if not settings:
+		return None
+	
+	for row in (settings.company_deposit_settings or []):
+		
+		if row.company == company:
+			return row.price_list or None
+		
+	frappe.throw(
+		f"Company '{company}' not found in PMS Settings → Company Deposit Settings. "
+		"Please add a row for this company and set a Price List to ensure correct pricing."
+	)
+
+	return None
 
