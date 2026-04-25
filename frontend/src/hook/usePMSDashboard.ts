@@ -51,7 +51,12 @@ export interface DashboardOverview {
   vacant_units: number
   occupancy_rate: number
   active_contracts: number
+  total_contracts: number
+  expired_contracts: number
+  terminated_contracts: number
+  expiring_soon: number
   monthly_revenue: number
+  monthly_paid: number
   total_outstanding: number
   lease_status: Record<string, number>
   top_tenants: TopTenant[]
@@ -106,7 +111,7 @@ export interface ContractDetail {
 
 export interface TenantDetail {
   tenant_name: string
-  email_id: string
+  email: string
   mobile_no: string
   customer: string
 }

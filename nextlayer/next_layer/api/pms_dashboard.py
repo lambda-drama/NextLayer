@@ -29,7 +29,7 @@ def get_dashboard_overview():
 
 	# ── Property & Unit counts ──────────────────────────────────────────────
 	total_properties = frappe.db.count("Property")
-
+	today = getdate(nowdate())
 	unit_data = frappe.db.get_all(
 		"Unit",
 		fields=["status"],
@@ -53,6 +53,19 @@ def get_dashboard_overview():
 	for c in contract_data:
 		lease_status[c.status] = lease_status.get(c.status, 0) + 1
 
+	total_contracts   = len(contract_data)
+	expired_contracts    = lease_status.get("Expired", 0)
+	terminated_contracts = lease_status.get("Terminated", 0)
+
+	# Contracts expiring within next 30 days
+	from frappe.utils import add_days
+	expiry_cutoff = add_days(today, 30)
+	expiring_soon = frappe.db.count("Tenant Contract", filters={
+		"status": "Active",
+		"docstatus": 1,
+		"end_date": ["between", [today, expiry_cutoff]],
+	})
+
 	# ── Monthly revenue (current month invoiced & submitted) ────────────────
 	today = getdate(nowdate())
 	month_start = get_first_day(today)
@@ -68,6 +81,7 @@ def get_dashboard_overview():
 		fields=["grand_total"],
 	)
 	monthly_revenue = sum(flt(i.grand_total) for i in monthly_invoices)
+	monthly_paid    = sum(flt(i.grand_total) - flt(i.outstanding_amount) for i in monthly_invoices)
 
 	# Outstanding balance (submitted invoices not fully paid)
 	outstanding_invoices = frappe.db.get_all(
@@ -156,7 +170,12 @@ def get_dashboard_overview():
 		"vacant_units": vacant,
 		"occupancy_rate": occupancy_rate,
 		"active_contracts": active_contracts,
+		"total_contracts": total_contracts,
+		"expired_contracts": expired_contracts,
+		"terminated_contracts": terminated_contracts,
+		"expiring_soon": expiring_soon,
 		"monthly_revenue": round(monthly_revenue, 2),
+		"monthly_paid": round(monthly_paid, 2),
 		"total_outstanding": round(total_outstanding, 2),
 		"lease_status": lease_status,
 		"top_tenants": top_tenants,
@@ -289,7 +308,7 @@ def get_unit_detail(unit_name):
 		tenant_info = frappe.db.get_value(
 			"Tenant",
 			contract.party_name,
-			["tenant_name", "email_id", "mobile_no", "customer"],
+			["tenant_name", "email", "mobile_no", "customer"],
 			as_dict=True,
 		)
 
@@ -372,12 +391,15 @@ def get_properties_financial():
 	today = getdate(nowdate())
 	properties = frappe.db.get_all(
 		"Property",
-		fields=["name", "property_name", "address"],
+		fields=["name", "property_name", "address_line_1", "city", "property_type", "status"],
 		limit=200,
 	)
 
 	results = []
 	for p in properties:
+		address_parts = [p.get("address_line_1") or "", p.get("city") or ""]
+		address = ", ".join(x for x in address_parts if x)
+
 		units = frappe.db.get_all(
 			"Unit",
 			filters={"property": p.name},
@@ -392,7 +414,9 @@ def get_properties_financial():
 			results.append({
 				"name": p.name,
 				"property_name": p.get("property_name") or p.name,
-				"address": p.get("address", ""),
+				"address": address,
+				"property_type": p.get("property_type", ""),
+				"status": p.get("status", ""),
 				"total_units": 0, "occupied": 0, "vacant": 0,
 				"total_monthly_rent": 0, "total_outstanding": 0, "total_overdue": 0,
 				"units": [],
@@ -454,7 +478,9 @@ def get_properties_financial():
 		results.append({
 			"name": p.name,
 			"property_name": p.get("property_name") or p.name,
-			"address": p.get("address", ""),
+			"address": address,
+			"property_type": p.get("property_type", ""),
+			"status": p.get("status", ""),
 			"total_units": total_units,
 			"occupied": occupied,
 			"vacant": vacant,
@@ -534,8 +560,8 @@ def get_units_overview():
 			"unit": u.name,
 			"property": u.property or "",
 			"unit_status": u.status,
-			"area": u.get("area", ""),
-			"floor": u.get("floor", ""),
+			"area": str(u.get("area") or ""),
+			"floor": str(u.get("floor") or ""),
 			"tenant_name": tenant_name,
 			"tenant_id": c.party_name if c else "",
 			"monthly_rent": flt(c.monthly_rent) if c else 0,

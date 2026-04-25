@@ -21,7 +21,7 @@
   "emergency_section",
   "emergency_contact_name",
   "emergency_phone",
-  "phone",
+  "mobile_no",
   "column_break_emergency",
   "email",
   "emergency_relationship",
@@ -94,12 +94,6 @@
    "fieldtype": "Data",
    "label": "Email",
    "options": "Email"
-  },
-  {
-   "fieldname": "phone",
-   "fieldtype": "Data",
-   "label": "Phone",
-   "options": "Phone"
   },
   {
    "fieldname": "current_unit_section",
@@ -229,12 +223,18 @@
    "fieldname": "link_existing_customer",
    "fieldtype": "Check",
    "label": "Link Existing Customer"
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile Phone",
+   "options": "Phone"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 11:07:16.415547",
+ "modified": "2026-04-26 01:57:07.952483",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant",

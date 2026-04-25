@@ -6,12 +6,15 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts"
 import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
+} from "recharts"
+import {
   Building2, Home, Users, TrendingUp, AlertCircle, CheckCircle2,
   Clock, DollarSign, Activity, RefreshCw, X, ChevronRight,
   Wallet, FileText, Zap, BarChart3, MapPin, Phone, Mail,
   ChevronDown, ChevronUp, CalendarDays, Layers,
 } from "lucide-react"
-
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
@@ -92,7 +95,65 @@ function KpiCard({ icon, label, value, sub, tone = "blue" }: KpiCardProps) {
   )
 }
 
-// Month grid tile
+// ── Screenshot-style summary card ────────────────────────────────────────────
+
+type MetricTone = "default" | "green" | "red" | "amber" | "blue"
+interface MetricRow { label: string; value: string | number; tone?: MetricTone }
+
+const TONE_VALUE: Record<MetricTone, string> = {
+  default: "text-slate-800",
+  green:   "text-emerald-600",
+  red:     "text-red-600",
+  amber:   "text-amber-600",
+  blue:    "text-blue-700",
+}
+
+interface SummaryCardProps {
+  title: string
+  icon: React.ReactNode
+  gradient: string
+  loading?: boolean
+  rows?: MetricRow[]
+  pairs?: MetricRow[]
+}
+function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: SummaryCardProps) {
+  return (
+    <Card className="border-slate-200 shadow-md overflow-hidden">
+      <div className={`bg-gradient-to-r ${gradient} text-white px-5 py-3.5 flex items-center gap-2.5`}>
+        <div className="p-1.5 bg-white/20 rounded-lg">{icon}</div>
+        <span className="font-bold text-base">{title}</span>
+      </div>
+      <CardContent className="p-0 divide-y divide-slate-100">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="h-5 w-5 text-blue-400 animate-spin"/>
+          </div>
+        ) : (
+          <>
+            {rows.map((r, i) => (
+              <div key={i} className="flex items-center justify-between px-5 py-3">
+                <span className="text-sm text-slate-500">{r.label}</span>
+                <span className={`text-sm font-bold ${TONE_VALUE[r.tone ?? "default"]}`}>{r.value}</span>
+              </div>
+            ))}
+            {pairs.length > 0 && (
+              <div className="grid grid-cols-2 divide-x divide-slate-100">
+                {pairs.map((p, i) => (
+                  <div key={i} className="flex flex-col items-center py-4 px-3">
+                    <span className={`text-xl font-extrabold ${TONE_VALUE[p.tone ?? "default"]}`}>{p.value}</span>
+                    <span className="text-xs text-slate-400 mt-0.5 text-center">{p.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+
 function MonthTile({ m }: { m: MonthBreakdown }) {
   const cfg = MONTH_STATUS[m.status] ?? MONTH_STATUS.no_invoice
   const [hover, setHover] = useState(false)
@@ -179,9 +240,9 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
               </h3>
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
                 <p className="font-semibold text-slate-800 text-base">{data.tenant.tenant_name}</p>
-                {data.tenant.email_id && (
-                  <a href={`mailto:${data.tenant.email_id}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
-                    <Mail className="h-3.5 w-3.5 shrink-0" />{data.tenant.email_id}
+                {data.tenant.email && (
+                  <a href={`mailto:${data.tenant.email}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                    <Mail className="h-3.5 w-3.5 shrink-0" />{data.tenant.email}
                   </a>
                 )}
                 {data.tenant.mobile_no && (
@@ -485,13 +546,21 @@ export default function PMSDashboard() {
     { invoiced: 0, paid: 0, outstanding: 0, overdue: 0 }
   ), [filteredFinancial])
 
-  const filteredUnits = useMemo(() =>
-    unitSearch ? unitsData.filter(u =>
-      u.unit.toLowerCase().includes(unitSearch.toLowerCase()) ||
-      u.tenant_name.toLowerCase().includes(unitSearch.toLowerCase()) ||
-      u.property.toLowerCase().includes(unitSearch.toLowerCase())
-    ) : unitsData
-  , [unitsData, unitSearch])
+  const filteredUnits = useMemo(() => {
+    let list = unitsData
+    if (propertyFilter !== ALL_PROPS) {
+      list = list.filter(u => u.property === propertyFilter)
+    }
+    if (unitSearch) {
+      const q = unitSearch.toLowerCase()
+      list = list.filter(u =>
+        u.unit.toLowerCase().includes(q) ||
+        u.tenant_name.toLowerCase().includes(q) ||
+        u.property.toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [unitsData, unitSearch, propertyFilter])
 
   const filteredProps = useMemo(() =>
     propSearch ? propsData.filter(p => p.property_name.toLowerCase().includes(propSearch.toLowerCase()))
@@ -538,17 +607,68 @@ export default function PMSDashboard() {
           {tab === "overview" && (
             <CardContent className="p-6 space-y-6">
               {ovError && <Alert variant="destructive"><AlertDescription>{ovError}</AlertDescription></Alert>}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<Building2 className="h-5 w-5"/>} label="Total Properties"  value={overview?.total_properties ?? "—"} tone="blue"/>
-                <KpiCard icon={<Home className="h-5 w-5"/>}      label="Total Units"        value={overview?.total_units ?? "—"} sub={`${overview?.occupied_units??0} occupied`} tone="slate"/>
-                <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Occupied"        value={overview?.occupied_units ?? "—"} tone="green"/>
-                <KpiCard icon={<Home className="h-5 w-5"/>}      label="Vacant"             value={overview?.vacant_units ?? "—"} tone="amber"/>
-                <KpiCard icon={<Activity className="h-5 w-5"/>}  label="Occupancy Rate"     value={`${overview?.occupancy_rate??0}%`} tone="blue"/>
-                <KpiCard icon={<FileText className="h-5 w-5"/>}  label="Active Contracts"   value={overview?.active_contracts ?? "—"} tone="green"/>
-                <KpiCard icon={<TrendingUp className="h-5 w-5"/>} label="Monthly Revenue"   value={overview ? fmt(overview.monthly_revenue):"—"} sub="Current month" tone="blue"/>
-                <KpiCard icon={<AlertCircle className="h-5 w-5"/>} label="Total Outstanding" value={overview ? fmt(overview.total_outstanding):"—"} tone="red"/>
+
+              {/* ── Summary cards row — screenshot style ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+
+                {/* Contracts */}
+                <SummaryCard
+                  title="Contracts" icon={<FileText className="h-5 w-5"/>}
+                  gradient="from-blue-600 to-blue-800"
+                  loading={ovLoading}
+                  rows={[
+                    { label: "Total Contracts", value: overview?.total_contracts ?? 0, tone: "default" },
+                  ]}
+                  pairs={[
+                    { label: "Active",     value: overview?.active_contracts ?? 0,     tone: "green" },
+                    { label: "Expired",    value: overview?.expired_contracts ?? 0,    tone: "red" },
+                    { label: "Terminated", value: overview?.terminated_contracts ?? 0, tone: "red" },
+                    { label: "Expiring (30d)", value: overview?.expiring_soon ?? 0,   tone: "amber" },
+                  ]}
+                />
+
+                {/* Properties */}
+                <SummaryCard
+                  title="Properties" icon={<Building2 className="h-5 w-5"/>}
+                  gradient="from-teal-500 to-teal-700"
+                  loading={ovLoading}
+                  rows={[
+                    { label: "Total Properties", value: overview?.total_properties ?? 0, tone: "default" },
+                    { label: "Total Units",       value: overview?.total_units ?? 0,      tone: "default" },
+                  ]}
+                  pairs={[
+                    { label: "Occupied", value: overview?.occupied_units ?? 0, tone: "green" },
+                    { label: "Vacant",   value: overview?.vacant_units ?? 0,   tone: "red" },
+                  ]}
+                />
+
+                {/* Invoices */}
+                <SummaryCard
+                  title="Invoices" icon={<DollarSign className="h-5 w-5"/>}
+                  gradient="from-emerald-500 to-emerald-700"
+                  loading={ovLoading}
+                  rows={[
+                    {
+                      label: `Paid (${new Date().toLocaleDateString("en-GB",{month:"short",year:"numeric"})})`,
+                      value: overview ? fmt(overview.monthly_paid) : "—",
+                      tone: "green",
+                    },
+                    {
+                      label: "Invoiced (this month)",
+                      value: overview ? fmt(overview.monthly_revenue) : "—",
+                      tone: "default",
+                    },
+                    {
+                      label: "Outstanding Invoices",
+                      value: overview ? fmt(overview.total_outstanding) : "—",
+                      tone: overview && overview.total_outstanding > 0 ? "red" : "green",
+                    },
+                  ]}
+                />
+
               </div>
 
+              {/* ── Revenue trend + Lease status charts ── */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <Card className="xl:col-span-2 border-blue-100 shadow-sm">
                   <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-6 py-4">
@@ -560,7 +680,7 @@ export default function PMSDashboard() {
                         <BarChart data={overview.revenue_trend} barGap={4}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
                           <XAxis dataKey="month" tick={{fontSize:11}}/>
-                          <YAxis tick={{fontSize:11}} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:v}/>
+                          <YAxis tick={{fontSize:11}} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)}/>
                           <Tooltip formatter={(v:number)=>fmt(v)} contentStyle={{fontSize:12,borderRadius:8}}/>
                           <Legend wrapperStyle={{fontSize:12}}/>
                           <Bar dataKey="revenue" name="Invoiced" fill="#3b82f6" radius={[4,4,0,0]}/>
@@ -604,27 +724,33 @@ export default function PMSDashboard() {
                 </Card>
               </div>
 
+              {/* ── Top tenants + Properties tables ── */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* Top tenants */}
                 <Card className="border-blue-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-6 py-4">
-                    <CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4"/>Top 5 Tenants by Rent</CardTitle>
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-5 py-3">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                      <Users className="h-4 w-4"/>Top Tenants by Monthly Rent
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     {overview?.top_tenants?.length ? (
                       <Table>
                         <TableHeader><TableRow className="bg-blue-50">
-                          <TableHead className="text-blue-800 text-xs font-semibold">#</TableHead>
+                          <TableHead className="text-blue-800 text-xs font-semibold pl-4">#</TableHead>
                           <TableHead className="text-blue-800 text-xs font-semibold">Tenant</TableHead>
                           <TableHead className="text-blue-800 text-xs font-semibold">Unit</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold text-right">Monthly Rent</TableHead>
+                          <TableHead className="text-blue-800 text-xs font-semibold">Property</TableHead>
+                          <TableHead className="text-blue-800 text-xs font-semibold text-right pr-4">Monthly Rent</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
                           {overview.top_tenants.map((t,i)=>(
                             <TableRow key={t.tenant_id} className="hover:bg-blue-50/50">
-                              <TableCell className="text-xs text-slate-400 font-medium">{i+1}</TableCell>
+                              <TableCell className="text-xs text-slate-400 font-medium pl-4">{i+1}</TableCell>
                               <TableCell><p className="font-medium text-slate-800 text-sm">{t.tenant_name}</p><p className="text-xs text-slate-400">{t.company}</p></TableCell>
-                              <TableCell><p className="text-sm">{t.unit}</p><p className="text-xs text-slate-400 flex items-center gap-1"><MapPin className="h-3 w-3"/>{t.property}</p></TableCell>
-                              <TableCell className="text-right font-bold text-blue-700 text-sm">{fmt(t.monthly_rent)}</TableCell>
+                              <TableCell className="text-sm text-slate-700">{t.unit}</TableCell>
+                              <TableCell className="text-sm text-slate-500">{t.property}</TableCell>
+                              <TableCell className="text-right font-bold text-blue-700 text-sm pr-4">{fmt(t.monthly_rent)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -633,27 +759,32 @@ export default function PMSDashboard() {
                   </CardContent>
                 </Card>
 
+                {/* Properties table */}
                 <Card className="border-blue-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-6 py-4">
-                    <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4"/>Properties</CardTitle>
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-5 py-3">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                      <Building2 className="h-4 w-4"/>Properties
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     {overview?.property_stats?.length ? (
                       <Table>
                         <TableHeader><TableRow className="bg-blue-50">
-                          <TableHead className="text-blue-800 text-xs font-semibold">Property</TableHead>
+                          <TableHead className="text-blue-800 text-xs font-semibold pl-4">Property</TableHead>
                           <TableHead className="text-blue-800 text-xs font-semibold text-center">Total</TableHead>
                           <TableHead className="text-blue-800 text-xs font-semibold text-center">Occ.</TableHead>
                           <TableHead className="text-blue-800 text-xs font-semibold text-center">Vacant</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
                           {overview.property_stats.map(p=>{
-                            const rate=p.total_units?Math.round((p.occupied/p.total_units)*100):0
+                            const rate = p.total_units ? Math.round((p.occupied / p.total_units) * 100) : 0
                             return (
                               <TableRow key={p.name} className="hover:bg-blue-50/50">
-                                <TableCell>
+                                <TableCell className="pl-4">
                                   <p className="font-medium text-slate-800 text-sm">{p.property_name}</p>
-                                  <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200"><div className="h-full rounded-full bg-blue-500" style={{width:`${rate}%`}}/></div>
+                                  <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200">
+                                    <div className="h-full rounded-full bg-blue-500" style={{width:`${rate}%`}}/>
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-center text-sm">{p.total_units}</TableCell>
                                 <TableCell className="text-center"><span className="text-sm font-medium text-emerald-700">{p.occupied}</span></TableCell>
@@ -716,9 +847,26 @@ export default function PMSDashboard() {
                 <KpiCard icon={<Clock className="h-5 w-5"/>}       label="Overdue"       value={fmt(unitsData.reduce((s,u)=>s+u.overdue,0))} tone="red"/>
               </div>
 
-              {/* Legend + search row */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-3">
+              {/* Filters row */}
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  className="px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 w-52"
+                  placeholder="Search unit…"
+                  value={unitSearch}
+                  onChange={e => setUnitSearch(e.target.value)}
+                />
+                <div className="w-52">
+                  <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+                    <SelectTrigger className="border-blue-200 text-sm"><SelectValue placeholder="All Properties"/></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_PROPS}>All Properties</SelectItem>
+                      {Array.from(new Set(unitsData.map(u=>u.property).filter(Boolean))).sort().map(p=>(
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-wrap gap-3 ml-auto">
                   {(Object.entries(UNIT_STATUS) as [UnitPayStatus, typeof UNIT_STATUS[UnitPayStatus]][]).map(([k,v])=>(
                     <div key={k} className="flex items-center gap-1.5">
                       <span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/>
@@ -726,12 +874,6 @@ export default function PMSDashboard() {
                     </div>
                   ))}
                 </div>
-                <input
-                  className="px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  placeholder="Search unit / tenant / property…"
-                  value={unitSearch}
-                  onChange={e => setUnitSearch(e.target.value)}
-                />
               </div>
 
               {unitsLoading ? (
@@ -739,21 +881,73 @@ export default function PMSDashboard() {
               ) : filteredUnits.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                  {filteredUnits.map(u => {
-                    const cfg = UNIT_STATUS[u.pay_status] ?? UNIT_STATUS.vacant
-                    return (
-                      <UnitCard key={u.unit} unit={u.unit}
-                        statusCfg={cfg}
-                        outstandingLabel={u.outstanding}
-                        overdueLabel={u.overdue}
-                        monthlyRent={u.monthly_rent}
-                        tenantName={u.tenant_name}
-                        onClick={() => setSelectedUnit(u.unit)}
-                      />
-                    )
-                  })}
-                </div>
+                <Card className="border-blue-100 shadow-sm">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-blue-50">
+                        <TableHead className="text-blue-800 text-xs font-semibold">Unit</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold">Property</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold">Tenant</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold">Floor / Area</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold text-right">Monthly Rent</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold text-right">Outstanding</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold text-right">Overdue</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold text-center">Status</TableHead>
+                        <TableHead className="text-blue-800 text-xs font-semibold"/>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUnits.map(u => {
+                        const cfg = UNIT_STATUS[u.pay_status] ?? UNIT_STATUS.vacant
+                        return (
+                          <TableRow key={u.unit}
+                            className="hover:bg-blue-50/60 cursor-pointer transition-colors"
+                            onClick={() => setSelectedUnit(u.unit)}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${cfg.dot}`}/>
+                                <span className="font-semibold text-slate-800 text-sm">{u.unit}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-sm text-slate-700">{u.property || "—"}</p>
+                            </TableCell>
+                            <TableCell>
+                              {u.tenant_name
+                                ? <p className="text-sm text-slate-700">{u.tenant_name}</p>
+                                : <span className="text-xs text-slate-400 italic">Vacant</span>}
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-xs text-slate-500">
+                                {[u.floor && `Floor ${u.floor}`, u.area && `${u.area} m²`].filter(Boolean).join(" · ") || "—"}
+                              </p>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-sm font-medium text-slate-700">{u.monthly_rent ? fmt(u.monthly_rent) : "—"}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {u.outstanding > 0
+                                ? <span className="text-sm font-semibold text-amber-700">{fmt(u.outstanding)}</span>
+                                : <span className="text-xs text-slate-400">—</span>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {u.overdue > 0
+                                ? <span className="text-sm font-bold text-red-700">{fmt(u.overdue)}</span>
+                                : <span className="text-xs text-slate-400">—</span>}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.badge}`}>{cfg.label}</span>
+                            </TableCell>
+                            <TableCell>
+                              <ChevronRight className="h-4 w-4 text-slate-400"/>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </Card>
               )}
             </CardContent>
           )}
