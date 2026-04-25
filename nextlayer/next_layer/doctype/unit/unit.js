@@ -45,5 +45,22 @@ frappe.ui.form.on('Unit', {
                 }
             });
         }
-    }
+    },
+
+    width(frm) {
+        calculate_area(frm);
+    },
+    
+    length(frm) {
+        calculate_area(frm);
+    },
 });
+
+
+function calculate_area(frm) {
+    let width = frm.doc.width || 0;
+    let length = frm.doc.length || 0;
+
+    let area = width * length;
+    frm.set_value('area', area);
+}

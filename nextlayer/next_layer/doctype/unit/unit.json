@@ -15,10 +15,12 @@
   "floor",
   "unit_type",
   "dimensions_section",
+  "width",
+  "length",
   "area",
-  "bedrooms",
   "bathrooms",
   "column_break_dimensions",
+  "bedrooms",
   "max_occupancy",
   "parking_spots",
   "storage_units",
@@ -72,6 +74,7 @@
    "description": "e.g., 'Ocean View Suite' or 'A101 - Garden View'",
    "fieldname": "unit_name",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Unit Name"
   },
   {
@@ -122,7 +125,7 @@
   },
   {
    "fieldname": "bathrooms",
-   "fieldtype": "Float",
+   "fieldtype": "Int",
    "label": "Bathrooms"
   },
   {
@@ -324,12 +327,22 @@
    "fieldname": "rentyearly",
    "fieldtype": "Currency",
    "label": "Rent(Yearly)"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Float",
+   "label": "Width"
+  },
+  {
+   "fieldname": "length",
+   "fieldtype": "Float",
+   "label": "Length"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-22 01:24:21.772475",
+ "modified": "2026-04-25 16:38:09.464442",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",
