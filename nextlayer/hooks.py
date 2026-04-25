@@ -160,6 +160,8 @@ fixtures = [
                     #Activity
                     "Activity Type-custom_section_break_cprjt",
                     "Activity Type-custom_expense_account",
+                    "Sales Invoice-custom_unit",
+                    "Sales Invoice-custom_tenant_contract"
                 ),
             ]
         ],

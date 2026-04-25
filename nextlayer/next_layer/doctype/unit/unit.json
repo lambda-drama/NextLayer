@@ -56,7 +56,10 @@
   "notes_section",
   "notes",
   "accounting_tab",
-  "expense_account"
+  "expense_account",
+  "tenant_deposit_liability_account",
+  "column_break_edad",
+  "owner_liability_account"
  ],
  "fields": [
   {
@@ -358,6 +361,22 @@
    "fieldtype": "Link",
    "label": "Company",
    "options": "Company"
+  },
+  {
+   "fieldname": "column_break_edad",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "owner_liability_account",
+   "fieldtype": "Link",
+   "label": "Liability Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "tenant_deposit_liability_account",
+   "fieldtype": "Link",
+   "label": "Tenant Deposit Liability Account",
+   "options": "Account"
   }
  ],
  "grid_page_length": 50,
@@ -372,7 +391,7 @@
    "link_fieldname": "unit"
   }
  ],
- "modified": "2026-04-25 23:21:16.098179",
+ "modified": "2026-04-26 02:26:54.805507",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",

@@ -10,11 +10,13 @@
   "unit",
   "property",
   "expense_type",
+  "company",
   "column_break_hvfq",
   "category",
   "supplier",
   "bill_number",
   "amount",
+  "status",
   "section_break_sche",
   "tax",
   "bill_to",
@@ -30,10 +32,19 @@
   "maintenance_request",
   "section_break_esbx",
   "description",
-  "attachments"
+  "attachments",
+  "amended_from",
+  "accounting_details_tab",
+  "company_group",
+  "cost_center",
+  "branch",
+  "column_break_pewb",
+  "marka",
+  "project"
  ],
  "fields": [
   {
+   "default": "Today",
    "fieldname": "expense_date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -176,12 +187,75 @@
   {
    "fieldname": "column_break_uavz",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Property Expense",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nPaid\nUnpaid"
+  },
+  {
+   "fieldname": "accounting_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting Details"
+  },
+  {
+   "fieldname": "company_group",
+   "fieldtype": "Link",
+   "label": "Company Group",
+   "options": "Company Group"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "column_break_pewb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "marka",
+   "fieldtype": "Link",
+   "label": "Marka",
+   "options": "Marka"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fetch_from": "unit.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-04-26 00:43:21.401388",
+ "modified": "2026-04-26 02:13:20.292791",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property Expense",
@@ -207,4 +281,3 @@
  "sort_order": "DESC",
  "states": []
 }
-
