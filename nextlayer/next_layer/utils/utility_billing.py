@@ -299,3 +299,5 @@ def _create_reading_log(meter, consumption, amount, invoice_name=None):
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Meter Reading Log creation failed")
 		return None
+
+

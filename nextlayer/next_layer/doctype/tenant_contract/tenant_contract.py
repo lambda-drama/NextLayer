@@ -806,7 +806,6 @@ class TenantContract(Document):
 		
 		return period_end.replace(month=period_end.month + 1, day=due_day)
 
-
 # ──────────────────────────────────────────
 #  MODULE-LEVEL HELPERS
 # ──────────────────────────────────────────
@@ -816,3 +815,4 @@ def _get_pms_settings():
 		return frappe.get_single("PMS Settings")
 	except Exception:
 		return None
+

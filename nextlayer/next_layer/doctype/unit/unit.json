@@ -341,8 +341,17 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-04-25 16:38:09.464442",
+ "links": [
+  {
+   "link_doctype": "Sales Invoice",
+   "link_fieldname": "custom_unit"
+  },
+  {
+   "link_doctype": "Tenant Contract",
+   "link_fieldname": "unit"
+  }
+ ],
+ "modified": "2026-04-25 18:20:14.793712",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",
