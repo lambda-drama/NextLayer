@@ -1,7 +1,8 @@
 import frappe
 import calendar
 from frappe.model.document import Document
-from frappe.utils import nowdate, flt, getdate, add_days
+from frappe.utils import nowdate, flt, getdate, add_days, add_months
+from datetime import timedelta
 
 RENT_ITEM_CODE = "RENT-CHARGES"
 RENT_ITEM_NAME = "Rent Charges"
@@ -307,6 +308,8 @@ class TenantContract(Document):
 			"due_date": self.get_due_date(settings),
 			"items": items,
 			"currency":self.currency,
+			"custom_unit": self.unit,
+			"custom_tenant_contract": self.name,
 		})
 		invoice.insert()
 		invoice.submit()
@@ -589,6 +592,182 @@ class TenantContract(Document):
 			"Sales Invoice", filters={"custom_invoice_no": ["like", pattern]}
 		)
 		return (count or 0) + 1
+
+	@frappe.whitelist()
+	def generate_invoices_bulk(self, start_date, months):
+		"""Generate invoices for multiple months"""
+		
+		if self.status != "Active":
+			frappe.throw("Only active contracts can generate invoices.")
+		
+		
+		start = getdate(start_date)
+		months = int(months)
+		
+		all_invoices = []
+		
+		for i in range(months):
+			# Calculate period for this month
+			period_start = add_months(start, i)
+			period_start = period_start.replace(day=1)
+			
+			# Calculate period end (last day of month)
+			if period_start.month == 12:
+				period_end = period_start.replace(year=period_start.year + 1, month=1, day=1) - timedelta(days=1)
+			else:
+				period_end = period_start.replace(month=period_start.month + 1, day=1) - timedelta(days=1)
+			
+			# Store period for invoice
+			self._current_period_start = period_start
+			self._current_period_end = period_end
+			
+			# Generate invoice for this period
+			invoice_name = self._generate_single_invoice_for_period(period_start, period_end)
+			
+			if invoice_name:
+				all_invoices.append(invoice_name)
+		
+		return all_invoices
+
+	def _generate_single_invoice_for_period(self, period_start, period_end):
+		"""Generate one invoice for a specific period"""
+		
+		settings = _get_pms_settings()
+		customer = self.get_customer_from_tenant()
+		self._ensure_rent_item()
+		
+		grouping = self.invoice_grouping or (
+			settings.invoice_grouping if settings else "Combined - All in one invoice"
+		)
+		
+		items = []
+		
+		# Rent
+		items.append({
+			"item_code": RENT_ITEM_CODE,
+			"item_name": RENT_ITEM_NAME,
+			"qty": 1,
+			"rate": flt(self.monthly_rent),
+			"description": f"Rent for {self.unit} - {period_start} to {period_end}",
+			"uom": "Month",
+		})
+		
+		# Service fees (recurring)
+		if self.service_fee:
+			for fee in self.service_fee:
+				if fee.apply_recurring:
+					item_code = self._get_service_item_erpnext_code(fee)
+					if item_code:
+						items.append({
+							"item_code": item_code,
+							"item_name": fee.service_name or fee.service_item,
+							"qty": 1,
+							"rate": flt(fee.amount),
+							"description": f"Service Fee: {fee.service_name or fee.service_item} - {period_start} to {period_end}",
+						})
+		
+		# Utilities
+		if self.utility:
+			for utility in self.utility:
+				if utility.tenant_pays:
+					if utility.billing_method == "Flat Fee":
+						item_code = self._get_utility_item_code_safe(utility.utility_type)
+						if item_code and flt(utility.flat_fee_amount) > 0:
+							items.append({
+								"item_code": item_code,
+								"item_name": f"{utility.utility_type} - Flat Fee",
+								"qty": 1,
+								"rate": flt(utility.flat_fee_amount),
+								"description": f"{utility.utility_type} flat fee - {period_start} to {period_end}",
+							})
+					
+					elif utility.billing_method == "Metered - Consumption Based":
+						if utility.meter:
+							consumption, amount = self.calculate_utility_consumption_for_period(
+								utility.meter, period_start, period_end
+							)
+							if consumption > 0:
+								item_code = self._get_utility_item_code_safe(utility.utility_type)
+								if item_code:
+									items.append({
+										"item_code": item_code,
+										"item_name": f"{utility.utility_type} - {self.unit}",
+										"qty": consumption,
+										"rate": self.get_meter_rate(utility.meter),
+										"description": f"{utility.utility_type} consumption for {period_start} to {period_end}",
+										"uom": self.get_utility_uom(utility.utility_type)
+									})
+		
+		if not items:
+			return None
+		
+		# Create invoice
+		invoice = frappe.get_doc({
+			"doctype": "Sales Invoice",
+			"custom_invoice_no": self.generate_invoice_number(),
+			"company": self.company,
+			"customer": customer,
+			"set_posting_time": 1,
+			"posting_date": period_end,
+			"due_date": add_days(period_end, 15),  # Simple due date logic for bulk invoices
+			"items": items,
+			"currency": self.currency,
+			"custom_unit": self.unit,
+			"custom_tenant_contract": self.name,
+			"custom_period_start": period_start,
+			"custom_period_end": period_end,
+		})
+		
+
+		invoice.insert()
+		invoice.submit()
+		
+		return invoice.name
+
+
+	def calculate_utility_consumption_for_period(self, meter_name, period_start, period_end):
+		"""Calculate consumption for a specific period"""
+		meter = frappe.get_doc("Utility Meter", meter_name)
+		
+		# Get readings at period start and end
+		start_reading = self._get_reading_at_date(meter, period_start)
+		end_reading = self._get_reading_at_date(meter, period_end)
+		
+		consumption = flt(end_reading) - flt(start_reading)
+		
+		if consumption < 0:
+			return 0, 0
+		
+		amount = consumption * flt(meter.tariff_rate)
+		return consumption, amount
+
+	def _get_reading_at_date(self, meter, target_date):
+		"""Get meter reading closest to target date"""
+		# For now, use current reading if available
+		if meter.current_reading_date and meter.current_reading_date <= target_date:
+			return flt(meter.current_reading)
+		
+		# Fallback to last reading
+		return flt(meter.last_reading or 0)
+
+	def get_due_date_for_period(self, settings, period_end_date):
+		"""Calculate due date based on period end"""
+		due_day = int(self.rent_due_day or (settings.rent_due_day if settings else 0) or 5)
+		
+		from frappe.utils import getdate
+		period_end = getdate(period_end_date)
+		
+		max_day = calendar.monthrange(period_end.year, period_end.month)[1]
+		due_day = min(due_day, max_day)
+		
+		if period_end.day <= due_day:
+			return period_end.replace(day=due_day)
+		
+		# Next month
+		if period_end.month == 12:
+			return period_end.replace(year=period_end.year + 1, month=1, day=min(due_day, 31))
+		
+		return period_end.replace(month=period_end.month + 1, day=due_day)
 
 
 # ──────────────────────────────────────────
