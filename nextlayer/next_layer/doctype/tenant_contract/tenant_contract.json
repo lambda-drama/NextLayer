@@ -85,6 +85,7 @@
   "amended_from",
   "guarantors_tab",
   "guarantors",
+  "proceed_without_guarantors",
   "additional_tenants_tab",
   "additional_tenants"
  ],
@@ -538,13 +539,24 @@
    "fieldname": "no_of_payments",
    "fieldtype": "Data",
    "label": "No of Payments"
+  },
+  {
+   "default": "0",
+   "fieldname": "proceed_without_guarantors",
+   "fieldtype": "Check",
+   "label": "Proceed Without Guarantors"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-04-24 12:23:44.162673",
+ "links": [
+  {
+   "link_doctype": "Sales Invoice",
+   "link_fieldname": "custom_tenant_contract"
+  }
+ ],
+ "modified": "2026-04-25 18:19:22.335344",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",

@@ -13,6 +13,7 @@
   "generate_invoice_for_zero_consumption",
   "combine_services_single_line",
   "send_invoice_automatically",
+  "active",
   "late_fee_section",
   "enable_late_fees",
   "late_fee_grace_days",
@@ -197,13 +198,13 @@
   {
    "fieldname": "deposit_section",
    "fieldtype": "Section Break",
-   "label": "Deposit Settings"
+   "label": "Default Settings"
   },
   {
    "description": "Per-company deposit account settings. These override the global defaults below.",
    "fieldname": "company_deposit_settings",
    "fieldtype": "Table",
-   "label": "Per-Company Deposit Settings",
+   "label": "Per-Company Settings",
    "options": "PMS Deposit Company Setting"
   },
   {
@@ -481,13 +482,19 @@
    "fieldname": "notification_tab",
    "fieldtype": "Tab Break",
    "label": "More info"
+  },
+  {
+   "default": "0",
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "Active"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-22 21:16:40.082364",
+ "modified": "2026-04-25 19:44:42.151344",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "PMS Settings",

@@ -18,8 +18,9 @@
   "occupied_units",
   "vacant_units",
   "column_break_details",
+  "width",
+  "length",
   "total_area",
-  "year_built",
   "amenities_section",
   "amenities",
   "financial_section",
@@ -190,11 +191,6 @@
    "precision": "2"
   },
   {
-   "fieldname": "year_built",
-   "fieldtype": "Int",
-   "label": "Year Built"
-  },
-  {
    "fieldname": "amenities_section",
    "fieldtype": "Section Break",
    "label": "Amenities"
@@ -303,7 +299,8 @@
    "fieldname": "property_owners",
    "fieldtype": "Table",
    "label": "Property Owners",
-   "options": "Property Owner"
+   "options": "Property Owner",
+   "reqd": 1
   },
   {
    "fieldname": "address_tab",
@@ -315,6 +312,16 @@
    "fieldtype": "Link",
    "label": "Company",
    "options": "Company"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Float",
+   "label": "Width"
+  },
+  {
+   "fieldname": "length",
+   "fieldtype": "Float",
+   "label": "Length"
   }
  ],
  "grid_page_length": 50,
@@ -325,7 +332,7 @@
    "link_fieldname": "property"
   }
  ],
- "modified": "2026-04-24 11:14:40.314544",
+ "modified": "2026-04-25 16:40:43.474105",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property",

@@ -1,0 +1,283 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "PE-.######",
+ "creation": "2026-04-26 00:02:20.904154",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "expense_date",
+  "unit",
+  "property",
+  "expense_type",
+  "company",
+  "column_break_hvfq",
+  "category",
+  "supplier",
+  "bill_number",
+  "amount",
+  "status",
+  "section_break_sche",
+  "tax",
+  "bill_to",
+  "column_break_uavz",
+  "total_amount",
+  "tenant",
+  "section_break_jbin",
+  "purchase_invoice",
+  "sales_invoice",
+  "reimbursement_date",
+  "column_break_asit",
+  "is_reimbursed",
+  "maintenance_request",
+  "section_break_esbx",
+  "description",
+  "attachments",
+  "amended_from",
+  "accounting_details_tab",
+  "company_group",
+  "cost_center",
+  "branch",
+  "column_break_pewb",
+  "marka",
+  "project"
+ ],
+ "fields": [
+  {
+   "default": "Today",
+   "fieldname": "expense_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Expense Date",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "unit.property",
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Property",
+   "options": "Property"
+  },
+  {
+   "fieldname": "unit",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Unit",
+   "options": "Unit"
+  },
+  {
+   "fieldname": "expense_type",
+   "fieldtype": "Select",
+   "label": "expense_type",
+   "options": "\nMaintenance\nRepair\nCleaning\nLandscaping\nUtilities\nInsurance\nProperty Tax\nManagement Fee\nLegal\nOther"
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Category",
+   "options": "\nOperating\nCapital Improvement\nTenant Damage\nEmergency"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier/Vendor",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "bill_number",
+   "fieldtype": "Data",
+   "label": "Bill/Invoice Number"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tax",
+   "fieldtype": "Currency",
+   "label": "Tax"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Total Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bill_to",
+   "fieldtype": "Select",
+   "label": "Bill_to",
+   "options": "\nOwner\nTenant\nProperty Management\nInsurance"
+  },
+  {
+   "depends_on": "eval:doc.bill_to == 'Tenant'",
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "label": "Tenant",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice (to tenant)",
+   "options": "Sales Invoice"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_reimbursed",
+   "fieldtype": "Check",
+   "label": "Reimbursed"
+  },
+  {
+   "fieldname": "reimbursement_date",
+   "fieldtype": "Date",
+   "label": "Reimbursement Date"
+  },
+  {
+   "fieldname": "maintenance_request",
+   "fieldtype": "Link",
+   "label": "Maintenance Request",
+   "options": "Maintenance Request"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "attachments",
+   "fieldtype": "Attach",
+   "label": "Receipt/Invoice"
+  },
+  {
+   "fieldname": "section_break_esbx",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_jbin",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_asit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_hvfq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_sche",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_uavz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Property Expense",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nPaid\nUnpaid"
+  },
+  {
+   "fieldname": "accounting_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting Details"
+  },
+  {
+   "fieldname": "company_group",
+   "fieldtype": "Link",
+   "label": "Company Group",
+   "options": "Company Group"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "column_break_pewb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "marka",
+   "fieldtype": "Link",
+   "label": "Marka",
+   "options": "Marka"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fetch_from": "unit.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-04-26 02:13:20.292791",
+ "modified_by": "Administrator",
+ "module": "Next Layer",
+ "name": "Property Expense",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

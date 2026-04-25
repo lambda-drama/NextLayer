@@ -10,15 +10,18 @@
   "property",
   "unit_number",
   "unit_name",
+  "company",
   "column_break_basic",
   "building",
   "floor",
   "unit_type",
   "dimensions_section",
+  "width",
+  "length",
   "area",
-  "bedrooms",
   "bathrooms",
   "column_break_dimensions",
+  "bedrooms",
   "max_occupancy",
   "parking_spots",
   "storage_units",
@@ -51,7 +54,12 @@
   "column_break_dawc",
   "attachments",
   "notes_section",
-  "notes"
+  "notes",
+  "accounting_tab",
+  "expense_account",
+  "tenant_deposit_liability_account",
+  "column_break_edad",
+  "owner_liability_account"
  ],
  "fields": [
   {
@@ -72,6 +80,7 @@
    "description": "e.g., 'Ocean View Suite' or 'A101 - Garden View'",
    "fieldname": "unit_name",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Unit Name"
   },
   {
@@ -122,7 +131,7 @@
   },
   {
    "fieldname": "bathrooms",
-   "fieldtype": "Float",
+   "fieldtype": "Int",
    "label": "Bathrooms"
   },
   {
@@ -324,12 +333,65 @@
    "fieldname": "rentyearly",
    "fieldtype": "Currency",
    "label": "Rent(Yearly)"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Float",
+   "label": "Width"
+  },
+  {
+   "fieldname": "length",
+   "fieldtype": "Float",
+   "label": "Length"
+  },
+  {
+   "fieldname": "accounting_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account"
+  },
+  {
+   "fetch_from": "property.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_edad",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "owner_liability_account",
+   "fieldtype": "Link",
+   "label": "Liability Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "tenant_deposit_liability_account",
+   "fieldtype": "Link",
+   "label": "Tenant Deposit Liability Account",
+   "options": "Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-04-22 01:24:21.772475",
+ "links": [
+  {
+   "link_doctype": "Sales Invoice",
+   "link_fieldname": "custom_unit"
+  },
+  {
+   "link_doctype": "Tenant Contract",
+   "link_fieldname": "unit"
+  }
+ ],
+ "modified": "2026-04-26 02:26:54.805507",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",
