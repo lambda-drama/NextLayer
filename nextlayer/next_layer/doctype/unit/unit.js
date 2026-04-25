@@ -54,6 +54,16 @@ frappe.ui.form.on('Unit', {
     length(frm) {
         calculate_area(frm);
     },
+    company(frm){
+         frm.set_query("expense_account", () => {
+        return {
+            filters: {
+                company: frm.doc.company,
+                account_type: "Expense Account",
+            },
+        };
+    });
+    }
    
 });
 

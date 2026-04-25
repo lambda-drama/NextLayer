@@ -10,6 +10,7 @@
   "property",
   "unit_number",
   "unit_name",
+  "company",
   "column_break_basic",
   "building",
   "floor",
@@ -53,7 +54,9 @@
   "column_break_dawc",
   "attachments",
   "notes_section",
-  "notes"
+  "notes",
+  "accounting_tab",
+  "expense_account"
  ],
  "fields": [
   {
@@ -337,6 +340,24 @@
    "fieldname": "length",
    "fieldtype": "Float",
    "label": "Length"
+  },
+  {
+   "fieldname": "accounting_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account"
+  },
+  {
+   "fetch_from": "property.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
   }
  ],
  "grid_page_length": 50,
@@ -351,7 +372,7 @@
    "link_fieldname": "unit"
   }
  ],
- "modified": "2026-04-25 18:20:14.793712",
+ "modified": "2026-04-25 23:21:16.098179",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",

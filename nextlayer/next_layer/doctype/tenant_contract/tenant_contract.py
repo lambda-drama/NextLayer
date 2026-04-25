@@ -14,8 +14,8 @@ class TenantContract(Document):
 			self.status = "Signed"
 
 	def on_submit(self):
-		if self.status != "Signed":
-			frappe.throw("Cannot submit contract. Both tenant and property owner must sign the contract.")
+		# if self.status != "Signed":
+		# 	frappe.throw("Cannot submit contract. Both tenant and property owner must sign the contract.")
 		self.db_set("status", "Active")
 		self._update_unit_on_activation()
 
@@ -77,7 +77,6 @@ class TenantContract(Document):
 
 		# ── Price list guard ──────────────────────────────────────────────────
 		# Look up the price list configured for this contract's company in the
-		# PMS Deposit Company Setting child table.  Alert the user if it is
 		# missing so they know invoices will fall back to ERPNext defaults.
 		price_list = _get_price_list_for_company(self.company, settings)
 		if not price_list:
@@ -337,6 +336,7 @@ class TenantContract(Document):
 			"payment_terms_template": None,
 			"payment_schedule": [],
 		}
+
 		if price_list:
 			invoice_data["selling_price_list"] = price_list
 
@@ -406,14 +406,14 @@ class TenantContract(Document):
 	# 		# duplicate due dates that clash with the due_date we set above.
 	# 		"payment_terms_template": None,
 	# 		"payment_schedule": [],
-			
+
 	# 	}
 	# 	if price_list:
 	# 		invoice_data["selling_price_list"] = price_list
 
 	# 	invoice = frappe.get_doc(invoice_data)
 	# 	invoice.insert()
-		
+
 	# 	# ── Payment schedule fix ─────────────────────────────────────────────
 	# 	# ERPNext's validate() (called during both insert AND submit) runs
 	# 	# set_payment_schedule(), which re-creates rows from the customer's
@@ -446,7 +446,7 @@ class TenantContract(Document):
 	# 			pass
 
 	# 	return invoice.name
-	
+
 	# ──────────────────────────────────────────
 	#  DAILY UTILITIES
 	# ──────────────────────────────────────────
@@ -544,7 +544,7 @@ class TenantContract(Document):
 
 		if getattr(svc, "item", None):
 			return svc.item
-        
+
 		# Auto-create/get ERPNext Item using service_item name as item_code
 		item_code = fee_row.service_item
 		if not frappe.db.exists("Item", item_code):
@@ -721,37 +721,37 @@ class TenantContract(Document):
 	@frappe.whitelist()
 	def generate_invoices_bulk(self, start_date, months):
 		"""Generate invoices for multiple months"""
-		
+
 		if self.status != "Active":
 			frappe.throw("Only active contracts can generate invoices.")
-		
-		
+
+
 		start = getdate(start_date)
 		months = int(months)
-		
+
 		all_invoices = []
-		
+
 		for i in range(months):
 			# Calculate period for this month
 			period_start = add_months(start, i)
 			period_start = period_start.replace(day=1)
-			
+
 			# Calculate period end (last day of month)
 			if period_start.month == 12:
 				period_end = period_start.replace(year=period_start.year + 1, month=1, day=1) - timedelta(days=1)
 			else:
 				period_end = period_start.replace(month=period_start.month + 1, day=1) - timedelta(days=1)
-			
+
 			# Store period for invoice
 			self._current_period_start = period_start
 			self._current_period_end = period_end
-			
+
 			# Generate invoice for this period
 			invoice_name = self._generate_single_invoice_for_period(period_start, period_end)
-			
+
 			if invoice_name:
 				all_invoices.append(invoice_name)
-		
+
 		return all_invoices
 
 	def _generate_single_invoice_for_period(self, period_start, period_end):
@@ -831,18 +831,18 @@ class TenantContract(Document):
 		return self._make_invoice(customer, items, settings, period_start=period_start, period_end=period_end)
 	def _check_existing_rent_invoice_for_month(self, posting_date):
 		"""Check if a rent invoice already exists for the given month.
-		
+
 		Args:
 			posting_date: Date of the invoice (will check its year and month)
-		
+
 		Returns:
 			bool: True if rent invoice exists for that month, False otherwise
 		"""
-		
+
 		# Get year and month from posting date
 		year = posting_date.year
 		month = posting_date.month
-		
+
 		# Find all invoices for this contract
 		existing_invoices = frappe.db.get_all(
 			"Sales Invoice",
@@ -853,27 +853,27 @@ class TenantContract(Document):
 			},
 			fields=["name"]
 		)
-		
+
 		for inv in existing_invoices:
 			invoice = frappe.get_doc("Sales Invoice", inv.name)
 			for item in invoice.items:
 				if item.item_code == RENT_ITEM_CODE:
 					return True
-		
+
 		return False
 	def calculate_utility_consumption_for_period(self, meter_name, period_start, period_end):
 		"""Calculate consumption for a specific period"""
 		meter = frappe.get_doc("Utility Meter", meter_name)
-		
+
 		# Get readings at period start and end
 		start_reading = self._get_reading_at_date(meter, period_start)
 		end_reading = self._get_reading_at_date(meter, period_end)
-		
+
 		consumption = flt(end_reading) - flt(start_reading)
-		
+
 		if consumption < 0:
 			return 0, 0
-		
+
 		amount = consumption * flt(meter.tariff_rate)
 		return consumption, amount
 
@@ -882,27 +882,27 @@ class TenantContract(Document):
 		# For now, use current reading if available
 		if meter.current_reading_date and meter.current_reading_date <= target_date:
 			return flt(meter.current_reading)
-		
+
 		# Fallback to last reading
 		return flt(meter.last_reading or 0)
 
 	def get_due_date_for_period(self, settings, period_end_date):
 		"""Calculate due date based on period end"""
 		due_day = int(self.rent_due_day or (settings.rent_due_day if settings else 0) or 5)
-		
+
 		from frappe.utils import getdate
 		period_end = getdate(period_end_date)
-		
+
 		max_day = calendar.monthrange(period_end.year, period_end.month)[1]
 		due_day = min(due_day, max_day)
-		
+
 		if period_end.day <= due_day:
 			return period_end.replace(day=due_day)
-		
+
 		# Next month
 		if period_end.month == 12:
 			return period_end.replace(year=period_end.year + 1, month=1, day=min(due_day, 31))
-		
+
 		return period_end.replace(month=period_end.month + 1, day=due_day)
 
 # ──────────────────────────────────────────
@@ -921,17 +921,17 @@ def _get_price_list_for_company(company, settings=None):
 	Return the Price List configured for *company* in PMS Settings →
 	Company Deposit Settings child table.  Returns None if not set.
 	"""
-	
+
 	if not settings:
 		settings = _get_pms_settings()
 	if not settings:
 		return None
-	
+
 	for row in (settings.company_deposit_settings or []):
-		
+
 		if row.company == company:
 			return row.price_list or None
-		
+
 	frappe.throw(
 		f"Company '{company}' not found in PMS Settings → Company Deposit Settings. "
 		"Please add a row for this company and set a Price List to ensure correct pricing."
