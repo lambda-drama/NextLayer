@@ -82,5 +82,10 @@ frappe.ui.form.on('Tenant Contract', {
                 }
             });
     }
-}
+},
+ validate(frm){
+        if (!frm.doc.proceed_without_guarantors && frm.doc.guarantors.length < 1) {
+            frappe.throw("At least one guarantor is required.");
+        }
+    },
 });

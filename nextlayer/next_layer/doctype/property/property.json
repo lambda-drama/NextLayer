@@ -299,7 +299,8 @@
    "fieldname": "property_owners",
    "fieldtype": "Table",
    "label": "Property Owners",
-   "options": "Property Owner"
+   "options": "Property Owner",
+   "reqd": 1
   },
   {
    "fieldname": "address_tab",
@@ -331,7 +332,7 @@
    "link_fieldname": "property"
   }
  ],
- "modified": "2026-04-25 16:27:11.699413",
+ "modified": "2026-04-25 16:40:43.474105",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Property",

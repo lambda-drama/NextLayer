@@ -54,6 +54,7 @@ frappe.ui.form.on('Unit', {
     length(frm) {
         calculate_area(frm);
     },
+   
 });
 
 
