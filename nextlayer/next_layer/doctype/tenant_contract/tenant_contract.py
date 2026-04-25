@@ -639,7 +639,13 @@ class TenantContract(Document):
 		grouping = self.invoice_grouping or (
 			settings.invoice_grouping if settings else "Combined - All in one invoice"
 		)
-		
+		posting_date = period_end
+		if self._check_existing_rent_invoice_for_month(posting_date):
+			frappe.throw(
+				f"Rent invoice already exists for {posting_date.strftime('%B %Y')}. "
+				"Cannot create duplicate rent invoice."
+			)
+			
 		items = []
 		
 		# Rent
@@ -724,7 +730,38 @@ class TenantContract(Document):
 		
 		return invoice.name
 
-
+	def _check_existing_rent_invoice_for_month(self, posting_date):
+		"""Check if a rent invoice already exists for the given month.
+		
+		Args:
+			posting_date: Date of the invoice (will check its year and month)
+		
+		Returns:
+			bool: True if rent invoice exists for that month, False otherwise
+		"""
+		
+		# Get year and month from posting date
+		year = posting_date.year
+		month = posting_date.month
+		
+		# Find all invoices for this contract
+		existing_invoices = frappe.db.get_all(
+			"Sales Invoice",
+			filters={
+				"custom_tenant_contract": self.name,
+				"docstatus": ["!=", 2],  # Not cancelled
+				"posting_date": ["between", [f"{year}-{month:02d}-01", f"{year}-{month:02d}-31"]]
+			},
+			fields=["name"]
+		)
+		
+		for inv in existing_invoices:
+			invoice = frappe.get_doc("Sales Invoice", inv.name)
+			for item in invoice.items:
+				if item.item_code == RENT_ITEM_CODE:
+					return True
+		
+		return False
 	def calculate_utility_consumption_for_period(self, meter_name, period_start, period_end):
 		"""Calculate consumption for a specific period"""
 		meter = frappe.get_doc("Utility Meter", meter_name)

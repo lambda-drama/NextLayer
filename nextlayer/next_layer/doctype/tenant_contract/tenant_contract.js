@@ -201,9 +201,9 @@ function generate_invoices(frm, dialog, values) {
                         frm.reload_doc();
                     }
                 },
-                error: function(err) {
-                    frappe.msgprint(__("Error: {0}", [err]));
-                }
+                // error: function(err) {
+                //     frappe.msgprint(__("Error: {0}", [err]));
+                // }
             });
             dialog.hide();
         }
