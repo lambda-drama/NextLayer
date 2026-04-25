@@ -3,7 +3,6 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.model.naming import make_autoname
 
 RENT_ITEM_CODE = "RENT-CHARGES"
 RENT_ITEM_NAME = "Rent Charges"
@@ -27,7 +26,7 @@ class Unit(Document):
 	def autoname(self):
 		unit = self.unit_number or "UNIT"
 		prop = self.property or "GEN"
-		self.name = make_autoname(f"{unit}-{prop}")
+		self.name = f"{unit}-{prop}"
 
 	@frappe.whitelist()
 	def generate_sales_invoice(self):
