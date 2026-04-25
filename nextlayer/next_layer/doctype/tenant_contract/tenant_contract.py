@@ -299,19 +299,31 @@ class TenantContract(Document):
 				if not item.get("cost_center"):
 					item["cost_center"] = cost_center
 
+		due_date = self.get_due_date(settings)
 		invoice = frappe.get_doc({
 			"doctype": "Sales Invoice",
 			"custom_invoice_no": self.generate_invoice_number(),
 			"company": self.company,
 			"customer": customer,
 			"posting_date": nowdate(),
-			"due_date": self.get_due_date(settings),
+			"due_date": due_date,
 			"items": items,
-			"currency":self.currency,
+			"currency": self.currency,
 			"custom_unit": self.unit,
 			"custom_tenant_contract": self.name,
+			"set_posting_time": 1,
+			# Clear any customer/company default payment terms to prevent
+			# the ERPNext validator from auto-creating a payment schedule with
+			# duplicate due dates that clash with the due_date we set above.
+			"payment_terms_template": None,
+			"payment_schedule": [],
 		})
 		invoice.insert()
+		# After insert ERPNext may still populate payment_schedule from the
+		# customer master; wipe it again and force our single due date.
+		invoice.payment_terms_template = None
+		invoice.payment_schedule = []
+		invoice.due_date = due_date
 		invoice.submit()
 
 		if settings and settings.send_invoice_automatically:

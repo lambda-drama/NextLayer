@@ -58,16 +58,16 @@ class TravelExpense(Document):
 			travel_row.sanctioned_amount = flt(self.amountcompany_currency)
 		if self.posting_date and not travel_row.expense_date:
 			travel_row.expense_date = self.posting_date
-	
+
 	def calculate_totals(self):
 		"""Calculate total, total_taxes_and_charges, and grand_total in both transaction and company currency"""
 		# Get company currency
 		company_currency = None
 		if self.company:
 			company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
-		
+
 		transaction_currency = self.currency
-		
+
 		# Calculate total from expenses child table (transaction currency)
 		total = 0
 		total_company_currency = 0
@@ -78,10 +78,10 @@ class TravelExpense(Document):
 				# Sum company currency amounts
 				if expense.amount_company_currency:
 					total_company_currency += flt(expense.amount_company_currency)
-		
+
 		self.total = total
 		self.total_company_currency = total_company_currency
-		
+
 		# Calculate total taxes and charges (transaction currency)
 		total_taxes_and_charges = 0
 		total_taxes_and_charges_company_currency = 0
@@ -106,10 +106,10 @@ class TravelExpense(Document):
 					else:
 						# Same currency, use same amount
 						total_taxes_and_charges_company_currency += flt(tax.tax_amount)
-		
+
 		self.total_taxes_and_charges = total_taxes_and_charges
 		self.total_taxes_and_charges_company_currency = total_taxes_and_charges_company_currency
-		
+
 		# Calculate grand total
 		self.grand_total = flt(total) + flt(total_taxes_and_charges)
 		self.grand_total_company_currency = flt(total_company_currency) + flt(total_taxes_and_charges_company_currency)
@@ -130,7 +130,7 @@ class TravelExpense(Document):
 			frappe.throw(
 				_("At least one attachment is required to submit this Travel Expense. Please attach a file and try again.")
 			)
-	
+
 	def before_cancel(self):
 		"""
 		Tell Frappe's link checker to ignore GL Entry / Payment Ledger Entry.
@@ -266,25 +266,25 @@ def travel_expense_on_save(doc):
     Hook: on_save
     Automatically divides expenses among travelers if conditions are met
     """
-    
+
     # Check if we have traveler_name (Table MultiSelect)
     if not doc.traveller_name or len(doc.traveller_name) == 0:
         return
-    
+
     # Get the list of members from traveller_name
     members_in_multiselect = [row.member for row in doc.traveller_name]
     number_of_travelers = len(members_in_multiselect)
-    
+
     # Get current expense rows
     current_expenses = doc.expenses if hasattr(doc, 'expenses') else []
     number_of_expense_rows = len(current_expenses)
-    
+
     # SKIP auto-division if:
     # 1. Number of travelers equals number of expense rows
     if number_of_expense_rows == number_of_travelers:
         # Check if all travelers are already represented in expense rows
         members_in_rows = [row.traveller_name for row in current_expenses if hasattr(row, 'traveller_name')]
-        
+
         if all(member in members_in_rows for member in members_in_multiselect):
             frappe.msgprint(
                 f"✓ Each of the {number_of_travelers} travelers is already assigned to expense rows. "
@@ -292,7 +292,7 @@ def travel_expense_on_save(doc):
                 alert=True
             )
             return
-    
+
     # 2. Skip if there are more expense rows than travelers (user already divided)
     if number_of_expense_rows >= number_of_travelers:
         frappe.msgprint(
@@ -301,44 +301,44 @@ def travel_expense_on_save(doc):
             alert=True
         )
         return
-    
+
     # AUTO-DIVIDE: If we have fewer expense rows than travelers
     if number_of_expense_rows > 0 and number_of_travelers > number_of_expense_rows:
         frappe.msgprint(
             f"Auto-dividing {number_of_expense_rows} expense row(s) among {number_of_travelers} travelers...",
             alert=True
         )
-        
+
         # Get the first (source) row
         source_row = current_expenses[0]
-        
+
         # Calculate divided amount (for currency fields)
         original_amount = Decimal(str(source_row.amount or 0))
         original_amount_company = Decimal(str(source_row.amount_company_currency or 0))
-        
+
         divided_amount = original_amount / number_of_travelers
         divided_amount_company = original_amount_company / number_of_travelers
-        
+
         # Clear existing rows (we'll rebuild from scratch)
         doc.expenses = []
-        
+
         # Create one row per traveler
         for idx, member in enumerate(members_in_multiselect):
             expense_row = frappe.new_doc('Travel Expense Detail')
-            
+
             # Copy all fields from source row
             expense_row.expense_type = source_row.expense_type
             expense_row.expense_date = source_row.expense_date
             expense_row.description = source_row.description
-            
+
             expense_row.traveller_name = member
-            
+
             expense_row.amount = float(divided_amount)
             expense_row.amount_company_currency = float(divided_amount_company)
-            
+
             if hasattr(source_row, 'sanctioned_amount') and source_row.sanctioned_amount:
                 expense_row.sanctioned_amount = float(Decimal(str(source_row.sanctioned_amount)) / number_of_travelers)
-            
+
             # Copy hotel-related fields if present
             if hasattr(source_row, 'hotel_checkin_date'):
                 expense_row.hotel_checkin_date = source_row.hotel_checkin_date
@@ -358,7 +358,7 @@ def travel_expense_on_save(doc):
                 expense_row.hotel_country = source_row.hotel_country
             if hasattr(source_row, 'purpose'):
                 expense_row.purpose = source_row.purpose
-            
+
             # Copy travel-related fields if present
             if hasattr(source_row, 'custom_prn_number'):
                 expense_row.custom_prn_number = source_row.custom_prn_number
@@ -378,14 +378,14 @@ def travel_expense_on_save(doc):
                 expense_row.custom_date_of_travel = source_row.custom_date_of_travel
             if hasattr(source_row, 'custom_date_of_arrival'):
                 expense_row.custom_date_of_arrival = source_row.custom_date_of_arrival
-            
+
             if hasattr(source_row, 'cost_center'):
                 expense_row.cost_center = source_row.cost_center
             if hasattr(source_row, 'project'):
                 expense_row.project = source_row.project
-            
+
             doc.append('expenses', expense_row)
-        
+
         frappe.msgprint(
             f"✓ Successfully created {number_of_travelers} expense rows (one per traveler) with divided amounts.",
             alert=True
@@ -398,7 +398,7 @@ import frappe
 def migrate_traveler_names():
 	"""
 	Migrate all Travel Expense traveler_name (Link field) to traveller_name (Table MultiSelect field)
-	
+
 	Called from a button on Travel Expense doctype
 	"""
 	try:
@@ -408,35 +408,35 @@ def migrate_traveler_names():
 			filters={"docstatus": 1},  # Only submitted documents
 			fields=["name", "traveler_name"]
 		)
-		
+
 		total = len(travel_expenses)
 		success_count = 0
 		error_count = 0
 		errors = []
-		
+
 		frappe.msgprint(f"Starting migration of {total} Travel Expenses...")
-		
+
 		for idx, te in enumerate(travel_expenses):
 			try:
 				# Load the document
 				te_doc = frappe.get_doc("Travel Expense", te.name)
-				
+
 				# If traveler_name (Link field) has a value
 				if te.traveler_name:
 					# Clear existing traveller_name table entries
 					te_doc.traveller_name = []
-					
+
 					# Add the member to traveller_name table
 					te_doc.append("traveller_name", {
 						"member": te.traveler_name
 					})
-					
+
 					# IMPORTANT: Save the document properly (not db_update)
 					# Use db_update_needing_parent=False to avoid docstatus issues
 					te_doc.save(ignore_permissions=True)
-					
+
 					success_count += 1
-					
+
 					# Show progress every 10 records
 					if (idx + 1) % 10 == 0:
 						frappe.publish_realtime(
@@ -444,19 +444,19 @@ def migrate_traveler_names():
 							{"progress": f"Migrated {idx + 1}/{total}"},
 							user=frappe.session.user
 						)
-				
+
 			except Exception as e:
 				error_count += 1
 				error_msg = f"{te.name}: {str(e)}"
 				errors.append(error_msg)
 				frappe.log_error(error_msg, "Travel Expense Migration Error")
-		
+
 		# Commit all changes
 		frappe.db.commit()
-		
+
 		# Clear cache for Travel Expense
 		frappe.clear_cache(doctype="Travel Expense")
-		
+
 		# Show final result
 		result_msg = f"""
 		<h3>Migration Complete</h3>
@@ -464,7 +464,7 @@ def migrate_traveler_names():
 		<p><strong>Successful:</strong> {success_count}</p>
 		<p><strong>Errors:</strong> {error_count}</p>
 		"""
-		
+
 		if errors:
 			result_msg += "<h4>Errors:</h4><ul>"
 			for err in errors[:10]:  # Show first 10 errors
@@ -472,16 +472,16 @@ def migrate_traveler_names():
 			if len(errors) > 10:
 				result_msg += f"<li>... and {len(errors) - 10} more</li>"
 			result_msg += "</ul>"
-		
+
 		frappe.msgprint(result_msg, title="Migration Results", indicator="green")
-		
+
 		return {
 			"status": "success",
 			"total": total,
 			"success": success_count,
 			"errors": error_count
 		}
-		
+
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Travel Expense Migration Error")
 		frappe.throw(f"Migration failed: {str(e)}")
