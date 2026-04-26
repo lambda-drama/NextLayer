@@ -335,6 +335,12 @@
    },
    {
     "role": "Administrator"
+   },
+   {
+    "role": "PMS Manager"
+   },
+   {
+    "role": "PMS User"
    }
   ],
   "sequence_id": 50.0,
@@ -481,6 +487,6 @@
    }
   ],
   "title": "PMS",
-  "type": null
+  "type": "Workspace"
  }
 ]
