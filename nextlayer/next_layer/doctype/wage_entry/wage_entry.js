@@ -2,21 +2,33 @@
 frappe.ui.form.on("Wage Entry", {
 	refresh: function (frm) {
 		update_wage_totals(frm);
-		create_journal(frm);
+		// create_journal(frm);
 		apply_filters(frm);
 
 		const allowed_roles = ["WhatsApp User", "System Manager", "Administrator"];
-
+		const all_checked_out = all_workers_checked_out(frm);
+			if (all_checked_out) {
+            create_journal(frm);
+        }
 		if (
-			frm.doc.docstatus > 0 &&
-			allowed_roles.some(role => frappe.user.has_role(role))
-		) {
-			frm.add_custom_button(
-				__("Send WhatsApp"),
-				() => open_whatsapp_dialog(frm),
-				__("Actions")
-			);
-		}
+            frm.doc.docstatus > 0 &&
+            allowed_roles.some(role => frappe.user.has_role(role)) &&
+            all_checked_out
+        ) {
+            frm.add_custom_button(
+                __("Send WhatsApp"),
+                () => open_whatsapp_dialog(frm),
+                __("Actions")
+            );
+        }
+
+		if (frm.doc.docstatus === 1 && frm.doc.status === "Unpaid" && !all_checked_out) {
+            frm.add_custom_button(
+                __("Checkout All Workers"),
+                () => checkout_all_workers(frm),
+                __("Actions")
+            );
+        }
 	},
 
 	after_submit: function (frm) {
@@ -70,6 +82,36 @@ frappe.ui.form.on("Wage Breakdown Detail", {
 		update_wage_row_amount(frm, cdt, cdn);
 	},
 });
+
+function checkout_all_workers(frm) {
+    
+            frappe.call({
+                method: 'nextlayer.next_layer.doctype.wage_entry.wage_entry.checkout_all_workers',
+                args: {
+                    wage_entry_name: frm.doc.name
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        frappe.msgprint({
+                            title: __('Checkout Complete'),
+                            message: r.message.message,
+                            indicator: 'green'
+                        });
+                        frm.reload_doc();
+                    }
+                },
+                error: function(err) {
+                    frappe.msgprint({
+                        title: __('Checkout Failed'),
+                        message: err.message,
+                        indicator: 'red'
+                    });
+                }
+            });
+        
+    
+}
+
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -736,3 +778,23 @@ function format_currency(amount, currency) {
 	return currency ? `${currency} ${formatted}` : formatted;
 }
  
+
+function all_workers_checked_out(frm) {
+    // If bypass is checked, return true immediately
+    if (frm.doc.bypass_checkins_validators) {
+        return true;
+    }
+    
+    // Check if there are no wages
+    if (!frm.doc.wages || frm.doc.wages.length === 0) {
+        return false;
+    }
+    
+    // Check if all workers have checkout time
+    let all_checked_out = frm.doc.wages.every(row => {
+        return row.checkout !== null && row.checkout !== undefined && row.checkout !== "";
+    });
+    
+    return all_checked_out;
+}
+

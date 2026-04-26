@@ -8,7 +8,7 @@ from frappe import _
 from frappe.model.naming import make_autoname
 from frappe.utils import cint
 from datetime import datetime
-from frappe.utils import nowdate
+from frappe.utils import nowdate, now, get_datetime, add_to_date, time_diff_in_seconds
 
 class WageEntry(Document):
 	def validate(self):
@@ -16,9 +16,11 @@ class WageEntry(Document):
   
 	def before_save(self):
 		self.generate_work_type_breakdown()
+		
   
 	def on_submit(self):
 		create_daily_wage_purchase_invoice(self.name)
+		self.add_checkin()
 
 	def calculate_totals(self):
 		"""Set amount per row (qty * rate) and total_qty, total_amount on main doc."""
@@ -35,7 +37,12 @@ class WageEntry(Document):
   
 	def autoname(self):
 		get_wage_entry_autoname(self)
-		
+  
+	def add_checkin(self):
+		for row in self.wages:
+			if not row.checkin:
+				row.db_set('checkin', now())
+    
 	def generate_work_type_breakdown(self):
     # Group wages by type_of_work
 		groups = {}
@@ -448,3 +455,124 @@ def get_permitted_branches(doctype, txt, searchfield, start, page_len, filters):
         fields=["name"],
         as_list=True,
     )
+    
+@frappe.whitelist()
+def checkout_worker(wage_entry_name, row_id):
+    """Checkout a single worker"""
+    wage_entry = frappe.get_doc("Wage Entry", wage_entry_name)
+    
+    # Get wage settings
+    wage_settings = frappe.get_single("Wage Settings")
+    avg_hours = wage_entry.average_working_hours or wage_settings.average_working_duration or 28800
+    grace_minutes = int(wage_settings.early_exit_grace_period or 0)
+    
+    for row in wage_entry.wages:
+        if row.name == row_id:
+            if not row.checkin:
+                frappe.throw(_("Worker has not checked in"))
+            
+            if row.checkout:
+                frappe.throw(_("Worker already checked out"))
+            
+            # Check if enough time passed
+            checkin_time = get_datetime(row.checkin)
+            earliest_checkout = add_to_date(checkin_time, seconds=avg_hours - (grace_minutes * 60))
+            
+            if get_datetime(now()) < earliest_checkout:
+                remaining = time_diff_in_seconds(earliest_checkout, now())
+                minutes = int(remaining / 60)
+                frappe.throw(_("Cannot checkout yet. Need {0} more minutes").format(minutes))
+            
+            # Set checkout
+            row.checkout = now()
+            
+            # Calculate hours worked
+            hours_worked = time_diff_in_seconds(row.checkout, row.checkin) / 3600
+            
+            # Update qty and amount
+            if wage_entry.wage_type == "Daily":
+                row.qty = 1 if hours_worked >= (avg_hours/3600) * 0.8 else round(hours_worked, 2)
+            else:
+                row.qty = round(hours_worked, 2)
+            
+            row.amount = row.qty * row.rate
+            
+            wage_entry.save()
+            
+            # Update totals
+            total_qty = sum(r.qty or 0 for r in wage_entry.wages)
+            total_amount = sum(r.amount or 0 for r in wage_entry.wages)
+            wage_entry.db_set({
+                "total_qty": total_qty,
+                "total_amount": total_amount
+            })
+            
+            frappe.db.commit()
+            
+            return {
+                "success": True,
+                "message": f"Checked out at {row.checkout}. Hours: {round(hours_worked, 2)}"
+            }
+    
+    frappe.throw(_("Record not found"))
+    
+    
+@frappe.whitelist()
+def checkout_all_workers(wage_entry_name):
+    """Checkout all workers at once"""
+    wage_entry = frappe.get_doc("Wage Entry", wage_entry_name)
+    
+    if wage_entry.docstatus != 1:
+        frappe.throw(_("Wage Entry must be submitted"))
+    
+    # Get wage settings
+    wage_settings = frappe.get_single("Wage Settings")
+    avg_hours = wage_entry.average_working_hours or wage_settings.average_working_duration or 28800
+    grace_minutes = int(wage_settings.early_exit_grace_period or 0)
+    
+    checked_out = 0
+    errors = []
+    
+    for row in wage_entry.wages:
+        if not row.checkin:
+            errors.append(f"{row.name1}: No checkin time")
+            continue
+        
+        if row.checkout:
+            continue
+        
+        # Check if enough time passed
+        checkin_time = get_datetime(row.checkin)
+        earliest_checkout = add_to_date(checkin_time, seconds=avg_hours - (grace_minutes * 60))
+        
+        if get_datetime(now()) < earliest_checkout:
+            remaining = time_diff_in_seconds(earliest_checkout, now())
+            minutes = int(remaining / 60)
+            errors.append(f"{row.name1}: Need {minutes} more minutes")
+            continue
+        
+        # Set checkout
+        row.checkout = now()
+        
+        # Calculate actual working duration in seconds
+        actual_duration_seconds = time_diff_in_seconds(row.checkout, row.checkin)
+        
+        # Update duration field
+        row.duration = actual_duration_seconds
+        
+        checked_out += 1
+    
+    if checked_out > 0:
+        wage_entry.save()
+        frappe.db.commit()
+    
+    message = f"Checked out {checked_out} workers"
+    if errors:
+        message += f"\n\nErrors:\n" + "\n".join(errors[:5])
+    
+    return {
+        "success": True,
+        "message": message,
+        "checked_out": checked_out,
+        "errors": errors
+    }

@@ -5,6 +5,7 @@ import ImportExportExpense from "./components/import-export-expense"
 import CostEstimateVsConsumed from "./components/cost-estimate-vs-consumed"
 import QuotationStagesReport from "./components/quotation-stages-report"
 import PMSDashboard from "./components/pms-dashboard"
+import WageEntryReport from "./components/wage-entry-report"
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/cost-estimate-vs-consumed" element={<CostEstimateVsConsumed />} />
           <Route path="/quotation-stages" element={<QuotationStagesReport />} />
           <Route path="/pms-dashboard" element={<PMSDashboard />} />
+          <Route path="/wage-entry-report" element={<WageEntryReport />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

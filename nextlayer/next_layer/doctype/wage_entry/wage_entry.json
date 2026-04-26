@@ -9,6 +9,7 @@
   "wage_type",
   "company",
   "status",
+  "average_working_hours",
   "column_break_lxbm",
   "project",
   "stage",
@@ -43,7 +44,9 @@
   "party_type",
   "party",
   "section_break_cqht",
-  "conversion_rate"
+  "conversion_rate",
+  "section_break_fdtr",
+  "bypass_checkins_validators"
  ],
  "fields": [
   {
@@ -287,6 +290,22 @@
    "label": "Wage Category",
    "options": "\nContract\nNon-Contract",
    "reqd": 1
+  },
+  {
+   "fieldname": "average_working_hours",
+   "fieldtype": "Duration",
+   "label": "Average Working Hours"
+  },
+  {
+   "fieldname": "section_break_fdtr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "bypass_checkins_validators",
+   "fieldtype": "Check",
+   "label": "Bypass Checkins Validators"
   }
  ],
  "grid_page_length": 50,
@@ -302,7 +321,7 @@
    "link_fieldname": "custom_wage_entry"
   }
  ],
- "modified": "2026-04-04 00:20:19.316964",
+ "modified": "2026-04-27 02:57:06.697721",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Wage Entry",
