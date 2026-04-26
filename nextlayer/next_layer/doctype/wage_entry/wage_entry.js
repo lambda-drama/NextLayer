@@ -797,3 +797,4 @@ function all_workers_checked_out(frm) {
     
     return all_checked_out;
 }
+

@@ -81,10 +81,10 @@ const ALL_PROPS     = "__all__"
 
 interface KpiCardProps { icon: React.ReactNode; label: string; value: string | number; sub?: string; tone?: "blue"|"green"|"amber"|"red"|"slate" }
 function KpiCard({ icon, label, value, sub, tone = "blue" }: KpiCardProps) {
-  const g = { blue:"from-blue-600 to-blue-700", green:"from-emerald-500 to-emerald-700",
-               amber:"from-amber-500 to-amber-600", red:"from-red-500 to-red-600", slate:"from-slate-500 to-slate-700" }
+  const g = { blue:"from-emerald-600 to-teal-700", green:"from-emerald-500 to-teal-600",
+               amber:"from-amber-500 to-amber-700", red:"from-red-500 to-red-600", slate:"from-stone-500 to-stone-700" }
   return (
-    <Card className="border-blue-100 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-5">
         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g[tone]} text-white flex items-center justify-center shadow-sm`}>{icon}</div>
         <p className="text-2xl font-bold text-slate-800 mt-3">{value}</p>
@@ -105,7 +105,7 @@ const TONE_VALUE: Record<MetricTone, string> = {
   green:   "text-emerald-600",
   red:     "text-red-600",
   amber:   "text-amber-600",
-  blue:    "text-blue-700",
+  blue:    "text-emerald-700",
 }
 
 interface SummaryCardProps {
@@ -126,7 +126,7 @@ function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: 
       <CardContent className="p-0 divide-y divide-slate-100">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="h-5 w-5 text-blue-400 animate-spin"/>
+            <RefreshCw className="h-5 w-5 text-emerald-300 animate-spin"/>
           </div>
         ) : (
           <>
@@ -163,7 +163,7 @@ function MonthTile({ m }: { m: MonthBreakdown }) {
       onMouseLeave={() => setHover(false)}
     >
       <div className={`rounded-lg border-2 ${cfg.border} ${cfg.bg} ${cfg.text} p-2 text-center cursor-default select-none
-        ${m.is_current ? "ring-2 ring-blue-400 ring-offset-1" : ""}`}>
+        ${m.is_current ? "ring-2 ring-emerald-400 ring-offset-1" : ""}`}>
         <p className="text-xs font-bold">{m.month_short}</p>
         <p className="text-[10px] opacity-75">{m.year}</p>
       </div>
@@ -189,18 +189,18 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
   const { data: breakdown, loading: bkLoading } = useUnitMonthBreakdown(unitName)
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col border-l border-blue-100">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col border-l border-emerald-100">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-5 flex items-center justify-between shrink-0">
+      <div className="bg-gradient-to-r from-emerald-700 to-teal-800 text-white p-5 flex items-center justify-between shrink-0">
         <div>
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Home className="h-4 w-4 opacity-75" />{unitName}
           </h2>
-          <p className="text-blue-200 text-sm mt-0.5 flex items-center gap-1">
+          <p className="text-emerald-200 text-sm mt-0.5 flex items-center gap-1">
             <MapPin className="h-3 w-3" />{data?.property || "—"}
           </p>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
           <X className="h-5 w-5" />
         </button>
       </div>
@@ -219,7 +219,7 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
                 : "bg-slate-50 text-slate-600 border-slate-200"
               }`}>{data.unit_status}</span>
               {data.contract && (
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-blue-50 text-blue-700 border-blue-200">
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
                   Active Contract
                 </span>
               )}
@@ -238,10 +238,10 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5" />Current Tenant
               </h3>
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-2">
                 <p className="font-semibold text-slate-800 text-base">{data.tenant.tenant_name}</p>
                 {data.tenant.email && (
-                  <a href={`mailto:${data.tenant.email}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                  <a href={`mailto:${data.tenant.email}`} className="flex items-center gap-2 text-sm text-emerald-700 hover:underline">
                     <Mail className="h-3.5 w-3.5 shrink-0" />{data.tenant.email}
                   </a>
                 )}
@@ -263,7 +263,7 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="bg-slate-50 rounded-lg p-3">
                   <p className="text-slate-400 text-xs">Monthly Rent</p>
-                  <p className="font-bold text-blue-700 text-lg">{fmt(data.contract.monthly_rent)}</p>
+                  <p className="font-bold text-emerald-700 text-lg">{fmt(data.contract.monthly_rent)}</p>
                 </div>
                 <div className="bg-slate-50 rounded-lg p-3">
                   <p className="text-slate-400 text-xs">Company</p>
@@ -291,7 +291,7 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
               <CalendarDays className="h-3.5 w-3.5" />12-Month Payment History
             </h3>
             {bkLoading ? (
-              <div className="flex items-center justify-center py-4"><RefreshCw className="h-4 w-4 text-blue-400 animate-spin" /></div>
+              <div className="flex items-center justify-center py-4"><RefreshCw className="h-4 w-4 text-emerald-300 animate-spin" /></div>
             ) : (
               <>
                 <div className="grid grid-cols-6 gap-1.5 mb-3">
@@ -351,7 +351,7 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
           {/* Invoice history */}
           <section className="p-5">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5 text-blue-400" />Recent Invoice History
+              <FileText className="h-3.5 w-3.5 text-emerald-300" />Recent Invoice History
             </h3>
             {data.invoice_history.length === 0 ? (
               <p className="text-slate-400 text-sm text-center py-4">No history</p>
@@ -445,12 +445,12 @@ function PropertyCard({ prop, onUnitClick }: { prop: PropertyFinancial; onUnitCl
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <Building2 className="h-4 w-4 text-blue-600 shrink-0" />
+                <Building2 className="h-4 w-4 text-emerald-700 shrink-0" />
                 <span className="font-semibold text-slate-800 truncate">{prop.property_name}</span>
               </div>
               {prop.address && <p className="text-xs text-slate-400 flex items-center gap-1 mb-2"><MapPin className="h-3 w-3" />{prop.address}</p>}
               <div className="flex flex-wrap gap-2">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">{prop.total_units} units</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{prop.total_units} units</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{prop.occupied} occupied</span>
                 {prop.vacant > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{prop.vacant} vacant</span>}
               </div>
@@ -462,7 +462,7 @@ function PropertyCard({ prop, onUnitClick }: { prop: PropertyFinancial; onUnitCl
             </div>
           </div>
         </div>
-        <div className="px-4 pb-3 flex items-center gap-1 text-xs text-blue-600 font-medium">
+        <div className="px-4 pb-3 flex items-center gap-1 text-xs text-emerald-700 font-medium">
           {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           {open ? "Hide units" : `View ${prop.units.length} units`}
         </div>
@@ -568,7 +568,7 @@ export default function PMSDashboard() {
   , [propsData, propSearch])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
       {selectedUnit && <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={() => setSelectedUnit(null)} />}
       {selectedUnit && <UnitDetailPanel unitName={selectedUnit} onClose={() => setSelectedUnit(null)} />}
 
@@ -577,7 +577,7 @@ export default function PMSDashboard() {
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div className="text-center space-y-2 flex-1">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-teal-800 bg-clip-text text-transparent">
               Property Management Dashboard
             </h1>
             <p className="text-gray-600 text-lg">Portfolio overview · financial health · occupancy analytics</p>
@@ -588,15 +588,15 @@ export default function PMSDashboard() {
         </div>
 
         {/* ── Main card with tab header ── */}
-        <Card className="border-blue-200 shadow-lg">
+        <Card className="border-emerald-200 shadow-lg">
           {/* Tab bar as card header */}
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg p-0">
+          <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg p-0">
             <div className="flex items-center overflow-x-auto">
               {TABS.map((t, i) => (
                 <button key={t.id} onClick={() => setTab(t.id)}
                   className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold whitespace-nowrap transition-all shrink-0
                     ${i === 0 ? "rounded-tl-lg" : ""}
-                    ${tab === t.id ? "bg-white/20 border-b-2 border-white text-white" : "text-blue-200 hover:text-white hover:bg-white/10"}`}>
+                    ${tab === t.id ? "bg-white/20 border-b-2 border-white text-white" : "text-emerald-200 hover:text-white hover:bg-white/10"}`}>
                   {t.icon}{t.label}
                 </button>
               ))}
@@ -614,7 +614,7 @@ export default function PMSDashboard() {
                 {/* Contracts */}
                 <SummaryCard
                   title="Contracts" icon={<FileText className="h-5 w-5"/>}
-                  gradient="from-blue-600 to-blue-800"
+                  gradient="from-emerald-700 to-teal-800"
                   loading={ovLoading}
                   rows={[
                     { label: "Total Contracts", value: overview?.total_contracts ?? 0, tone: "default" },
@@ -670,8 +670,8 @@ export default function PMSDashboard() {
 
               {/* ── Revenue trend + Lease status charts ── */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <Card className="xl:col-span-2 border-blue-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-6 py-4">
+                <Card className="xl:col-span-2 border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
                     <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4"/>Revenue Trend — Last 6 Months</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 pr-2">
@@ -683,7 +683,7 @@ export default function PMSDashboard() {
                           <YAxis tick={{fontSize:11}} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)}/>
                           <Tooltip formatter={(v:number)=>fmt(v)} contentStyle={{fontSize:12,borderRadius:8}}/>
                           <Legend wrapperStyle={{fontSize:12}}/>
-                          <Bar dataKey="revenue" name="Invoiced" fill="#3b82f6" radius={[4,4,0,0]}/>
+                          <Bar dataKey="revenue" name="Invoiced" fill="#059669" radius={[4,4,0,0]}/>
                           <Bar dataKey="collected" name="Collected" fill="#10b981" radius={[4,4,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
@@ -691,8 +691,8 @@ export default function PMSDashboard() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-blue-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-6 py-4">
+                <Card className="border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
                     <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4"/>Lease Status</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4">
@@ -727,8 +727,8 @@ export default function PMSDashboard() {
               {/* ── Top tenants + Properties tables ── */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {/* Top tenants */}
-                <Card className="border-blue-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-5 py-3">
+                <Card className="border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
                     <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                       <Users className="h-4 w-4"/>Top Tenants by Monthly Rent
                     </CardTitle>
@@ -736,21 +736,21 @@ export default function PMSDashboard() {
                   <CardContent className="p-0">
                     {overview?.top_tenants?.length ? (
                       <Table>
-                        <TableHeader><TableRow className="bg-blue-50">
-                          <TableHead className="text-blue-800 text-xs font-semibold pl-4">#</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold">Tenant</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold">Unit</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold">Property</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold text-right pr-4">Monthly Rent</TableHead>
+                        <TableHeader><TableRow className="bg-emerald-50">
+                          <TableHead className="text-teal-800 text-xs font-semibold pl-4">#</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Monthly Rent</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
                           {overview.top_tenants.map((t,i)=>(
-                            <TableRow key={t.tenant_id} className="hover:bg-blue-50/50">
+                            <TableRow key={t.tenant_id} className="hover:bg-emerald-50/50">
                               <TableCell className="text-xs text-slate-400 font-medium pl-4">{i+1}</TableCell>
                               <TableCell><p className="font-medium text-slate-800 text-sm">{t.tenant_name}</p><p className="text-xs text-slate-400">{t.company}</p></TableCell>
                               <TableCell className="text-sm text-slate-700">{t.unit}</TableCell>
                               <TableCell className="text-sm text-slate-500">{t.property}</TableCell>
-                              <TableCell className="text-right font-bold text-blue-700 text-sm pr-4">{fmt(t.monthly_rent)}</TableCell>
+                              <TableCell className="text-right font-bold text-emerald-700 text-sm pr-4">{fmt(t.monthly_rent)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -760,8 +760,8 @@ export default function PMSDashboard() {
                 </Card>
 
                 {/* Properties table */}
-                <Card className="border-blue-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg px-5 py-3">
+                <Card className="border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
                     <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                       <Building2 className="h-4 w-4"/>Properties
                     </CardTitle>
@@ -769,21 +769,21 @@ export default function PMSDashboard() {
                   <CardContent className="p-0">
                     {overview?.property_stats?.length ? (
                       <Table>
-                        <TableHeader><TableRow className="bg-blue-50">
-                          <TableHead className="text-blue-800 text-xs font-semibold pl-4">Property</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold text-center">Total</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold text-center">Occ.</TableHead>
-                          <TableHead className="text-blue-800 text-xs font-semibold text-center">Vacant</TableHead>
+                        <TableHeader><TableRow className="bg-emerald-50">
+                          <TableHead className="text-teal-800 text-xs font-semibold pl-4">Property</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Total</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Occ.</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Vacant</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
                           {overview.property_stats.map(p=>{
                             const rate = p.total_units ? Math.round((p.occupied / p.total_units) * 100) : 0
                             return (
-                              <TableRow key={p.name} className="hover:bg-blue-50/50">
+                              <TableRow key={p.name} className="hover:bg-emerald-50/50">
                                 <TableCell className="pl-4">
                                   <p className="font-medium text-slate-800 text-sm">{p.property_name}</p>
                                   <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200">
-                                    <div className="h-full rounded-full bg-blue-500" style={{width:`${rate}%`}}/>
+                                    <div className="h-full rounded-full bg-emerald-500" style={{width:`${rate}%`}}/>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-center text-sm">{p.total_units}</TableCell>
@@ -816,7 +816,7 @@ export default function PMSDashboard() {
 
               {/* Search */}
               <input
-                className="w-full max-w-sm px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="w-full max-w-sm px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 placeholder="Search properties…"
                 value={propSearch}
                 onChange={e => setPropSearch(e.target.value)}
@@ -850,14 +850,14 @@ export default function PMSDashboard() {
               {/* Filters row */}
               <div className="flex flex-wrap items-center gap-3">
                 <input
-                  className="px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 w-52"
+                  className="px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 w-52"
                   placeholder="Search unit…"
                   value={unitSearch}
                   onChange={e => setUnitSearch(e.target.value)}
                 />
                 <div className="w-52">
                   <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                    <SelectTrigger className="border-blue-200 text-sm"><SelectValue placeholder="All Properties"/></SelectTrigger>
+                    <SelectTrigger className="border-emerald-200 text-sm"><SelectValue placeholder="All Properties"/></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={ALL_PROPS}>All Properties</SelectItem>
                       {Array.from(new Set(unitsData.map(u=>u.property).filter(Boolean))).sort().map(p=>(
@@ -881,19 +881,19 @@ export default function PMSDashboard() {
               ) : filteredUnits.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
               ) : (
-                <Card className="border-blue-100 shadow-sm">
+                <Card className="border-emerald-100 shadow-sm">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead className="text-blue-800 text-xs font-semibold">Unit</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold">Property</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold">Tenant</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold">Floor / Area</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold text-right">Monthly Rent</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold text-right">Outstanding</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold text-right">Overdue</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold text-center">Status</TableHead>
-                        <TableHead className="text-blue-800 text-xs font-semibold"/>
+                      <TableRow className="bg-emerald-50">
+                        <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Floor / Area</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Monthly Rent</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Outstanding</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Overdue</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-center">Status</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold"/>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -901,7 +901,7 @@ export default function PMSDashboard() {
                         const cfg = UNIT_STATUS[u.pay_status] ?? UNIT_STATUS.vacant
                         return (
                           <TableRow key={u.unit}
-                            className="hover:bg-blue-50/60 cursor-pointer transition-colors"
+                            className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
                             onClick={() => setSelectedUnit(u.unit)}
                           >
                             <TableCell>
@@ -959,7 +959,7 @@ export default function PMSDashboard() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Month</label>
                   <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="border-blue-200"><SelectValue placeholder="Current Month"/></SelectTrigger>
+                    <SelectTrigger className="border-emerald-200"><SelectValue placeholder="Current Month"/></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={CURRENT_MONTH}>Current Month</SelectItem>
                       {months.map(m=><SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
@@ -969,7 +969,7 @@ export default function PMSDashboard() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Property</label>
                   <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                    <SelectTrigger className="border-blue-200"><SelectValue placeholder="All Properties"/></SelectTrigger>
+                    <SelectTrigger className="border-emerald-200"><SelectValue placeholder="All Properties"/></SelectTrigger>
                     <SelectContent>
                       {finProperties.map(p=><SelectItem key={p} value={p}>{p===ALL_PROPS?"All Properties":p}</SelectItem>)}
                     </SelectContent>
@@ -1011,7 +1011,7 @@ export default function PMSDashboard() {
           {/* ── UTILITY ── */}
           {tab === "utility" && (
             <CardContent className="py-20 text-center space-y-3">
-              <Zap className="h-12 w-12 mx-auto text-blue-300"/>
+              <Zap className="h-12 w-12 mx-auto text-emerald-200"/>
               <p className="text-xl font-semibold text-slate-600">Coming Soon</p>
               <p className="text-slate-400 text-sm max-w-md mx-auto">
                 Utility consumption analytics — water, electricity, and gas trends per unit and property — will be available in a future release.

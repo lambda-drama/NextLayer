@@ -106,6 +106,12 @@
     "stats_filter": null,
     "type": "URL",
     "url": "/frontend/quotation-stages"
+   },
+   {
+    "label": "Wage Entry Report",
+    "link_to": "/frontend/wage-entry-report",
+    "type": "URL",
+    "color": "Green"
    }
   ],
   "title": "Data Visualizer",
