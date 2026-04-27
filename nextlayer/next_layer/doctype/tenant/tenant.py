@@ -31,7 +31,7 @@ class Tenant(Document):
 			customer.customer_group = "Tenant"
 			customer.custom_is_tenant = 1
 			customer.email_id = self.email
-			customer.mobile_no = self.phone
+			customer.mobile_no = self.mobile_no
 			customer.save()
 			return customer.name
 		
@@ -42,7 +42,7 @@ class Tenant(Document):
 			"customer_group": "Tenant",
 			"customer_type": "Individual",
 			"email_id": self.email,
-			"mobile_no": self.phone,
+			"mobile_no": self.mobile_no,
 			"custom_is_tenant": 1
 		})
 		customer.insert()
@@ -56,7 +56,7 @@ class Tenant(Document):
 		customer = frappe.get_doc("Customer", self.customer)
 		customer.customer_name = self.tenant_name
 		customer.email_id = self.email
-		customer.mobile_no = self.phone
+		customer.mobile_no = self.mobile_no
 		customer.save()
 	
 	@frappe.whitelist()
@@ -83,7 +83,7 @@ class Tenant(Document):
 			customer.customer_group = "Tenant"
 			customer.custom_is_tenant = 1
 			customer.email_id = self.email
-			customer.mobile_no = self.phone
+			customer.mobile_no = self.mobile_no
 			customer.save()
 			return customer.name
 		
@@ -94,7 +94,7 @@ class Tenant(Document):
 			"customer_group": "Tenant",
 			"customer_type": "Individual",
 			"email_id": self.email,
-			"mobile_no": self.phone,
+			"mobile_no": self.mobile_no,
 			"custom_is_tenant": 1
 		})
 		customer.insert()
