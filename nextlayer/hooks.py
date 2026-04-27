@@ -162,6 +162,11 @@ fixtures = [
                     "Activity Type-custom_expense_account",
                     "Sales Invoice-custom_unit",
                     "Sales Invoice-custom_tenant_contract"
+                    
+                    #Contract
+                    "Contract-custom_total_service_amount",
+                    "Contract-custom_contract_type",
+                    
                 ),
             ]
         ],

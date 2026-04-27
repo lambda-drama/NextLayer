@@ -281,16 +281,18 @@ export interface MonthBreakdown {
   invoice_count: number
 }
 
-export interface TenantContactRow {
+export interface TenantContractRow {
   name: string
-  tenant_name: string
-  email: string
-  mobile_no: string
   status: string
-  current_unit: string
+  tenant_name: string
+  party_name: string
+  unit: string
   property: string
-  emergency_contact_name: string
-  emergency_phone: string
+  monthly_rent: number
+  start_date: string
+  end_date: string
+  company: string
+  expiring_soon: boolean
 }
 
 // ── New hooks ─────────────────────────────────────────────────────────────────
@@ -335,8 +337,8 @@ export function useUnitsOverview() {
   return { data, loading, error, reload: load }
 }
 
-export function useTenantsContactList() {
-  const [data, setData] = useState<TenantContactRow[]>([])
+export function useTenantContractsDashboard() {
+  const [data, setData] = useState<TenantContractRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -344,8 +346,8 @@ export function useTenantsContactList() {
     setLoading(true)
     setError(null)
     try {
-      const result = await apiFetch<TenantContactRow[]>(
-        "nextlayer.next_layer.api.pms_dashboard.get_tenants_contact_list"
+      const result = await apiFetch<TenantContractRow[]>(
+        "nextlayer.next_layer.api.pms_dashboard.get_tenant_contracts_dashboard"
       )
       setData(result)
     } catch (e) {

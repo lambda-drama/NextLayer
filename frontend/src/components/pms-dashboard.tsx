@@ -9,7 +9,7 @@ import {
   Building2, Home, Users, TrendingUp, AlertCircle, CheckCircle2,
   Clock, DollarSign, Activity, RefreshCw, X, ChevronRight,
   Wallet, FileText, Zap, BarChart3, MapPin, Phone, Mail,
-  ChevronDown, ChevronUp, CalendarDays, Layers, UserCircle, FilterX,
+  ChevronDown, ChevronUp, CalendarDays, Layers, FilterX,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
@@ -25,7 +25,8 @@ import {
   usePropertiesFinancial,
   useUnitsOverview,
   useUnitMonthBreakdown,
-  useTenantsContactList,
+  useTenantContractsDashboard,
+  type TenantContractRow,
   type UnitFinancial,
   type UnitPaymentStatus,
   type UnitOverview,
@@ -34,23 +35,9 @@ import {
   type MonthBreakdown,
 } from "../hook/usePMSDashboard"
 
-// ── Desk navigation (Frappe list) ───────────────────────────────────────────
-
-function deskListPath(doctype: string): string {
-  const slug = doctype.trim().toLowerCase().replace(/\s+/g, "-")
-  return `${window.location.origin}/app/${slug}`
-}
-
-/** Open DocType list in Desk. `filters` is Frappe filter array, e.g. [["status","=","Active"]]. */
-function navigateDeskList(doctype: string, filters?: unknown[][]): void {
-  const path = deskListPath(doctype)
-  if (filters?.length) {
-    const u = new URL(path)
-    u.searchParams.set("filters", JSON.stringify(filters))
-    window.location.assign(u.toString())
-  } else {
-    window.location.assign(path)
-  }
+/** Optional: open submitted contract form in Desk in a new tab. */
+function deskTenantContractUrl(name: string): string {
+  return `${window.location.origin}/app/tenant-contract/${encodeURIComponent(name)}`
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -86,8 +73,8 @@ const MONTH_STATUS: Record<string, { bg: string; text: string; border: string }>
   no_invoice:  { bg: "bg-slate-200",  text: "text-slate-500", border: "border-slate-200" },
 }
 const LEASE_COLORS: Record<string, string> = {
-  Active: "#ca8a04", Expired: "#f59e0b", Draft: "#94a3b8",
-  Terminated: "#ef4444", Signed: "#10b981", Renewed: "#d97706",
+  Active: "#2563eb", Expired: "#f59e0b", Draft: "#94a3b8",
+  Terminated: "#ef4444", Signed: "#10b981", Renewed: "#059669",
 }
 
 const CURRENT_MONTH = "__current__"
@@ -100,14 +87,18 @@ interface KpiCardProps {
   tone?: "gold"|"green"|"amber"|"red"|"slate"
   onClick?: () => void
 }
+/** Small KPI tiles: gold accent strip on top; body stays neutral / icon tint by tone. */
 function KpiCard({ icon, label, value, sub, tone = "gold", onClick }: KpiCardProps) {
   const g = {
-    gold: "from-amber-500 to-amber-800",
+    gold: "from-emerald-600 to-teal-700",
     green: "from-emerald-500 to-teal-600",
     amber: "from-amber-500 to-amber-700",
     red: "from-red-500 to-red-600",
     slate: "from-stone-500 to-stone-700",
   }
+  const strip = (
+    <div className="h-1.5 w-full shrink-0 rounded-t-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-800" aria-hidden />
+  )
   const body = (
     <>
       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g[tone]} text-white flex items-center justify-center shadow-sm`}>{icon}</div>
@@ -117,17 +108,19 @@ function KpiCard({ icon, label, value, sub, tone = "gold", onClick }: KpiCardPro
     </>
   )
   const cardClass =
-    "rounded-xl border border-emerald-100/80 shadow-sm bg-white hover:shadow-md transition-shadow" +
-    (onClick ? " hover:border-amber-300/60 cursor-pointer w-full text-left" : "")
+    "overflow-hidden rounded-xl border border-emerald-100/80 bg-white shadow-sm hover:shadow-md transition-shadow" +
+    (onClick ? " hover:border-emerald-300/70 cursor-pointer w-full text-left" : "")
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={cardClass}>
-        <div className="p-5">{body}</div>
+      <button type="button" onClick={onClick} className={`flex flex-col ${cardClass}`}>
+        {strip}
+        <div className="p-5 w-full">{body}</div>
       </button>
     )
   }
   return (
-    <Card className={cardClass}>
+    <Card className={`${cardClass} p-0`}>
+      {strip}
       <CardContent className="p-5">{body}</CardContent>
     </Card>
   )
@@ -143,7 +136,7 @@ const TONE_VALUE: Record<MetricTone, string> = {
   green:   "text-emerald-600",
   red:     "text-red-600",
   amber:   "text-amber-600",
-  blue:    "text-amber-800",
+  blue:    "text-emerald-700",
 }
 
 type MetricRowNav = MetricRow & { onNavigate?: () => void }
@@ -156,17 +149,18 @@ interface SummaryCardProps {
   rows?: MetricRowNav[]
   pairs?: MetricRowNav[]
 }
+/** Overview metric cards: gold header band only; body stays white. `gradient` should be amber-only. */
 function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: SummaryCardProps) {
   return (
     <Card className="border-slate-200 shadow-md overflow-hidden">
       <div className={`bg-gradient-to-r ${gradient} text-white px-5 py-3.5 flex items-center gap-2.5`}>
-        <div className="p-1.5 bg-white/20 rounded-lg ring-1 ring-amber-200/30">{icon}</div>
+        <div className="p-1.5 bg-white/20 rounded-lg">{icon}</div>
         <span className="font-bold text-base">{title}</span>
       </div>
       <CardContent className="p-0 divide-y divide-slate-100">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="h-5 w-5 text-amber-400 animate-spin"/>
+            <RefreshCw className="h-5 w-5 text-emerald-400 animate-spin"/>
           </div>
         ) : (
           <>
@@ -175,7 +169,7 @@ function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: 
               if (r.onNavigate) {
                 return (
                   <button key={i} type="button" onClick={r.onNavigate}
-                    className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-amber-50/80 transition-colors">
+                    className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-emerald-50/90 transition-colors">
                     <span className="text-sm text-slate-500">{r.label}</span>
                     {val}
                   </button>
@@ -200,7 +194,7 @@ function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: 
                   if (p.onNavigate) {
                     return (
                       <button key={i} type="button" onClick={p.onNavigate}
-                        className="flex flex-col items-center py-4 px-3 hover:bg-amber-50/80 transition-colors">
+                        className="flex flex-col items-center py-4 px-3 hover:bg-emerald-50/90 transition-colors">
                         {body}
                       </button>
                     )
@@ -230,7 +224,7 @@ function MonthTile({ m }: { m: MonthBreakdown }) {
       onMouseLeave={() => setHover(false)}
     >
       <div className={`rounded-lg border-2 ${cfg.border} ${cfg.bg} ${cfg.text} p-2 text-center cursor-default select-none
-        ${m.is_current ? "ring-2 ring-amber-400 ring-offset-1" : ""}`}>
+        ${m.is_current ? "ring-2 ring-emerald-400 ring-offset-1" : ""}`}>
         <p className="text-xs font-bold">{m.month_short}</p>
         <p className="text-[10px] opacity-75">{m.year}</p>
       </div>
@@ -258,7 +252,7 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col border-l border-emerald-100">
       {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-700 via-amber-700 to-amber-950 text-white p-5 flex items-center justify-between shrink-0">
+      <div className="bg-gradient-to-r from-emerald-700 to-teal-800 text-white p-5 flex items-center justify-between shrink-0">
         <div>
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Home className="h-4 w-4 opacity-75" />{unitName}
@@ -272,7 +266,7 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
         </button>
       </div>
 
-      {(loading || bkLoading) && <div className="flex-1 flex items-center justify-center"><RefreshCw className="h-6 w-6 text-amber-600 animate-spin" /></div>}
+      {(loading || bkLoading) && <div className="flex-1 flex items-center justify-center"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin" /></div>}
       {error && <div className="p-4"><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>}
 
       {data && !loading && (
@@ -567,37 +561,37 @@ function PropertyCard({ prop, onUnitClick }: { prop: PropertyFinancial; onUnitCl
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "properties" | "units" | "financial" | "utility" | "tenant_contact"
+type TabId = "overview" | "properties" | "units" | "financial" | "utility" | "tenant_contract"
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: "overview",       label: "Overview",        icon: <BarChart3 className="h-4 w-4" /> },
-  { id: "properties",     label: "Properties",      icon: <Building2 className="h-4 w-4" /> },
-  { id: "units",          label: "Units",           icon: <Layers className="h-4 w-4" /> },
-  { id: "tenant_contact", label: "Tenant contact",  icon: <UserCircle className="h-4 w-4" /> },
-  { id: "financial",      label: "Financial",       icon: <DollarSign className="h-4 w-4" /> },
-  { id: "utility",        label: "Utility",         icon: <Zap className="h-4 w-4" /> },
+  { id: "overview",        label: "Overview",        icon: <BarChart3 className="h-4 w-4" /> },
+  { id: "properties",      label: "Properties",      icon: <Building2 className="h-4 w-4" /> },
+  { id: "units",           label: "Units",           icon: <Layers className="h-4 w-4" /> },
+  { id: "tenant_contract", label: "Tenant Contract", icon: <FileText className="h-4 w-4" /> },
+  { id: "financial",       label: "Financial",       icon: <DollarSign className="h-4 w-4" /> },
+  { id: "utility",         label: "Utility",         icon: <Zap className="h-4 w-4" /> },
 ]
 
-/** Desk — Tenant Contract filters (submitted leases only). */
-function deskContractSubmitted(status?: string): unknown[][] {
-  const row: unknown[][] = [["docstatus", "=", 1]]
-  if (status) row.push(["status", "=", status])
-  return row
+type ContractQuickFilter = null | "total" | "active" | "expired" | "terminated" | "expiring"
+
+function contractMatches(row: TenantContractRow, f: ContractQuickFilter): boolean {
+  if (f === null || f === "total") return true
+  if (f === "expiring") return row.expiring_soon === true
+  if (f === "active") return row.status === "Active"
+  if (f === "expired") return row.status === "Expired"
+  if (f === "terminated") return row.status === "Terminated"
+  return true
 }
 
-function deskContractExpiringSoon(): unknown[][] {
-  const t = new Date()
-  const start = t.toISOString().slice(0, 10)
-  const end = new Date(t.getTime() + 30 * 86400000).toISOString().slice(0, 10)
-  return [
-    ["docstatus", "=", 1],
-    ["status", "=", "Active"],
-    ["end_date", "between", [start, end]],
-  ]
-}
-
-function deskTenantForm(name: string): string {
-  return `${window.location.origin}/app/tenant/${encodeURIComponent(name)}`
+function contractFilterDescription(f: ContractQuickFilter): string {
+  switch (f) {
+    case "total": return "All submitted contracts"
+    case "active": return "Active contracts"
+    case "expired": return "Expired contracts"
+    case "terminated": return "Terminated contracts"
+    case "expiring": return "Expiring within 30 days"
+    default: return ""
+  }
 }
 
 type PropertyQuickFilter = null | "fully_occupied" | "outstanding"
@@ -613,6 +607,8 @@ export default function PMSDashboard() {
   const [selectedUnit, setSelectedUnit]     = useState<string | null>(null)
   const [propertyQuickFilter, setPropertyQuickFilter] = useState<PropertyQuickFilter>(null)
   const [unitsQuickFilter, setUnitsQuickFilter]       = useState<UnitsQuickFilter>(null)
+  const [contractQuickFilter, setContractQuickFilter] = useState<ContractQuickFilter>(null)
+  const [contractSearch, setContractSearch]           = useState("")
 
   const months = useAvailableMonths()
 
@@ -620,16 +616,38 @@ export default function PMSDashboard() {
   const { data: propsData, loading: propLoading, error: propError }              = usePropertiesFinancial()
   const { data: unitsData, loading: unitsLoading, error: unitsError }            = useUnitsOverview()
   const {
-    data: tenantContacts,
-    loading: tenantsLoading,
-    error: tenantsError,
-    reload: tenantsReload,
-  } = useTenantsContactList()
+    data: tenantContractsRaw,
+    loading: contractsLoading,
+    error: contractsError,
+    reload: contractsReload,
+  } = useTenantContractsDashboard()
 
   useEffect(() => {
     if (tab !== "units") setUnitsQuickFilter(null)
     if (tab !== "properties") setPropertyQuickFilter(null)
+    if (tab !== "tenant_contract") setContractQuickFilter(null)
   }, [tab])
+
+  const navigateContracts = (f: ContractQuickFilter) => {
+    setContractQuickFilter(f)
+    setTab("tenant_contract")
+  }
+
+  const filteredTenantContracts = useMemo(() => {
+    let list = tenantContractsRaw.filter(row => contractMatches(row, contractQuickFilter))
+    if (contractSearch.trim()) {
+      const q = contractSearch.toLowerCase()
+      list = list.filter(
+        row =>
+          row.name.toLowerCase().includes(q) ||
+          row.tenant_name.toLowerCase().includes(q) ||
+          row.unit.toLowerCase().includes(q) ||
+          row.property.toLowerCase().includes(q) ||
+          row.status.toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [tenantContractsRaw, contractQuickFilter, contractSearch])
 
   const { month: filterMonth, year: filterYear } = useMemo(() => {
     if (selectedMonth === CURRENT_MONTH) return { month: undefined, year: undefined }
@@ -691,7 +709,7 @@ export default function PMSDashboard() {
   }, [propsData, propSearch, propertyQuickFilter])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-amber-50/35 to-teal-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
       {selectedUnit && <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={() => setSelectedUnit(null)} />}
       {selectedUnit && <UnitDetailPanel unitName={selectedUnit} onClose={() => setSelectedUnit(null)} />}
 
@@ -700,7 +718,7 @@ export default function PMSDashboard() {
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div className="text-center space-y-2 flex-1">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 via-amber-700 to-amber-900 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-teal-800 bg-clip-text text-transparent">
               Property Management Dashboard
             </h1>
             <p className="text-gray-600 text-lg">Portfolio overview · financial health · occupancy analytics</p>
@@ -711,15 +729,15 @@ export default function PMSDashboard() {
         </div>
 
         {/* ── Main card with tab header ── */}
-        <Card className="border-emerald-200/90 shadow-lg ring-1 ring-amber-200/40">
+        <Card className="border-emerald-200 shadow-lg">
           {/* Tab bar as card header */}
-          <CardHeader className="bg-gradient-to-r from-emerald-700 via-amber-700 to-amber-950 text-white rounded-t-lg p-0">
+          <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg p-0">
             <div className="flex items-center overflow-x-auto">
               {TABS.map((t, i) => (
                 <button key={t.id} onClick={() => setTab(t.id)}
                   className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold whitespace-nowrap transition-all shrink-0
                     ${i === 0 ? "rounded-tl-lg" : ""}
-                    ${tab === t.id ? "bg-white/20 border-b-2 border-amber-200 text-white" : "text-amber-100/90 hover:text-white hover:bg-white/10"}`}>
+                    ${tab === t.id ? "bg-white/20 border-b-2 border-white text-white" : "text-emerald-200 hover:text-white hover:bg-white/10"}`}>
                   {t.icon}{t.label}
                 </button>
               ))}
@@ -734,17 +752,17 @@ export default function PMSDashboard() {
               {/* ── Summary cards row — screenshot style ── */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
 
-                {/* Contracts → Desk list with filters */}
+                {/* Contracts → Tenant Contract tab with filters */}
                 <SummaryCard
                   title="Contracts" icon={<FileText className="h-5 w-5"/>}
-                  gradient="from-emerald-700 via-amber-700 to-amber-950"
+                  gradient="from-amber-600 to-amber-800"
                   loading={ovLoading}
                   rows={[
                     {
                       label: "Total Contracts",
                       value: overview?.total_contracts ?? 0,
                       tone: "default",
-                      onNavigate: () => navigateDeskList("Tenant Contract", deskContractSubmitted()),
+                      onNavigate: () => navigateContracts("total"),
                     },
                   ]}
                   pairs={[
@@ -752,25 +770,25 @@ export default function PMSDashboard() {
                       label: "Active",
                       value: overview?.active_contracts ?? 0,
                       tone: "green",
-                      onNavigate: () => navigateDeskList("Tenant Contract", deskContractSubmitted("Active")),
+                      onNavigate: () => navigateContracts("active"),
                     },
                     {
                       label: "Expired",
                       value: overview?.expired_contracts ?? 0,
                       tone: "red",
-                      onNavigate: () => navigateDeskList("Tenant Contract", deskContractSubmitted("Expired")),
+                      onNavigate: () => navigateContracts("expired"),
                     },
                     {
                       label: "Terminated",
                       value: overview?.terminated_contracts ?? 0,
                       tone: "red",
-                      onNavigate: () => navigateDeskList("Tenant Contract", deskContractSubmitted("Terminated")),
+                      onNavigate: () => navigateContracts("terminated"),
                     },
                     {
                       label: "Expiring (30d)",
                       value: overview?.expiring_soon ?? 0,
                       tone: "amber",
-                      onNavigate: () => navigateDeskList("Tenant Contract", deskContractExpiringSoon()),
+                      onNavigate: () => navigateContracts("expiring"),
                     },
                   ]}
                 />
@@ -778,7 +796,7 @@ export default function PMSDashboard() {
                 {/* Properties — Occupied / Vacant → Units tab */}
                 <SummaryCard
                   title="Properties" icon={<Building2 className="h-5 w-5"/>}
-                  gradient="from-teal-600 via-amber-600 to-amber-900"
+                  gradient="from-amber-500 to-amber-700"
                   loading={ovLoading}
                   rows={[
                     { label: "Total Properties", value: overview?.total_properties ?? 0, tone: "default" },
@@ -803,7 +821,7 @@ export default function PMSDashboard() {
                 {/* Invoices — display only (no drill-down) */}
                 <SummaryCard
                   title="Invoices" icon={<DollarSign className="h-5 w-5"/>}
-                  gradient="from-emerald-600 via-amber-600 to-amber-950"
+                  gradient="from-amber-600 to-amber-800"
                   loading={ovLoading}
                   rows={[
                     {
@@ -828,8 +846,8 @@ export default function PMSDashboard() {
 
               {/* ── Revenue trend + Lease status charts ── */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <Card className="xl:col-span-2 border-emerald-100 shadow-sm ring-1 ring-amber-100/60">
-                  <CardHeader className="bg-gradient-to-r from-emerald-700 via-amber-700 to-amber-950 text-white rounded-t-lg px-6 py-4">
+                <Card className="xl:col-span-2 border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
                     <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4"/>Revenue Trend — Last 6 Months</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 pr-2">
@@ -842,15 +860,15 @@ export default function PMSDashboard() {
                           <Tooltip formatter={(v:number)=>fmt(v)} contentStyle={{fontSize:12,borderRadius:8}}/>
                           <Legend wrapperStyle={{fontSize:12}}/>
                           <Bar dataKey="revenue" name="Invoiced" fill="#059669" radius={[4,4,0,0]}/>
-                          <Bar dataKey="collected" name="Collected" fill="#ca8a04" radius={[4,4,0,0]}/>
+                          <Bar dataKey="collected" name="Collected" fill="#10b981" radius={[4,4,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     ) : <div className="h-[240px] flex items-center justify-center text-slate-400 text-sm">No revenue data</div>}
                   </CardContent>
                 </Card>
 
-                <Card className="border-emerald-100 shadow-sm ring-1 ring-amber-100/60">
-                  <CardHeader className="bg-gradient-to-r from-emerald-700 via-amber-700 to-amber-950 text-white rounded-t-lg px-6 py-4">
+                <Card className="border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
                     <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4"/>Lease Status</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4">
@@ -885,8 +903,8 @@ export default function PMSDashboard() {
               {/* ── Top tenants + Properties tables ── */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {/* Top tenants */}
-                <Card className="border-emerald-100 shadow-sm ring-1 ring-amber-100/60">
-                  <CardHeader className="bg-gradient-to-r from-emerald-700 via-amber-700 to-amber-950 text-white rounded-t-lg px-5 py-3">
+                <Card className="border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
                     <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                       <Users className="h-4 w-4"/>Top Tenants by Monthly Rent
                     </CardTitle>
@@ -918,8 +936,8 @@ export default function PMSDashboard() {
                 </Card>
 
                 {/* Properties table */}
-                <Card className="border-emerald-100 shadow-sm ring-1 ring-amber-100/60">
-                  <CardHeader className="bg-gradient-to-r from-emerald-700 via-amber-700 to-amber-950 text-white rounded-t-lg px-5 py-3">
+                <Card className="border-emerald-100 shadow-sm">
+                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
                     <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                       <Building2 className="h-4 w-4"/>Properties
                     </CardTitle>
@@ -987,14 +1005,14 @@ export default function PMSDashboard() {
               </div>
 
               {propertyQuickFilter && (
-                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
                   <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
                   <span className="font-medium">
                     {propertyQuickFilter === "fully_occupied"
                       ? "Showing fully occupied properties only"
                       : "Showing properties with outstanding balance"}
                   </span>
-                  <Button type="button" variant="outline" size="sm" className="ml-auto border-amber-300 text-amber-900"
+                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
                     onClick={() => setPropertyQuickFilter(null)}>
                     Clear
                   </Button>
@@ -1010,7 +1028,7 @@ export default function PMSDashboard() {
               />
 
               {propLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-amber-600 animate-spin"/></div>
+                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
               ) : filteredProps.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No properties found</p></div>
               ) : (
@@ -1056,7 +1074,7 @@ export default function PMSDashboard() {
               </div>
 
               {unitsQuickFilter && (
-                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
                   <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
                   <span className="font-medium">
                     {unitsQuickFilter === "occupied" && "Showing occupied units only"}
@@ -1064,7 +1082,7 @@ export default function PMSDashboard() {
                     {unitsQuickFilter === "overdue" && "Showing units with overdue amounts"}
                     {unitsQuickFilter === "outstanding" && "Showing units with outstanding balance"}
                   </span>
-                  <Button type="button" variant="outline" size="sm" className="ml-auto border-amber-300 text-amber-900"
+                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
                     onClick={() => setUnitsQuickFilter(null)}>
                     Clear
                   </Button>
@@ -1101,7 +1119,7 @@ export default function PMSDashboard() {
               </div>
 
               {unitsLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-amber-600 animate-spin"/></div>
+                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
               ) : filteredUnits.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
               ) : (
@@ -1176,63 +1194,83 @@ export default function PMSDashboard() {
             </CardContent>
           )}
 
-          {/* ── TENANT CONTACT ── */}
-          {tab === "tenant_contact" && (
+          {/* ── TENANT CONTRACT ── */}
+          {tab === "tenant_contract" && (
             <CardContent className="p-6 space-y-4">
-              {tenantsError && (
-                <Alert variant="destructive"><AlertDescription>{tenantsError}</AlertDescription></Alert>
+              {contractsError && (
+                <Alert variant="destructive"><AlertDescription>{contractsError}</AlertDescription></Alert>
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-slate-600 text-sm max-w-xl">
-                  Contact details from the <span className="font-medium text-amber-900">Tenant</span> register. Open a record in Desk to edit.
+                  Submitted <span className="font-medium text-emerald-800">Tenant Contract</span> records — same filters as Overview shortcuts below.
                 </p>
-                <Button variant="outline" type="button" className="border-amber-200 text-amber-950" onClick={tenantsReload}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${tenantsLoading ? "animate-spin" : ""}`}/>Refresh
+                <Button variant="outline" type="button" className="border-emerald-200" onClick={contractsReload}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${contractsLoading ? "animate-spin" : ""}`}/>Refresh
                 </Button>
               </div>
-              {tenantsLoading && !tenantContacts.length ? (
-                <div className="flex items-center justify-center py-16">
-                  <RefreshCw className="h-6 w-6 text-amber-600 animate-spin"/>
+
+              {contractQuickFilter !== null && (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                  <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
+                  <span className="font-medium">{contractFilterDescription(contractQuickFilter)}</span>
+                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                    onClick={() => setContractQuickFilter(null)}>
+                    Clear filter
+                  </Button>
                 </div>
-              ) : tenantContacts.length === 0 ? (
-                <div className="text-center text-slate-400 text-sm py-16 border border-dashed border-amber-200/80 rounded-xl bg-amber-50/30">
-                  No tenants found
+              )}
+
+              <input
+                className="w-full max-w-md px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                placeholder="Search contract, tenant, unit, property…"
+                value={contractSearch}
+                onChange={e => setContractSearch(e.target.value)}
+              />
+
+              {contractsLoading && !tenantContractsRaw.length ? (
+                <div className="flex items-center justify-center py-16">
+                  <RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/>
+                </div>
+              ) : filteredTenantContracts.length === 0 ? (
+                <div className="text-center text-slate-400 text-sm py-16 border border-dashed border-emerald-200 rounded-xl bg-emerald-50/40">
+                  No contracts match this view
                 </div>
               ) : (
-                <Card className="border-emerald-100 shadow-sm ring-1 ring-amber-100/60 overflow-hidden">
+                <Card className="border-emerald-100 shadow-sm overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-amber-50/80">
-                        <TableHead className="text-amber-950/90 text-xs font-semibold pl-4">Tenant</TableHead>
-                        <TableHead className="text-amber-950/90 text-xs font-semibold">Status</TableHead>
-                        <TableHead className="text-amber-950/90 text-xs font-semibold">Email</TableHead>
-                        <TableHead className="text-amber-950/90 text-xs font-semibold">Phone</TableHead>
-                        <TableHead className="text-amber-950/90 text-xs font-semibold">Property / unit</TableHead>
-                        <TableHead className="text-amber-950/90 text-xs font-semibold text-right pr-4">Desk</TableHead>
+                      <TableRow className="bg-emerald-50">
+                        <TableHead className="text-teal-800 text-xs font-semibold pl-4">Contract</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Status</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Rent / mo</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">End date</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Open</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tenantContacts.map(t => (
-                        <TableRow key={t.name} className="hover:bg-amber-50/50">
-                          <TableCell className="pl-4 font-medium text-slate-800 text-sm">{t.tenant_name}</TableCell>
-                          <TableCell className="text-xs text-slate-600">{t.status || "—"}</TableCell>
-                          <TableCell>
-                            {t.email
-                              ? <a className="text-sm text-amber-800 hover:underline" href={`mailto:${t.email}`}>{t.email}</a>
-                              : <span className="text-xs text-slate-400">—</span>}
+                      {filteredTenantContracts.map(c => (
+                        <TableRow key={c.name} className="hover:bg-emerald-50/50">
+                          <TableCell className="pl-4 font-mono text-xs text-slate-800">{c.name}</TableCell>
+                          <TableCell className="text-xs">
+                            <span className={`font-medium px-2 py-0.5 rounded-full border ${
+                              c.status === "Active" ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : c.status === "Terminated" ? "bg-red-50 text-red-800 border-red-200"
+                                : "bg-slate-50 text-slate-700 border-slate-200"
+                            }`}>{c.status}</span>
+                            {c.expiring_soon && <span className="ml-1 text-[10px] font-semibold text-amber-700">30d</span>}
                           </TableCell>
-                          <TableCell>
-                            {t.mobile_no
-                              ? <a className="text-sm text-slate-700 hover:underline" href={`tel:${t.mobile_no}`}>{t.mobile_no}</a>
-                              : <span className="text-xs text-slate-400">—</span>}
-                          </TableCell>
-                          <TableCell className="text-xs text-slate-600">
-                            {[t.property, t.current_unit].filter(Boolean).join(" · ") || "—"}
-                          </TableCell>
+                          <TableCell className="text-sm text-slate-800">{c.tenant_name}</TableCell>
+                          <TableCell className="text-sm text-slate-700">{c.unit || "—"}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{c.property || "—"}</TableCell>
+                          <TableCell className="text-right text-sm font-medium text-slate-800">{fmt(c.monthly_rent)}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{fmtDate(c.end_date)}</TableCell>
                           <TableCell className="text-right pr-4">
                             <a
-                              href={deskTenantForm(t.name)}
-                              className="text-xs font-medium text-amber-800 hover:underline"
+                              href={deskTenantContractUrl(c.name)}
+                              className="text-xs font-medium text-emerald-700 hover:underline"
                               target="_blank"
                               rel="noopener noreferrer"
                             >
@@ -1285,7 +1323,7 @@ export default function PMSDashboard() {
               </div>
               {finError && <Alert variant="destructive"><AlertDescription>{finError}</AlertDescription></Alert>}
               {finLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-amber-600 animate-spin"/></div>
+                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
               ) : filteredFinancial.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No contracts found for this period</p></div>
               ) : (

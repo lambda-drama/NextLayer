@@ -5,7 +5,7 @@ Whitelisted API endpoints powering the Property Management Dashboard.
 """
 
 import frappe
-from frappe.utils import nowdate, flt, getdate, add_months, get_first_day, get_last_day
+from frappe.utils import nowdate, flt, getdate, add_months, add_days, get_first_day, get_last_day
 from datetime import date
 import calendar
 
@@ -58,7 +58,6 @@ def get_dashboard_overview():
 	terminated_contracts = lease_status.get("Terminated", 0)
 
 	# Contracts expiring within next 30 days
-	from frappe.utils import add_days
 	expiry_cutoff = add_days(today, 30)
 	expiring_soon = frappe.db.count("Tenant Contract", filters={
 		"status": "Active",
@@ -657,39 +656,55 @@ def get_available_months():
 
 
 @frappe.whitelist()
-def get_tenants_contact_list():
-	"""Tenant directory with contact fields for the dashboard Tenant Contact tab."""
-	tenants = frappe.db.get_all(
-		"Tenant",
+def get_tenant_contracts_dashboard():
+	"""Submitted Tenant Contracts for the dashboard Tenant Contract tab (filter client-side)."""
+	today = getdate(nowdate())
+	expiry_cutoff = add_days(today, 30)
+
+	rows = frappe.db.get_all(
+		"Tenant Contract",
+		filters={"docstatus": 1},
 		fields=[
 			"name",
-			"tenant_name",
-			"email",
-			"mobile_no",
 			"status",
-			"current_unit",
-			"emergency_contact_name",
-			"emergency_phone",
+			"party_name",
+			"unit",
+			"property",
+			"monthly_rent",
+			"start_date",
+			"end_date",
+			"company",
 		],
-		order_by="tenant_name asc",
+		order_by="modified desc",
 		limit=500,
 	)
+
 	out = []
-	for t in tenants:
+	for r in rows:
+		tenant_label = frappe.db.get_value("Tenant", r.party_name, "tenant_name") or r.party_name or ""
 		prop_display = ""
-		if t.get("current_unit"):
-			prop_id = frappe.db.get_value("Unit", t.current_unit, "property") or ""
-			if prop_id:
-				prop_display = frappe.db.get_value("Property", prop_id, "property_name") or prop_id
+		if r.get("property"):
+			prop_display = frappe.db.get_value("Property", r.property, "property_name") or r.property
+
+		end_d = getdate(r.end_date) if r.end_date else None
+		expiring_soon = (
+			r.status == "Active"
+			and end_d is not None
+			and today <= end_d <= expiry_cutoff
+		)
+
 		out.append({
-			"name": t.name,
-			"tenant_name": t.get("tenant_name") or t.name,
-			"email": t.get("email") or "",
-			"mobile_no": t.get("mobile_no") or "",
-			"status": t.get("status") or "",
-			"current_unit": t.get("current_unit") or "",
-			"property": prop_display,
-			"emergency_contact_name": t.get("emergency_contact_name") or "",
-			"emergency_phone": t.get("emergency_phone") or "",
+			"name": r.name,
+			"status": r.status or "",
+			"tenant_name": tenant_label,
+			"party_name": r.party_name or "",
+			"unit": r.unit or "",
+			"property": prop_display or "",
+			"monthly_rent": flt(r.monthly_rent),
+			"start_date": str(r.start_date) if r.start_date else "",
+			"end_date": str(r.end_date) if r.end_date else "",
+			"company": r.company or "",
+			"expiring_soon": expiring_soon,
 		})
+
 	return out
