@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -9,13 +9,12 @@ import {
   RefreshCw, X, ChevronRight, Users, DollarSign, Briefcase,
   CalendarDays, Clock, Phone, Search, Filter, FileText,
   TrendingUp, CheckCircle2, AlertCircle, Building2, Layers,
-  ChevronDown, ChevronUp, Leaf, TreePine,
+  ChevronDown, Leaf, TreePine,
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Alert, AlertDescription } from "./ui/alert"
 
 import {
@@ -41,16 +40,10 @@ function fmtDate(d: string | null | undefined): string {
   try { return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) }
   catch { return d }
 }
-/** Normalise any datetime/time string to a JS Date-parseable ISO string */
 function toIso(t: string): string {
-  // "2026-04-27 08:30:00"  →  "2026-04-27T08:30:00"
-  // "08:30:00"             →  "1970-01-01T08:30:00"
-  // "2026-04-27T08:30:00"  →  unchanged
   if (!t) return ""
-  const normalised = t.replace(" ", "T")           // space → T
-  if (/^\d{2}:\d{2}/.test(normalised)) {            // time-only
-    return `1970-01-01T${normalised}`
-  }
+  const normalised = t.replace(" ", "T")
+  if (/^\d{2}:\d{2}/.test(normalised)) return `1970-01-01T${normalised}`
   return normalised
 }
 function fmtTime(t: string | null | undefined): string {
@@ -59,7 +52,7 @@ function fmtTime(t: string | null | undefined): string {
     const iso = toIso(t)
     const d = new Date(iso)
     if (isNaN(d.getTime())) return "—"
-    return d.toTimeString().slice(0, 5)             // "HH:MM"
+    return d.toTimeString().slice(0, 5)
   } catch { return "—" }
 }
 function duration(checkin: string, checkout: string): string {
@@ -74,7 +67,6 @@ function duration(checkin: string, checkout: string): string {
     return `${h}h ${m > 0 ? ` ${m}m` : ""}`
   } catch { return "—" }
 }
-/** Strip HTML tags from Quill / rich-text fields */
 function stripHtml(html: string | null | undefined): string {
   if (!html) return ""
   try {
@@ -93,7 +85,147 @@ const STATUS_CFG: Record<string, { bg: string; text: string; border: string; dot
 }
 
 const ALL_VAL = "__all__"
-const TODAY_VAL = "__today__"
+
+// ── Searchable Combobox ───────────────────────────────────────────────────────
+
+interface ComboboxOption {
+  value: string
+  label: string
+}
+
+interface SearchableComboboxProps {
+  value: string
+  onChange: (val: string) => void
+  options: ComboboxOption[]
+  placeholder?: string
+  allLabel?: string
+  className?: string
+}
+
+function SearchableCombobox({
+  value,
+  onChange,
+  options,
+  placeholder = "Select…",
+  allLabel = "All",
+  className = "",
+}: SearchableComboboxProps) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const allOption: ComboboxOption = { value: ALL_VAL, label: allLabel }
+  const allOptions = [allOption, ...options]
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return allOptions
+    const q = query.toLowerCase()
+    return allOptions.filter(o => o.label.toLowerCase().includes(q))
+  }, [query, options])
+
+  const selectedLabel = allOptions.find(o => o.value === value)?.label ?? placeholder
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery("")
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  function handleOpen() {
+    setOpen(o => !o)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  function handleSelect(val: string) {
+    onChange(val)
+    setOpen(false)
+    setQuery("")
+  }
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={handleOpen}
+        className={`
+          w-full h-9 px-3 pr-8 text-sm text-left rounded-md border
+          flex items-center justify-between gap-2
+          transition-all duration-150
+          ${open
+            ? "border-green-500 ring-2 ring-green-200 bg-green-50"
+            : "border-green-200 bg-white hover:border-green-400 hover:bg-green-50/40"
+          }
+          text-slate-700 font-medium
+        `}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-green-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="
+          absolute left-0 top-full mt-1 z-50 min-w-full w-max max-w-xs
+          rounded-xl border border-green-200 shadow-xl
+          bg-green-50/95 backdrop-blur-sm
+          overflow-hidden
+        ">
+          {/* Search input */}
+          <div className="p-2 border-b border-green-200 bg-green-100/70">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-green-600" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search…"
+                className="
+                  w-full pl-8 pr-3 py-1.5 text-sm rounded-lg
+                  border border-green-300 bg-white/80
+                  focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400
+                  placeholder:text-green-400 text-slate-700
+                "
+              />
+            </div>
+          </div>
+
+          {/* Options list */}
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-green-600 text-center">No results</div>
+            ) : (
+              filtered.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSelect(opt.value)}
+                  className={`
+                    w-full text-left px-3 py-2 text-sm transition-colors
+                    ${opt.value === value
+                      ? "bg-green-600 text-white font-semibold"
+                      : "text-slate-700 hover:bg-green-200/60 hover:text-green-900"
+                    }
+                  `}
+                >
+                  {opt.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
@@ -113,8 +245,6 @@ function KpiCard({ icon, label, value, sub, gradient }: {
     </Card>
   )
 }
-
-// ── Worker row (collapsible within the detail panel) ─────────────────────────
 
 // ── Detail Panel ─────────────────────────────────────────────────────────────
 
@@ -164,8 +294,6 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
 
       {data && !loading && (
         <div className="flex-1 overflow-y-auto">
-
-          {/* Summary cards */}
           <div className="p-4 grid grid-cols-3 gap-3">
             <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
               <p className="text-xs text-green-600 font-medium">Workers</p>
@@ -181,7 +309,6 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
             </div>
           </div>
 
-          {/* Meta */}
           <div className="px-4 pb-3">
             <div className="grid grid-cols-2 gap-2 text-sm">
               {data.company && <div className="bg-slate-50 rounded-lg px-3 py-2"><p className="text-xs text-slate-400">Company</p><p className="font-medium">{data.company}</p></div>}
@@ -196,7 +323,6 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
             )}
           </div>
 
-          {/* Sub-view toggle */}
           <div className="px-4 pb-2 flex gap-2 border-b border-green-100">
             <button onClick={() => setView("workers")}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${view === "workers" ? "bg-green-700 text-white shadow-sm" : "text-green-700 hover:bg-green-50"}`}>
@@ -208,7 +334,6 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
             </button>
           </div>
 
-          {/* Workers view */}
           {view === "workers" && (
             <div className="p-4 space-y-3">
               {data.wages.length > 5 && (
@@ -268,7 +393,6 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
             </div>
           )}
 
-          {/* Work type view */}
           {view === "worktype" && (
             <div className="p-4">
               {data.work_breakdown.length === 0 ? (
@@ -296,7 +420,7 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
   )
 }
 
-// ── Wage Entry row (expandable inline summary) ────────────────────────────────
+// ── Wage Entry row ────────────────────────────────────────────────────────────
 
 function WageEntryRow({ entry, onOpen }: { entry: WageEntry; onOpen: () => void }) {
   const cfg = STATUS_CFG[entry.status_label] ?? STATUS_CFG.Draft
@@ -344,12 +468,12 @@ export default function WageEntryReport() {
   const [tab, setTab] = useState<TabId>("list")
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null)
 
-  const [project, setProject]     = useState<string>(ALL_VAL)
-  const [company, setCompany]     = useState<string>(ALL_VAL)
-  const [status, setStatus]       = useState<string>(ALL_VAL)
-  const [dateFrom, setDateFrom]   = useState<string>("")
-  const [dateTo, setDateTo]       = useState<string>("")
-  const [search, setSearch]       = useState<string>("")
+  const [project, setProject]   = useState<string>(ALL_VAL)
+  const [company, setCompany]   = useState<string>(ALL_VAL)
+  const [status, setStatus]     = useState<string>(ALL_VAL)
+  const [dateFrom, setDateFrom] = useState<string>("")
+  const [dateTo, setDateTo]     = useState<string>("")
+  const [search, setSearch]     = useState<string>("")
 
   const opts = useWageFilterOptions()
 
@@ -373,7 +497,6 @@ export default function WageEntryReport() {
     setDateFrom(t); setDateTo(t)
   }
   function clearDates() { setDateFrom(""); setDateTo("") }
-
   function reload() { sumReload(); listReload() }
 
   const filteredEntries = useMemo(() => {
@@ -420,51 +543,76 @@ export default function WageEntryReport() {
         {/* ── Filters ── */}
         <Card className="border-green-200 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1"><Briefcase className="h-3 w-3"/>Project</label>
-                <Select value={project} onValueChange={setProject}>
-                  <SelectTrigger className="w-48 border-green-200 text-sm"><SelectValue placeholder="All Projects"/></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VAL}>All Projects</SelectItem>
-                    {opts.projects.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1"><Building2 className="h-3 w-3"/>Company</label>
-                <Select value={company} onValueChange={setCompany}>
-                  <SelectTrigger className="w-44 border-green-200 text-sm"><SelectValue placeholder="All Companies"/></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VAL}>All Companies</SelectItem>
-                    {opts.companies.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1"><Filter className="h-3 w-3"/>Status</label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="w-36 border-green-200 text-sm"><SelectValue placeholder="All Status"/></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_VAL}>All Status</SelectItem>
-                    {opts.statuses.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1"><CalendarDays className="h-3 w-3"/>Date From</label>
-                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                  className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-green-700 uppercase tracking-wide">Date To</label>
-                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                  className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300" />
-              </div>
-              <div className="flex gap-2 pb-0.5">
-                <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50" onClick={setToday}>Today</Button>
+            {/*
+              All labels sit in a CSS grid row at the top,
+              all inputs sit in the second row at the bottom.
+              Each column is sized to its input width.
+            */}
+            <div
+              className="grid items-end gap-x-3 gap-y-1"
+              style={{ gridTemplateColumns: "11rem 11rem 9rem 10rem 10rem auto" }}
+            >
+              {/* ── ROW 1: labels ── */}
+              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+                <Building2 className="h-3 w-3" />Company
+              </label>
+              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+                <Briefcase className="h-3 w-3" />Project
+              </label>
+              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+                <Filter className="h-3 w-3" />Status
+              </label>
+              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+                <CalendarDays className="h-3 w-3" />Date From
+              </label>
+              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+                Date To
+              </label>
+              {/* empty header cell for buttons column */}
+              <span />
+
+              {/* ── ROW 2: fields ── */}
+              <SearchableCombobox
+                value={company}
+                onChange={setCompany}
+                options={opts.companies}
+                allLabel="All Companies"
+                className="w-full"
+              />
+              <SearchableCombobox
+                value={project}
+                onChange={setProject}
+                options={opts.projects}
+                allLabel="All Projects"
+                className="w-full"
+              />
+              <SearchableCombobox
+                value={status}
+                onChange={setStatus}
+                options={opts.statuses}
+                allLabel="All Status"
+                className="w-full"
+              />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white hover:border-green-400 w-full"
+              />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white hover:border-green-400 w-full"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap" onClick={setToday}>
+                  Today
+                </Button>
                 {(dateFrom || dateTo) && (
-                  <Button size="sm" variant="ghost" className="text-slate-400 hover:text-slate-600" onClick={clearDates}>Clear</Button>
+                  <Button size="sm" variant="ghost" className="text-slate-400 hover:text-slate-600" onClick={clearDates}>
+                    Clear
+                  </Button>
                 )}
               </div>
             </div>
@@ -473,19 +621,18 @@ export default function WageEntryReport() {
 
         {/* ── KPI cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-4">
-          <KpiCard icon={<FileText className="h-5 w-5"/>}     label="Total Entries"    value={summary?.total_entries ?? "—"}                     gradient="from-green-600 to-green-800"/>
-          <KpiCard icon={<DollarSign className="h-5 w-5"/>}   label="Total Amount"     value={summary ? fmt(summary.total_amount) : "—"}          gradient="from-emerald-500 to-emerald-700"/>
-          <KpiCard icon={<Users className="h-5 w-5"/>}        label="Total Workers"    value={summary?.total_workers ?? "—"}                      gradient="from-teal-500 to-teal-700"/>
-          <KpiCard icon={<Briefcase className="h-5 w-5"/>}    label="Projects"         value={summary?.unique_projects ?? "—"}                    gradient="from-green-700 to-emerald-800"/>
-          <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Submitted"        value={summary?.submitted_count ?? "—"}                    gradient="from-emerald-600 to-emerald-800"/>
-          <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Draft"            value={summary?.draft_count ?? "—"}                        gradient="from-amber-500 to-amber-700"/>
-          <KpiCard icon={<CalendarDays className="h-5 w-5"/>} label="Today Entries"    value={summary?.today_count ?? "—"}                        gradient="from-green-600 to-teal-700"/>
-          <KpiCard icon={<TrendingUp className="h-5 w-5"/>}   label="Today Amount"     value={summary ? fmt(summary.today_amount) : "—"}          gradient="from-teal-600 to-emerald-700"/>
+          <KpiCard icon={<FileText className="h-5 w-5"/>}     label="Total Entries"  value={summary?.total_entries ?? "—"}              gradient="from-green-600 to-green-800"/>
+          <KpiCard icon={<DollarSign className="h-5 w-5"/>}   label="Total Amount"   value={summary ? fmt(summary.total_amount) : "—"}  gradient="from-emerald-500 to-emerald-700"/>
+          <KpiCard icon={<Users className="h-5 w-5"/>}        label="Total Workers"  value={summary?.total_workers ?? "—"}              gradient="from-teal-500 to-teal-700"/>
+          <KpiCard icon={<Briefcase className="h-5 w-5"/>}    label="Projects"       value={summary?.unique_projects ?? "—"}            gradient="from-green-700 to-emerald-800"/>
+          <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Submitted"      value={summary?.submitted_count ?? "—"}            gradient="from-emerald-600 to-emerald-800"/>
+          <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Draft"          value={summary?.draft_count ?? "—"}                gradient="from-amber-500 to-amber-700"/>
+          <KpiCard icon={<CalendarDays className="h-5 w-5"/>} label="Today Entries"  value={summary?.today_count ?? "—"}                gradient="from-green-600 to-teal-700"/>
+          <KpiCard icon={<TrendingUp className="h-5 w-5"/>}   label="Today Amount"   value={summary ? fmt(summary.today_amount) : "—"}  gradient="from-teal-600 to-emerald-700"/>
         </div>
 
         {/* ── Main card ── */}
         <Card className="border-green-200 shadow-lg">
-          {/* Tab bar */}
           <CardHeader className="bg-gradient-to-r from-green-700 to-emerald-800 text-white rounded-t-lg p-0">
             <div className="flex items-center">
               {TABS.map((t, i) => (
@@ -504,7 +651,6 @@ export default function WageEntryReport() {
             <CardContent className="p-4 space-y-4">
               {listError && <Alert variant="destructive"><AlertDescription>{listError}</AlertDescription></Alert>}
 
-              {/* Search */}
               <div className="flex items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

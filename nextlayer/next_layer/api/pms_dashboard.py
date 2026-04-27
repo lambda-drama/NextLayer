@@ -654,3 +654,42 @@ def get_available_months():
 			"year": ref.year,
 		})
 	return months
+
+
+@frappe.whitelist()
+def get_tenants_contact_list():
+	"""Tenant directory with contact fields for the dashboard Tenant Contact tab."""
+	tenants = frappe.db.get_all(
+		"Tenant",
+		fields=[
+			"name",
+			"tenant_name",
+			"email",
+			"mobile_no",
+			"status",
+			"current_unit",
+			"emergency_contact_name",
+			"emergency_phone",
+		],
+		order_by="tenant_name asc",
+		limit=500,
+	)
+	out = []
+	for t in tenants:
+		prop_display = ""
+		if t.get("current_unit"):
+			prop_id = frappe.db.get_value("Unit", t.current_unit, "property") or ""
+			if prop_id:
+				prop_display = frappe.db.get_value("Property", prop_id, "property_name") or prop_id
+		out.append({
+			"name": t.name,
+			"tenant_name": t.get("tenant_name") or t.name,
+			"email": t.get("email") or "",
+			"mobile_no": t.get("mobile_no") or "",
+			"status": t.get("status") or "",
+			"current_unit": t.get("current_unit") or "",
+			"property": prop_display,
+			"emergency_contact_name": t.get("emergency_contact_name") or "",
+			"emergency_phone": t.get("emergency_phone") or "",
+		})
+	return out
