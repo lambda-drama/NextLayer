@@ -1,10 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell,
-} from "recharts"
+import { useEffect, useState, useMemo } from "react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -13,7 +9,7 @@ import {
   Building2, Home, Users, TrendingUp, AlertCircle, CheckCircle2,
   Clock, DollarSign, Activity, RefreshCw, X, ChevronRight,
   Wallet, FileText, Zap, BarChart3, MapPin, Phone, Mail,
-  ChevronDown, ChevronUp, CalendarDays, Layers,
+  ChevronDown, ChevronUp, CalendarDays, Layers, FilterX,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
@@ -29,6 +25,8 @@ import {
   usePropertiesFinancial,
   useUnitsOverview,
   useUnitMonthBreakdown,
+  useTenantContractsDashboard,
+  type TenantContractRow,
   type UnitFinancial,
   type UnitPaymentStatus,
   type UnitOverview,
@@ -36,6 +34,11 @@ import {
   type PropertyFinancial,
   type MonthBreakdown,
 } from "../hook/usePMSDashboard"
+
+/** Optional: open submitted contract form in Desk in a new tab. */
+function deskTenantContractUrl(name: string): string {
+  return `${window.location.origin}/app/tenant-contract/${encodeURIComponent(name)}`
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,7 +74,7 @@ const MONTH_STATUS: Record<string, { bg: string; text: string; border: string }>
 }
 const LEASE_COLORS: Record<string, string> = {
   Active: "#2563eb", Expired: "#f59e0b", Draft: "#94a3b8",
-  Terminated: "#ef4444", Signed: "#10b981",
+  Terminated: "#ef4444", Signed: "#10b981", Renewed: "#059669",
 }
 
 const CURRENT_MONTH = "__current__"
@@ -79,18 +82,46 @@ const ALL_PROPS     = "__all__"
 
 // ── Small components ──────────────────────────────────────────────────────────
 
-interface KpiCardProps { icon: React.ReactNode; label: string; value: string | number; sub?: string; tone?: "blue"|"green"|"amber"|"red"|"slate" }
-function KpiCard({ icon, label, value, sub, tone = "blue" }: KpiCardProps) {
-  const g = { blue:"from-emerald-600 to-teal-700", green:"from-emerald-500 to-teal-600",
-               amber:"from-amber-500 to-amber-700", red:"from-red-500 to-red-600", slate:"from-stone-500 to-stone-700" }
+interface KpiCardProps {
+  icon: React.ReactNode; label: string; value: string | number; sub?: string
+  tone?: "gold"|"green"|"amber"|"red"|"slate"
+  onClick?: () => void
+}
+/** Small KPI tiles: gold accent strip on top; body stays neutral / icon tint by tone. */
+function KpiCard({ icon, label, value, sub, tone = "gold", onClick }: KpiCardProps) {
+  const g = {
+    gold: "from-emerald-600 to-teal-700",
+    green: "from-emerald-500 to-teal-600",
+    amber: "from-amber-500 to-amber-700",
+    red: "from-red-500 to-red-600",
+    slate: "from-stone-500 to-stone-700",
+  }
+  const strip = (
+    <div className="h-1.5 w-full shrink-0 rounded-t-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-800" aria-hidden />
+  )
+  const body = (
+    <>
+      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g[tone]} text-white flex items-center justify-center shadow-sm`}>{icon}</div>
+      <p className="text-2xl font-bold text-slate-800 mt-3">{value}</p>
+      <p className="text-sm font-medium text-slate-500 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+    </>
+  )
+  const cardClass =
+    "overflow-hidden rounded-xl border border-emerald-100/80 bg-white shadow-sm hover:shadow-md transition-shadow" +
+    (onClick ? " hover:border-emerald-300/70 cursor-pointer w-full text-left" : "")
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`flex flex-col ${cardClass}`}>
+        {strip}
+        <div className="p-5 w-full">{body}</div>
+      </button>
+    )
+  }
   return (
-    <Card className="border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
-      <CardContent className="p-5">
-        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g[tone]} text-white flex items-center justify-center shadow-sm`}>{icon}</div>
-        <p className="text-2xl font-bold text-slate-800 mt-3">{value}</p>
-        <p className="text-sm font-medium text-slate-500 mt-0.5">{label}</p>
-        {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
-      </CardContent>
+    <Card className={`${cardClass} p-0`}>
+      {strip}
+      <CardContent className="p-5">{body}</CardContent>
     </Card>
   )
 }
@@ -108,14 +139,17 @@ const TONE_VALUE: Record<MetricTone, string> = {
   blue:    "text-emerald-700",
 }
 
+type MetricRowNav = MetricRow & { onNavigate?: () => void }
+
 interface SummaryCardProps {
   title: string
   icon: React.ReactNode
   gradient: string
   loading?: boolean
-  rows?: MetricRow[]
-  pairs?: MetricRow[]
+  rows?: MetricRowNav[]
+  pairs?: MetricRowNav[]
 }
+/** Overview metric cards: gold header band only; body stays white. `gradient` should be amber-only. */
 function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: SummaryCardProps) {
   return (
     <Card className="border-slate-200 shadow-md overflow-hidden">
@@ -126,24 +160,51 @@ function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: 
       <CardContent className="p-0 divide-y divide-slate-100">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="h-5 w-5 text-emerald-300 animate-spin"/>
+            <RefreshCw className="h-5 w-5 text-emerald-400 animate-spin"/>
           </div>
         ) : (
           <>
-            {rows.map((r, i) => (
-              <div key={i} className="flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-slate-500">{r.label}</span>
-                <span className={`text-sm font-bold ${TONE_VALUE[r.tone ?? "default"]}`}>{r.value}</span>
-              </div>
-            ))}
+            {rows.map((r, i) => {
+              const val = <span className={`text-sm font-bold ${TONE_VALUE[r.tone ?? "default"]}`}>{r.value}</span>
+              if (r.onNavigate) {
+                return (
+                  <button key={i} type="button" onClick={r.onNavigate}
+                    className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-emerald-50/90 transition-colors">
+                    <span className="text-sm text-slate-500">{r.label}</span>
+                    {val}
+                  </button>
+                )
+              }
+              return (
+                <div key={i} className="flex items-center justify-between px-5 py-3">
+                  <span className="text-sm text-slate-500">{r.label}</span>
+                  {val}
+                </div>
+              )
+            })}
             {pairs.length > 0 && (
               <div className="grid grid-cols-2 divide-x divide-slate-100">
-                {pairs.map((p, i) => (
-                  <div key={i} className="flex flex-col items-center py-4 px-3">
-                    <span className={`text-xl font-extrabold ${TONE_VALUE[p.tone ?? "default"]}`}>{p.value}</span>
-                    <span className="text-xs text-slate-400 mt-0.5 text-center">{p.label}</span>
-                  </div>
-                ))}
+                {pairs.map((p, i) => {
+                  const body = (
+                    <>
+                      <span className={`text-xl font-extrabold ${TONE_VALUE[p.tone ?? "default"]}`}>{p.value}</span>
+                      <span className="text-xs text-slate-400 mt-0.5 text-center">{p.label}</span>
+                    </>
+                  )
+                  if (p.onNavigate) {
+                    return (
+                      <button key={i} type="button" onClick={p.onNavigate}
+                        className="flex flex-col items-center py-4 px-3 hover:bg-emerald-50/90 transition-colors">
+                        {body}
+                      </button>
+                    )
+                  }
+                  return (
+                    <div key={i} className="flex flex-col items-center py-4 px-3">
+                      {body}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </>
@@ -205,7 +266,7 @@ function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClo
         </button>
       </div>
 
-      {(loading || bkLoading) && <div className="flex-1 flex items-center justify-center"><RefreshCw className="h-6 w-6 text-blue-500 animate-spin" /></div>}
+      {(loading || bkLoading) && <div className="flex-1 flex items-center justify-center"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin" /></div>}
       {error && <div className="p-4"><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>}
 
       {data && !loading && (
@@ -500,15 +561,42 @@ function PropertyCard({ prop, onUnitClick }: { prop: PropertyFinancial; onUnitCl
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "properties" | "units" | "financial" | "utility"
+type TabId = "overview" | "properties" | "units" | "financial" | "utility" | "tenant_contract"
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: "overview",    label: "Overview",    icon: <BarChart3 className="h-4 w-4" /> },
-  { id: "properties",  label: "Properties",  icon: <Building2 className="h-4 w-4" /> },
-  { id: "units",       label: "Units",       icon: <Layers className="h-4 w-4" /> },
-  { id: "financial",   label: "Financial",   icon: <DollarSign className="h-4 w-4" /> },
-  { id: "utility",     label: "Utility",     icon: <Zap className="h-4 w-4" /> },
+  { id: "overview",        label: "Overview",        icon: <BarChart3 className="h-4 w-4" /> },
+  { id: "properties",      label: "Properties",      icon: <Building2 className="h-4 w-4" /> },
+  { id: "units",           label: "Units",           icon: <Layers className="h-4 w-4" /> },
+  { id: "tenant_contract", label: "Tenant Contract", icon: <FileText className="h-4 w-4" /> },
+  { id: "financial",       label: "Financial",       icon: <DollarSign className="h-4 w-4" /> },
+  { id: "utility",         label: "Utility",         icon: <Zap className="h-4 w-4" /> },
 ]
+
+type ContractQuickFilter = null | "total" | "active" | "expired" | "terminated" | "expiring"
+
+function contractMatches(row: TenantContractRow, f: ContractQuickFilter): boolean {
+  if (f === null || f === "total") return true
+  if (f === "expiring") return row.expiring_soon === true
+  if (f === "active") return row.status === "Active"
+  if (f === "expired") return row.status === "Expired"
+  if (f === "terminated") return row.status === "Terminated"
+  return true
+}
+
+function contractFilterDescription(f: ContractQuickFilter): string {
+  switch (f) {
+    case "total": return "All submitted contracts"
+    case "active": return "Active contracts"
+    case "expired": return "Expired contracts"
+    case "terminated": return "Terminated contracts"
+    case "expiring": return "Expiring within 30 days"
+    default: return ""
+  }
+}
+
+type PropertyQuickFilter = null | "fully_occupied" | "outstanding"
+type UnitsQuickFilter = null | "occupied" | "vacant" | "overdue" | "outstanding"
+
 
 export default function PMSDashboard() {
   const [tab, setTab]                       = useState<TabId>("overview")
@@ -517,12 +605,49 @@ export default function PMSDashboard() {
   const [unitSearch, setUnitSearch]         = useState("")
   const [propSearch, setPropSearch]         = useState("")
   const [selectedUnit, setSelectedUnit]     = useState<string | null>(null)
+  const [propertyQuickFilter, setPropertyQuickFilter] = useState<PropertyQuickFilter>(null)
+  const [unitsQuickFilter, setUnitsQuickFilter]       = useState<UnitsQuickFilter>(null)
+  const [contractQuickFilter, setContractQuickFilter] = useState<ContractQuickFilter>(null)
+  const [contractSearch, setContractSearch]           = useState("")
 
   const months = useAvailableMonths()
 
   const { data: overview, loading: ovLoading, error: ovError, reload: ovReload } = useDashboardOverview()
   const { data: propsData, loading: propLoading, error: propError }              = usePropertiesFinancial()
   const { data: unitsData, loading: unitsLoading, error: unitsError }            = useUnitsOverview()
+  const {
+    data: tenantContractsRaw,
+    loading: contractsLoading,
+    error: contractsError,
+    reload: contractsReload,
+  } = useTenantContractsDashboard()
+
+  useEffect(() => {
+    if (tab !== "units") setUnitsQuickFilter(null)
+    if (tab !== "properties") setPropertyQuickFilter(null)
+    if (tab !== "tenant_contract") setContractQuickFilter(null)
+  }, [tab])
+
+  const navigateContracts = (f: ContractQuickFilter) => {
+    setContractQuickFilter(f)
+    setTab("tenant_contract")
+  }
+
+  const filteredTenantContracts = useMemo(() => {
+    let list = tenantContractsRaw.filter(row => contractMatches(row, contractQuickFilter))
+    if (contractSearch.trim()) {
+      const q = contractSearch.toLowerCase()
+      list = list.filter(
+        row =>
+          row.name.toLowerCase().includes(q) ||
+          row.tenant_name.toLowerCase().includes(q) ||
+          row.unit.toLowerCase().includes(q) ||
+          row.property.toLowerCase().includes(q) ||
+          row.status.toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [tenantContractsRaw, contractQuickFilter, contractSearch])
 
   const { month: filterMonth, year: filterYear } = useMemo(() => {
     if (selectedMonth === CURRENT_MONTH) return { month: undefined, year: undefined }
@@ -551,6 +676,15 @@ export default function PMSDashboard() {
     if (propertyFilter !== ALL_PROPS) {
       list = list.filter(u => u.property === propertyFilter)
     }
+    if (unitsQuickFilter === "occupied") {
+      list = list.filter(u => u.unit_status === "Occupied")
+    } else if (unitsQuickFilter === "vacant") {
+      list = list.filter(u => u.unit_status !== "Occupied")
+    } else if (unitsQuickFilter === "overdue") {
+      list = list.filter(u => u.overdue > 0)
+    } else if (unitsQuickFilter === "outstanding") {
+      list = list.filter(u => u.outstanding > 0)
+    }
     if (unitSearch) {
       const q = unitSearch.toLowerCase()
       list = list.filter(u =>
@@ -560,12 +694,19 @@ export default function PMSDashboard() {
       )
     }
     return list
-  }, [unitsData, unitSearch, propertyFilter])
+  }, [unitsData, unitSearch, propertyFilter, unitsQuickFilter])
 
-  const filteredProps = useMemo(() =>
-    propSearch ? propsData.filter(p => p.property_name.toLowerCase().includes(propSearch.toLowerCase()))
-    : propsData
-  , [propsData, propSearch])
+  const filteredProps = useMemo(() => {
+    let list = propSearch
+      ? propsData.filter(p => p.property_name.toLowerCase().includes(propSearch.toLowerCase()))
+      : propsData
+    if (propertyQuickFilter === "fully_occupied") {
+      list = list.filter(p => p.total_units > 0 && p.vacant === 0)
+    } else if (propertyQuickFilter === "outstanding") {
+      list = list.filter(p => p.total_outstanding > 0)
+    }
+    return list
+  }, [propsData, propSearch, propertyQuickFilter])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
@@ -611,41 +752,76 @@ export default function PMSDashboard() {
               {/* ── Summary cards row — screenshot style ── */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
 
-                {/* Contracts */}
+                {/* Contracts → Tenant Contract tab with filters */}
                 <SummaryCard
                   title="Contracts" icon={<FileText className="h-5 w-5"/>}
-                  gradient="from-emerald-700 to-teal-800"
+                  gradient="from-amber-600 to-amber-800"
                   loading={ovLoading}
                   rows={[
-                    { label: "Total Contracts", value: overview?.total_contracts ?? 0, tone: "default" },
+                    {
+                      label: "Total Contracts",
+                      value: overview?.total_contracts ?? 0,
+                      tone: "default",
+                      onNavigate: () => navigateContracts("total"),
+                    },
                   ]}
                   pairs={[
-                    { label: "Active",     value: overview?.active_contracts ?? 0,     tone: "green" },
-                    { label: "Expired",    value: overview?.expired_contracts ?? 0,    tone: "red" },
-                    { label: "Terminated", value: overview?.terminated_contracts ?? 0, tone: "red" },
-                    { label: "Expiring (30d)", value: overview?.expiring_soon ?? 0,   tone: "amber" },
+                    {
+                      label: "Active",
+                      value: overview?.active_contracts ?? 0,
+                      tone: "green",
+                      onNavigate: () => navigateContracts("active"),
+                    },
+                    {
+                      label: "Expired",
+                      value: overview?.expired_contracts ?? 0,
+                      tone: "red",
+                      onNavigate: () => navigateContracts("expired"),
+                    },
+                    {
+                      label: "Terminated",
+                      value: overview?.terminated_contracts ?? 0,
+                      tone: "red",
+                      onNavigate: () => navigateContracts("terminated"),
+                    },
+                    {
+                      label: "Expiring (30d)",
+                      value: overview?.expiring_soon ?? 0,
+                      tone: "amber",
+                      onNavigate: () => navigateContracts("expiring"),
+                    },
                   ]}
                 />
 
-                {/* Properties */}
+                {/* Properties — Occupied / Vacant → Units tab */}
                 <SummaryCard
                   title="Properties" icon={<Building2 className="h-5 w-5"/>}
-                  gradient="from-teal-500 to-teal-700"
+                  gradient="from-amber-500 to-amber-700"
                   loading={ovLoading}
                   rows={[
                     { label: "Total Properties", value: overview?.total_properties ?? 0, tone: "default" },
                     { label: "Total Units",       value: overview?.total_units ?? 0,      tone: "default" },
                   ]}
                   pairs={[
-                    { label: "Occupied", value: overview?.occupied_units ?? 0, tone: "green" },
-                    { label: "Vacant",   value: overview?.vacant_units ?? 0,   tone: "red" },
+                    {
+                      label: "Occupied",
+                      value: overview?.occupied_units ?? 0,
+                      tone: "green",
+                      onNavigate: () => { setUnitsQuickFilter("occupied"); setTab("units") },
+                    },
+                    {
+                      label: "Vacant",
+                      value: overview?.vacant_units ?? 0,
+                      tone: "red",
+                      onNavigate: () => { setUnitsQuickFilter("vacant"); setTab("units") },
+                    },
                   ]}
                 />
 
-                {/* Invoices */}
+                {/* Invoices — display only (no drill-down) */}
                 <SummaryCard
                   title="Invoices" icon={<DollarSign className="h-5 w-5"/>}
-                  gradient="from-emerald-500 to-emerald-700"
+                  gradient="from-amber-600 to-amber-800"
                   loading={ovLoading}
                   rows={[
                     {
@@ -808,11 +984,40 @@ export default function PMSDashboard() {
 
               {/* Summary row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<Building2 className="h-5 w-5"/>} label="Properties"       value={propsData.length} tone="blue"/>
-                <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Total Occupied" value={propsData.reduce((s,p)=>s+p.occupied,0)} tone="green"/>
-                <KpiCard icon={<AlertCircle className="h-5 w-5"/>} label="Total Outstanding" value={fmt(propsData.reduce((s,p)=>s+p.total_outstanding,0))} tone="amber"/>
-                <KpiCard icon={<Clock className="h-5 w-5"/>}       label="Total Overdue"   value={fmt(propsData.reduce((s,p)=>s+p.total_overdue,0))} tone="red"/>
+                <KpiCard icon={<Building2 className="h-5 w-5"/>} label="Properties" value={propsData.length} tone="gold"/>
+                <KpiCard
+                  icon={<CheckCircle2 className="h-5 w-5"/>}
+                  label="Total Occupied"
+                  value={propsData.reduce((s,p)=>s+p.occupied,0)}
+                  tone="green"
+                  onClick={() => setPropertyQuickFilter(f => f === "fully_occupied" ? null : "fully_occupied")}
+                  sub={propertyQuickFilter === "fully_occupied" ? "Fully occupied properties" : undefined}
+                />
+                <KpiCard
+                  icon={<AlertCircle className="h-5 w-5"/>}
+                  label="Total Outstanding"
+                  value={fmt(propsData.reduce((s,p)=>s+p.total_outstanding,0))}
+                  tone="amber"
+                  onClick={() => setPropertyQuickFilter(f => f === "outstanding" ? null : "outstanding")}
+                  sub={propertyQuickFilter === "outstanding" ? "Properties with outstanding balance" : undefined}
+                />
+                <KpiCard icon={<Clock className="h-5 w-5"/>} label="Total Overdue" value={fmt(propsData.reduce((s,p)=>s+p.total_overdue,0))} tone="red"/>
               </div>
+
+              {propertyQuickFilter && (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                  <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
+                  <span className="font-medium">
+                    {propertyQuickFilter === "fully_occupied"
+                      ? "Showing fully occupied properties only"
+                      : "Showing properties with outstanding balance"}
+                  </span>
+                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                    onClick={() => setPropertyQuickFilter(null)}>
+                    Clear
+                  </Button>
+                </div>
+              )}
 
               {/* Search */}
               <input
@@ -823,7 +1028,7 @@ export default function PMSDashboard() {
               />
 
               {propLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-blue-500 animate-spin"/></div>
+                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
               ) : filteredProps.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No properties found</p></div>
               ) : (
@@ -841,11 +1046,48 @@ export default function PMSDashboard() {
 
               {/* Summary */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<Home className="h-5 w-5"/>}      label="Total Units"     value={unitsData.length} tone="blue"/>
-                <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Occupied"     value={unitsData.filter(u=>u.unit_status==="Occupied").length} tone="green"/>
-                <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Outstanding"  value={fmt(unitsData.reduce((s,u)=>s+u.outstanding,0))} tone="amber"/>
-                <KpiCard icon={<Clock className="h-5 w-5"/>}       label="Overdue"       value={fmt(unitsData.reduce((s,u)=>s+u.overdue,0))} tone="red"/>
+                <KpiCard icon={<Home className="h-5 w-5"/>} label="Total Units" value={unitsData.length} tone="gold"/>
+                <KpiCard
+                  icon={<CheckCircle2 className="h-5 w-5"/>}
+                  label="Occupied"
+                  value={unitsData.filter(u => u.unit_status === "Occupied").length}
+                  tone="green"
+                  onClick={() => setUnitsQuickFilter(f => f === "occupied" ? null : "occupied")}
+                  sub={unitsQuickFilter === "occupied" ? "Occupied units only" : undefined}
+                />
+                <KpiCard
+                  icon={<AlertCircle className="h-5 w-5"/>}
+                  label="Outstanding"
+                  value={fmt(unitsData.reduce((s, u) => s + u.outstanding, 0))}
+                  tone="amber"
+                  onClick={() => setUnitsQuickFilter(f => f === "outstanding" ? null : "outstanding")}
+                  sub={unitsQuickFilter === "outstanding" ? "Units with outstanding balance" : undefined}
+                />
+                <KpiCard
+                  icon={<Clock className="h-5 w-5"/>}
+                  label="Overdue"
+                  value={fmt(unitsData.reduce((s, u) => s + u.overdue, 0))}
+                  tone="red"
+                  onClick={() => setUnitsQuickFilter(f => f === "overdue" ? null : "overdue")}
+                  sub={unitsQuickFilter === "overdue" ? "Units with overdue amounts" : undefined}
+                />
               </div>
+
+              {unitsQuickFilter && (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                  <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
+                  <span className="font-medium">
+                    {unitsQuickFilter === "occupied" && "Showing occupied units only"}
+                    {unitsQuickFilter === "vacant" && "Showing vacant / non-occupied units"}
+                    {unitsQuickFilter === "overdue" && "Showing units with overdue amounts"}
+                    {unitsQuickFilter === "outstanding" && "Showing units with outstanding balance"}
+                  </span>
+                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                    onClick={() => setUnitsQuickFilter(null)}>
+                    Clear
+                  </Button>
+                </div>
+              )}
 
               {/* Filters row */}
               <div className="flex flex-wrap items-center gap-3">
@@ -877,7 +1119,7 @@ export default function PMSDashboard() {
               </div>
 
               {unitsLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-blue-500 animate-spin"/></div>
+                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
               ) : filteredUnits.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
               ) : (
@@ -952,6 +1194,98 @@ export default function PMSDashboard() {
             </CardContent>
           )}
 
+          {/* ── TENANT CONTRACT ── */}
+          {tab === "tenant_contract" && (
+            <CardContent className="p-6 space-y-4">
+              {contractsError && (
+                <Alert variant="destructive"><AlertDescription>{contractsError}</AlertDescription></Alert>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-slate-600 text-sm max-w-xl">
+                  Submitted <span className="font-medium text-emerald-800">Tenant Contract</span> records — same filters as Overview shortcuts below.
+                </p>
+                <Button variant="outline" type="button" className="border-emerald-200" onClick={contractsReload}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${contractsLoading ? "animate-spin" : ""}`}/>Refresh
+                </Button>
+              </div>
+
+              {contractQuickFilter !== null && (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                  <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
+                  <span className="font-medium">{contractFilterDescription(contractQuickFilter)}</span>
+                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                    onClick={() => setContractQuickFilter(null)}>
+                    Clear filter
+                  </Button>
+                </div>
+              )}
+
+              <input
+                className="w-full max-w-md px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                placeholder="Search contract, tenant, unit, property…"
+                value={contractSearch}
+                onChange={e => setContractSearch(e.target.value)}
+              />
+
+              {contractsLoading && !tenantContractsRaw.length ? (
+                <div className="flex items-center justify-center py-16">
+                  <RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/>
+                </div>
+              ) : filteredTenantContracts.length === 0 ? (
+                <div className="text-center text-slate-400 text-sm py-16 border border-dashed border-emerald-200 rounded-xl bg-emerald-50/40">
+                  No contracts match this view
+                </div>
+              ) : (
+                <Card className="border-emerald-100 shadow-sm overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-emerald-50">
+                        <TableHead className="text-teal-800 text-xs font-semibold pl-4">Contract</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Status</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Rent / mo</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold">End date</TableHead>
+                        <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Open</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTenantContracts.map(c => (
+                        <TableRow key={c.name} className="hover:bg-emerald-50/50">
+                          <TableCell className="pl-4 font-mono text-xs text-slate-800">{c.name}</TableCell>
+                          <TableCell className="text-xs">
+                            <span className={`font-medium px-2 py-0.5 rounded-full border ${
+                              c.status === "Active" ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : c.status === "Terminated" ? "bg-red-50 text-red-800 border-red-200"
+                                : "bg-slate-50 text-slate-700 border-slate-200"
+                            }`}>{c.status}</span>
+                            {c.expiring_soon && <span className="ml-1 text-[10px] font-semibold text-amber-700">30d</span>}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-800">{c.tenant_name}</TableCell>
+                          <TableCell className="text-sm text-slate-700">{c.unit || "—"}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{c.property || "—"}</TableCell>
+                          <TableCell className="text-right text-sm font-medium text-slate-800">{fmt(c.monthly_rent)}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{fmtDate(c.end_date)}</TableCell>
+                          <TableCell className="text-right pr-4">
+                            <a
+                              href={deskTenantContractUrl(c.name)}
+                              className="text-xs font-medium text-emerald-700 hover:underline"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Open
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              )}
+            </CardContent>
+          )}
+
           {/* ── FINANCIAL ── */}
           {tab === "financial" && (
             <CardContent className="p-6 space-y-6">
@@ -977,7 +1311,7 @@ export default function PMSDashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<TrendingUp className="h-5 w-5"/>}   label="Invoiced"     value={fmt(finSummary.invoiced)}     tone="blue"/>
+                <KpiCard icon={<TrendingUp className="h-5 w-5"/>} label="Invoiced" value={fmt(finSummary.invoiced)} tone="gold"/>
                 <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Collected"    value={fmt(finSummary.paid)}          tone="green"/>
                 <KpiCard icon={<Clock className="h-5 w-5"/>}        label="Outstanding"  value={fmt(finSummary.outstanding)}   tone="amber"/>
                 <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Overdue"      value={fmt(finSummary.overdue)}       tone="red"/>
@@ -989,7 +1323,7 @@ export default function PMSDashboard() {
               </div>
               {finError && <Alert variant="destructive"><AlertDescription>{finError}</AlertDescription></Alert>}
               {finLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-blue-500 animate-spin"/></div>
+                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
               ) : filteredFinancial.length === 0 ? (
                 <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No contracts found for this period</p></div>
               ) : (

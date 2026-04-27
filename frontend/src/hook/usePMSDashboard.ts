@@ -281,6 +281,20 @@ export interface MonthBreakdown {
   invoice_count: number
 }
 
+export interface TenantContractRow {
+  name: string
+  status: string
+  tenant_name: string
+  party_name: string
+  unit: string
+  property: string
+  monthly_rent: number
+  start_date: string
+  end_date: string
+  company: string
+  expiring_soon: boolean
+}
+
 // ── New hooks ─────────────────────────────────────────────────────────────────
 
 export function usePropertiesFinancial() {
@@ -320,6 +334,33 @@ export function useUnitsOverview() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  return { data, loading, error, reload: load }
+}
+
+export function useTenantContractsDashboard() {
+  const [data, setData] = useState<TenantContractRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await apiFetch<TenantContractRow[]>(
+        "nextlayer.next_layer.api.pms_dashboard.get_tenant_contracts_dashboard"
+      )
+      setData(result)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
   return { data, loading, error, reload: load }
 }
 

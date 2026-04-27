@@ -68,6 +68,7 @@ frappe.ui.form.on('Contract', {
             }
 
 		render_stage_payment_button(frm);
+        calculate_total_amount(frm);
 
 
 	},
@@ -381,4 +382,48 @@ function render_stage_payment_button(frm) {
         d.show();
 
     }, __('Create'));   // groups the button under a "Create" dropdown (same as Wage Entry)
+}
+
+frappe.ui.form.on('Construction Service Fee', {
+    qty: function(frm, cdt, cdn) {
+        calculate_row_amount(cdt, cdn);
+        calculate_total_amount(frm);
+    },
+    
+    rate: function(frm, cdt, cdn) {
+        calculate_row_amount(cdt, cdn);
+        calculate_total_amount(frm);
+    },
+    
+    amount: function(frm, cdt, cdn) {
+        calculate_total_amount(frm);
+    },
+    
+    'custom_other_service_fee_add': function(frm, cdt, cdn) {
+        calculate_total_amount(frm);
+    },
+    
+    'custom_other_service_fee_remove': function(frm, cdt, cdn) {
+        calculate_total_amount(frm);
+    }
+});
+
+function calculate_row_amount(cdt, cdn) {
+    let row = locals[cdt][cdn];
+    if (row.qty && row.rate) {
+        let amount = flt(row.qty) * flt(row.rate);
+        frappe.model.set_value(cdt, cdn, 'amount', amount);
+    }
+}
+
+function calculate_total_amount(frm) {
+    let total_amount = 0;
+    
+    if (frm.doc.custom_other_service_fee && frm.doc.custom_other_service_fee.length) {
+        $.each(frm.doc.custom_other_service_fee, function(idx, row) {
+            total_amount += flt(row.amount);
+        });
+    }
+    
+    frm.set_value('custom_total_service_amount', total_amount);
 }

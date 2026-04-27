@@ -84,7 +84,16 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+   {
+   "hidden": 0,
+   "label": "PMS Dashboard",
+   "link_to": "/frontend/pms-dashboard",
+   "link_type": "URL",
+   "onboard": 0,
+   "type": "Link"
   }
+
  ],
  "modified": "2026-04-22 00:00:00.000000",
  "modified_by": "Administrator",
