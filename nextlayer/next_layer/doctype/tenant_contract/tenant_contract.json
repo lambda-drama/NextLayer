@@ -211,7 +211,7 @@
    "fieldname": "end_date",
    "fieldtype": "Date",
    "label": "End Date",
-   "reqd": 1
+   "mandatory_depends_on": "eval: doc.lease_type != \"Month-to-Month\""
   },
   {
    "default": "30",
@@ -556,7 +556,7 @@
    "link_fieldname": "custom_tenant_contract"
   }
  ],
- "modified": "2026-04-25 18:19:22.335344",
+ "modified": "2026-04-29 02:02:57.499017",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",
