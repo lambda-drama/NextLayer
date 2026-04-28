@@ -166,6 +166,7 @@ fixtures = [
                     #Contract
                     "Contract-custom_total_service_amount",
                     "Contract-custom_contract_type",
+                    "Contract-custom_section_break_ntz2n",
                     
                 ),
             ]
