@@ -234,6 +234,7 @@
    "in_list_view": 1,
    "label": "Unit Status",
    "options": "\nAvailable\nOccupied\nMaintenance\nRetired\nUnder Renovation",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -391,7 +392,7 @@
    "link_fieldname": "unit"
   }
  ],
- "modified": "2026-04-26 02:26:54.805507",
+ "modified": "2026-04-29 01:30:03.977941",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Unit",

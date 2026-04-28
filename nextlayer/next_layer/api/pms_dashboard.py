@@ -350,20 +350,23 @@ def get_unit_detail(unit_name):
 			"""
 			SELECT
 				je.name, je.posting_date, je.total_debit as amount,
-				je.remark as description, je.docstatus
+				je.user_remark as description, je.docstatus
 			FROM `tabJournal Entry` je
+			INNER JOIN `tabJournal Entry Account` jea ON jea.parent = je.name
 			WHERE je.docstatus = 1
-			  AND (je.remark LIKE %s OR je.remark LIKE %s)
+			AND jea.reference_type = 'Unit'
+			AND jea.reference_name = %s
+			GROUP BY je.name
 			ORDER BY je.posting_date DESC
 			LIMIT 10
 			""",
-			(f"%{unit_name}%", f"%{property_name}%" if property_name else "%%"),
+			(unit_name,),
 			as_dict=True,
 		)
 		expenses = [dict(e) for e in je_rows]
 	except Exception:
 		pass
-
+	print("hapa tunataka tuone inatoa wapi", expenses)
 	return {
 		"unit": unit_name,
 		"property": property_name,
