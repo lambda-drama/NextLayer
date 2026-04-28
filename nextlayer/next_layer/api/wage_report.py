@@ -5,12 +5,58 @@ Whitelisted API endpoints powering the Wage Entry Report UI.
 """
 
 import frappe
-from frappe.utils import flt, getdate, nowdate, get_first_day, get_last_day, add_days
+from frappe import _
+from frappe.utils import flt, getdate, nowdate, add_days
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  HELPER
+#  COMPANY PERMISSION (aligned with general_ledger.get_permission_aware_companies)
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _allowed_company_rows():
+	"""Company rows (name, company_name) the current user may use for Wage Entry."""
+	all_cos = frappe.get_all(
+		"Company",
+		fields=["name", "company_name"],
+		order_by="name",
+	)
+	user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
+	permitted_names = []
+	if user_permitted and "Company" in user_permitted:
+		permitted_names = [perm.get("doc") for perm in user_permitted["Company"]]
+
+	if permitted_names:
+		return [c for c in all_cos if c.name in permitted_names]
+	return list(all_cos)
+
+
+def _allowed_company_names():
+	return {c.name for c in _allowed_company_rows()}
+
+
+def _ensure_company_allowed(company):
+	if not company:
+		return
+	if company not in _allowed_company_names():
+		frappe.throw(_("No permission for company {0}").format(company), frappe.PermissionError)
+
+
+def _company_filters_for_query(requested_company=None):
+	"""
+	Restrict Wage Entry queries to companies the user may access.
+	If requested_company is set, validate and filter to that company only.
+	If not set, restrict to ["in", allowed companies].
+	"""
+	allowed = _allowed_company_names()
+	if not allowed:
+		return {"company": "__DOES_NOT_EXIST__"}
+
+	if requested_company:
+		_ensure_company_allowed(requested_company)
+		return {"company": requested_company}
+
+	return {"company": ["in", sorted(allowed)]}
+
 
 def _fmt_date(d):
 	return str(d) if d else ""
@@ -29,12 +75,11 @@ def get_wage_summary(project=None, date_from=None, date_to=None, status=None, co
 	"""
 	today = getdate(nowdate())
 	filters = {"docstatus": ["!=", 2]}
+	filters.update(_company_filters_for_query(company or None))
 	if project:
 		filters["project"] = project
 	if status:
 		filters["status"] = status
-	if company:
-		filters["company"] = company
 	if date_from:
 		filters["date"] = [">=", date_from]
 	if date_to:
@@ -83,12 +128,11 @@ def get_wage_entries(project=None, date_from=None, date_to=None, status=None, co
 	Return list of wage entries with core fields for the table view.
 	"""
 	filters = {"docstatus": ["!=", 2]}
+	filters.update(_company_filters_for_query(company or None))
 	if project:
 		filters["project"] = project
 	if status:
 		filters["status"] = status
-	if company:
-		filters["company"] = company
 	if date_from and date_to:
 		filters["date"] = ["between", [date_from, date_to]]
 	elif date_from:
@@ -150,6 +194,7 @@ def get_wage_entry_detail(name):
 	  - type_of_work_breakdown child table (summary by work type)
 	"""
 	doc = frappe.get_doc("Wage Entry", name)
+	_ensure_company_allowed(doc.company)
 
 	wages = []
 	for row in doc.wages or []:
@@ -207,28 +252,32 @@ def get_wage_entry_detail(name):
 
 @frappe.whitelist()
 def get_wage_filter_options():
-	"""Return available projects, companies, and statuses for filter dropdowns."""
-	projects = frappe.db.get_all(
-		"Project",
-		fields=["name", "project_name"],
-		filters={"status": ["!=", "Cancelled"]},
-		order_by="project_name",
-		limit=500,
-	)
-	companies = frappe.db.get_all(
-		"Company",
-		fields=["name"],
-		order_by="name",
-		limit=100,
-	)
+	"""Companies respect User Permissions on Company (same idea as ledger summary). Projects load via get_wage_projects_for_company."""
+	rows = _allowed_company_rows()
 	return {
-		"projects": [{"value": p.name, "label": p.get("project_name") or p.name} for p in projects],
-		"companies": [{"value": c.name, "label": c.name} for c in companies],
+		"projects": [],
+		"companies": [{"value": r.name, "label": r.get("company_name") or r.name} for r in rows],
 		"statuses": [
 			{"value": "Draft",     "label": "Draft"},
 			{"value": "Submitted", "label": "Submitted"},
 		],
 	}
+
+
+@frappe.whitelist()
+def get_wage_projects_for_company(company=None):
+	"""Projects for the selected company only (must be allowed for current user)."""
+	if not company:
+		return []
+	_ensure_company_allowed(company)
+	projects = frappe.db.get_all(
+		"Project",
+		fields=["name", "project_name"],
+		filters={"company": company, "status": ["!=", "Cancelled"]},
+		order_by="project_name",
+		limit=500,
+	)
+	return [{"value": p.name, "label": p.get("project_name") or p.name} for p in projects]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -242,10 +291,9 @@ def get_wage_trend(project=None, company=None, days=30):
 	date_from = add_days(today, -int(days) + 1)
 
 	filters = {"docstatus": 1, "date": ["between", [date_from, today]]}
+	filters.update(_company_filters_for_query(company or None))
 	if project:
 		filters["project"] = project
-	if company:
-		filters["company"] = company
 
 	rows = frappe.db.get_all(
 		"Wage Entry",

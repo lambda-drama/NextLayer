@@ -19,7 +19,7 @@ import { Alert, AlertDescription } from "./ui/alert"
 
 import {
   useWageSummary, useWageEntries, useWageEntryDetail,
-  useWageFilterOptions, useWageTrend,
+  useWageFilterOptions, useWageProjectsForCompany, useWageTrend,
   type WageEntry, type WageFilters,
 } from "../hook/useWageReport"
 
@@ -102,6 +102,7 @@ interface SearchableComboboxProps {
   placeholder?: string
   allLabel?: string
   className?: string
+  disabled?: boolean
 }
 
 function SearchableCombobox({
@@ -111,6 +112,7 @@ function SearchableCombobox({
   placeholder = "Select…",
   allLabel = "All",
   className = "",
+  disabled = false,
 }: SearchableComboboxProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
@@ -156,14 +158,16 @@ function SearchableCombobox({
       {/* Trigger button */}
       <button
         type="button"
-        onClick={handleOpen}
+        disabled={disabled}
+        onClick={() => { if (!disabled) handleOpen() }}
         className={`
           w-full h-9 px-3 pr-8 text-sm text-left rounded-md border
           flex items-center justify-between gap-2
           transition-all duration-150
-          ${open
+          ${disabled ? "opacity-60 cursor-not-allowed border-green-100 bg-slate-50" : ""}
+          ${!disabled && open
             ? "border-green-500 ring-2 ring-green-200 bg-green-50"
-            : "border-green-200 bg-white hover:border-green-400 hover:bg-green-50/40"
+            : !disabled ? "border-green-200 bg-white hover:border-green-400 hover:bg-green-50/40" : ""
           }
           text-slate-700 font-medium
         `}
@@ -477,7 +481,28 @@ export default function WageEntryReport() {
   const [dateTo, setDateTo]     = useState<string>("")
   const [search, setSearch]     = useState<string>("")
 
-  const opts = useWageFilterOptions()
+  const { companies: companyOpts, statuses: statusOpts, loading: filterOptsLoading } = useWageFilterOptions()
+  const { projects: projectOpts, loading: projectsLoading } = useWageProjectsForCompany(company, ALL_VAL)
+
+  /** Reset project when company changes — projects are scoped by company */
+  useEffect(() => {
+    setProject(ALL_VAL)
+  }, [company])
+
+  /** One permitted company → select it automatically (same idea as narrowing scope on backend) */
+  useEffect(() => {
+    if (!filterOptsLoading && companyOpts.length === 1 && company === ALL_VAL) {
+      setCompany(companyOpts[0].value)
+    }
+  }, [filterOptsLoading, companyOpts, company])
+
+  /** Clear company selection if no longer permitted */
+  useEffect(() => {
+    if (filterOptsLoading || company === ALL_VAL || companyOpts.length === 0) return
+    if (!companyOpts.some(c => c.value === company)) {
+      setCompany(ALL_VAL)
+    }
+  }, [company, companyOpts, filterOptsLoading])
 
   const filters: WageFilters = useMemo(() => ({
     project: project !== ALL_VAL ? project : undefined,
@@ -585,21 +610,23 @@ export default function WageEntryReport() {
               <SearchableCombobox
                 value={company}
                 onChange={setCompany}
-                options={opts.companies}
+                options={companyOpts}
                 allLabel="All Companies"
                 className="w-full"
+                disabled={filterOptsLoading && companyOpts.length === 0}
               />
               <SearchableCombobox
                 value={project}
                 onChange={setProject}
-                options={opts.projects}
-                allLabel="All Projects"
+                options={projectOpts}
+                allLabel={company === ALL_VAL ? "Select company first" : "All Projects"}
                 className="w-full"
+                disabled={company === ALL_VAL || filterOptsLoading || projectsLoading}
               />
               <SearchableCombobox
                 value={status}
                 onChange={setStatus}
-                options={opts.statuses}
+                options={statusOpts}
                 allLabel="All Status"
                 className="w-full"
               />
