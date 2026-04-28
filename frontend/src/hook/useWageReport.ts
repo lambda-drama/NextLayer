@@ -98,7 +98,8 @@ export interface WageEntryDetail {
 
 export interface FilterOption { value: string; label: string }
 export interface WageFilterOptions {
-  projects: FilterOption[]
+  /** Deprecated for UI — projects load via get_wage_projects_for_company when company is chosen */
+  projects?: FilterOption[]
   companies: FilterOption[]
   statuses: FilterOption[]
 }
@@ -183,15 +184,60 @@ export function useWageEntryDetail(name: string | null) {
 }
 
 export function useWageFilterOptions() {
-  const [data, setData] = useState<WageFilterOptions>({ projects: [], companies: [], statuses: [] })
+  const [companies, setCompanies] = useState<FilterOption[]>([])
+  const [statuses, setStatuses] = useState<FilterOption[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setLoading(true)
     apiFetch<WageFilterOptions>(
       "nextlayer.next_layer.api.wage_report.get_wage_filter_options"
-    ).then(setData).catch(() => {})
+    )
+      .then(d => {
+        setCompanies(d.companies ?? [])
+        setStatuses(d.statuses ?? [])
+      })
+      .catch(() => {
+        setCompanies([])
+        setStatuses([])
+      })
+      .finally(() => setLoading(false))
   }, [])
 
-  return data
+  return { companies, statuses, loading }
+}
+
+/** Projects linked to the selected company only (permission-checked server-side). */
+export function useWageProjectsForCompany(company: string | undefined, allToken = "__all__") {
+  const [projects, setProjects] = useState<FilterOption[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!company || company === allToken) {
+      setProjects([])
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    apiFetch<FilterOption[]>(
+      "nextlayer.next_layer.api.wage_report.get_wage_projects_for_company",
+      { company }
+    )
+      .then(rows => {
+        if (!cancelled) setProjects(rows ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setProjects([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [company, allToken])
+
+  return { projects, loading }
 }
 
 export function useWageTrend(project?: string, company?: string) {
