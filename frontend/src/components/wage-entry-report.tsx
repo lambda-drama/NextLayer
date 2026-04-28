@@ -6,7 +6,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import {
-  RefreshCw, X, ChevronRight, Users, DollarSign, Briefcase,
+  RefreshCw, X, ChevronRight, Users, DollarSign, Briefcase, ArrowLeft,
   CalendarDays, Clock, Phone, Search, Filter, FileText,
   TrendingUp, CheckCircle2, AlertCircle, Building2, Layers,
   ChevronDown, Leaf, TreePine,
@@ -81,6 +81,8 @@ function stripHtml(html: string | null | undefined): string {
 const STATUS_CFG: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   Draft:     { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-300",   dot: "bg-amber-400" },
   Submitted: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300", dot: "bg-emerald-500" },
+  Paid:      { bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-300",    dot: "bg-blue-500" },
+  Unpaid:    { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-300",   dot: "bg-amber-400" },
   Cancelled: { bg: "bg-red-50",     text: "text-red-700",     border: "border-red-300",     dot: "bg-red-500" },
 }
 
@@ -524,6 +526,14 @@ export default function WageEntryReport() {
 
         {/* ── Page header ── */}
         <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            className="border-green-300 text-green-700 hover:bg-green-50 flex items-center gap-2"
+            onClick={() => window.location.assign(`${window.location.origin}/app`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Desk
+          </Button>
           <div className="text-center space-y-2 flex-1">
             <div className="flex items-center justify-center gap-3">
               <div className="p-2 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl text-white shadow-md">

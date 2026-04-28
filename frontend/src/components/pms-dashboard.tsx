@@ -7,7 +7,7 @@ import {
 } from "recharts"
 import {
   Building2, Home, Users, TrendingUp, AlertCircle, CheckCircle2,
-  Clock, DollarSign, Activity, RefreshCw, X, ChevronRight,
+  Clock, DollarSign, Activity, RefreshCw, X, ChevronRight, ArrowLeft,
   Wallet, FileText, Zap, BarChart3, MapPin, Phone, Mail,
   ChevronDown, ChevronUp, CalendarDays, Layers, FilterX,
 } from "lucide-react"
@@ -73,8 +73,12 @@ const MONTH_STATUS: Record<string, { bg: string; text: string; border: string }>
   no_invoice:  { bg: "bg-slate-200",  text: "text-slate-500", border: "border-slate-200" },
 }
 const LEASE_COLORS: Record<string, string> = {
-  Active: "#2563eb", Expired: "#f59e0b", Draft: "#94a3b8",
-  Terminated: "#ef4444", Signed: "#10b981", Renewed: "#059669",
+  Active: "#f59e0b",      // Gold/amber for active
+  Expired: "#94a3b8",    // Slate for expired
+  Draft: "#cbd5e1",      // Light slate
+  Terminated: "#ef4444", // Red
+  Signed: "#fbbf24",     // Light gold
+  Renewed: "#eab308",    // Amber
 }
 
 const CURRENT_MONTH = "__current__"
@@ -87,8 +91,8 @@ interface KpiCardProps {
   tone?: "gold"|"green"|"amber"|"red"|"slate"
   onClick?: () => void
 }
-/** Small KPI tiles: gold accent strip on top; body stays neutral / icon tint by tone. */
-function KpiCard({ icon, label, value, sub, tone = "gold", onClick }: KpiCardProps) {
+/** Small KPI tiles: green accent strip on top (no gold in headers) */
+function KpiCard({ icon, label, value, sub, tone = "green", onClick }: KpiCardProps) {
   const g = {
     gold: "from-emerald-600 to-teal-700",
     green: "from-emerald-500 to-teal-600",
@@ -97,7 +101,7 @@ function KpiCard({ icon, label, value, sub, tone = "gold", onClick }: KpiCardPro
     slate: "from-stone-500 to-stone-700",
   }
   const strip = (
-    <div className="h-1.5 w-full shrink-0 rounded-t-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-800" aria-hidden />
+    <div className="h-1.5 w-full shrink-0 rounded-t-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600" aria-hidden />
   )
   const body = (
     <>
@@ -149,11 +153,13 @@ interface SummaryCardProps {
   rows?: MetricRowNav[]
   pairs?: MetricRowNav[]
 }
-/** Overview metric cards: gold header band only; body stays white. `gradient` should be amber-only. */
+/** Overview metric cards: green header band only (no gold). */
 function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: SummaryCardProps) {
+  // Use emerald/teal gradient instead of amber
+  const safeGradient = "from-emerald-600 to-teal-700"
   return (
     <Card className="border-slate-200 shadow-md overflow-hidden">
-      <div className={`bg-gradient-to-r ${gradient} text-white px-5 py-3.5 flex items-center gap-2.5`}>
+      <div className={`bg-gradient-to-r ${safeGradient} text-white px-5 py-3.5 flex items-center gap-2.5`}>
         <div className="p-1.5 bg-white/20 rounded-lg">{icon}</div>
         <span className="font-bold text-base">{title}</span>
       </div>
@@ -717,6 +723,14 @@ export default function PMSDashboard() {
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={() => window.location.assign(`${window.location.origin}/app`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Desk
+          </Button>
           <div className="text-center space-y-2 flex-1">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-teal-800 bg-clip-text text-transparent">
               Property Management Dashboard
@@ -730,7 +744,7 @@ export default function PMSDashboard() {
 
         {/* ── Main card with tab header ── */}
         <Card className="border-emerald-200 shadow-lg">
-          {/* Tab bar as card header */}
+          {/* Tab bar as card header - using green gradient (no gold) */}
           <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg p-0">
             <div className="flex items-center overflow-x-auto">
               {TABS.map((t, i) => (
@@ -749,13 +763,13 @@ export default function PMSDashboard() {
             <CardContent className="p-6 space-y-6">
               {ovError && <Alert variant="destructive"><AlertDescription>{ovError}</AlertDescription></Alert>}
 
-              {/* ── Summary cards row — screenshot style ── */}
+              {/* ── Summary cards row — screenshot style, all green headers ── */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
 
                 {/* Contracts → Tenant Contract tab with filters */}
                 <SummaryCard
                   title="Contracts" icon={<FileText className="h-5 w-5"/>}
-                  gradient="from-amber-600 to-amber-800"
+                  gradient="from-emerald-600 to-teal-700"
                   loading={ovLoading}
                   rows={[
                     {
@@ -796,7 +810,7 @@ export default function PMSDashboard() {
                 {/* Properties — Occupied / Vacant → Units tab */}
                 <SummaryCard
                   title="Properties" icon={<Building2 className="h-5 w-5"/>}
-                  gradient="from-amber-500 to-amber-700"
+                  gradient="from-emerald-500 to-teal-600"
                   loading={ovLoading}
                   rows={[
                     { label: "Total Properties", value: overview?.total_properties ?? 0, tone: "default" },
@@ -821,7 +835,7 @@ export default function PMSDashboard() {
                 {/* Invoices — display only (no drill-down) */}
                 <SummaryCard
                   title="Invoices" icon={<DollarSign className="h-5 w-5"/>}
-                  gradient="from-amber-600 to-amber-800"
+                  gradient="from-emerald-600 to-teal-700"
                   loading={ovLoading}
                   rows={[
                     {
@@ -859,8 +873,9 @@ export default function PMSDashboard() {
                           <YAxis tick={{fontSize:11}} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)}/>
                           <Tooltip formatter={(v:number)=>fmt(v)} contentStyle={{fontSize:12,borderRadius:8}}/>
                           <Legend wrapperStyle={{fontSize:12}}/>
-                          <Bar dataKey="revenue" name="Invoiced" fill="#059669" radius={[4,4,0,0]}/>
-                          <Bar dataKey="collected" name="Collected" fill="#10b981" radius={[4,4,0,0]}/>
+                          {/* Gold/amber bars for the chart */}
+                          <Bar dataKey="revenue" name="Invoiced" fill="#eab308" radius={[4,4,0,0]}/>
+                          <Bar dataKey="collected" name="Collected" fill="#f59e0b" radius={[4,4,0,0]}/>
                         </BarChart>
                       </ResponsiveContainer>
                     ) : <div className="h-[240px] flex items-center justify-center text-slate-400 text-sm">No revenue data</div>}
@@ -959,7 +974,7 @@ export default function PMSDashboard() {
                                 <TableCell className="pl-4">
                                   <p className="font-medium text-slate-800 text-sm">{p.property_name}</p>
                                   <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200">
-                                    <div className="h-full rounded-full bg-emerald-500" style={{width:`${rate}%`}}/>
+                                    <div className="h-full rounded-full bg-amber-500" style={{width:`${rate}%`}}/>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-center text-sm">{p.total_units}</TableCell>
@@ -984,7 +999,7 @@ export default function PMSDashboard() {
 
               {/* Summary row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<Building2 className="h-5 w-5"/>} label="Properties" value={propsData.length} tone="gold"/>
+                <KpiCard icon={<Building2 className="h-5 w-5"/>} label="Properties" value={propsData.length} tone="green"/>
                 <KpiCard
                   icon={<CheckCircle2 className="h-5 w-5"/>}
                   label="Total Occupied"
@@ -1046,7 +1061,7 @@ export default function PMSDashboard() {
 
               {/* Summary */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<Home className="h-5 w-5"/>} label="Total Units" value={unitsData.length} tone="gold"/>
+                <KpiCard icon={<Home className="h-5 w-5"/>} label="Total Units" value={unitsData.length} tone="green"/>
                 <KpiCard
                   icon={<CheckCircle2 className="h-5 w-5"/>}
                   label="Occupied"
@@ -1256,7 +1271,7 @@ export default function PMSDashboard() {
                           <TableCell className="pl-4 font-mono text-xs text-slate-800">{c.name}</TableCell>
                           <TableCell className="text-xs">
                             <span className={`font-medium px-2 py-0.5 rounded-full border ${
-                              c.status === "Active" ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              c.status === "Active" ? "bg-amber-50 text-amber-800 border-amber-200"
                                 : c.status === "Terminated" ? "bg-red-50 text-red-800 border-red-200"
                                 : "bg-slate-50 text-slate-700 border-slate-200"
                             }`}>{c.status}</span>
@@ -1311,7 +1326,7 @@ export default function PMSDashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<TrendingUp className="h-5 w-5"/>} label="Invoiced" value={fmt(finSummary.invoiced)} tone="gold"/>
+                <KpiCard icon={<TrendingUp className="h-5 w-5"/>} label="Invoiced" value={fmt(finSummary.invoiced)} tone="green"/>
                 <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Collected"    value={fmt(finSummary.paid)}          tone="green"/>
                 <KpiCard icon={<Clock className="h-5 w-5"/>}        label="Outstanding"  value={fmt(finSummary.outstanding)}   tone="amber"/>
                 <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Overdue"      value={fmt(finSummary.overdue)}       tone="red"/>
