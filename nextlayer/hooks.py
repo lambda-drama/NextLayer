@@ -186,6 +186,9 @@ fixtures = [
                     "Contract-custom_container_no",
                     "Contract-custom_shipping_details",
                     
+                    "Purchase Invoice-custom_contract_service",
+                    
+                    
                     
                 ),
             ]
