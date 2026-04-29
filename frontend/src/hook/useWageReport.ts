@@ -49,6 +49,9 @@ export interface WageEntry {
   description: string
   wage_category: string
   average_working_hours: number
+  has_checkin_tracking: boolean
+  has_pending_checkout: boolean
+  checkout_state: "legacy" | "checked_out" | "not_checked_out"
 }
 
 export interface WageBreakdownRow {
@@ -119,6 +122,7 @@ export interface WageFilters {
   date_to?: string
   status?: string
   company?: string
+  pending_checkout?: boolean
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ Whitelisted API endpoints powering the Wage Entry Report UI.
 
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate, nowdate, add_days
+from frappe.utils import flt, getdate, nowdate, add_days, cint
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,13 +61,66 @@ def _company_filters_for_query(requested_company=None):
 def _fmt_date(d):
 	return str(d) if d else ""
 
+def _checkout_tracking_by_entry(entry_names):
+	"""
+	Build checkout tracking flags per Wage Entry:
+	- legacy rows (no checkin recorded): checkout_state = "legacy"
+	- tracked rows with all checkins checked out: checkout_state = "checked_out"
+	- tracked rows with any missing checkout: checkout_state = "not_checked_out"
+	"""
+	if not entry_names:
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			parent,
+			SUM(CASE WHEN checkin IS NOT NULL THEN 1 ELSE 0 END) AS checkin_count,
+			SUM(CASE WHEN checkin IS NOT NULL AND checkout IS NULL THEN 1 ELSE 0 END) AS missing_checkout_count
+		FROM `tabWage Breakdown Detail`
+		WHERE parenttype='Wage Entry' AND parent IN %(parents)s
+		GROUP BY parent
+		""",
+		{"parents": tuple(entry_names)},
+		as_dict=True,
+	)
+
+	tracking_map = {}
+	for r in rows:
+		has_checkin = int(r.get("checkin_count") or 0) > 0
+		has_pending_checkout = int(r.get("missing_checkout_count") or 0) > 0
+		if not has_checkin:
+			state = "legacy"
+		elif has_pending_checkout:
+			state = "not_checked_out"
+		else:
+			state = "checked_out"
+		tracking_map[r.parent] = {
+			"has_checkin_tracking": has_checkin,
+			"has_pending_checkout": has_pending_checkout,
+			"checkout_state": state,
+		}
+	return tracking_map
+
+def _pending_checkout_entry_names():
+	"""Distinct Wage Entry names that have checkin and missing checkout."""
+	rows = frappe.db.sql(
+		"""
+		SELECT DISTINCT parent
+		FROM `tabWage Breakdown Detail`
+		WHERE parenttype='Wage Entry' AND checkin IS NOT NULL AND checkout IS NULL
+		""",
+		as_dict=True,
+	)
+	return [r.parent for r in rows if r.get("parent")]
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  SUMMARY KPIs
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_wage_summary(project=None, date_from=None, date_to=None, status=None, company=None):
+def get_wage_summary(project=None, date_from=None, date_to=None, status=None, company=None, pending_checkout=0):
 	"""
 	Return top-level KPIs for the wage entry dashboard:
 	  total_entries, total_amount, total_workers, unique_projects,
@@ -88,6 +141,12 @@ def get_wage_summary(project=None, date_from=None, date_to=None, status=None, co
 			filters["date"] = ["between", [date_from, date_to]]
 		else:
 			filters["date"] = ["<=", date_to]
+	if cint(pending_checkout):
+		pending_names = _pending_checkout_entry_names()
+		if pending_names:
+			filters["name"] = ["in", pending_names]
+		else:
+			filters["name"] = "__NO_PENDING_CHECKOUT__"
 
 	entries = frappe.db.get_all(
 		"Wage Entry",
@@ -123,7 +182,7 @@ def get_wage_summary(project=None, date_from=None, date_to=None, status=None, co
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_wage_entries(project=None, date_from=None, date_to=None, status=None, company=None, limit=200):
+def get_wage_entries(project=None, date_from=None, date_to=None, status=None, company=None, limit=200, pending_checkout=0):
 	"""
 	Return list of wage entries with core fields for the table view.
 	"""
@@ -139,6 +198,12 @@ def get_wage_entries(project=None, date_from=None, date_to=None, status=None, co
 		filters["date"] = [">=", date_from]
 	elif date_to:
 		filters["date"] = ["<=", date_to]
+	if cint(pending_checkout):
+		pending_names = _pending_checkout_entry_names()
+		if pending_names:
+			filters["name"] = ["in", pending_names]
+		else:
+			filters["name"] = "__NO_PENDING_CHECKOUT__"
 
 	entries = frappe.db.get_all(
 		"Wage Entry",
@@ -155,10 +220,16 @@ def get_wage_entries(project=None, date_from=None, date_to=None, status=None, co
 	)
 
 	result = []
+	checkout_tracking = _checkout_tracking_by_entry([e.name for e in entries])
 	for e in entries:
 		status_label = {0: "Draft", 1: "Submitted", 2: "Cancelled"}.get(e.docstatus, "Draft")
 		if e.status:
 			status_label = e.status
+		tracking = checkout_tracking.get(e.name, {
+			"has_checkin_tracking": False,
+			"has_pending_checkout": False,
+			"checkout_state": "legacy",
+		})
 		result.append({
 			"name": e.name,
 			"date": _fmt_date(e.date),
@@ -176,6 +247,9 @@ def get_wage_entries(project=None, date_from=None, date_to=None, status=None, co
 			"description": e.description or "",
 			"wage_category": e.wage_category or "",
 			"average_working_hours": flt(e.average_working_hours),
+			"has_checkin_tracking": tracking["has_checkin_tracking"],
+			"has_pending_checkout": tracking["has_pending_checkout"],
+			"checkout_state": tracking["checkout_state"],
 		})
 
 	return result

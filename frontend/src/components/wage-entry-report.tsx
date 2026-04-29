@@ -9,7 +9,7 @@ import {
   RefreshCw, X, ChevronRight, Users, DollarSign, Briefcase, ArrowLeft,
   CalendarDays, Clock, Phone, Search, Filter, FileText,
   TrendingUp, CheckCircle2, AlertCircle, Building2, Layers,
-  ChevronDown, Leaf, TreePine,
+  ChevronDown, Leaf, TreePine, Minus,
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
@@ -430,6 +430,26 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
 
 function WageEntryRow({ entry, onOpen }: { entry: WageEntry; onOpen: () => void }) {
   const cfg = STATUS_CFG[entry.status_label] ?? STATUS_CFG.Draft
+  const checkoutUi = entry.checkout_state === "checked_out"
+    ? {
+      label: "Checked out",
+      title: "All check-ins have check-outs",
+      icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />,
+      cls: "bg-emerald-50 text-emerald-700 border-emerald-300",
+    }
+    : entry.checkout_state === "not_checked_out"
+      ? {
+        label: "Not checked out",
+        title: "Has check-in rows pending check-out",
+        icon: <AlertCircle className="h-3.5 w-3.5 text-amber-600" />,
+        cls: "bg-amber-50 text-amber-700 border-amber-300",
+      }
+      : {
+        label: "—",
+        title: "Legacy entry (before check-in/out tracking)",
+        icon: <Minus className="h-3.5 w-3.5 text-slate-500" />,
+        cls: "bg-slate-50 text-slate-600 border-slate-300",
+      }
   return (
     <TableRow
       className="hover:bg-green-50/60 cursor-pointer transition-colors group"
@@ -455,9 +475,18 @@ function WageEntryRow({ entry, onOpen }: { entry: WageEntry; onOpen: () => void 
         <span className="font-bold text-green-800 text-sm">{fmt(entry.total_amount, entry.currency)}</span>
       </TableCell>
       <TableCell className="text-center">
-        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />{entry.status_label}
-        </span>
+        <div className="inline-flex items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />{entry.status_label}
+          </span>
+          <span
+            title={checkoutUi.title}
+            className={`inline-flex items-center justify-center rounded-full border px-1.5 py-0.5 ${checkoutUi.cls}`}
+          >
+            {checkoutUi.icon}
+            <span className="sr-only">{checkoutUi.label}</span>
+          </span>
+        </div>
       </TableCell>
       <TableCell className="pr-4">
         <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-green-600 transition-colors" />
@@ -479,6 +508,7 @@ export default function WageEntryReport() {
   const [status, setStatus]     = useState<string>(ALL_VAL)
   const [dateFrom, setDateFrom] = useState<string>("")
   const [dateTo, setDateTo]     = useState<string>("")
+  const [pendingCheckout, setPendingCheckout] = useState<boolean>(false)
   const [search, setSearch]     = useState<string>("")
 
   const { companies: companyOpts, statuses: statusOpts, loading: filterOptsLoading } = useWageFilterOptions()
@@ -510,7 +540,8 @@ export default function WageEntryReport() {
     status:  status  !== ALL_VAL ? status  : undefined,
     date_from: dateFrom || undefined,
     date_to:   dateTo   || undefined,
-  }), [project, company, status, dateFrom, dateTo])
+    pending_checkout: pendingCheckout || undefined,
+  }), [project, company, status, dateFrom, dateTo, pendingCheckout])
 
   const { data: summary, loading: sumLoading, reload: sumReload } = useWageSummary(filters)
   const { data: entries, loading: listLoading, error: listError, reload: listReload } = useWageEntries(filters)
@@ -523,7 +554,7 @@ export default function WageEntryReport() {
     const t = new Date().toISOString().slice(0, 10)
     setDateFrom(t); setDateTo(t)
   }
-  function clearDates() { setDateFrom(""); setDateTo("") }
+  function clearDates() { setDateFrom(""); setDateTo(""); setPendingCheckout(false) }
   function reload() { sumReload(); listReload() }
 
   const filteredEntries = useMemo(() => {
@@ -585,7 +616,7 @@ export default function WageEntryReport() {
             */}
             <div
               className="grid items-end gap-x-3 gap-y-1"
-              style={{ gridTemplateColumns: "11rem 11rem 9rem 10rem 10rem auto" }}
+              style={{ gridTemplateColumns: "11rem 11rem 9rem 10rem 10rem 12rem auto" }}
             >
               {/* ── ROW 1: labels ── */}
               <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
@@ -602,6 +633,9 @@ export default function WageEntryReport() {
               </label>
               <label className="text-xs font-semibold text-green-700 uppercase tracking-wide">
                 Date To
+              </label>
+              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+                Check-Out
               </label>
               {/* empty header cell for buttons column */}
               <span />
@@ -642,11 +676,20 @@ export default function WageEntryReport() {
                 onChange={e => setDateTo(e.target.value)}
                 className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white hover:border-green-400 w-full"
               />
+              <label className="h-9 px-3 text-sm border border-green-200 rounded-md bg-white hover:border-green-400 w-full inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={pendingCheckout}
+                  onChange={e => setPendingCheckout(e.target.checked)}
+                  className="h-4 w-4 accent-amber-600"
+                />
+                <span className="text-slate-700">Pending only</span>
+              </label>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap" onClick={setToday}>
                   Today
                 </Button>
-                {(dateFrom || dateTo) && (
+                {(dateFrom || dateTo || pendingCheckout) && (
                   <Button size="sm" variant="ghost" className="text-slate-400 hover:text-slate-600" onClick={clearDates}>
                     Clear
                   </Button>
