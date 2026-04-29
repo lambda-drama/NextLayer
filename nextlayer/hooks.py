@@ -291,6 +291,7 @@ doc_events = {
     },
     "Contract": {
         "autoname": "nextlayer.next_layer.controllers.contract.get_contract_autoname",
+        "before_update_after_submit": "nextlayer.next_layer.controllers.contract.preserve_transport_completed_before_update",
     },
 }
 
@@ -436,6 +437,10 @@ override_doctype_class = {
 scheduler_events = {
 	"daily": [
 		"nextlayer.tasks.daily"
+	],
+	"daily_maintenance": [
+		# After ERPNext update_status_for_contracts — keep Transport + PI-linked contracts Completed
+		"nextlayer.next_layer.controllers.contract.restore_transport_completed_after_daily_contract_sync",
 	],
 	"monthly": [
 		"nextlayer.tasks.monthly"

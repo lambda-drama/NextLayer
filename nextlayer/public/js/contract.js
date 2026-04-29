@@ -1,4 +1,7 @@
 frappe.ui.form.on('Contract', {
+    custom_contract_type(frm) {
+        sync_company_signees_from_settings(frm);
+    },
     custom_width: function(frm) {
         calculate_area(frm);
     },
@@ -68,7 +71,11 @@ frappe.ui.form.on('Contract', {
             }
 
 		render_stage_payment_button(frm);
-        calculate_total_amount(frm);
+		render_transport_contract_actions(frm);
+
+        if (frm.doc.docstatus === 0) {
+    calculate_total_amount(frm);
+}
 
 
 	},
@@ -80,6 +87,100 @@ frappe.ui.form.on('Contract', {
 	}
 
 });
+
+function sync_company_signees_from_settings(frm) {
+    if (!frm.doc.custom_contract_type || frm.doc.docstatus !== 0) {
+        return;
+    }
+    frappe.call({
+        method: "nextlayer.next_layer.api.contract.get_company_signees_from_settings",
+        args: { contract_type: frm.doc.custom_contract_type },
+        callback(r) {
+            const rows = r.message || [];
+            frm.clear_table("custom_project_signee");
+            rows.forEach((row) => {
+                const d = frm.add_child("custom_project_signee");
+                d.role = row.role;
+                d.member = row.member;
+            });
+            frm.refresh_field("custom_project_signee");
+        },
+    });
+}
+
+function render_transport_contract_actions(frm) {
+    if (frm.doc.custom_contract_type !== "Transport Contract" || frm.doc.docstatus !== 1) {
+        return;
+    }
+
+    frappe.call({
+        method: "nextlayer.next_layer.api.contract.get_transport_contract_service_invoice",
+        args: { contract_name: frm.doc.name },
+        callback(r) {
+            const piName = r.message || null;
+
+            if (frm.doc.status !== "Completed") {
+                frm.add_custom_button(
+                    __("Complete"),
+                    () => {
+                        // frappe.confirm(__("Set contract status to Completed?"), () => {
+                            frappe.call({
+                                method: "nextlayer.next_layer.api.contract.mark_transport_contract_complete",
+                                args: { contract_name: frm.doc.name },
+                                freeze: true,
+                                callback(res) {
+                                    if (!res.exc && res.message) {
+                                        frappe.model.sync(res.message);
+                                        frm.refresh();
+                                        frm.dirty = false;
+                                        frappe.show_alert(
+                                            { message: __("Status set to Completed"), indicator: "green" },
+                                            5
+                                        );
+                                    }
+                                },
+                            // });
+                        });
+                    },
+                    __("Actions")
+                );
+                return;
+            }
+
+            if (!piName) {
+                frm.add_custom_button(
+                    __("Create Purchase Invoice"),
+                    () => {
+                        frappe.call({
+                            method: "nextlayer.next_layer.api.contract.create_transport_contract_purchase_invoice",
+                            args: { contract_name: frm.doc.name },
+                            freeze: true,
+                            freeze_message: __("Creating Purchase Invoice..."),
+                            callback(res) {
+                                if (res.message && !res.exc) {
+                                    frappe.show_alert({
+                                        message: __("Purchase Invoice {0} created", [res.message]),
+                                        indicator: "green",
+                                    }, 8);
+                                    frm.reload_doc();
+                                }
+                            },
+                        });
+                    },
+                    __("Actions")
+                );
+            } else {
+                frm.add_custom_button(
+                    __("View Purchase Invoice"),
+                    () => {
+                        frappe.set_route("Form", "Purchase Invoice", piName);
+                    },
+                    __("Actions")
+                );
+            }
+        },
+    });
+}
 
 
 function set_all_queries(frm) {
