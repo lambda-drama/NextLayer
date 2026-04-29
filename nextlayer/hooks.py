@@ -168,6 +168,27 @@ fixtures = [
                     "Contract-custom_contract_type",
                     "Contract-custom_other_service_fee",
                     "Contract-custom_section_break_ntz2n",
+                    "Contract-custom_shipping_status",
+                    "Contract-custom_actual_arrival_date",
+                    "Contract-custom_remaining_days",
+                    "Contract-custom_estimated_date_of_arrival",
+                    "Contract-custom_column_break_tdhwg",
+                    "Contract-custom_shippin_line",
+                    "Contract-custom_container_quantity",
+                    "Contract-custom_port_of_discharge",
+                    "Contract-custom_destination",
+                    "Contract-custom_column_break_ofynn",
+                    "Contract-custom_column_break_ofynn",
+                    "Contract-custom_bill_of_exit",
+                    "Contract-custom_bil",
+                    "Contract-custom_bill_of_landing",
+                    "Contract-custom_port_of_loading",
+                    "Contract-custom_container_no",
+                    "Contract-custom_shipping_details",
+                    
+                    "Purchase Invoice-custom_contract_service",
+                    
+                    
                     
                 ),
             ]
@@ -273,6 +294,7 @@ doc_events = {
     },
     "Contract": {
         "autoname": "nextlayer.next_layer.controllers.contract.get_contract_autoname",
+        "before_update_after_submit": "nextlayer.next_layer.controllers.contract.preserve_transport_completed_before_update",
     },
 }
 
@@ -418,6 +440,10 @@ override_doctype_class = {
 scheduler_events = {
 	"daily": [
 		"nextlayer.tasks.daily"
+	],
+	"daily_maintenance": [
+		# After ERPNext update_status_for_contracts — keep Transport + PI-linked contracts Completed
+		"nextlayer.next_layer.controllers.contract.restore_transport_completed_after_daily_contract_sync",
 	],
 	"monthly": [
 		"nextlayer.tasks.monthly"
