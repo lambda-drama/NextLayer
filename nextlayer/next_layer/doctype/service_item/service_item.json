@@ -9,6 +9,7 @@
   "basic_section",
   "service_name",
   "service_type",
+  "company",
   "column_break_basic",
   "status",
   "description",
@@ -24,6 +25,7 @@
   "income_account",
   "column_break_accounting",
   "liability_account",
+  "expense_account",
   "behavior_section",
   "is_refundable",
   "is_recurring",
@@ -184,12 +186,24 @@
    "fieldname": "max_per_lease",
    "fieldtype": "Int",
    "label": "Maximum Per Lease"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-22 21:12:51.769149",
+ "modified": "2026-04-29 21:44:17.654807",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Service Item",
