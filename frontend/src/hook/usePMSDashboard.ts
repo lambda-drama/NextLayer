@@ -134,9 +134,35 @@ export interface MonthOption {
   year: number
 }
 
+export interface PMSCompanyOption {
+  value: string
+  label: string
+}
+
+export interface PMSDashboardFilterOptions {
+  companies: PMSCompanyOption[]
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
-export function useDashboardOverview() {
+export function usePMSDashboardCompanies() {
+  const [companies, setCompanies] = useState<PMSCompanyOption[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    apiFetch<PMSDashboardFilterOptions>(
+      "nextlayer.next_layer.api.pms_dashboard.get_pms_dashboard_companies"
+    )
+      .then(d => setCompanies(d.companies ?? []))
+      .catch(() => setCompanies([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return { companies, loading }
+}
+
+export function useDashboardOverview(company?: string) {
   const [data, setData] = useState<DashboardOverview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -146,7 +172,8 @@ export function useDashboardOverview() {
     setError(null)
     try {
       const result = await apiFetch<DashboardOverview>(
-        "nextlayer.next_layer.api.pms_dashboard.get_dashboard_overview"
+        "nextlayer.next_layer.api.pms_dashboard.get_dashboard_overview",
+        company ? { company } : {}
       )
       setData(result)
     } catch (e) {
@@ -154,13 +181,13 @@ export function useDashboardOverview() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [company])
 
   useEffect(() => { load() }, [load])
   return { data, loading, error, reload: load }
 }
 
-export function useFinancialOverview(month?: number, year?: number) {
+export function useFinancialOverview(month?: number, year?: number, company?: string) {
   const [data, setData] = useState<UnitFinancial[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -169,9 +196,11 @@ export function useFinancialOverview(month?: number, year?: number) {
     setLoading(true)
     setError(null)
     try {
+      const args: Record<string, unknown> = { month: month ?? null, year: year ?? null }
+      if (company) args.company = company
       const result = await apiFetch<UnitFinancial[]>(
         "nextlayer.next_layer.api.pms_dashboard.get_financial_overview",
-        { month: month ?? null, year: year ?? null }
+        args
       )
       setData(result)
     } catch (e) {
@@ -179,13 +208,13 @@ export function useFinancialOverview(month?: number, year?: number) {
     } finally {
       setLoading(false)
     }
-  }, [month, year])
+  }, [month, year, company])
 
   useEffect(() => { load() }, [load])
   return { data, loading, error, reload: load }
 }
 
-export function useUnitDetail(unitName: string | null) {
+export function useUnitDetail(unitName: string | null, company?: string) {
   const [data, setData] = useState<UnitDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -194,9 +223,11 @@ export function useUnitDetail(unitName: string | null) {
     setLoading(true)
     setError(null)
     try {
+      const args: Record<string, unknown> = { unit_name: name }
+      if (company) args.company = company
       const result = await apiFetch<UnitDetail>(
         "nextlayer.next_layer.api.pms_dashboard.get_unit_detail",
-        { unit_name: name }
+        args
       )
       setData(result)
     } catch (e) {
@@ -204,7 +235,7 @@ export function useUnitDetail(unitName: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [company])
 
   useEffect(() => {
     if (unitName) load(unitName)
@@ -297,7 +328,7 @@ export interface TenantContractRow {
 
 // ── New hooks ─────────────────────────────────────────────────────────────────
 
-export function usePropertiesFinancial() {
+export function usePropertiesFinancial(company?: string) {
   const [data, setData] = useState<PropertyFinancial[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -306,18 +337,19 @@ export function usePropertiesFinancial() {
     setLoading(true); setError(null)
     try {
       const result = await apiFetch<PropertyFinancial[]>(
-        "nextlayer.next_layer.api.pms_dashboard.get_properties_financial"
+        "nextlayer.next_layer.api.pms_dashboard.get_properties_financial",
+        company ? { company } : {}
       )
       setData(result)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setLoading(false) }
-  }, [])
+  }, [company])
 
   useEffect(() => { load() }, [load])
   return { data, loading, error, reload: load }
 }
 
-export function useUnitsOverview() {
+export function useUnitsOverview(company?: string) {
   const [data, setData] = useState<UnitOverview[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -326,18 +358,19 @@ export function useUnitsOverview() {
     setLoading(true); setError(null)
     try {
       const result = await apiFetch<UnitOverview[]>(
-        "nextlayer.next_layer.api.pms_dashboard.get_units_overview"
+        "nextlayer.next_layer.api.pms_dashboard.get_units_overview",
+        company ? { company } : {}
       )
       setData(result)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setLoading(false) }
-  }, [])
+  }, [company])
 
   useEffect(() => { load() }, [load])
   return { data, loading, error, reload: load }
 }
 
-export function useTenantContractsDashboard() {
+export function useTenantContractsDashboard(company?: string) {
   const [data, setData] = useState<TenantContractRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -347,7 +380,8 @@ export function useTenantContractsDashboard() {
     setError(null)
     try {
       const result = await apiFetch<TenantContractRow[]>(
-        "nextlayer.next_layer.api.pms_dashboard.get_tenant_contracts_dashboard"
+        "nextlayer.next_layer.api.pms_dashboard.get_tenant_contracts_dashboard",
+        company ? { company } : {}
       )
       setData(result)
     } catch (e) {
@@ -355,7 +389,7 @@ export function useTenantContractsDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [company])
 
   useEffect(() => {
     load()
@@ -364,18 +398,20 @@ export function useTenantContractsDashboard() {
   return { data, loading, error, reload: load }
 }
 
-export function useUnitMonthBreakdown(unitName: string | null) {
+export function useUnitMonthBreakdown(unitName: string | null, company?: string) {
   const [data, setData] = useState<MonthBreakdown[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!unitName) { setData([]); return }
     setLoading(true)
+    const args: Record<string, unknown> = { unit_name: unitName }
+    if (company) args.company = company
     apiFetch<MonthBreakdown[]>(
       "nextlayer.next_layer.api.pms_dashboard.get_unit_month_breakdown",
-      { unit_name: unitName }
+      args
     ).then(setData).catch(() => {}).finally(() => setLoading(false))
-  }, [unitName])
+  }, [unitName, company])
 
   return { data, loading }
 }

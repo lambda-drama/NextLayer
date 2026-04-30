@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -9,7 +9,7 @@ import {
   Building2, Home, Users, TrendingUp, AlertCircle, CheckCircle2,
   Clock, DollarSign, Activity, RefreshCw, X, ChevronRight, ArrowLeft,
   Wallet, FileText, Zap, BarChart3, MapPin, Phone, Mail,
-  ChevronDown, ChevronUp, CalendarDays, Layers, FilterX,
+  ChevronDown, ChevronUp, CalendarDays, Layers, FilterX, Search,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
@@ -26,6 +26,7 @@ import {
   useUnitsOverview,
   useUnitMonthBreakdown,
   useTenantContractsDashboard,
+  usePMSDashboardCompanies,
   type TenantContractRow,
   type UnitFinancial,
   type UnitPaymentStatus,
@@ -83,6 +84,145 @@ const LEASE_COLORS: Record<string, string> = {
 
 const CURRENT_MONTH = "__current__"
 const ALL_PROPS     = "__all__"
+const ALL_COMPANIES = "__all__"
+
+// ── Company combobox (same pattern as wage entry report) ─────────────────────
+
+interface CompanyComboboxOption {
+  value: string
+  label: string
+}
+
+interface CompanySearchableComboboxProps {
+  value: string
+  onChange: (val: string) => void
+  options: CompanyComboboxOption[]
+  placeholder?: string
+  allLabel?: string
+  className?: string
+  disabled?: boolean
+}
+
+function CompanySearchableCombobox({
+  value,
+  onChange,
+  options,
+  placeholder = "Company…",
+  allLabel = "All companies",
+  className = "",
+  disabled = false,
+}: CompanySearchableComboboxProps) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const allOption: CompanyComboboxOption = { value: ALL_COMPANIES, label: allLabel }
+  const allOptions = [allOption, ...options]
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return allOptions
+    const q = query.toLowerCase()
+    return allOptions.filter(o => o.label.toLowerCase().includes(q))
+  }, [query, options, allLabel])
+
+  const selectedLabel = allOptions.find(o => o.value === value)?.label ?? placeholder
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery("")
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  function handleOpen() {
+    setOpen(o => !o)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  function handleSelect(val: string) {
+    onChange(val)
+    setOpen(false)
+    setQuery("")
+  }
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => { if (!disabled) handleOpen() }}
+        className={`
+          w-full h-9 px-3 pr-8 text-sm text-left rounded-md border
+          flex items-center justify-between gap-2 transition-all duration-150
+          ${disabled ? "opacity-60 cursor-not-allowed border-emerald-100 bg-slate-50" : ""}
+          ${!disabled && open
+            ? "border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50"
+            : !disabled ? "border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/40" : ""
+          }
+          text-slate-700 font-medium
+        `}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-emerald-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="
+          absolute left-0 top-full mt-1 z-50 min-w-full w-max max-w-xs
+          rounded-xl border border-emerald-200 shadow-xl
+          bg-white overflow-hidden
+        ">
+          <div className="p-2 border-b border-emerald-100 bg-emerald-50/80">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-600" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search…"
+                className="
+                  w-full pl-8 pr-3 py-1.5 text-sm rounded-lg
+                  border border-emerald-200 bg-white
+                  focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400
+                  placeholder:text-emerald-300 text-slate-700
+                "
+              />
+            </div>
+          </div>
+
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-slate-500 text-center">No results</div>
+            ) : (
+              filtered.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSelect(opt.value)}
+                  className={`
+                    w-full text-left px-3 py-2 text-sm transition-colors
+                    ${opt.value === value
+                      ? "bg-emerald-600 text-white font-semibold"
+                      : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-900"
+                    }
+                  `}
+                >
+                  {opt.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Small components ──────────────────────────────────────────────────────────
 
@@ -251,9 +391,17 @@ function MonthTile({ m }: { m: MonthBreakdown }) {
 
 // ── Unit detail panel ─────────────────────────────────────────────────────────
 
-function UnitDetailPanel({ unitName, onClose }: { unitName: string | null; onClose: () => void }) {
-  const { data, loading, error } = useUnitDetail(unitName)
-  const { data: breakdown, loading: bkLoading } = useUnitMonthBreakdown(unitName)
+function UnitDetailPanel({
+  unitName,
+  company,
+  onClose,
+}: {
+  unitName: string | null
+  company?: string
+  onClose: () => void
+}) {
+  const { data, loading, error } = useUnitDetail(unitName, company)
+  const { data: breakdown, loading: bkLoading } = useUnitMonthBreakdown(unitName, company)
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col border-l border-emerald-100">
@@ -615,18 +763,41 @@ export default function PMSDashboard() {
   const [unitsQuickFilter, setUnitsQuickFilter]       = useState<UnitsQuickFilter>(null)
   const [contractQuickFilter, setContractQuickFilter] = useState<ContractQuickFilter>(null)
   const [contractSearch, setContractSearch]           = useState("")
+  const [company, setCompany]                         = useState<string>(ALL_COMPANIES)
 
   const months = useAvailableMonths()
+  const { companies: companyOpts, loading: companyOptsLoading } = usePMSDashboardCompanies()
 
-  const { data: overview, loading: ovLoading, error: ovError, reload: ovReload } = useDashboardOverview()
-  const { data: propsData, loading: propLoading, error: propError }              = usePropertiesFinancial()
-  const { data: unitsData, loading: unitsLoading, error: unitsError }            = useUnitsOverview()
+  const apiCompany = company !== ALL_COMPANIES ? company : undefined
+
+  const { data: overview, loading: ovLoading, error: ovError, reload: ovReload } = useDashboardOverview(apiCompany)
+  const { data: propsData, loading: propLoading, error: propError, reload: propsReload } = usePropertiesFinancial(apiCompany)
+  const { data: unitsData, loading: unitsLoading, error: unitsError, reload: unitsReload } = useUnitsOverview(apiCompany)
   const {
     data: tenantContractsRaw,
     loading: contractsLoading,
     error: contractsError,
     reload: contractsReload,
-  } = useTenantContractsDashboard()
+  } = useTenantContractsDashboard(apiCompany)
+
+  /** One permitted company — narrow scope automatically (same idea as wage entry). */
+  useEffect(() => {
+    if (!companyOptsLoading && companyOpts.length === 1 && company === ALL_COMPANIES) {
+      setCompany(companyOpts[0].value)
+    }
+  }, [companyOptsLoading, companyOpts, company])
+
+  useEffect(() => {
+    if (companyOptsLoading || company === ALL_COMPANIES || companyOpts.length === 0) return
+    if (!companyOpts.some(c => c.value === company)) {
+      setCompany(ALL_COMPANIES)
+    }
+  }, [company, companyOpts, companyOptsLoading])
+
+  useEffect(() => {
+    setSelectedUnit(null)
+    setPropertyFilter(ALL_PROPS)
+  }, [apiCompany])
 
   useEffect(() => {
     if (tab !== "units") setUnitsQuickFilter(null)
@@ -661,7 +832,19 @@ export default function PMSDashboard() {
     return { month: Number(m), year: Number(y) }
   }, [selectedMonth])
 
-  const { data: financial, loading: finLoading, error: finError } = useFinancialOverview(filterMonth, filterYear)
+  const { data: financial, loading: finLoading, error: finError, reload: finReload } = useFinancialOverview(
+    filterMonth,
+    filterYear,
+    apiCompany,
+  )
+
+  const refreshAll = () => {
+    ovReload()
+    propsReload()
+    unitsReload()
+    contractsReload()
+    finReload()
+  }
 
   const finProperties = useMemo(() => {
     const set = new Set(financial.map(u => u.property).filter(Boolean))
@@ -717,7 +900,13 @@ export default function PMSDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
       {selectedUnit && <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={() => setSelectedUnit(null)} />}
-      {selectedUnit && <UnitDetailPanel unitName={selectedUnit} onClose={() => setSelectedUnit(null)} />}
+      {selectedUnit && (
+        <UnitDetailPanel
+          unitName={selectedUnit}
+          company={apiCompany}
+          onClose={() => setSelectedUnit(null)}
+        />
+      )}
 
       <div className="max-w-8xl mx-auto space-y-6">
 
@@ -737,10 +926,29 @@ export default function PMSDashboard() {
             </h1>
             <p className="text-gray-600 text-lg">Portfolio overview · financial health · occupancy analytics</p>
           </div>
-          <Button variant="outline" className="flex items-center gap-2" onClick={ovReload}>
-            <RefreshCw className={`h-4 w-4 ${ovLoading ? "animate-spin" : ""}`} />Refresh
+          <Button
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={refreshAll}
+          >
+            <RefreshCw className={`h-4 w-4 ${ovLoading || propLoading || unitsLoading || contractsLoading || finLoading ? "animate-spin" : ""}`} />
+            Refresh
           </Button>
         </div>
+
+        <Card className="border-emerald-100 shadow-sm bg-white/90">
+          <CardContent className="py-3 px-4 flex flex-wrap items-center gap-3">
+            <Building2 className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
+            <span className="text-sm font-medium text-slate-600 shrink-0">Company</span>
+            <CompanySearchableCombobox
+              value={company}
+              onChange={setCompany}
+              options={companyOpts}
+              disabled={companyOptsLoading && companyOpts.length === 0}
+              className="min-w-[14rem] max-w-xs"
+            />
+          </CardContent>
+        </Card>
 
         {/* ── Main card with tab header ── */}
         <Card className="border-emerald-200 shadow-lg">
