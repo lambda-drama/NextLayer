@@ -2,6 +2,7 @@ frappe.ui.form.on('Contract', {
     custom_contract_type(frm) {
         sync_company_signees_from_settings(frm);
     },
+   
     custom_width: function(frm) {
         calculate_area(frm);
     },
@@ -24,11 +25,11 @@ frappe.ui.form.on('Contract', {
         generate_payment_terms(frm); // 🔥 THIS is the key
     },
 		custom_company: function (frm){
-		
 
 		set_all_queries(frm);
 
 		frm.trigger("get_currency_exchange");
+        sync_company_signees_from_settings(frm);
 
 	},
 	get_currency_exchange: function (frm) {
@@ -94,7 +95,7 @@ function sync_company_signees_from_settings(frm) {
     }
     frappe.call({
         method: "nextlayer.next_layer.api.contract.get_company_signees_from_settings",
-        args: { contract_type: frm.doc.custom_contract_type },
+        args: { contract_type: frm.doc.custom_contract_type, company: frm.doc.custom_company },
         callback(r) {
             const rows = r.message || [];
             frm.clear_table("custom_project_signee");

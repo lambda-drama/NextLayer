@@ -203,21 +203,23 @@ def get_transport_contract_service_invoice(contract_name):
 
 
 @frappe.whitelist()
-def get_company_signees_from_settings(contract_type):
-	"""Rows from Contract Settings → Contract Signee Members filtered by contract type."""
-	if not contract_type:
-		return []
+def get_company_signees_from_settings(contract_type, company):
+    """Rows from Contract Settings → Contract Signee Members filtered by contract type and company."""
+    if not contract_type:
+        return []
 
-	settings = frappe.get_single("Contract Settings")
-	out = []
-	for row in settings.contract_signee or []:
-		if getattr(row, "contract_type", None) != contract_type:
-			continue
-		designation = getattr(row, "contract_designation", None)
-		member = getattr(row, "member", None)
-		if designation and member:
-			out.append({"role": designation, "member": member})
-	return out
+    settings = frappe.get_single("Contract Settings")
+    out = []
+    for row in settings.contract_signee or []:
+        if getattr(row, "contract_type", None) != contract_type:
+            continue
+        if company and getattr(row, "company", None) != company:
+            continue
+        designation = getattr(row, "contract_designation", None)
+        member = getattr(row, "member", None)
+        if designation and member:
+            out.append({"role": designation, "member": member})
+    return out
 
 
 @frappe.whitelist()
