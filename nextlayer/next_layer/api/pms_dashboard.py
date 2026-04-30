@@ -5,9 +5,75 @@ Whitelisted API endpoints powering the Property Management Dashboard.
 """
 
 import frappe
+from frappe import _
 from frappe.utils import nowdate, flt, getdate, add_months, add_days, get_first_day, get_last_day
 from datetime import date
 import calendar
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  COMPANY SCOPE (aligned with wage_report / ledger-style permissions)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _allowed_company_rows():
+	all_cos = frappe.get_all(
+		"Company",
+		fields=["name", "company_name"],
+		order_by="name",
+	)
+	user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
+	permitted_names = []
+	if user_permitted and "Company" in user_permitted:
+		permitted_names = [perm.get("doc") for perm in user_permitted["Company"]]
+
+	if permitted_names:
+		return [c for c in all_cos if c.name in permitted_names]
+	return list(all_cos)
+
+
+def _allowed_company_names():
+	return {c.name for c in _allowed_company_rows()}
+
+
+def _ensure_company_allowed(company):
+	if not company:
+		return
+	if company not in _allowed_company_names():
+		frappe.throw(_("No permission for company {0}").format(company), frappe.PermissionError)
+
+
+def _pms_effective_companies(requested_company=None):
+	allowed = sorted(_allowed_company_names())
+	if not allowed:
+		return []
+	if requested_company:
+		_ensure_company_allowed(requested_company)
+		return [requested_company]
+	return allowed
+
+
+def _property_names_for_companies(companies):
+	if not companies:
+		return []
+	return frappe.get_all("Property", filters={"company": ["in", companies]}, pluck="name")
+
+
+def _ensure_unit_company_allowed(unit_doc, requested_company=None):
+	all_allowed = _allowed_company_names()
+	prop_company = frappe.db.get_value("Property", unit_doc.property, "company")
+	if not prop_company or prop_company not in all_allowed:
+		frappe.throw(_("Not permitted to view this unit."), frappe.PermissionError)
+	effective = _pms_effective_companies(requested_company)
+	if prop_company not in effective:
+		frappe.throw(_("This unit does not belong to the selected company."), frappe.PermissionError)
+
+
+@frappe.whitelist()
+def get_pms_dashboard_companies():
+	rows = _allowed_company_rows()
+	return {
+		"companies": [{"value": r.name, "label": r.get("company_name") or r.name} for r in rows],
+	}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -15,7 +81,7 @@ import calendar
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_dashboard_overview():
+def get_dashboard_overview(company=None):
 	"""
 	Return all KPIs needed for the Overview tab:
 	  - property / unit counts
@@ -25,16 +91,45 @@ def get_dashboard_overview():
 	  - lease status breakdown
 	  - top-5 tenants by monthly rent
 	  - last-6-months revenue trend
+
+	Optional ``company``: restrict to one permitted company (omit / None for all permitted).
 	"""
 
-	# ── Property & Unit counts ──────────────────────────────────────────────
-	total_properties = frappe.db.count("Property")
+	companies = _pms_effective_companies(company or None)
 	today = getdate(nowdate())
-	unit_data = frappe.db.get_all(
-		"Unit",
-		fields=["status"],
-		filters=[],
-	)
+
+	if not companies:
+		return {
+			"total_properties": 0,
+			"total_units": 0,
+			"occupied_units": 0,
+			"vacant_units": 0,
+			"occupancy_rate": 0,
+			"active_contracts": 0,
+			"total_contracts": 0,
+			"expired_contracts": 0,
+			"terminated_contracts": 0,
+			"expiring_soon": 0,
+			"monthly_revenue": 0,
+			"monthly_paid": 0,
+			"total_outstanding": 0,
+			"lease_status": {},
+			"top_tenants": [],
+			"revenue_trend": [],
+			"property_stats": [],
+		}
+
+	prop_names = _property_names_for_companies(companies)
+	contract_base = {"docstatus": 1, "company": ["in", companies]}
+	si_pms_base = {
+		"custom_tenant_contract": ["!=", ""],
+		"company": ["in", companies],
+	}
+
+	# ── Property & Unit counts ──────────────────────────────────────────────
+	total_properties = frappe.db.count("Property", filters={"company": ["in", companies]})
+	unit_filters = {"property": ["in", prop_names]} if prop_names else {"name": "__DOES_NOT_EXIST__"}
+	unit_data = frappe.db.get_all("Unit", fields=["status"], filters=unit_filters)
 	total_units = len(unit_data)
 	occupied = sum(1 for u in unit_data if u.status == "Occupied")
 	vacant = total_units - occupied
@@ -43,7 +138,7 @@ def get_dashboard_overview():
 	# ── Active contracts ────────────────────────────────────────────────────
 	contract_data = frappe.db.get_all(
 		"Tenant Contract",
-		filters={"docstatus": 1},
+		filters=contract_base,
 		fields=["status"],
 	)
 	active_contracts = sum(1 for c in contract_data if c.status == "Active")
@@ -60,24 +155,23 @@ def get_dashboard_overview():
 	# Contracts expiring within next 30 days
 	expiry_cutoff = add_days(today, 30)
 	expiring_soon = frappe.db.count("Tenant Contract", filters={
+		**contract_base,
 		"status": "Active",
-		"docstatus": 1,
 		"end_date": ["between", [today, expiry_cutoff]],
 	})
 
 	# ── Monthly revenue (current month invoiced & submitted) ────────────────
-	today = getdate(nowdate())
 	month_start = get_first_day(today)
 	month_end = get_last_day(today)
 
 	monthly_invoices = frappe.db.get_all(
 		"Sales Invoice",
 		filters={
+			**si_pms_base,
 			"docstatus": 1,
 			"posting_date": ["between", [month_start, month_end]],
-			"custom_tenant_contract": ["!=", ""],
 		},
-		fields=["grand_total"],
+		fields=["grand_total", "outstanding_amount"],
 	)
 	monthly_revenue = sum(flt(i.grand_total) for i in monthly_invoices)
 	monthly_paid    = sum(flt(i.grand_total) - flt(i.outstanding_amount) for i in monthly_invoices)
@@ -86,9 +180,9 @@ def get_dashboard_overview():
 	outstanding_invoices = frappe.db.get_all(
 		"Sales Invoice",
 		filters={
+			**si_pms_base,
 			"docstatus": 1,
 			"outstanding_amount": [">", 0],
-			"custom_tenant_contract": ["!=", ""],
 		},
 		fields=["outstanding_amount"],
 	)
@@ -97,7 +191,7 @@ def get_dashboard_overview():
 	# ── Top-5 tenants by monthly rent ───────────────────────────────────────
 	top_tenants_raw = frappe.db.get_all(
 		"Tenant Contract",
-		filters={"status": "Active", "docstatus": 1},
+		filters={**contract_base, "status": "Active"},
 		fields=["party_name", "unit", "monthly_rent", "company"],
 		order_by="monthly_rent desc",
 		limit=5,
@@ -125,9 +219,9 @@ def get_dashboard_overview():
 		rows = frappe.db.get_all(
 			"Sales Invoice",
 			filters={
+				**si_pms_base,
 				"docstatus": 1,
 				"posting_date": ["between", [m_start, m_end]],
-				"custom_tenant_contract": ["!=", ""],
 			},
 			fields=["grand_total", "outstanding_amount"],
 		)
@@ -142,8 +236,9 @@ def get_dashboard_overview():
 	# ── Properties list with unit counts ────────────────────────────────────
 	properties = frappe.db.get_all(
 		"Property",
+		filters={"name": ["in", prop_names]} if prop_names else {"name": "__DOES_NOT_EXIST__"},
 		fields=["name", "property_name"],
-		limit=100,
+		limit=500,
 	)
 	property_stats = []
 	for p in properties:
@@ -188,13 +283,15 @@ def get_dashboard_overview():
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_financial_overview(month=None, year=None):
+def get_financial_overview(month=None, year=None, company=None):
 	"""
 	Return per-unit financial status for a given month/year.
 	Each record contains:
 	  unit, property, tenant, monthly_rent,
 	  invoiced (this month), paid, outstanding, overdue_amount,
 	  status  ("paid" | "partial" | "outstanding" | "overdue" | "no_contract")
+
+	Optional ``company``: restrict to one permitted company (omit / None for all permitted).
 	"""
 	today = getdate(nowdate())
 	if month and year:
@@ -204,10 +301,18 @@ def get_financial_overview(month=None, year=None):
 	m_start = get_first_day(ref)
 	m_end = get_last_day(ref)
 
+	companies = _pms_effective_companies(company or None)
+	if not companies:
+		return []
+
 	# All active (and recently expired) contracts for context
 	contracts = frappe.db.get_all(
 		"Tenant Contract",
-		filters={"docstatus": 1, "status": ["in", ["Active", "Expired"]]},
+		filters={
+			"docstatus": 1,
+			"status": ["in", ["Active", "Expired"]],
+			"company": ["in", companies],
+		},
 		fields=[
 			"name", "unit", "party_name", "monthly_rent",
 			"company", "start_date", "end_date", "status",
@@ -282,16 +387,20 @@ def get_financial_overview(month=None, year=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_unit_detail(unit_name):
+def get_unit_detail(unit_name, company=None):
 	"""
 	Return full detail for a unit's right-side panel:
 	  - contract info
 	  - all pending (unpaid) invoices
 	  - last 10 submitted invoices (payment history)
 	  - recent expenses linked to this unit/property
+
+	Optional ``company``: must match the unit's property company when set (permission-checked).
 	"""
 	unit = frappe.get_doc("Unit", unit_name)
+	_ensure_unit_company_allowed(unit, company or None)
 	property_name = unit.property
+	si_company = {"company": ["in", _pms_effective_companies(company or None)]}
 
 	# Active contract
 	contract = frappe.db.get_value(
@@ -315,6 +424,7 @@ def get_unit_detail(unit_name):
 	pending_invoices = frappe.db.get_all(
 		"Sales Invoice",
 		filters={
+			**si_company,
 			"custom_unit": unit_name,
 			"docstatus": 1,
 			"outstanding_amount": [">", 0],
@@ -331,6 +441,7 @@ def get_unit_detail(unit_name):
 	invoice_history = frappe.db.get_all(
 		"Sales Invoice",
 		filters={
+			**si_company,
 			"custom_unit": unit_name,
 			"docstatus": 1,
 		},
@@ -366,7 +477,6 @@ def get_unit_detail(unit_name):
 		expenses = [dict(e) for e in je_rows]
 	except Exception:
 		pass
-	print("hapa tunataka tuone inatoa wapi", expenses)
 	return {
 		"unit": unit_name,
 		"property": property_name,
@@ -384,17 +494,24 @@ def get_unit_detail(unit_name):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_properties_financial():
+def get_properties_financial(company=None):
 	"""
 	Return per-property financial summary:
 	  name, total_units, occupied, vacant, total_monthly_rent,
 	  total_outstanding, total_overdue, unit_count_by_status
+
+	Optional ``company``: restrict to one permitted company (omit / None for all permitted).
 	"""
 	today = getdate(nowdate())
+	companies = _pms_effective_companies(company or None)
+	if not companies:
+		return []
+
 	properties = frappe.db.get_all(
 		"Property",
+		filters={"company": ["in", companies]},
 		fields=["name", "property_name", "address_line_1", "city", "property_type", "status"],
-		limit=200,
+		limit=500,
 	)
 
 	results = []
@@ -428,7 +545,12 @@ def get_properties_financial():
 		# Active contracts for units in this property
 		contracts = frappe.db.get_all(
 			"Tenant Contract",
-			filters={"unit": ["in", unit_names], "status": "Active", "docstatus": 1},
+			filters={
+				"unit": ["in", unit_names],
+				"status": "Active",
+				"docstatus": 1,
+				"company": ["in", companies],
+			},
 			fields=["name", "unit", "party_name", "monthly_rent"],
 		)
 		total_monthly_rent = sum(flt(c.monthly_rent) for c in contracts)
@@ -439,6 +561,7 @@ def get_properties_financial():
 			outstanding_rows = frappe.db.get_all(
 				"Sales Invoice",
 				filters={
+					"company": ["in", companies],
 					"custom_unit": ["in", unit_names],
 					"docstatus": 1,
 					"outstanding_amount": [">", 0],
@@ -501,22 +624,31 @@ def get_properties_financial():
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_units_overview():
+def get_units_overview(company=None):
 	"""
 	Return every unit with its financial status and current tenant.
+
+	Optional ``company``: restrict to one permitted company (omit / None for all permitted).
 	"""
 	today = getdate(nowdate())
+	companies = _pms_effective_companies(company or None)
+	if not companies:
+		return []
+
+	prop_names = _property_names_for_companies(companies)
+	unit_filters = {"property": ["in", prop_names]} if prop_names else {"name": "__DOES_NOT_EXIST__"}
 
 	units = frappe.db.get_all(
 		"Unit",
 		fields=["name", "property", "status", "standard_rent", "area", "floor"],
-		limit=500,
+		filters=unit_filters,
+		limit=2000,
 	)
 
 	# Batch-fetch active contracts
 	contracts = frappe.db.get_all(
 		"Tenant Contract",
-		filters={"status": "Active", "docstatus": 1},
+		filters={"status": "Active", "docstatus": 1, "company": ["in", companies]},
 		fields=["name", "unit", "party_name", "monthly_rent", "start_date", "end_date", "company"],
 	)
 	contract_map = {c.unit: c for c in contracts}
@@ -524,7 +656,11 @@ def get_units_overview():
 	# Batch-fetch all outstanding invoices
 	outstanding_rows = frappe.db.get_all(
 		"Sales Invoice",
-		filters={"docstatus": 1, "outstanding_amount": [">", 0]},
+		filters={
+			"company": ["in", companies],
+			"docstatus": 1,
+			"outstanding_amount": [">", 0],
+		},
 		fields=["custom_unit", "outstanding_amount", "due_date"],
 	) if units else []
 	outstanding_by_unit: dict = {}
@@ -589,12 +725,17 @@ def get_units_overview():
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def get_unit_month_breakdown(unit_name):
+def get_unit_month_breakdown(unit_name, company=None):
 	"""
 	Return a 12-month payment breakdown for a single unit.
 	Each entry: month_label, month_start, invoiced, paid, outstanding, status
+
+	Optional ``company``: must match the unit's property company when set (permission-checked).
 	"""
+	unit = frappe.get_doc("Unit", unit_name)
+	_ensure_unit_company_allowed(unit, company or None)
 	today = getdate(nowdate())
+	si_company = {"company": ["in", _pms_effective_companies(company or None)]}
 	breakdown = []
 
 	for i in range(11, -1, -1):
@@ -605,6 +746,7 @@ def get_unit_month_breakdown(unit_name):
 		invoices = frappe.db.get_all(
 			"Sales Invoice",
 			filters={
+				**si_company,
 				"custom_unit": unit_name,
 				"docstatus": ["!=", 2],
 				"posting_date": ["between", [m_start, m_end]],
@@ -659,14 +801,17 @@ def get_available_months():
 
 
 @frappe.whitelist()
-def get_tenant_contracts_dashboard():
+def get_tenant_contracts_dashboard(company=None):
 	"""Submitted Tenant Contracts for the dashboard Tenant Contract tab (filter client-side)."""
 	today = getdate(nowdate())
 	expiry_cutoff = add_days(today, 30)
+	companies = _pms_effective_companies(company or None)
+	if not companies:
+		return []
 
 	rows = frappe.db.get_all(
 		"Tenant Contract",
-		filters={"docstatus": 1},
+		filters={"docstatus": 1, "company": ["in", companies]},
 		fields=[
 			"name",
 			"status",

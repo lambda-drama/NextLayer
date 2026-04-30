@@ -89,7 +89,7 @@ def make_journal_entry(contract_name, amount, stage_no):
 
     # ---------- increment stages_payment counter ----------
     frappe.db.set_value("Contract", contract_name, "custom_stages_payment", stages_paid + 1)
-    
+
     update_contract_payment_status(contract_name)
     return jv.name
 
@@ -97,7 +97,7 @@ def make_journal_entry(contract_name, amount, stage_no):
 def update_contract_payment_status(contract_name):
     """
     After each Journal Entry is created, re-evaluate the contract's payment status.
-    
+
     Logic:
       - Fetch all submitted JEs referencing this contract
       - Sum their credit amounts
