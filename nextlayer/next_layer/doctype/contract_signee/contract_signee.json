@@ -8,6 +8,7 @@
  "field_order": [
   "role",
   "member",
+  "signer_user",
   "column_break_wnrb",
   "signature"
  ],
@@ -38,13 +39,20 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Signature"
+  },
+  {
+   "fetch_from": "member.custom_user",
+   "fieldname": "signer_user",
+   "fieldtype": "Link",
+   "label": "Signer User",
+   "options": "User"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-06 02:22:56.106864",
+ "modified": "2026-05-01 03:06:37.323388",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Contract Signee",

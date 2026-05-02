@@ -60,6 +60,7 @@ frappe.ui.form.on('Contract', {
     refresh(frm) {
 		const allowed_roles = ["WhatsApp User", "System Manager", "Administrator"];
 
+
             if (
                 frm.doc.docstatus > 0 &&
                 allowed_roles.some(role => frappe.user.has_role(role))
@@ -76,6 +77,8 @@ frappe.ui.form.on('Contract', {
 
         if (frm.doc.docstatus === 0) {
     calculate_total_amount(frm);
+
+    signer_hide(frm)
 }
 
 
@@ -528,4 +531,28 @@ function calculate_total_amount(frm) {
     }
     
     frm.set_value('custom_total_service_amount', total_amount);
+}
+
+function signer_hide(frm) {
+    const current_user = frappe.session.user;
+
+    if (frappe.user.has_role("System Manager")) {
+        console.log("Uko haoa");
+        return;
+    }
+
+    
+
+    if (!frm.fields_dict.custom_project_signee) {
+        console.log("2nd");
+        return;
+    }
+
+    const grid = frm.fields_dict.custom_project_signee.grid;
+
+    grid.grid_rows.forEach(row => {
+        console.log(row.doc.signer_user);
+        const show = row.doc.signer_user === current_user;
+        row.wrapper.toggle(show);
+    });
 }
