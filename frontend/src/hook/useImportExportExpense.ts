@@ -90,29 +90,40 @@ export interface ImportExportData {
   filters_applied: Record<string, unknown>
 }
 
+export type ExpenseSideFilter = 'all' | 'purchase' | 'sales'
+
 // ─── Hook params ─────────────────────────────────────────────────────────────
 interface UseImportExportExpenseParams {
   company: string
-  item: string
+  /** Multiple item codes; empty = all items */
+  items: string[]
   fromDate: string
   toDate: string
   currency: string
   groupBy: string
+  companyGroup: string
+  expenseSide: ExpenseSideFilter
+  includeDrafts: boolean
   enabled: boolean
 }
 
 export function useImportExportExpense({
   company,
-  item,
+  items,
   fromDate,
   toDate,
   currency,
   groupBy,
+  companyGroup,
+  expenseSide,
+  includeDrafts,
   enabled,
 }: UseImportExportExpenseParams) {
   const [data, setData] = useState<ImportExportData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const itemsKey = items.slice().sort().join('|')
 
   useEffect(() => {
     if (!enabled || !fromDate || !toDate) {
@@ -125,14 +136,20 @@ export function useImportExportExpense({
       setIsLoading(true)
       setError(null)
       try {
-        const filters = {
+        const filters: Record<string, unknown> = {
           company: company || undefined,
-          item: item || undefined,
           from_date: fromDate,
           to_date: toDate,
           currency: currency === 'all' ? '' : currency,
           group_by: groupBy || 'default',
+          expense_side: expenseSide === 'all' ? undefined : expenseSide,
+          company_group: companyGroup.trim() || undefined,
+          include_drafts: includeDrafts || undefined,
         }
+        if (items.length > 0) {
+          filters.items = items
+        }
+
         const csrfToken =
           (window as unknown as { csrf_token?: string }).csrf_token || ''
 
@@ -170,7 +187,7 @@ export function useImportExportExpense({
     }
 
     fetchData()
-  }, [enabled, company, item, fromDate, toDate, currency, groupBy])
+  }, [enabled, company, itemsKey, fromDate, toDate, currency, groupBy, companyGroup, expenseSide, includeDrafts])
 
   return { data, isLoading, error }
 }

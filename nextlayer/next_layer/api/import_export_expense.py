@@ -49,41 +49,139 @@ def _get_company_currency(company_name):
     return frappe.get_cached_value("Company", company_name, "default_currency") or "USD"
 
 
-def _collect_transit_display(pi_names, si_names):
-    if not _transit_table_exists():
-        return ""
-    transit_nos = []
+def _parse_item_codes(filters):
+    """Normalize `items` array (or legacy `item`) to a list of item_code strings."""
+    raw = filters.get("items")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            raw = frappe.parse_json(raw)
+        except Exception:
+            raw = [raw]
+    if not raw:
+        one = filters.get("item") or ""
+        raw = [one] if str(one).strip() else []
+    if not isinstance(raw, (list, tuple)):
+        raw = [raw]
+    return [str(x).strip() for x in raw if str(x).strip()]
 
+
+def _sql_in_clause_single(field_sql, codes, param_key_single="item", param_key_multi="items"):
+    """Return (sql_fragment, extra_bind_dict). Empty codes → no filter."""
+    if not codes:
+        return "", {}
+    if len(codes) == 1:
+        return f" AND {field_sql} = %({param_key_single})s", {param_key_single: codes[0]}
+    return f" AND {field_sql} IN %({param_key_multi})s", {param_key_multi: tuple(codes)}
+
+
+def _company_group_on_purchase_invoice():
+    return frappe.db.has_column("Purchase Invoice", "company_group")
+
+
+def _company_group_on_sales_invoice():
+    return frappe.db.has_column("Sales Invoice", "company_group")
+
+
+def _filter_pi_si_by_company(pi_names, si_names, company_filter):
+    """After transit expansion, keep only invoices belonging to the selected company."""
+    if not company_filter:
+        return list(pi_names or []), list(si_names or [])
+    pi_names = list(pi_names or [])
+    si_names = list(si_names or [])
+    out_pi, out_si = [], []
     if pi_names:
-        rows = frappe.db.sql("""
-            SELECT transit_no FROM `tabTransit Numbers`
-            WHERE parent IN %(pi)s AND parenttype='Purchase Invoice'
-              AND document_type='Sales Invoice'
-              AND transit_no IS NOT NULL AND transit_no != ''
-        """, {"pi": pi_names}, as_dict=True)
-        for r in rows:
-            if r.transit_no not in transit_nos:
-                transit_nos.append(r.transit_no)
-
+        rows = frappe.db.sql(
+            """
+            SELECT name FROM `tabPurchase Invoice`
+            WHERE name IN %(n)s AND company = %(c)s
+            """,
+            {"n": pi_names, "c": company_filter},
+            as_dict=True,
+        )
+        out_pi = [r.name for r in rows]
     if si_names:
-        rows = frappe.db.sql("""
-            SELECT transit_no FROM `tabTransit Numbers`
-            WHERE parent IN %(si)s AND parenttype='Sales Invoice'
-              AND document_type='Purchase Invoice'
-              AND transit_no IS NOT NULL AND transit_no != ''
-        """, {"si": si_names}, as_dict=True)
-        for r in rows:
-            if r.transit_no not in transit_nos:
-                transit_nos.append(r.transit_no)
+        rows = frappe.db.sql(
+            """
+            SELECT name FROM `tabSales Invoice`
+            WHERE name IN %(n)s AND company = %(c)s
+            """,
+            {"n": si_names, "c": company_filter},
+            as_dict=True,
+        )
+        out_si = [r.name for r in rows]
+    return out_pi, out_si
 
-    return ", ".join(transit_nos)
+
+def _bulk_invoice_companies(doctype, names):
+    """Return {invoice_name: company} for PI or SI."""
+    if not names:
+        return {}
+    table = "Purchase Invoice" if doctype == "Purchase Invoice" else "Sales Invoice"
+    rows = frappe.db.sql(
+        f"SELECT name, company FROM `tab{table}` WHERE name IN %(n)s",
+        {"n": list(names)},
+        as_dict=True,
+    )
+    return {r.name: (r.company or "") for r in rows}
 
 
-def _collect_transit_invoices_structured(pi_names, si_names):
+def _filter_transit_refs_by_company(refs, company_filter):
+    """Drop linked transit invoices that belong to another company."""
+    if not company_filter or not refs:
+        return refs
+    pi_names = [r["name"] for r in refs if r.get("doctype") == "Purchase Invoice"]
+    si_names = [r["name"] for r in refs if r.get("doctype") == "Sales Invoice"]
+    pi_co = _bulk_invoice_companies("Purchase Invoice", pi_names)
+    si_co = _bulk_invoice_companies("Sales Invoice", si_names)
+    out = []
+    for r in refs:
+        dt, nm = r.get("doctype"), r.get("name")
+        if dt == "Purchase Invoice":
+            co = pi_co.get(nm)
+        elif dt == "Sales Invoice":
+            co = si_co.get(nm)
+        else:
+            co = None
+        if co == company_filter:
+            out.append(r)
+    return out
+
+
+def _empty_import_aggregate(target_currency=None):
+    return {
+        "item_costs": defaultdict(float),
+        "item_names": {},
+        "posting_dates": [],
+        "distribution_lines": [],
+        "total_charges": 0.0,
+        "target_currency": target_currency,
+        "lcv_names": [],
+    }
+
+
+def _empty_export_aggregate():
+    return {
+        "item_costs": defaultdict(float),
+        "item_names": {},
+        "posting_dates": [],
+        "distribution_lines": [],
+        "total_charges": 0.0,
+        "currency": "USD",
+        "ssc_names": [],
+    }
+
+
+def _collect_transit_display(pi_names, si_names, company_filter=None):
+    refs = _collect_transit_invoices_structured(pi_names, si_names, company_filter)
+    return ", ".join(r["name"] for r in refs)
+
+
+def _collect_transit_invoices_structured(pi_names, si_names, company_filter=None):
     """
     Ordered unique linked invoices for Transit No. column (styling + ERPNext links).
     When Transit Numbers child rows exist, use their document_type + transit_no.
     Otherwise fall back to journey PI/SI names.
+    If company_filter is set, linked invoices from other companies are omitted.
     """
     out = []
     seen = set()
@@ -116,15 +214,35 @@ def _collect_transit_invoices_structured(pi_names, si_names):
                     out.append({"doctype": r.document_type, "name": r.transit_no})
 
     if not out:
-        for n in sorted(si_names or []):
+        si_list = sorted(si_names or [])
+        pi_list = sorted(pi_names or [])
+        if company_filter:
+            si_co = _bulk_invoice_companies("Sales Invoice", si_list)
+            pi_co = _bulk_invoice_companies("Purchase Invoice", pi_list)
+            si_list = [n for n in si_list if si_co.get(n) == company_filter]
+            pi_list = [n for n in pi_list if pi_co.get(n) == company_filter]
+        for n in si_list:
             key = ("Sales Invoice", n)
             if key not in seen:
                 seen.add(key)
                 out.append({"doctype": "Sales Invoice", "name": n})
-        for n in sorted(pi_names or []):
+        for n in pi_list:
             key = ("Purchase Invoice", n)
             if key not in seen:
                 seen.add(key)
+                out.append({"doctype": "Purchase Invoice", "name": n})
+    elif company_filter:
+        out = _filter_transit_refs_by_company(out, company_filter)
+        if not out:
+            si_list = sorted(si_names or [])
+            pi_list = sorted(pi_names or [])
+            si_co = _bulk_invoice_companies("Sales Invoice", si_list)
+            pi_co = _bulk_invoice_companies("Purchase Invoice", pi_list)
+            si_list = [n for n in si_list if si_co.get(n) == company_filter]
+            pi_list = [n for n in pi_list if pi_co.get(n) == company_filter]
+            for n in si_list:
+                out.append({"doctype": "Sales Invoice", "name": n})
+            for n in pi_list:
                 out.append({"doctype": "Purchase Invoice", "name": n})
 
     return out
@@ -203,7 +321,7 @@ def _get_journey_component(start_doctype, start_name):
 # Journey grouping
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_journey_map(from_date, to_date, company_filter):
+def _build_journey_map(from_date, to_date, company_filter, company_group_filter=None, include_drafts=False):
     """
     Returns:
         journey_to_pi:   dict[journey_id → list[pi_name]]
@@ -217,20 +335,30 @@ def _build_journey_map(from_date, to_date, company_filter):
     visited_nodes   = set()
 
     pi_filters = [
-        ["Purchase Invoice", "docstatus",             "=",       1],
         ["Purchase Invoice", "posting_date",          "between", [from_date, to_date]],
         ["Purchase Invoice", "custom_is_export_sale", "=",       1],
     ]
+    if include_drafts:
+        pi_filters.append(["Purchase Invoice", "docstatus", "in", [0, 1]])
+    else:
+        pi_filters.append(["Purchase Invoice", "docstatus", "=", 1])
     if company_filter:
         pi_filters.append(["Purchase Invoice", "company", "=", company_filter])
+    if company_group_filter and _company_group_on_purchase_invoice():
+        pi_filters.append(["Purchase Invoice", "company_group", "=", company_group_filter])
 
     si_filters = [
-        ["Sales Invoice", "docstatus",             "=",       1],
         ["Sales Invoice", "posting_date",          "between", [from_date, to_date]],
         ["Sales Invoice", "custom_is_export_sale", "=",       1],
     ]
+    if include_drafts:
+        si_filters.append(["Sales Invoice", "docstatus", "in", [0, 1]])
+    else:
+        si_filters.append(["Sales Invoice", "docstatus", "=", 1])
     if company_filter:
         si_filters.append(["Sales Invoice", "company", "=", company_filter])
+    if company_group_filter and _company_group_on_sales_invoice():
+        si_filters.append(["Sales Invoice", "company_group", "=", company_group_filter])
 
     seed_nodes = set()
     for row in frappe.get_all("Purchase Invoice", filters=pi_filters, fields=["name"]):
@@ -306,10 +434,11 @@ def _collect_export_meta_bulk(si_names):
 # Units / Price / Total Value — bulk SQL on SI item rows
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _collect_si_item_data_bulk(si_names, item_filter, split_by_uom=False):
+def _collect_si_item_data_bulk(si_names, item_codes, split_by_uom=False):
     """
     Return {item_code: {units, price, total_value, transaction_currency, company_currency, stock_uom?}}.
     If split_by_uom=True, returns {f"{item_code}||{uom}": {...}} with one entry per item_code × stock_uom.
+    item_codes: optional list; empty = all items.
     """
     if not si_names:
         return {}
@@ -325,14 +454,14 @@ def _collect_si_item_data_bulk(si_names, item_filter, split_by_uom=False):
     si_company_map  = {r.name: r.company or "" for r in si_meta_rows}
 
     uom_sql = ", sii.stock_uom, sii.uom" if split_by_uom else ""
-    item_clause = "AND sii.item_code = %(item)s" if item_filter else ""
+    item_frag, item_bind = _sql_in_clause_single("sii.item_code", item_codes or [])
     rows = frappe.db.sql(f"""
         SELECT sii.parent, sii.item_code, sii.qty, sii.rate, sii.amount{uom_sql}
         FROM `tabSales Invoice Item` sii
         WHERE sii.parent IN %(names)s
-          {item_clause}
+          {item_frag}
           AND sii.item_code IS NOT NULL AND sii.item_code != ''
-    """, {"names": si_names, "item": item_filter}, as_dict=True)
+    """, {"names": si_names, **item_bind}, as_dict=True)
 
     item_data = {}
     for r in rows:
@@ -472,15 +601,23 @@ def _bulk_item_names(item_codes):
 #         "lcv_names": lcv_names
 #     }
 
-def _aggregate_import_costs_bulk(pi_names, company_filter, item_filter, target_currency=None, conversion_date=None):
+def _aggregate_import_costs_bulk(
+    pi_names,
+    company_filter,
+    item_codes=None,
+    target_currency=None,
+    conversion_date=None,
+    include_drafts=False,
+):
     """
     Return ALL distribution lines grouped by expense account.
-    
+
     Currency handling for Imports (Landed Cost Voucher):
     - Each LCV can be from a different company with different company currency
     - ALL amounts are converted to target_currency (from user's filter)
     - target_currency is the display currency selected in the report filters
     """
+    item_codes = item_codes or []
     if not pi_names:
         return {
             "item_costs": defaultdict(float),
@@ -493,6 +630,7 @@ def _aggregate_import_costs_bulk(pi_names, company_filter, item_filter, target_c
         }
 
     company_clause = "AND lcv.company = %(company)s" if company_filter else ""
+    lcv_ds_clause = "lcv.docstatus IN (0, 1)" if include_drafts else "lcv.docstatus = 1"
 
     # Step 1: find matching LCVs with company info
     lcv_rows = frappe.db.sql(f"""
@@ -504,7 +642,7 @@ def _aggregate_import_costs_bulk(pi_names, company_filter, item_filter, target_c
         FROM `tabLanded Cost Voucher` lcv
         INNER JOIN `tabLanded Cost Purchase Receipt` lcpr
             ON lcpr.parent = lcv.name
-        WHERE lcv.docstatus = 1
+        WHERE {lcv_ds_clause}
           AND lcpr.receipt_document_type = 'Purchase Invoice'
           AND lcpr.receipt_document IN %(pi_names)s
           {company_clause}
@@ -544,9 +682,7 @@ def _aggregate_import_costs_bulk(pi_names, company_filter, item_filter, target_c
                     convert_currency(amt_in_lcv_currency, target_currency, lcv_company_currency, conversion_date_use),
                     2
                 )
-                print("Curries disrrribution", target_currency, lcv_company_currency)
                 total_charges_sum += converted_amount
-                print("sum all is ")
             except Exception as e:
                 # If conversion fails, use original amount but log error
                 total_charges_sum += amt_in_lcv_currency
@@ -607,7 +743,7 @@ def _aggregate_import_costs_bulk(pi_names, company_filter, item_filter, target_c
             })
 
     # Step 3: Get item-level charges and convert to target_currency
-    item_clause = "AND lci.item_code = %(item)s" if item_filter else ""
+    item_frag, item_bind = _sql_in_clause_single("lci.item_code", item_codes)
     item_rows = frappe.db.sql(f"""
         SELECT 
             lci.item_code, 
@@ -619,8 +755,8 @@ def _aggregate_import_costs_bulk(pi_names, company_filter, item_filter, target_c
         INNER JOIN `tabLanded Cost Voucher` lcv ON lcv.name = lci.parent
         WHERE lci.parent IN %(lcv_names)s
           AND lci.item_code IS NOT NULL AND lci.item_code != ''
-          {item_clause}
-    """, {"lcv_names": lcv_names, "item": item_filter}, as_dict=True)
+          {item_frag}
+    """, {"lcv_names": lcv_names, **item_bind}, as_dict=True)
 
     item_costs = defaultdict(float)
     item_names = {}
@@ -658,8 +794,9 @@ def _aggregate_import_costs_bulk(pi_names, company_filter, item_filter, target_c
     
 
 
-def _aggregate_export_costs_bulk(si_names, company_filter, item_filter):
+def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, include_drafts=False):
     """Return ALL distribution lines grouped by expense account"""
+    item_codes = item_codes or []
     if not si_names or not frappe.db.table_exists("Sales Shipment Cost"):
         return {
             "item_costs": defaultdict(float),
@@ -672,6 +809,7 @@ def _aggregate_export_costs_bulk(si_names, company_filter, item_filter):
         }
 
     company_clause = "AND ssc.company = %(company)s" if company_filter else ""
+    ssc_ds_clause = "ssc.docstatus IN (0, 1)" if include_drafts else "ssc.docstatus = 1"
 
     # Step 1: find matching SSCs and get their total_amount
     ssc_rows = frappe.db.sql(f"""
@@ -682,7 +820,7 @@ def _aggregate_export_costs_bulk(si_names, company_filter, item_filter):
         FROM `tabSales Shipment Cost` ssc
         INNER JOIN `tabLanded Cost Sales Invoice` lcsi
             ON lcsi.parent = ssc.name
-        WHERE ssc.docstatus = 1
+        WHERE {ssc_ds_clause}
           AND lcsi.receipt_document_type = 'Sales Invoice'
           AND lcsi.receipt_document IN %(si_names)s
           {company_clause}
@@ -732,14 +870,14 @@ def _aggregate_export_costs_bulk(si_names, company_filter, item_filter):
             })
 
     # Step 3: Get item-level charges (for per-item breakdown)
-    item_clause = "AND item_code = %(item)s" if item_filter else ""
+    item_frag, item_bind = _sql_in_clause_single("item_code", item_codes)
     item_rows = frappe.db.sql(f"""
         SELECT item_code, applicable_charges, description
         FROM `tabSales Shipment Cost Item`
         WHERE parent IN %(ssc_names)s
           AND item_code IS NOT NULL AND item_code != ''
-          {item_clause}
-    """, {"ssc_names": ssc_names, "item": item_filter}, as_dict=True)
+          {item_frag}
+    """, {"ssc_names": ssc_names, **item_bind}, as_dict=True)
 
     item_costs = defaultdict(float)
     item_names = {}
@@ -1040,6 +1178,7 @@ def _build_journey_rows(
     display_currency=None,
     conversion_date=None,
     split_by_uom=False,
+    expense_side="all",
 ):
     """
     Build journey rows with complete expense account distribution.
@@ -1090,12 +1229,18 @@ def _build_journey_rows(
     lcv_names = import_data.get("lcv_names", [])
     ssc_names = export_data.get("ssc_names", [])
     
-    # Determine source type
-    source = (
-        "both"   if (pi_names and si_names) else
-        "import" if pi_names else
-        "export"
-    )
+    # Determine source type (respect expense-side filter for UI badges)
+    es = (expense_side or "all").lower()
+    if es == "purchase":
+        source = "import" if pi_names else ("export" if si_names else "import")
+    elif es == "sales":
+        source = "export" if si_names else ("import" if pi_names else "export")
+    else:
+        source = (
+            "both"   if (pi_names and si_names) else
+            "import" if pi_names else
+            "export"
+        )
     
     date_str = _fmt_dates(posting_dates)
     conv_date = conversion_date or frappe.utils.nowdate()
@@ -1225,18 +1370,32 @@ def get_import_export_expense_report(filters=None):
         if not from_date or not to_date:
             frappe.throw(_("From Date and To Date are required"))
 
-        company_filter  = filters.get("company")  or ""
-        item_filter     = filters.get("item")      or ""
-        currency_filter   = filters.get("currency")  or ""
+        company_filter = filters.get("company") or ""
+        company_group_filter = (filters.get("company_group") or "").strip()
+        currency_filter = filters.get("currency") or ""
         # display_currency: non-empty, non-"all" value means "convert everything to this"
         display_currency = currency_filter if (currency_filter and currency_filter != "all") else None
+
+        item_codes = _parse_item_codes(filters)
+        include_drafts = str(filters.get("include_drafts") or "").lower() in ("1", "true", "yes", "on")
+        expense_side = (filters.get("expense_side") or filters.get("expense_scope") or "all").strip().lower()
+        if expense_side not in ("all", "purchase", "sales", "import", "export"):
+            expense_side = "all"
+        if expense_side == "import":
+            expense_side = "purchase"
+        if expense_side == "export":
+            expense_side = "sales"
 
         gb_raw = (filters.get("group_by") or "default").strip().lower()
         group_by_container = gb_raw in ("container", "containers")
         split_by_uom       = gb_raw in ("unit", "units", "uom")
 
         journey_to_pi, journey_to_si, journey_display = _build_journey_map(
-            from_date, to_date, company_filter
+            from_date,
+            to_date,
+            company_filter,
+            company_group_filter=company_group_filter or None,
+            include_drafts=include_drafts,
         )
         all_journey_ids = sorted(set(journey_to_pi.keys()) | set(journey_to_si.keys()))
 
@@ -1260,6 +1419,9 @@ def get_import_export_expense_report(filters=None):
             display_name = journey_display.get(journey_id, journey_id.replace("|", " "))
 
             all_pi_names, all_si_names = _expand_journey_invoices(pi_seed, si_seed)
+            all_pi_names, all_si_names = _filter_pi_si_by_company(all_pi_names, all_si_names, company_filter)
+            if not all_pi_names and not all_si_names:
+                continue
 
             for sl in _cluster_journey_slices(all_pi_names, all_si_names, group_by_container):
                 slice_pi = sl["pi_names"]
@@ -1274,11 +1436,29 @@ def get_import_export_expense_report(filters=None):
                 export_container, export_bl, destination = _collect_export_meta_bulk(slice_si)
 
                 si_item_data = _collect_si_item_data_bulk(
-                    slice_si, item_filter, split_by_uom=split_by_uom,
+                    slice_si, item_codes, split_by_uom=split_by_uom,
                 )
 
-                import_data = _aggregate_import_costs_bulk(slice_pi, company_filter, item_filter, target_currency=display_currency, conversion_date=to_date)
-                export_data = _aggregate_export_costs_bulk(slice_si, company_filter, item_filter)
+                if expense_side == "sales":
+                    import_data = _empty_import_aggregate(display_currency)
+                else:
+                    import_data = _aggregate_import_costs_bulk(
+                        slice_pi,
+                        company_filter,
+                        item_codes=item_codes,
+                        target_currency=display_currency,
+                        conversion_date=to_date,
+                        include_drafts=include_drafts,
+                    )
+                if expense_side == "purchase":
+                    export_data = _empty_export_aggregate()
+                else:
+                    export_data = _aggregate_export_costs_bulk(
+                        slice_si,
+                        company_filter,
+                        item_codes=item_codes,
+                        include_drafts=include_drafts,
+                    )
 
                 import_costs = import_data["item_costs"]
                 import_item_names = import_data["item_names"]
@@ -1305,8 +1485,8 @@ def get_import_export_expense_report(filters=None):
                     all_item_names.update(_bulk_item_names(unknown_codes))
 
                 all_dates    = import_dates + export_dates
-                transit_no   = _collect_transit_display(slice_pi, slice_si)
-                transit_docs = _collect_transit_invoices_structured(slice_pi, slice_si)
+                transit_no   = _collect_transit_display(slice_pi, slice_si, company_filter)
+                transit_docs = _collect_transit_invoices_structured(slice_pi, slice_si, company_filter)
 
                 imp_lines_conv = _convert_distribution_lines(
                     _distribution_lines_for_api(import_data.get("distribution_lines", [])),
@@ -1354,6 +1534,7 @@ def get_import_export_expense_report(filters=None):
                     display_currency=display_currency or None,
                     conversion_date=to_date,
                     split_by_uom=split_by_uom,
+                    expense_side=expense_side,
                 )
 
                 for row in journey_rows:
@@ -1372,7 +1553,11 @@ def get_import_export_expense_report(filters=None):
                 "from_date": from_date,
                 "to_date":   to_date,
                 "company":   company_filter,
-                "item":      item_filter,
+                "company_group": company_group_filter,
+                "items":     item_codes,
+                "item":      item_codes[0] if len(item_codes) == 1 else "",
+                "expense_side": expense_side,
+                "include_drafts": include_drafts,
                 "currency":  currency_filter or "all",
                 "group_by":  gb_raw if gb_raw else "default",
             },
@@ -1388,6 +1573,40 @@ def get_import_export_expense_report(filters=None):
             "totals":             {},
             "journey_breakdowns": {},
         }
+
+
+@frappe.whitelist()
+def get_company_groups_for_import_export_filter():
+    """Distinct company_group values from export-related Purchase / Sales Invoices (if column exists)."""
+    groups = set()
+    try:
+        if _company_group_on_purchase_invoice():
+            for r in frappe.db.sql(
+                """
+                SELECT DISTINCT company_group AS cg FROM `tabPurchase Invoice`
+                WHERE IFNULL(company_group,'') != '' AND IFNULL(custom_is_export_sale,0) = 1
+                """,
+                as_dict=True,
+            ):
+                if r.get("cg"):
+                    groups.add(r.cg)
+        if _company_group_on_sales_invoice():
+            for r in frappe.db.sql(
+                """
+                SELECT DISTINCT company_group AS cg FROM `tabSales Invoice`
+                WHERE IFNULL(company_group,'') != '' AND IFNULL(custom_is_export_sale,0) = 1
+                """,
+                as_dict=True,
+            ):
+                if r.get("cg"):
+                    groups.add(r.cg)
+        return {
+            "success": True,
+            "company_groups": [{"name": g, "value": g} for g in sorted(groups)],
+        }
+    except Exception as e:
+        frappe.log_error(f"get_company_groups_for_import_export_filter: {str(e)}")
+        return {"success": False, "company_groups": [], "error": str(e)}
 
 
 @frappe.whitelist()
