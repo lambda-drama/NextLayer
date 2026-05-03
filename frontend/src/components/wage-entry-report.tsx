@@ -88,7 +88,7 @@ const STATUS_CFG: Record<string, { bg: string; text: string; border: string; dot
 
 const ALL_VAL = "__all__"
 
-// ── Searchable Combobox ───────────────────────────────────────────────────────
+// ── Searchable Combobox (without "All" option for company) ───────────────────────────────────────────────────────
 
 interface ComboboxOption {
   value: string
@@ -100,9 +100,9 @@ interface SearchableComboboxProps {
   onChange: (val: string) => void
   options: ComboboxOption[]
   placeholder?: string
-  allLabel?: string
   className?: string
   disabled?: boolean
+  required?: boolean
 }
 
 function SearchableCombobox({
@@ -110,25 +110,22 @@ function SearchableCombobox({
   onChange,
   options,
   placeholder = "Select…",
-  allLabel = "All",
   className = "",
   disabled = false,
+  required = false,
 }: SearchableComboboxProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const allOption: ComboboxOption = { value: ALL_VAL, label: allLabel }
-  const allOptions = [allOption, ...options]
-
   const filtered = useMemo(() => {
-    if (!query.trim()) return allOptions
+    if (!query.trim()) return options
     const q = query.toLowerCase()
-    return allOptions.filter(o => o.label.toLowerCase().includes(q))
+    return options.filter(o => o.label.toLowerCase().includes(q))
   }, [query, options])
 
-  const selectedLabel = allOptions.find(o => o.value === value)?.label ?? placeholder
+  const selectedLabel = options.find(o => o.value === value)?.label ?? placeholder
 
   // Close on outside click
   useEffect(() => {
@@ -169,6 +166,7 @@ function SearchableCombobox({
             ? "border-green-500 ring-2 ring-green-200 bg-green-50"
             : !disabled ? "border-green-200 bg-white hover:border-green-400 hover:bg-green-50/40" : ""
           }
+          ${required && !value && !disabled ? "border-amber-400 bg-amber-50/30" : ""}
           text-slate-700 font-medium
         `}
       >
@@ -230,6 +228,36 @@ function SearchableCombobox({
         </div>
       )}
     </div>
+  )
+}
+
+// ── Searchable Combobox with "All" option (for non-required fields) ──
+
+interface SearchableComboboxWithAllProps extends SearchableComboboxProps {
+  allLabel?: string
+}
+
+function SearchableComboboxWithAll({
+  value,
+  onChange,
+  options,
+  placeholder = "Select…",
+  allLabel = "All",
+  className = "",
+  disabled = false,
+}: SearchableComboboxWithAllProps) {
+  const allOption: ComboboxOption = { value: ALL_VAL, label: allLabel }
+  const allOptions = [allOption, ...options]
+  
+  return (
+    <SearchableCombobox
+      value={value}
+      onChange={onChange}
+      options={allOptions}
+      placeholder={placeholder}
+      className={className}
+      disabled={disabled}
+    />
   )
 }
 
@@ -503,8 +531,8 @@ export default function WageEntryReport() {
   const [tab, setTab] = useState<TabId>("list")
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null)
 
+  const [company, setCompany]   = useState<string>("") // No default, must be selected
   const [project, setProject]   = useState<string>(ALL_VAL)
-  const [company, setCompany]   = useState<string>(ALL_VAL)
   const [status, setStatus]     = useState<string>(ALL_VAL)
   const [dateFrom, setDateFrom] = useState<string>("")
   const [dateTo, setDateTo]     = useState<string>("")
@@ -514,40 +542,45 @@ export default function WageEntryReport() {
   const { companies: companyOpts, statuses: statusOpts, loading: filterOptsLoading } = useWageFilterOptions()
   const { projects: projectOpts, loading: projectsLoading } = useWageProjectsForCompany(company, ALL_VAL)
 
-  /** Reset project when company changes — projects are scoped by company */
+  /** Auto-select first company if available */
   useEffect(() => {
-    setProject(ALL_VAL)
-  }, [company])
-
-  /** One permitted company → select it automatically (same idea as narrowing scope on backend) */
-  useEffect(() => {
-    if (!filterOptsLoading && companyOpts.length === 1 && company === ALL_VAL) {
+    if (!filterOptsLoading && companyOpts.length > 0 && !company) {
       setCompany(companyOpts[0].value)
     }
   }, [filterOptsLoading, companyOpts, company])
 
-  /** Clear company selection if no longer permitted */
+  /** Reset project when company changes */
   useEffect(() => {
-    if (filterOptsLoading || company === ALL_VAL || companyOpts.length === 0) return
+    setProject(ALL_VAL)
+  }, [company])
+
+  /** Clear company selection if no longer valid */
+  useEffect(() => {
+    if (filterOptsLoading || !company || companyOpts.length === 0) return
     if (!companyOpts.some(c => c.value === company)) {
-      setCompany(ALL_VAL)
+      setCompany(companyOpts[0]?.value || "")
     }
   }, [company, companyOpts, filterOptsLoading])
 
-  const filters: WageFilters = useMemo(() => ({
-    project: project !== ALL_VAL ? project : undefined,
-    company: company !== ALL_VAL ? company : undefined,
-    status:  status  !== ALL_VAL ? status  : undefined,
-    date_from: dateFrom || undefined,
-    date_to:   dateTo   || undefined,
-    pending_checkout: pendingCheckout || undefined,
-  }), [project, company, status, dateFrom, dateTo, pendingCheckout])
+  const filters: WageFilters = useMemo(() => {
+    // Don't apply filters if no company is selected
+    if (!company) return {}
+    
+    return {
+      company: company,
+      project: project !== ALL_VAL ? project : undefined,
+      status:  status  !== ALL_VAL ? status  : undefined,
+      date_from: dateFrom || undefined,
+      date_to:   dateTo   || undefined,
+      pending_checkout: pendingCheckout || undefined,
+    }
+  }, [company, project, status, dateFrom, dateTo, pendingCheckout])
 
   const { data: summary, loading: sumLoading, reload: sumReload } = useWageSummary(filters)
   const { data: entries, loading: listLoading, error: listError, reload: listReload } = useWageEntries(filters)
   const { data: trend, loading: trendLoading } = useWageTrend(
     project !== ALL_VAL ? project : undefined,
-    company !== ALL_VAL ? company : undefined,
+    company || undefined,
   )
 
   function setToday() {
@@ -558,6 +591,7 @@ export default function WageEntryReport() {
   function reload() { sumReload(); listReload() }
 
   const filteredEntries = useMemo(() => {
+    if (!entries) return []
     if (!search) return entries
     const q = search.toLowerCase()
     return entries.filter(e =>
@@ -572,6 +606,8 @@ export default function WageEntryReport() {
     { id: "list",  label: "Wage Entries", icon: <FileText className="h-4 w-4" /> },
     { id: "trend", label: "Trend",        icon: <TrendingUp className="h-4 w-4" /> },
   ]
+
+  const isCompanySelected = !!company
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 p-4">
@@ -601,7 +637,7 @@ export default function WageEntryReport() {
             </div>
             <p className="text-slate-500 text-base">Track daily wages · worker check-in/out · project breakdowns</p>
           </div>
-          <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 flex items-center gap-2" onClick={reload}>
+          <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 flex items-center gap-2" onClick={reload} disabled={!isCompanySelected}>
             <RefreshCw className={`h-4 w-4 ${sumLoading || listLoading ? "animate-spin" : ""}`} />Refresh
           </Button>
         </div>
@@ -609,18 +645,13 @@ export default function WageEntryReport() {
         {/* ── Filters ── */}
         <Card className="border-green-200 shadow-sm">
           <CardContent className="p-4">
-            {/*
-              All labels sit in a CSS grid row at the top,
-              all inputs sit in the second row at the bottom.
-              Each column is sized to its input width.
-            */}
             <div
               className="grid items-end gap-x-3 gap-y-1"
               style={{ gridTemplateColumns: "11rem 11rem 9rem 10rem 10rem 12rem auto" }}
             >
               {/* ── ROW 1: labels ── */}
               <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
-                <Building2 className="h-3 w-3" />Company
+                <Building2 className="h-3 w-3" />Company <span className="text-red-500">*</span>
               </label>
               <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
                 <Briefcase className="h-3 w-3" />Project
@@ -645,19 +676,21 @@ export default function WageEntryReport() {
                 value={company}
                 onChange={setCompany}
                 options={companyOpts}
-                allLabel="All Companies"
+                placeholder="Select a company"
                 className="w-full"
                 disabled={filterOptsLoading && companyOpts.length === 0}
+                required={true}
               />
-              <SearchableCombobox
+              <SearchableComboboxWithAll
                 value={project}
                 onChange={setProject}
                 options={projectOpts}
-                allLabel={company === ALL_VAL ? "Select company first" : "All Projects"}
+                allLabel="All Projects"
+                placeholder={!company ? "Select company first" : "All Projects"}
                 className="w-full"
-                disabled={company === ALL_VAL || filterOptsLoading || projectsLoading}
+                disabled={!company || filterOptsLoading || projectsLoading}
               />
-              <SearchableCombobox
+              <SearchableComboboxWithAll
                 value={status}
                 onChange={setStatus}
                 options={statusOpts}
@@ -669,12 +702,14 @@ export default function WageEntryReport() {
                 value={dateFrom}
                 onChange={e => setDateFrom(e.target.value)}
                 className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white hover:border-green-400 w-full"
+                disabled={!isCompanySelected}
               />
               <input
                 type="date"
                 value={dateTo}
                 onChange={e => setDateTo(e.target.value)}
                 className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white hover:border-green-400 w-full"
+                disabled={!isCompanySelected}
               />
               <label className="h-9 px-3 text-sm border border-green-200 rounded-md bg-white hover:border-green-400 w-full inline-flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -682,11 +717,12 @@ export default function WageEntryReport() {
                   checked={pendingCheckout}
                   onChange={e => setPendingCheckout(e.target.checked)}
                   className="h-4 w-4 accent-amber-600"
+                  disabled={!isCompanySelected}
                 />
                 <span className="text-slate-700">Pending only</span>
               </label>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap" onClick={setToday}>
+                <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap" onClick={setToday} disabled={!isCompanySelected}>
                   Today
                 </Button>
                 {(dateFrom || dateTo || pendingCheckout) && (
@@ -696,19 +732,27 @@ export default function WageEntryReport() {
                 )}
               </div>
             </div>
+            
+            {/* Warning message when no company selected */}
+            {!isCompanySelected && (
+              <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Please select a company to view wage entries
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* ── KPI cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-4">
-          <KpiCard icon={<FileText className="h-5 w-5"/>}     label="Total Entries"  value={summary?.total_entries ?? "—"}              gradient="from-green-600 to-green-800"/>
-          <KpiCard icon={<DollarSign className="h-5 w-5"/>}   label="Total Amount"   value={summary ? fmt(summary.total_amount) : "—"}  gradient="from-emerald-500 to-emerald-700"/>
-          <KpiCard icon={<Users className="h-5 w-5"/>}        label="Total Workers"  value={summary?.total_workers ?? "—"}              gradient="from-teal-500 to-teal-700"/>
-          <KpiCard icon={<Briefcase className="h-5 w-5"/>}    label="Projects"       value={summary?.unique_projects ?? "—"}            gradient="from-green-700 to-emerald-800"/>
-          <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Submitted"      value={summary?.submitted_count ?? "—"}            gradient="from-emerald-600 to-emerald-800"/>
-          <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Draft"          value={summary?.draft_count ?? "—"}                gradient="from-amber-500 to-amber-700"/>
-          <KpiCard icon={<CalendarDays className="h-5 w-5"/>} label="Today Entries"  value={summary?.today_count ?? "—"}                gradient="from-green-600 to-teal-700"/>
-          <KpiCard icon={<TrendingUp className="h-5 w-5"/>}   label="Today Amount"   value={summary ? fmt(summary.today_amount) : "—"}  gradient="from-teal-600 to-emerald-700"/>
+          <KpiCard icon={<FileText className="h-5 w-5"/>}     label="Total Entries"  value={!isCompanySelected ? "—" : (summary?.total_entries ?? "—")}              gradient="from-green-600 to-green-800"/>
+          <KpiCard icon={<DollarSign className="h-5 w-5"/>}   label="Total Amount"   value={!isCompanySelected ? "—" : (summary ? fmt(summary.total_amount) : "—")}  gradient="from-emerald-500 to-emerald-700"/>
+          <KpiCard icon={<Users className="h-5 w-5"/>}        label="Total Workers"  value={!isCompanySelected ? "—" : (summary?.total_workers ?? "—")}              gradient="from-teal-500 to-teal-700"/>
+          <KpiCard icon={<Briefcase className="h-5 w-5"/>}    label="Projects"       value={!isCompanySelected ? "—" : (summary?.unique_projects ?? "—")}            gradient="from-green-700 to-emerald-800"/>
+          <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Submitted"      value={!isCompanySelected ? "—" : (summary?.submitted_count ?? "—")}            gradient="from-emerald-600 to-emerald-800"/>
+          <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Draft"          value={!isCompanySelected ? "—" : (summary?.draft_count ?? "—")}                gradient="from-amber-500 to-amber-700"/>
+          <KpiCard icon={<CalendarDays className="h-5 w-5"/>} label="Today Entries"  value={!isCompanySelected ? "—" : (summary?.today_count ?? "—")}                gradient="from-green-600 to-teal-700"/>
+          <KpiCard icon={<TrendingUp className="h-5 w-5"/>}   label="Today Amount"   value={!isCompanySelected ? "—" : (summary ? fmt(summary.today_amount) : "—")}  gradient="from-teal-600 to-emerald-700"/>
         </div>
 
         {/* ── Main card ── */}
@@ -739,12 +783,19 @@ export default function WageEntryReport() {
                     placeholder="Search entry / project / stage…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
+                    disabled={!isCompanySelected}
                   />
                 </div>
-                <p className="text-sm text-slate-500 ml-auto">{filteredEntries.length} entries</p>
+                <p className="text-sm text-slate-500 ml-auto">{isCompanySelected ? `${filteredEntries.length} entries` : "Select a company"}</p>
               </div>
 
-              {listLoading ? (
+              {!isCompanySelected ? (
+                <div className="text-center py-20 text-slate-400">
+                  <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30"/>
+                  <p className="font-medium">Please select a company</p>
+                  <p className="text-sm">Choose a company from the dropdown above to view wage entries</p>
+                </div>
+              ) : listLoading ? (
                 <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-green-500 animate-spin"/></div>
               ) : filteredEntries.length === 0 ? (
                 <div className="text-center py-20 text-slate-400">
@@ -782,7 +833,13 @@ export default function WageEntryReport() {
           {tab === "trend" && (
             <CardContent className="p-6 space-y-4">
               <p className="text-sm text-slate-500">Daily wage amounts — last 30 days</p>
-              {trendLoading ? (
+              {!isCompanySelected ? (
+                <div className="text-center py-16 text-slate-400">
+                  <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30"/>
+                  <p className="font-medium">Please select a company</p>
+                  <p className="text-sm">Choose a company to view wage trends</p>
+                </div>
+              ) : trendLoading ? (
                 <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-green-500 animate-spin"/></div>
               ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

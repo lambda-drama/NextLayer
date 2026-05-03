@@ -1284,7 +1284,7 @@ def get_import_export_expense_report(filters=None):
                 import_item_names = import_data["item_names"]
                 import_dates = import_data["posting_dates"]
                 lcv_currency = import_data.get("target_currency") or display_currency
-
+                
                 export_costs = export_data["item_costs"]
                 export_item_names = export_data["item_names"]
                 export_dates = export_data["posting_dates"]

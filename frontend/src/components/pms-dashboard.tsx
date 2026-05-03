@@ -74,19 +74,18 @@ const MONTH_STATUS: Record<string, { bg: string; text: string; border: string }>
   no_invoice:  { bg: "bg-slate-200",  text: "text-slate-500", border: "border-slate-200" },
 }
 const LEASE_COLORS: Record<string, string> = {
-  Active: "#f59e0b",      // Gold/amber for active
-  Expired: "#94a3b8",    // Slate for expired
-  Draft: "#cbd5e1",      // Light slate
-  Terminated: "#ef4444", // Red
-  Signed: "#fbbf24",     // Light gold
-  Renewed: "#eab308",    // Amber
+  Active: "#f59e0b",
+  Expired: "#94a3b8",
+  Draft: "#cbd5e1",
+  Terminated: "#ef4444",
+  Signed: "#fbbf24",
+  Renewed: "#eab308",
 }
 
 const CURRENT_MONTH = "__current__"
 const ALL_PROPS     = "__all__"
-const ALL_COMPANIES = "__all__"
 
-// ── Company combobox (same pattern as wage entry report) ─────────────────────
+// ── Company combobox ──────────────────────────────────────────────────────────
 
 interface CompanyComboboxOption {
   value: string
@@ -98,7 +97,6 @@ interface CompanySearchableComboboxProps {
   onChange: (val: string) => void
   options: CompanyComboboxOption[]
   placeholder?: string
-  allLabel?: string
   className?: string
   disabled?: boolean
 }
@@ -107,8 +105,7 @@ function CompanySearchableCombobox({
   value,
   onChange,
   options,
-  placeholder = "Company…",
-  allLabel = "All companies",
+  placeholder = "Select a company…",
   className = "",
   disabled = false,
 }: CompanySearchableComboboxProps) {
@@ -117,14 +114,14 @@ function CompanySearchableCombobox({
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const allOption: CompanyComboboxOption = { value: ALL_COMPANIES, label: allLabel }
-  const allOptions = [allOption, ...options]
+  // No "All companies" option — company is mandatory
+  const allOptions = options
 
   const filtered = useMemo(() => {
     if (!query.trim()) return allOptions
     const q = query.toLowerCase()
     return allOptions.filter(o => o.label.toLowerCase().includes(q))
-  }, [query, options, allLabel])
+  }, [query, options])
 
   const selectedLabel = allOptions.find(o => o.value === value)?.label ?? placeholder
 
@@ -164,7 +161,7 @@ function CompanySearchableCombobox({
             ? "border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50"
             : !disabled ? "border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/40" : ""
           }
-          text-slate-700 font-medium
+          ${!value ? "text-slate-400" : "text-slate-700 font-medium"}
         `}
       >
         <span className="truncate">{selectedLabel}</span>
@@ -231,7 +228,6 @@ interface KpiCardProps {
   tone?: "gold"|"green"|"amber"|"red"|"slate"
   onClick?: () => void
 }
-/** Small KPI tiles: green accent strip on top (no gold in headers) */
 function KpiCard({ icon, label, value, sub, tone = "green", onClick }: KpiCardProps) {
   const g = {
     gold: "from-emerald-600 to-teal-700",
@@ -270,7 +266,7 @@ function KpiCard({ icon, label, value, sub, tone = "green", onClick }: KpiCardPr
   )
 }
 
-// ── Screenshot-style summary card ────────────────────────────────────────────
+// ── Summary card ──────────────────────────────────────────────────────────────
 
 type MetricTone = "default" | "green" | "red" | "amber" | "blue"
 interface MetricRow { label: string; value: string | number; tone?: MetricTone }
@@ -293,9 +289,7 @@ interface SummaryCardProps {
   rows?: MetricRowNav[]
   pairs?: MetricRowNav[]
 }
-/** Overview metric cards: green header band only (no gold). */
 function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: SummaryCardProps) {
-  // Use emerald/teal gradient instead of amber
   const safeGradient = "from-emerald-600 to-teal-700"
   return (
     <Card className="border-slate-200 shadow-md overflow-hidden">
@@ -360,7 +354,6 @@ function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: 
   )
 }
 
-
 function MonthTile({ m }: { m: MonthBreakdown }) {
   const cfg = MONTH_STATUS[m.status] ?? MONTH_STATUS.no_invoice
   const [hover, setHover] = useState(false)
@@ -405,7 +398,6 @@ function UnitDetailPanel({
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col border-l border-emerald-100">
-      {/* Header */}
       <div className="bg-gradient-to-r from-emerald-700 to-teal-800 text-white p-5 flex items-center justify-between shrink-0">
         <div>
           <h2 className="text-lg font-bold flex items-center gap-2">
@@ -425,8 +417,6 @@ function UnitDetailPanel({
 
       {data && !loading && (
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-
-          {/* Unit status + basic info */}
           <section className="p-5">
             <div className="flex items-center gap-3 flex-wrap">
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
@@ -447,7 +437,6 @@ function UnitDetailPanel({
             ) : null}
           </section>
 
-          {/* Tenant */}
           {data.tenant && (
             <section className="p-5">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
@@ -469,7 +458,6 @@ function UnitDetailPanel({
             </section>
           )}
 
-          {/* Contract */}
           {data.contract && (
             <section className="p-5">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
@@ -500,7 +488,6 @@ function UnitDetailPanel({
             </section>
           )}
 
-          {/* 12-month breakdown */}
           <section className="p-5">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5" />12-Month Payment History
@@ -524,7 +511,6 @@ function UnitDetailPanel({
             )}
           </section>
 
-          {/* Pending invoices */}
           <section className="p-5">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
               <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
@@ -563,7 +549,6 @@ function UnitDetailPanel({
             )}
           </section>
 
-          {/* Invoice history */}
           <section className="p-5">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5 text-emerald-300" />Recent Invoice History
@@ -594,7 +579,6 @@ function UnitDetailPanel({
             )}
           </section>
 
-          {/* Expenses */}
           {data.expenses.length > 0 && (
             <section className="p-5">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
@@ -619,7 +603,7 @@ function UnitDetailPanel({
   )
 }
 
-// ── Unit card (shared between Financial and Units tabs) ───────────────────────
+// ── Unit card ─────────────────────────────────────────────────────────────────
 
 function UnitCard({ unit, statusCfg, outstandingLabel, overdueLabel, monthlyRent, tenantName, onClick }: {
   unit: string; statusCfg: { label: string; border: string; bg: string; dot: string; badge: string }
@@ -763,12 +747,15 @@ export default function PMSDashboard() {
   const [unitsQuickFilter, setUnitsQuickFilter]       = useState<UnitsQuickFilter>(null)
   const [contractQuickFilter, setContractQuickFilter] = useState<ContractQuickFilter>(null)
   const [contractSearch, setContractSearch]           = useState("")
-  const [company, setCompany]                         = useState<string>(ALL_COMPANIES)
+
+  // ── Company is mandatory: default to empty string (no selection) ──
+  const [company, setCompany] = useState<string>("")
 
   const months = useAvailableMonths()
   const { companies: companyOpts, loading: companyOptsLoading } = usePMSDashboardCompanies()
 
-  const apiCompany = company !== ALL_COMPANIES ? company : undefined
+  // apiCompany is only set when a company is actually selected
+  const apiCompany = company || undefined
 
   const { data: overview, loading: ovLoading, error: ovError, reload: ovReload } = useDashboardOverview(apiCompany)
   const { data: propsData, loading: propLoading, error: propError, reload: propsReload } = usePropertiesFinancial(apiCompany)
@@ -780,17 +767,18 @@ export default function PMSDashboard() {
     reload: contractsReload,
   } = useTenantContractsDashboard(apiCompany)
 
-  /** One permitted company — narrow scope automatically (same idea as wage entry). */
+  // Auto-select if only one company is available
   useEffect(() => {
-    if (!companyOptsLoading && companyOpts.length === 1 && company === ALL_COMPANIES) {
+    if (!companyOptsLoading && companyOpts.length === 1 && !company) {
       setCompany(companyOpts[0].value)
     }
   }, [companyOptsLoading, companyOpts, company])
 
+  // Reset company if it no longer exists in options
   useEffect(() => {
-    if (companyOptsLoading || company === ALL_COMPANIES || companyOpts.length === 0) return
+    if (companyOptsLoading || !company || companyOpts.length === 0) return
     if (!companyOpts.some(c => c.value === company)) {
-      setCompany(ALL_COMPANIES)
+      setCompany("")
     }
   }, [company, companyOpts, companyOptsLoading])
 
@@ -936,646 +924,662 @@ export default function PMSDashboard() {
           </Button>
         </div>
 
+        {/* ── Company selector (mandatory) ── */}
         <Card className="border-emerald-100 shadow-sm bg-white/90">
           <CardContent className="py-3 px-4 flex flex-wrap items-center gap-3">
             <Building2 className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
             <span className="text-sm font-medium text-slate-600 shrink-0">Company</span>
+            <span className="text-xs text-red-500 font-medium shrink-0">* required</span>
             <CompanySearchableCombobox
               value={company}
               onChange={setCompany}
               options={companyOpts}
+              placeholder="Select a company to continue…"
               disabled={companyOptsLoading && companyOpts.length === 0}
               className="min-w-[14rem] max-w-xs"
             />
+            {!company && !companyOptsLoading && (
+              <span className="text-xs text-slate-400 italic">Select a company to load the dashboard</span>
+            )}
           </CardContent>
         </Card>
 
-        {/* ── Main card with tab header ── */}
-        <Card className="border-emerald-200 shadow-lg">
-          {/* Tab bar as card header - using green gradient (no gold) */}
-          <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg p-0">
-            <div className="flex items-center overflow-x-auto">
-              {TABS.map((t, i) => (
-                <button key={t.id} onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold whitespace-nowrap transition-all shrink-0
-                    ${i === 0 ? "rounded-tl-lg" : ""}
-                    ${tab === t.id ? "bg-white/20 border-b-2 border-white text-white" : "text-emerald-200 hover:text-white hover:bg-white/10"}`}>
-                  {t.icon}{t.label}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
-
-          {/* ── OVERVIEW ── */}
-          {tab === "overview" && (
-            <CardContent className="p-6 space-y-6">
-              {ovError && <Alert variant="destructive"><AlertDescription>{ovError}</AlertDescription></Alert>}
-
-              {/* ── Summary cards row — screenshot style, all green headers ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-
-                {/* Contracts → Tenant Contract tab with filters */}
-                <SummaryCard
-                  title="Contracts" icon={<FileText className="h-5 w-5"/>}
-                  gradient="from-emerald-600 to-teal-700"
-                  loading={ovLoading}
-                  rows={[
-                    {
-                      label: "Total Contracts",
-                      value: overview?.total_contracts ?? 0,
-                      tone: "default",
-                      onNavigate: () => navigateContracts("total"),
-                    },
-                  ]}
-                  pairs={[
-                    {
-                      label: "Active",
-                      value: overview?.active_contracts ?? 0,
-                      tone: "green",
-                      onNavigate: () => navigateContracts("active"),
-                    },
-                    {
-                      label: "Expired",
-                      value: overview?.expired_contracts ?? 0,
-                      tone: "red",
-                      onNavigate: () => navigateContracts("expired"),
-                    },
-                    {
-                      label: "Terminated",
-                      value: overview?.terminated_contracts ?? 0,
-                      tone: "red",
-                      onNavigate: () => navigateContracts("terminated"),
-                    },
-                    {
-                      label: "Expiring (30d)",
-                      value: overview?.expiring_soon ?? 0,
-                      tone: "amber",
-                      onNavigate: () => navigateContracts("expiring"),
-                    },
-                  ]}
-                />
-
-                {/* Properties — Occupied / Vacant → Units tab */}
-                <SummaryCard
-                  title="Properties" icon={<Building2 className="h-5 w-5"/>}
-                  gradient="from-emerald-500 to-teal-600"
-                  loading={ovLoading}
-                  rows={[
-                    { label: "Total Properties", value: overview?.total_properties ?? 0, tone: "default" },
-                    { label: "Total Units",       value: overview?.total_units ?? 0,      tone: "default" },
-                  ]}
-                  pairs={[
-                    {
-                      label: "Occupied",
-                      value: overview?.occupied_units ?? 0,
-                      tone: "green",
-                      onNavigate: () => { setUnitsQuickFilter("occupied"); setTab("units") },
-                    },
-                    {
-                      label: "Vacant",
-                      value: overview?.vacant_units ?? 0,
-                      tone: "red",
-                      onNavigate: () => { setUnitsQuickFilter("vacant"); setTab("units") },
-                    },
-                  ]}
-                />
-
-                {/* Invoices — display only (no drill-down) */}
-                <SummaryCard
-                  title="Invoices" icon={<DollarSign className="h-5 w-5"/>}
-                  gradient="from-emerald-600 to-teal-700"
-                  loading={ovLoading}
-                  rows={[
-                    {
-                      label: `Paid (${new Date().toLocaleDateString("en-GB",{month:"short",year:"numeric"})})`,
-                      value: overview ? fmt(overview.monthly_paid) : "—",
-                      tone: "green",
-                    },
-                    {
-                      label: "Invoiced (this month)",
-                      value: overview ? fmt(overview.monthly_revenue) : "—",
-                      tone: "default",
-                    },
-                    {
-                      label: "Outstanding Invoices",
-                      value: overview ? fmt(overview.total_outstanding) : "—",
-                      tone: overview && overview.total_outstanding > 0 ? "red" : "green",
-                    },
-                  ]}
-                />
-
+        {/* ── Gate: show prompt if no company selected, otherwise show dashboard ── */}
+        {!company ? (
+          <Card className="border-emerald-200 shadow-lg">
+            <CardContent className="py-24 text-center space-y-4">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center">
+                <Building2 className="h-10 w-10 text-emerald-300" />
               </div>
+              <div className="space-y-2">
+                <p className="text-xl font-semibold text-slate-600">Select a Company to Continue</p>
+                <p className="text-slate-400 text-sm max-w-md mx-auto">
+                  Please choose a company from the filter above to load the dashboard data.
+                </p>
+              </div>
+              {companyOptsLoading && (
+                <div className="flex items-center justify-center gap-2 text-sm text-emerald-600">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Loading companies…
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          /* ── Main card with tab header ── */
+          <Card className="border-emerald-200 shadow-lg">
+            {/* Tab bar */}
+            <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg p-0">
+              <div className="flex items-center overflow-x-auto">
+                {TABS.map((t, i) => (
+                  <button key={t.id} onClick={() => setTab(t.id)}
+                    className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold whitespace-nowrap transition-all shrink-0
+                      ${i === 0 ? "rounded-tl-lg" : ""}
+                      ${tab === t.id ? "bg-white/20 border-b-2 border-white text-white" : "text-emerald-200 hover:text-white hover:bg-white/10"}`}>
+                    {t.icon}{t.label}
+                  </button>
+                ))}
+              </div>
+            </CardHeader>
 
-              {/* ── Revenue trend + Lease status charts ── */}
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <Card className="xl:col-span-2 border-emerald-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
-                    <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4"/>Revenue Trend — Last 6 Months</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4 pr-2">
-                    {overview?.revenue_trend?.length ? (
-                      <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={overview.revenue_trend} barGap={4}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
-                          <XAxis dataKey="month" tick={{fontSize:11}}/>
-                          <YAxis tick={{fontSize:11}} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)}/>
-                          <Tooltip formatter={(v:number)=>fmt(v)} contentStyle={{fontSize:12,borderRadius:8}}/>
-                          <Legend wrapperStyle={{fontSize:12}}/>
-                          {/* Gold/amber bars for the chart */}
-                          <Bar dataKey="revenue" name="Invoiced" fill="#eab308" radius={[4,4,0,0]}/>
-                          <Bar dataKey="collected" name="Collected" fill="#f59e0b" radius={[4,4,0,0]}/>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : <div className="h-[240px] flex items-center justify-center text-slate-400 text-sm">No revenue data</div>}
-                  </CardContent>
-                </Card>
+            {/* ── OVERVIEW ── */}
+            {tab === "overview" && (
+              <CardContent className="p-6 space-y-6">
+                {ovError && <Alert variant="destructive"><AlertDescription>{ovError}</AlertDescription></Alert>}
 
-                <Card className="border-emerald-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
-                    <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4"/>Lease Status</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    {overview?.lease_status && Object.keys(overview.lease_status).length ? (
-                      <>
-                        <ResponsiveContainer width="100%" height={160}>
-                          <PieChart>
-                            <Pie data={Object.entries(overview.lease_status).map(([k,v])=>({name:k,value:v}))}
-                              cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
-                              {Object.keys(overview.lease_status).map(k=><Cell key={k} fill={LEASE_COLORS[k]??"#94a3b8"}/>)}
-                            </Pie>
-                            <Tooltip contentStyle={{fontSize:12,borderRadius:8}}/>
-                          </PieChart>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                  <SummaryCard
+                    title="Contracts" icon={<FileText className="h-5 w-5"/>}
+                    gradient="from-emerald-600 to-teal-700"
+                    loading={ovLoading}
+                    rows={[
+                      {
+                        label: "Total Contracts",
+                        value: overview?.total_contracts ?? 0,
+                        tone: "default",
+                        onNavigate: () => navigateContracts("total"),
+                      },
+                    ]}
+                    pairs={[
+                      {
+                        label: "Active",
+                        value: overview?.active_contracts ?? 0,
+                        tone: "green",
+                        onNavigate: () => navigateContracts("active"),
+                      },
+                      {
+                        label: "Expired",
+                        value: overview?.expired_contracts ?? 0,
+                        tone: "red",
+                        onNavigate: () => navigateContracts("expired"),
+                      },
+                      {
+                        label: "Terminated",
+                        value: overview?.terminated_contracts ?? 0,
+                        tone: "red",
+                        onNavigate: () => navigateContracts("terminated"),
+                      },
+                      {
+                        label: "Expiring (30d)",
+                        value: overview?.expiring_soon ?? 0,
+                        tone: "amber",
+                        onNavigate: () => navigateContracts("expiring"),
+                      },
+                    ]}
+                  />
+
+                  <SummaryCard
+                    title="Properties" icon={<Building2 className="h-5 w-5"/>}
+                    gradient="from-emerald-500 to-teal-600"
+                    loading={ovLoading}
+                    rows={[
+                      { label: "Total Properties", value: overview?.total_properties ?? 0, tone: "default" },
+                      { label: "Total Units",       value: overview?.total_units ?? 0,      tone: "default" },
+                    ]}
+                    pairs={[
+                      {
+                        label: "Occupied",
+                        value: overview?.occupied_units ?? 0,
+                        tone: "green",
+                        onNavigate: () => { setUnitsQuickFilter("occupied"); setTab("units") },
+                      },
+                      {
+                        label: "Vacant",
+                        value: overview?.vacant_units ?? 0,
+                        tone: "red",
+                        onNavigate: () => { setUnitsQuickFilter("vacant"); setTab("units") },
+                      },
+                    ]}
+                  />
+
+                  <SummaryCard
+                    title="Invoices" icon={<DollarSign className="h-5 w-5"/>}
+                    gradient="from-emerald-600 to-teal-700"
+                    loading={ovLoading}
+                    rows={[
+                      {
+                        label: `Paid (${new Date().toLocaleDateString("en-GB",{month:"short",year:"numeric"})})`,
+                        value: overview ? fmt(overview.monthly_paid) : "—",
+                        tone: "green",
+                      },
+                      {
+                        label: "Invoiced (this month)",
+                        value: overview ? fmt(overview.monthly_revenue) : "—",
+                        tone: "default",
+                      },
+                      {
+                        label: "Outstanding Invoices",
+                        value: overview ? fmt(overview.total_outstanding) : "—",
+                        tone: overview && overview.total_outstanding > 0 ? "red" : "green",
+                      },
+                    ]}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                  <Card className="xl:col-span-2 border-emerald-100 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
+                      <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4"/>Revenue Trend — Last 6 Months</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 pr-2">
+                      {overview?.revenue_trend?.length ? (
+                        <ResponsiveContainer width="100%" height={240}>
+                          <BarChart data={overview.revenue_trend} barGap={4}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
+                            <XAxis dataKey="month" tick={{fontSize:11}}/>
+                            <YAxis tick={{fontSize:11}} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:String(v)}/>
+                            <Tooltip formatter={(v:number)=>fmt(v)} contentStyle={{fontSize:12,borderRadius:8}}/>
+                            <Legend wrapperStyle={{fontSize:12}}/>
+                            <Bar dataKey="revenue" name="Invoiced" fill="#eab308" radius={[4,4,0,0]}/>
+                            <Bar dataKey="collected" name="Collected" fill="#f59e0b" radius={[4,4,0,0]}/>
+                          </BarChart>
                         </ResponsiveContainer>
-                        <div className="space-y-2 mt-2">
-                          {Object.entries(overview.lease_status).map(([k,v])=>(
-                            <div key={k} className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:LEASE_COLORS[k]??"#94a3b8"}}/>
-                                <span className="text-slate-600">{k}</span>
-                              </div>
-                              <span className="font-semibold text-slate-800">{v}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : <div className="h-[200px] flex items-center justify-center text-slate-400 text-sm">No contracts</div>}
-                  </CardContent>
-                </Card>
-              </div>
+                      ) : <div className="h-[240px] flex items-center justify-center text-slate-400 text-sm">No revenue data</div>}
+                    </CardContent>
+                  </Card>
 
-              {/* ── Top tenants + Properties tables ── */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {/* Top tenants */}
-                <Card className="border-emerald-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                      <Users className="h-4 w-4"/>Top Tenants by Monthly Rent
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {overview?.top_tenants?.length ? (
-                      <Table>
-                        <TableHeader><TableRow className="bg-emerald-50">
-                          <TableHead className="text-teal-800 text-xs font-semibold pl-4">#</TableHead>
+                  <Card className="border-emerald-100 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
+                      <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4"/>Lease Status</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {overview?.lease_status && Object.keys(overview.lease_status).length ? (
+                        <>
+                          <ResponsiveContainer width="100%" height={160}>
+                            <PieChart>
+                              <Pie data={Object.entries(overview.lease_status).map(([k,v])=>({name:k,value:v}))}
+                                cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
+                                {Object.keys(overview.lease_status).map(k=><Cell key={k} fill={LEASE_COLORS[k]??"#94a3b8"}/>)}
+                              </Pie>
+                              <Tooltip contentStyle={{fontSize:12,borderRadius:8}}/>
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="space-y-2 mt-2">
+                            {Object.entries(overview.lease_status).map(([k,v])=>(
+                              <div key={k} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                  <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:LEASE_COLORS[k]??"#94a3b8"}}/>
+                                  <span className="text-slate-600">{k}</span>
+                                </div>
+                                <span className="font-semibold text-slate-800">{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : <div className="h-[200px] flex items-center justify-center text-slate-400 text-sm">No contracts</div>}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <Card className="border-emerald-100 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
+                      <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                        <Users className="h-4 w-4"/>Top Tenants by Monthly Rent
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {overview?.top_tenants?.length ? (
+                        <Table>
+                          <TableHeader><TableRow className="bg-emerald-50">
+                            <TableHead className="text-teal-800 text-xs font-semibold pl-4">#</TableHead>
+                            <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
+                            <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
+                            <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
+                            <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Monthly Rent</TableHead>
+                          </TableRow></TableHeader>
+                          <TableBody>
+                            {overview.top_tenants.map((t,i)=>(
+                              <TableRow key={t.tenant_id} className="hover:bg-emerald-50/50">
+                                <TableCell className="text-xs text-slate-400 font-medium pl-4">{i+1}</TableCell>
+                                <TableCell><p className="font-medium text-slate-800 text-sm">{t.tenant_name}</p><p className="text-xs text-slate-400">{t.company}</p></TableCell>
+                                <TableCell className="text-sm text-slate-700">{t.unit}</TableCell>
+                                <TableCell className="text-sm text-slate-500">{t.property}</TableCell>
+                                <TableCell className="text-right font-bold text-emerald-700 text-sm pr-4">{fmt(t.monthly_rent)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : <div className="py-10 text-center text-slate-400 text-sm">No active tenants</div>}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-emerald-100 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
+                      <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                        <Building2 className="h-4 w-4"/>Properties
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {overview?.property_stats?.length ? (
+                        <Table>
+                          <TableHeader><TableRow className="bg-emerald-50">
+                            <TableHead className="text-teal-800 text-xs font-semibold pl-4">Property</TableHead>
+                            <TableHead className="text-teal-800 text-xs font-semibold text-center">Total</TableHead>
+                            <TableHead className="text-teal-800 text-xs font-semibold text-center">Occ.</TableHead>
+                            <TableHead className="text-teal-800 text-xs font-semibold text-center">Vacant</TableHead>
+                          </TableRow></TableHeader>
+                          <TableBody>
+                            {overview.property_stats.map(p=>{
+                              const rate = p.total_units ? Math.round((p.occupied / p.total_units) * 100) : 0
+                              return (
+                                <TableRow key={p.name} className="hover:bg-emerald-50/50">
+                                  <TableCell className="pl-4">
+                                    <p className="font-medium text-slate-800 text-sm">{p.property_name}</p>
+                                    <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200">
+                                      <div className="h-full rounded-full bg-amber-500" style={{width:`${rate}%`}}/>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center text-sm">{p.total_units}</TableCell>
+                                  <TableCell className="text-center"><span className="text-sm font-medium text-emerald-700">{p.occupied}</span></TableCell>
+                                  <TableCell className="text-center"><span className={`text-sm font-medium ${p.vacant>0?"text-amber-600":"text-slate-400"}`}>{p.vacant}</span></TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      ) : <div className="py-10 text-center text-slate-400 text-sm">No properties</div>}
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            )}
+
+            {/* ── PROPERTIES TAB ── */}
+            {tab === "properties" && (
+              <CardContent className="p-6 space-y-4">
+                {propError && <Alert variant="destructive"><AlertDescription>{propError}</AlertDescription></Alert>}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <KpiCard icon={<Building2 className="h-5 w-5"/>} label="Properties" value={propsData.length} tone="green"/>
+                  <KpiCard
+                    icon={<CheckCircle2 className="h-5 w-5"/>}
+                    label="Total Occupied"
+                    value={propsData.reduce((s,p)=>s+p.occupied,0)}
+                    tone="green"
+                    onClick={() => setPropertyQuickFilter(f => f === "fully_occupied" ? null : "fully_occupied")}
+                    sub={propertyQuickFilter === "fully_occupied" ? "Fully occupied properties" : undefined}
+                  />
+                  <KpiCard
+                    icon={<AlertCircle className="h-5 w-5"/>}
+                    label="Total Outstanding"
+                    value={fmt(propsData.reduce((s,p)=>s+p.total_outstanding,0))}
+                    tone="amber"
+                    onClick={() => setPropertyQuickFilter(f => f === "outstanding" ? null : "outstanding")}
+                    sub={propertyQuickFilter === "outstanding" ? "Properties with outstanding balance" : undefined}
+                  />
+                  <KpiCard icon={<Clock className="h-5 w-5"/>} label="Total Overdue" value={fmt(propsData.reduce((s,p)=>s+p.total_overdue,0))} tone="red"/>
+                </div>
+
+                {propertyQuickFilter && (
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                    <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
+                    <span className="font-medium">
+                      {propertyQuickFilter === "fully_occupied"
+                        ? "Showing fully occupied properties only"
+                        : "Showing properties with outstanding balance"}
+                    </span>
+                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                      onClick={() => setPropertyQuickFilter(null)}>
+                      Clear
+                    </Button>
+                  </div>
+                )}
+
+                <input
+                  className="w-full max-w-sm px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  placeholder="Search properties…"
+                  value={propSearch}
+                  onChange={e => setPropSearch(e.target.value)}
+                />
+
+                {propLoading ? (
+                  <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
+                ) : filteredProps.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No properties found</p></div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredProps.map(p => <PropertyCard key={p.name} prop={p} onUnitClick={setSelectedUnit}/>)}
+                  </div>
+                )}
+              </CardContent>
+            )}
+
+            {/* ── UNITS TAB ── */}
+            {tab === "units" && (
+              <CardContent className="p-6 space-y-4">
+                {unitsError && <Alert variant="destructive"><AlertDescription>{unitsError}</AlertDescription></Alert>}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <KpiCard icon={<Home className="h-5 w-5"/>} label="Total Units" value={unitsData.length} tone="green"/>
+                  <KpiCard
+                    icon={<CheckCircle2 className="h-5 w-5"/>}
+                    label="Occupied"
+                    value={unitsData.filter(u => u.unit_status === "Occupied").length}
+                    tone="green"
+                    onClick={() => setUnitsQuickFilter(f => f === "occupied" ? null : "occupied")}
+                    sub={unitsQuickFilter === "occupied" ? "Occupied units only" : undefined}
+                  />
+                  <KpiCard
+                    icon={<AlertCircle className="h-5 w-5"/>}
+                    label="Outstanding"
+                    value={fmt(unitsData.reduce((s, u) => s + u.outstanding, 0))}
+                    tone="amber"
+                    onClick={() => setUnitsQuickFilter(f => f === "outstanding" ? null : "outstanding")}
+                    sub={unitsQuickFilter === "outstanding" ? "Units with outstanding balance" : undefined}
+                  />
+                  <KpiCard
+                    icon={<Clock className="h-5 w-5"/>}
+                    label="Overdue"
+                    value={fmt(unitsData.reduce((s, u) => s + u.overdue, 0))}
+                    tone="red"
+                    onClick={() => setUnitsQuickFilter(f => f === "overdue" ? null : "overdue")}
+                    sub={unitsQuickFilter === "overdue" ? "Units with overdue amounts" : undefined}
+                  />
+                </div>
+
+                {unitsQuickFilter && (
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                    <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
+                    <span className="font-medium">
+                      {unitsQuickFilter === "occupied" && "Showing occupied units only"}
+                      {unitsQuickFilter === "vacant" && "Showing vacant / non-occupied units"}
+                      {unitsQuickFilter === "overdue" && "Showing units with overdue amounts"}
+                      {unitsQuickFilter === "outstanding" && "Showing units with outstanding balance"}
+                    </span>
+                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                      onClick={() => setUnitsQuickFilter(null)}>
+                      Clear
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    className="px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 w-52"
+                    placeholder="Search unit…"
+                    value={unitSearch}
+                    onChange={e => setUnitSearch(e.target.value)}
+                  />
+                  <div className="w-52">
+                    <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+                      <SelectTrigger className="border-emerald-200 text-sm"><SelectValue placeholder="All Properties"/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL_PROPS}>All Properties</SelectItem>
+                        {Array.from(new Set(unitsData.map(u=>u.property).filter(Boolean))).sort().map(p=>(
+                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-wrap gap-3 ml-auto">
+                    {(Object.entries(UNIT_STATUS) as [UnitPayStatus, typeof UNIT_STATUS[UnitPayStatus]][]).map(([k,v])=>(
+                      <div key={k} className="flex items-center gap-1.5">
+                        <span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/>
+                        <span className="text-xs text-slate-600">{v.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {unitsLoading ? (
+                  <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
+                ) : filteredUnits.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
+                ) : (
+                  <Card className="border-emerald-100 shadow-sm">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-emerald-50">
+                          <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">Floor / Area</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Monthly Rent</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Outstanding</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Overdue</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Status</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold"/>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUnits.map(u => {
+                          const cfg = UNIT_STATUS[u.pay_status] ?? UNIT_STATUS.vacant
+                          return (
+                            <TableRow key={u.unit}
+                              className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
+                              onClick={() => setSelectedUnit(u.unit)}
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${cfg.dot}`}/>
+                                  <span className="font-semibold text-slate-800 text-sm">{u.unit}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <p className="text-sm text-slate-700">{u.property || "—"}</p>
+                              </TableCell>
+                              <TableCell>
+                                {u.tenant_name
+                                  ? <p className="text-sm text-slate-700">{u.tenant_name}</p>
+                                  : <span className="text-xs text-slate-400 italic">Vacant</span>}
+                              </TableCell>
+                              <TableCell>
+                                <p className="text-xs text-slate-500">
+                                  {[u.floor && `Floor ${u.floor}`, u.area && `${u.area} m²`].filter(Boolean).join(" · ") || "—"}
+                                </p>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="text-sm font-medium text-slate-700">{u.monthly_rent ? fmt(u.monthly_rent) : "—"}</span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {u.outstanding > 0
+                                  ? <span className="text-sm font-semibold text-amber-700">{fmt(u.outstanding)}</span>
+                                  : <span className="text-xs text-slate-400">—</span>}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {u.overdue > 0
+                                  ? <span className="text-sm font-bold text-red-700">{fmt(u.overdue)}</span>
+                                  : <span className="text-xs text-slate-400">—</span>}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.badge}`}>{cfg.label}</span>
+                              </TableCell>
+                              <TableCell>
+                                <ChevronRight className="h-4 w-4 text-slate-400"/>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Card>
+                )}
+              </CardContent>
+            )}
+
+            {/* ── TENANT CONTRACT ── */}
+            {tab === "tenant_contract" && (
+              <CardContent className="p-6 space-y-4">
+                {contractsError && (
+                  <Alert variant="destructive"><AlertDescription>{contractsError}</AlertDescription></Alert>
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-slate-600 text-sm max-w-xl">
+                    Submitted <span className="font-medium text-emerald-800">Tenant Contract</span> records — same filters as Overview shortcuts below.
+                  </p>
+                  <Button variant="outline" type="button" className="border-emerald-200" onClick={contractsReload}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${contractsLoading ? "animate-spin" : ""}`}/>Refresh
+                  </Button>
+                </div>
+
+                {contractQuickFilter !== null && (
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                    <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
+                    <span className="font-medium">{contractFilterDescription(contractQuickFilter)}</span>
+                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                      onClick={() => setContractQuickFilter(null)}>
+                      Clear filter
+                    </Button>
+                  </div>
+                )}
+
+                <input
+                  className="w-full max-w-md px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  placeholder="Search contract, tenant, unit, property…"
+                  value={contractSearch}
+                  onChange={e => setContractSearch(e.target.value)}
+                />
+
+                {contractsLoading && !tenantContractsRaw.length ? (
+                  <div className="flex items-center justify-center py-16">
+                    <RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/>
+                  </div>
+                ) : filteredTenantContracts.length === 0 ? (
+                  <div className="text-center text-slate-400 text-sm py-16 border border-dashed border-emerald-200 rounded-xl bg-emerald-50/40">
+                    No contracts match this view
+                  </div>
+                ) : (
+                  <Card className="border-emerald-100 shadow-sm overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-emerald-50">
+                          <TableHead className="text-teal-800 text-xs font-semibold pl-4">Contract</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">Status</TableHead>
                           <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
                           <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
                           <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Monthly Rent</TableHead>
-                        </TableRow></TableHeader>
-                        <TableBody>
-                          {overview.top_tenants.map((t,i)=>(
-                            <TableRow key={t.tenant_id} className="hover:bg-emerald-50/50">
-                              <TableCell className="text-xs text-slate-400 font-medium pl-4">{i+1}</TableCell>
-                              <TableCell><p className="font-medium text-slate-800 text-sm">{t.tenant_name}</p><p className="text-xs text-slate-400">{t.company}</p></TableCell>
-                              <TableCell className="text-sm text-slate-700">{t.unit}</TableCell>
-                              <TableCell className="text-sm text-slate-500">{t.property}</TableCell>
-                              <TableCell className="text-right font-bold text-emerald-700 text-sm pr-4">{fmt(t.monthly_rent)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    ) : <div className="py-10 text-center text-slate-400 text-sm">No active tenants</div>}
-                  </CardContent>
-                </Card>
-
-                {/* Properties table */}
-                <Card className="border-emerald-100 shadow-sm">
-                  <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                      <Building2 className="h-4 w-4"/>Properties
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {overview?.property_stats?.length ? (
-                      <Table>
-                        <TableHeader><TableRow className="bg-emerald-50">
-                          <TableHead className="text-teal-800 text-xs font-semibold pl-4">Property</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Total</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Occ.</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Vacant</TableHead>
-                        </TableRow></TableHeader>
-                        <TableBody>
-                          {overview.property_stats.map(p=>{
-                            const rate = p.total_units ? Math.round((p.occupied / p.total_units) * 100) : 0
-                            return (
-                              <TableRow key={p.name} className="hover:bg-emerald-50/50">
-                                <TableCell className="pl-4">
-                                  <p className="font-medium text-slate-800 text-sm">{p.property_name}</p>
-                                  <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200">
-                                    <div className="h-full rounded-full bg-amber-500" style={{width:`${rate}%`}}/>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center text-sm">{p.total_units}</TableCell>
-                                <TableCell className="text-center"><span className="text-sm font-medium text-emerald-700">{p.occupied}</span></TableCell>
-                                <TableCell className="text-center"><span className={`text-sm font-medium ${p.vacant>0?"text-amber-600":"text-slate-400"}`}>{p.vacant}</span></TableCell>
-                              </TableRow>
-                            )
-                          })}
-                        </TableBody>
-                      </Table>
-                    ) : <div className="py-10 text-center text-slate-400 text-sm">No properties</div>}
-                  </CardContent>
-                </Card>
-              </div>
-            </CardContent>
-          )}
-
-          {/* ── PROPERTIES TAB ── */}
-          {tab === "properties" && (
-            <CardContent className="p-6 space-y-4">
-              {propError && <Alert variant="destructive"><AlertDescription>{propError}</AlertDescription></Alert>}
-
-              {/* Summary row */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<Building2 className="h-5 w-5"/>} label="Properties" value={propsData.length} tone="green"/>
-                <KpiCard
-                  icon={<CheckCircle2 className="h-5 w-5"/>}
-                  label="Total Occupied"
-                  value={propsData.reduce((s,p)=>s+p.occupied,0)}
-                  tone="green"
-                  onClick={() => setPropertyQuickFilter(f => f === "fully_occupied" ? null : "fully_occupied")}
-                  sub={propertyQuickFilter === "fully_occupied" ? "Fully occupied properties" : undefined}
-                />
-                <KpiCard
-                  icon={<AlertCircle className="h-5 w-5"/>}
-                  label="Total Outstanding"
-                  value={fmt(propsData.reduce((s,p)=>s+p.total_outstanding,0))}
-                  tone="amber"
-                  onClick={() => setPropertyQuickFilter(f => f === "outstanding" ? null : "outstanding")}
-                  sub={propertyQuickFilter === "outstanding" ? "Properties with outstanding balance" : undefined}
-                />
-                <KpiCard icon={<Clock className="h-5 w-5"/>} label="Total Overdue" value={fmt(propsData.reduce((s,p)=>s+p.total_overdue,0))} tone="red"/>
-              </div>
-
-              {propertyQuickFilter && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
-                  <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
-                  <span className="font-medium">
-                    {propertyQuickFilter === "fully_occupied"
-                      ? "Showing fully occupied properties only"
-                      : "Showing properties with outstanding balance"}
-                  </span>
-                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
-                    onClick={() => setPropertyQuickFilter(null)}>
-                    Clear
-                  </Button>
-                </div>
-              )}
-
-              {/* Search */}
-              <input
-                className="w-full max-w-sm px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder="Search properties…"
-                value={propSearch}
-                onChange={e => setPropSearch(e.target.value)}
-              />
-
-              {propLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
-              ) : filteredProps.length === 0 ? (
-                <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No properties found</p></div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredProps.map(p => <PropertyCard key={p.name} prop={p} onUnitClick={setSelectedUnit}/>)}
-                </div>
-              )}
-            </CardContent>
-          )}
-
-          {/* ── UNITS TAB ── */}
-          {tab === "units" && (
-            <CardContent className="p-6 space-y-4">
-              {unitsError && <Alert variant="destructive"><AlertDescription>{unitsError}</AlertDescription></Alert>}
-
-              {/* Summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<Home className="h-5 w-5"/>} label="Total Units" value={unitsData.length} tone="green"/>
-                <KpiCard
-                  icon={<CheckCircle2 className="h-5 w-5"/>}
-                  label="Occupied"
-                  value={unitsData.filter(u => u.unit_status === "Occupied").length}
-                  tone="green"
-                  onClick={() => setUnitsQuickFilter(f => f === "occupied" ? null : "occupied")}
-                  sub={unitsQuickFilter === "occupied" ? "Occupied units only" : undefined}
-                />
-                <KpiCard
-                  icon={<AlertCircle className="h-5 w-5"/>}
-                  label="Outstanding"
-                  value={fmt(unitsData.reduce((s, u) => s + u.outstanding, 0))}
-                  tone="amber"
-                  onClick={() => setUnitsQuickFilter(f => f === "outstanding" ? null : "outstanding")}
-                  sub={unitsQuickFilter === "outstanding" ? "Units with outstanding balance" : undefined}
-                />
-                <KpiCard
-                  icon={<Clock className="h-5 w-5"/>}
-                  label="Overdue"
-                  value={fmt(unitsData.reduce((s, u) => s + u.overdue, 0))}
-                  tone="red"
-                  onClick={() => setUnitsQuickFilter(f => f === "overdue" ? null : "overdue")}
-                  sub={unitsQuickFilter === "overdue" ? "Units with overdue amounts" : undefined}
-                />
-              </div>
-
-              {unitsQuickFilter && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
-                  <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
-                  <span className="font-medium">
-                    {unitsQuickFilter === "occupied" && "Showing occupied units only"}
-                    {unitsQuickFilter === "vacant" && "Showing vacant / non-occupied units"}
-                    {unitsQuickFilter === "overdue" && "Showing units with overdue amounts"}
-                    {unitsQuickFilter === "outstanding" && "Showing units with outstanding balance"}
-                  </span>
-                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
-                    onClick={() => setUnitsQuickFilter(null)}>
-                    Clear
-                  </Button>
-                </div>
-              )}
-
-              {/* Filters row */}
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  className="px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 w-52"
-                  placeholder="Search unit…"
-                  value={unitSearch}
-                  onChange={e => setUnitSearch(e.target.value)}
-                />
-                <div className="w-52">
-                  <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                    <SelectTrigger className="border-emerald-200 text-sm"><SelectValue placeholder="All Properties"/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL_PROPS}>All Properties</SelectItem>
-                      {Array.from(new Set(unitsData.map(u=>u.property).filter(Boolean))).sort().map(p=>(
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-wrap gap-3 ml-auto">
-                  {(Object.entries(UNIT_STATUS) as [UnitPayStatus, typeof UNIT_STATUS[UnitPayStatus]][]).map(([k,v])=>(
-                    <div key={k} className="flex items-center gap-1.5">
-                      <span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/>
-                      <span className="text-xs text-slate-600">{v.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {unitsLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
-              ) : filteredUnits.length === 0 ? (
-                <div className="text-center py-16 text-slate-400"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
-              ) : (
-                <Card className="border-emerald-100 shadow-sm">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-emerald-50">
-                        <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">Floor / Area</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Monthly Rent</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Outstanding</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Overdue</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold text-center">Status</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold"/>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUnits.map(u => {
-                        const cfg = UNIT_STATUS[u.pay_status] ?? UNIT_STATUS.vacant
-                        return (
-                          <TableRow key={u.unit}
-                            className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
-                            onClick={() => setSelectedUnit(u.unit)}
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${cfg.dot}`}/>
-                                <span className="font-semibold text-slate-800 text-sm">{u.unit}</span>
-                              </div>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Rent / mo</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold">End date</TableHead>
+                          <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Open</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTenantContracts.map(c => (
+                          <TableRow key={c.name} className="hover:bg-emerald-50/50">
+                            <TableCell className="pl-4 font-mono text-xs text-slate-800">{c.name}</TableCell>
+                            <TableCell className="text-xs">
+                              <span className={`font-medium px-2 py-0.5 rounded-full border ${
+                                c.status === "Active" ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : c.status === "Terminated" ? "bg-red-50 text-red-800 border-red-200"
+                                  : "bg-slate-50 text-slate-700 border-slate-200"
+                              }`}>{c.status}</span>
+                              {c.expiring_soon && <span className="ml-1 text-[10px] font-semibold text-amber-700">30d</span>}
                             </TableCell>
-                            <TableCell>
-                              <p className="text-sm text-slate-700">{u.property || "—"}</p>
-                            </TableCell>
-                            <TableCell>
-                              {u.tenant_name
-                                ? <p className="text-sm text-slate-700">{u.tenant_name}</p>
-                                : <span className="text-xs text-slate-400 italic">Vacant</span>}
-                            </TableCell>
-                            <TableCell>
-                              <p className="text-xs text-slate-500">
-                                {[u.floor && `Floor ${u.floor}`, u.area && `${u.area} m²`].filter(Boolean).join(" · ") || "—"}
-                              </p>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <span className="text-sm font-medium text-slate-700">{u.monthly_rent ? fmt(u.monthly_rent) : "—"}</span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {u.outstanding > 0
-                                ? <span className="text-sm font-semibold text-amber-700">{fmt(u.outstanding)}</span>
-                                : <span className="text-xs text-slate-400">—</span>}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {u.overdue > 0
-                                ? <span className="text-sm font-bold text-red-700">{fmt(u.overdue)}</span>
-                                : <span className="text-xs text-slate-400">—</span>}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.badge}`}>{cfg.label}</span>
-                            </TableCell>
-                            <TableCell>
-                              <ChevronRight className="h-4 w-4 text-slate-400"/>
+                            <TableCell className="text-sm text-slate-800">{c.tenant_name}</TableCell>
+                            <TableCell className="text-sm text-slate-700">{c.unit || "—"}</TableCell>
+                            <TableCell className="text-xs text-slate-600">{c.property || "—"}</TableCell>
+                            <TableCell className="text-right text-sm font-medium text-slate-800">{fmt(c.monthly_rent)}</TableCell>
+                            <TableCell className="text-xs text-slate-600">{fmtDate(c.end_date)}</TableCell>
+                            <TableCell className="text-right pr-4">
+                              <a
+                                href={deskTenantContractUrl(c.name)}
+                                className="text-xs font-medium text-emerald-700 hover:underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Open
+                              </a>
                             </TableCell>
                           </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </Card>
-              )}
-            </CardContent>
-          )}
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Card>
+                )}
+              </CardContent>
+            )}
 
-          {/* ── TENANT CONTRACT ── */}
-          {tab === "tenant_contract" && (
-            <CardContent className="p-6 space-y-4">
-              {contractsError && (
-                <Alert variant="destructive"><AlertDescription>{contractsError}</AlertDescription></Alert>
-              )}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-slate-600 text-sm max-w-xl">
-                  Submitted <span className="font-medium text-emerald-800">Tenant Contract</span> records — same filters as Overview shortcuts below.
+            {/* ── FINANCIAL ── */}
+            {tab === "financial" && (
+              <CardContent className="p-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Month</label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="border-emerald-200"><SelectValue placeholder="Current Month"/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={CURRENT_MONTH}>Current Month</SelectItem>
+                        {months.map(m=><SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Property</label>
+                    <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+                      <SelectTrigger className="border-emerald-200"><SelectValue placeholder="All Properties"/></SelectTrigger>
+                      <SelectContent>
+                        {finProperties.map(p=><SelectItem key={p} value={p}>{p===ALL_PROPS?"All Properties":p}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <KpiCard icon={<TrendingUp className="h-5 w-5"/>} label="Invoiced" value={fmt(finSummary.invoiced)} tone="green"/>
+                  <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Collected"    value={fmt(finSummary.paid)}          tone="green"/>
+                  <KpiCard icon={<Clock className="h-5 w-5"/>}        label="Outstanding"  value={fmt(finSummary.outstanding)}   tone="amber"/>
+                  <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Overdue"      value={fmt(finSummary.overdue)}       tone="red"/>
+                </div>
+                <div className="flex flex-wrap gap-3 items-center">
+                  {(Object.entries(FINANCIAL_STATUS) as [UnitPaymentStatus, typeof FINANCIAL_STATUS[UnitPaymentStatus]][]).map(([k,v])=>(
+                    <div key={k} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/><span className="text-xs text-slate-600">{v.label}</span></div>
+                  ))}
+                </div>
+                {finError && <Alert variant="destructive"><AlertDescription>{finError}</AlertDescription></Alert>}
+                {finLoading ? (
+                  <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
+                ) : filteredFinancial.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No contracts found for this period</p></div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    {filteredFinancial.map(u=>{
+                      const cfg = FINANCIAL_STATUS[u.status] ?? FINANCIAL_STATUS.no_invoice
+                      return (
+                        <UnitCard key={u.contract} unit={u.unit}
+                          statusCfg={cfg} outstandingLabel={u.outstanding} overdueLabel={u.overdue}
+                          monthlyRent={u.monthly_rent} tenantName={u.tenant_name}
+                          onClick={() => setSelectedUnit(u.unit)}/>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            )}
+
+            {/* ── UTILITY ── */}
+            {tab === "utility" && (
+              <CardContent className="py-20 text-center space-y-3">
+                <Zap className="h-12 w-12 mx-auto text-emerald-200"/>
+                <p className="text-xl font-semibold text-slate-600">Coming Soon</p>
+                <p className="text-slate-400 text-sm max-w-md mx-auto">
+                  Utility consumption analytics — water, electricity, and gas trends per unit and property — will be available in a future release.
                 </p>
-                <Button variant="outline" type="button" className="border-emerald-200" onClick={contractsReload}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${contractsLoading ? "animate-spin" : ""}`}/>Refresh
-                </Button>
-              </div>
+              </CardContent>
+            )}
+          </Card>
+        )}
+        {/* ── End gate ── */}
 
-              {contractQuickFilter !== null && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
-                  <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
-                  <span className="font-medium">{contractFilterDescription(contractQuickFilter)}</span>
-                  <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
-                    onClick={() => setContractQuickFilter(null)}>
-                    Clear filter
-                  </Button>
-                </div>
-              )}
-
-              <input
-                className="w-full max-w-md px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder="Search contract, tenant, unit, property…"
-                value={contractSearch}
-                onChange={e => setContractSearch(e.target.value)}
-              />
-
-              {contractsLoading && !tenantContractsRaw.length ? (
-                <div className="flex items-center justify-center py-16">
-                  <RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/>
-                </div>
-              ) : filteredTenantContracts.length === 0 ? (
-                <div className="text-center text-slate-400 text-sm py-16 border border-dashed border-emerald-200 rounded-xl bg-emerald-50/40">
-                  No contracts match this view
-                </div>
-              ) : (
-                <Card className="border-emerald-100 shadow-sm overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-emerald-50">
-                        <TableHead className="text-teal-800 text-xs font-semibold pl-4">Contract</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">Status</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold text-right">Rent / mo</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold">End date</TableHead>
-                        <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Open</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTenantContracts.map(c => (
-                        <TableRow key={c.name} className="hover:bg-emerald-50/50">
-                          <TableCell className="pl-4 font-mono text-xs text-slate-800">{c.name}</TableCell>
-                          <TableCell className="text-xs">
-                            <span className={`font-medium px-2 py-0.5 rounded-full border ${
-                              c.status === "Active" ? "bg-amber-50 text-amber-800 border-amber-200"
-                                : c.status === "Terminated" ? "bg-red-50 text-red-800 border-red-200"
-                                : "bg-slate-50 text-slate-700 border-slate-200"
-                            }`}>{c.status}</span>
-                            {c.expiring_soon && <span className="ml-1 text-[10px] font-semibold text-amber-700">30d</span>}
-                          </TableCell>
-                          <TableCell className="text-sm text-slate-800">{c.tenant_name}</TableCell>
-                          <TableCell className="text-sm text-slate-700">{c.unit || "—"}</TableCell>
-                          <TableCell className="text-xs text-slate-600">{c.property || "—"}</TableCell>
-                          <TableCell className="text-right text-sm font-medium text-slate-800">{fmt(c.monthly_rent)}</TableCell>
-                          <TableCell className="text-xs text-slate-600">{fmtDate(c.end_date)}</TableCell>
-                          <TableCell className="text-right pr-4">
-                            <a
-                              href={deskTenantContractUrl(c.name)}
-                              className="text-xs font-medium text-emerald-700 hover:underline"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Open
-                            </a>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Card>
-              )}
-            </CardContent>
-          )}
-
-          {/* ── FINANCIAL ── */}
-          {tab === "financial" && (
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Month</label>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="border-emerald-200"><SelectValue placeholder="Current Month"/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={CURRENT_MONTH}>Current Month</SelectItem>
-                      {months.map(m=><SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Property</label>
-                  <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                    <SelectTrigger className="border-emerald-200"><SelectValue placeholder="All Properties"/></SelectTrigger>
-                    <SelectContent>
-                      {finProperties.map(p=><SelectItem key={p} value={p}>{p===ALL_PROPS?"All Properties":p}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard icon={<TrendingUp className="h-5 w-5"/>} label="Invoiced" value={fmt(finSummary.invoiced)} tone="green"/>
-                <KpiCard icon={<CheckCircle2 className="h-5 w-5"/>} label="Collected"    value={fmt(finSummary.paid)}          tone="green"/>
-                <KpiCard icon={<Clock className="h-5 w-5"/>}        label="Outstanding"  value={fmt(finSummary.outstanding)}   tone="amber"/>
-                <KpiCard icon={<AlertCircle className="h-5 w-5"/>}  label="Overdue"      value={fmt(finSummary.overdue)}       tone="red"/>
-              </div>
-              <div className="flex flex-wrap gap-3 items-center">
-                {(Object.entries(FINANCIAL_STATUS) as [UnitPaymentStatus, typeof FINANCIAL_STATUS[UnitPaymentStatus]][]).map(([k,v])=>(
-                  <div key={k} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/><span className="text-xs text-slate-600">{v.label}</span></div>
-                ))}
-              </div>
-              {finError && <Alert variant="destructive"><AlertDescription>{finError}</AlertDescription></Alert>}
-              {finLoading ? (
-                <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
-              ) : filteredFinancial.length === 0 ? (
-                <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No contracts found for this period</p></div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                  {filteredFinancial.map(u=>{
-                    const cfg = FINANCIAL_STATUS[u.status] ?? FINANCIAL_STATUS.no_invoice
-                    return (
-                      <UnitCard key={u.contract} unit={u.unit}
-                        statusCfg={cfg} outstandingLabel={u.outstanding} overdueLabel={u.overdue}
-                        monthlyRent={u.monthly_rent} tenantName={u.tenant_name}
-                        onClick={() => setSelectedUnit(u.unit)}/>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          )}
-
-          {/* ── UTILITY ── */}
-          {tab === "utility" && (
-            <CardContent className="py-20 text-center space-y-3">
-              <Zap className="h-12 w-12 mx-auto text-emerald-200"/>
-              <p className="text-xl font-semibold text-slate-600">Coming Soon</p>
-              <p className="text-slate-400 text-sm max-w-md mx-auto">
-                Utility consumption analytics — water, electricity, and gas trends per unit and property — will be available in a future release.
-              </p>
-            </CardContent>
-          )}
-        </Card>
       </div>
     </div>
   )
