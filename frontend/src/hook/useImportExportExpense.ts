@@ -64,6 +64,8 @@ export interface ImportExportEntry {
   total: number
   company_currency: string // for all distribution charges (LCV / SSC)
   source: 'import' | 'export' | 'both'
+  /** Sales Invoice(s) driving qty / value for this line (comma-separated if merged) */
+  sales_invoice?: string | null
 }
 
 // ─── Totals footer ────────────────────────────────────────────────────────────
@@ -103,7 +105,10 @@ interface UseImportExportExpenseParams {
   groupBy: string
   companyGroup: string
   expenseSide: ExpenseSideFilter
-  includeDrafts: boolean
+  /** submitted = default (no drafts); all = draft+submitted; draft_only = drafts only */
+  draftMode: 'submitted' | 'all' | 'draft_only'
+  /** When true with a company, transit links and expanded PI/SI are limited to that company */
+  restrictTransitToCompany: boolean
   enabled: boolean
 }
 
@@ -116,7 +121,8 @@ export function useImportExportExpense({
   groupBy,
   companyGroup,
   expenseSide,
-  includeDrafts,
+  draftMode,
+  restrictTransitToCompany,
   enabled,
 }: UseImportExportExpenseParams) {
   const [data, setData] = useState<ImportExportData | null>(null)
@@ -144,7 +150,9 @@ export function useImportExportExpense({
           group_by: groupBy || 'default',
           expense_side: expenseSide === 'all' ? undefined : expenseSide,
           company_group: companyGroup.trim() || undefined,
-          include_drafts: includeDrafts || undefined,
+          draft_mode: draftMode !== 'submitted' ? draftMode : undefined,
+          restrict_transit_to_company:
+            restrictTransitToCompany && company ? true : undefined,
         }
         if (items.length > 0) {
           filters.items = items
@@ -187,7 +195,19 @@ export function useImportExportExpense({
     }
 
     fetchData()
-  }, [enabled, company, itemsKey, fromDate, toDate, currency, groupBy, companyGroup, expenseSide, includeDrafts])
+  }, [
+    enabled,
+    company,
+    itemsKey,
+    fromDate,
+    toDate,
+    currency,
+    groupBy,
+    companyGroup,
+    expenseSide,
+    draftMode,
+    restrictTransitToCompany,
+  ])
 
   return { data, isLoading, error }
 }

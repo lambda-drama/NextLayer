@@ -321,7 +321,49 @@ def _get_journey_component(start_doctype, start_name):
 # Journey grouping
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_journey_map(from_date, to_date, company_filter, company_group_filter=None, include_drafts=False):
+def _parse_draft_mode(filters):
+    """
+    submitted (default): docstatus = 1 only.
+    all: docstatus 0 and 1.
+    draft_only: docstatus = 0 only.
+    """
+    v = (filters.get("draft_mode") or filters.get("document_status") or "").strip().lower()
+    if v in ("all", "both", "submitted_and_draft", "include_draft", "with_draft"):
+        return "all"
+    if v in ("draft", "draft_only", "drafts"):
+        return "draft_only"
+    return "submitted"
+
+
+def _pi_si_docstatus_filter(draft_mode):
+    """Return (operator, value) for frappe.get_all Purchase/Sales Invoice docstatus."""
+    dm = (draft_mode or "submitted").strip().lower()
+    if dm == "all":
+        return "in", [0, 1]
+    if dm == "draft_only":
+        return "=", 0
+    return "=", 1
+
+
+def _lcv_docstatus_sql(draft_mode):
+    dm = (draft_mode or "submitted").strip().lower()
+    if dm == "all":
+        return "lcv.docstatus IN (0, 1)"
+    if dm == "draft_only":
+        return "lcv.docstatus = 0"
+    return "lcv.docstatus = 1"
+
+
+def _ssc_docstatus_sql(draft_mode):
+    dm = (draft_mode or "submitted").strip().lower()
+    if dm == "all":
+        return "ssc.docstatus IN (0, 1)"
+    if dm == "draft_only":
+        return "ssc.docstatus = 0"
+    return "ssc.docstatus = 1"
+
+
+def _build_journey_map(from_date, to_date, company_filter, company_group_filter=None, draft_mode="submitted"):
     """
     Returns:
         journey_to_pi:   dict[journey_id → list[pi_name]]
@@ -338,10 +380,11 @@ def _build_journey_map(from_date, to_date, company_filter, company_group_filter=
         ["Purchase Invoice", "posting_date",          "between", [from_date, to_date]],
         ["Purchase Invoice", "custom_is_export_sale", "=",       1],
     ]
-    if include_drafts:
-        pi_filters.append(["Purchase Invoice", "docstatus", "in", [0, 1]])
+    ds_op, ds_val = _pi_si_docstatus_filter(draft_mode)
+    if ds_op == "in":
+        pi_filters.append(["Purchase Invoice", "docstatus", "in", ds_val])
     else:
-        pi_filters.append(["Purchase Invoice", "docstatus", "=", 1])
+        pi_filters.append(["Purchase Invoice", "docstatus", ds_op, ds_val])
     if company_filter:
         pi_filters.append(["Purchase Invoice", "company", "=", company_filter])
     if company_group_filter and _company_group_on_purchase_invoice():
@@ -351,10 +394,11 @@ def _build_journey_map(from_date, to_date, company_filter, company_group_filter=
         ["Sales Invoice", "posting_date",          "between", [from_date, to_date]],
         ["Sales Invoice", "custom_is_export_sale", "=",       1],
     ]
-    if include_drafts:
-        si_filters.append(["Sales Invoice", "docstatus", "in", [0, 1]])
+    ds_op_si, ds_val_si = _pi_si_docstatus_filter(draft_mode)
+    if ds_op_si == "in":
+        si_filters.append(["Sales Invoice", "docstatus", "in", ds_val_si])
     else:
-        si_filters.append(["Sales Invoice", "docstatus", "=", 1])
+        si_filters.append(["Sales Invoice", "docstatus", ds_op_si, ds_val_si])
     if company_filter:
         si_filters.append(["Sales Invoice", "company", "=", company_filter])
     if company_group_filter and _company_group_on_sales_invoice():
@@ -455,8 +499,12 @@ def _collect_si_item_data_bulk(si_names, item_codes, split_by_uom=False):
 
     uom_sql = ", sii.stock_uom, sii.uom" if split_by_uom else ""
     item_frag, item_bind = _sql_in_clause_single("sii.item_code", item_codes or [])
+    if frappe.db.has_column("Sales Invoice Item", "stock_qty"):
+        qty_sel = "IFNULL(NULLIF(IFNULL(sii.stock_qty, 0), 0), IFNULL(sii.qty, 0))"
+    else:
+        qty_sel = "IFNULL(sii.qty, 0)"
     rows = frappe.db.sql(f"""
-        SELECT sii.parent, sii.item_code, sii.qty, sii.rate, sii.amount{uom_sql}
+        SELECT sii.parent, sii.item_code, {qty_sel} AS qty, sii.rate, sii.amount{uom_sql}
         FROM `tabSales Invoice Item` sii
         WHERE sii.parent IN %(names)s
           {item_frag}
@@ -476,6 +524,7 @@ def _collect_si_item_data_bulk(si_names, item_codes, split_by_uom=False):
             cc = _get_company_currency(si_company_map.get(r.parent, ""))
             item_data[uom_key] = {
                 "item_code":            ic,
+                "si_invoice":           r.parent,
                 "stock_uom":            (r.get("stock_uom") or r.get("uom") or "").strip() or None,
                 "units":                0.0,
                 "price":                0.0,
@@ -486,6 +535,12 @@ def _collect_si_item_data_bulk(si_names, item_codes, split_by_uom=False):
         item_data[uom_key]["units"]       += flt(r.qty, 2)
         item_data[uom_key]["price"]        = flt(r.rate, 2)
         item_data[uom_key]["total_value"] += flt(r.amount, 2)
+        p = r.parent or ""
+        if p:
+            seen = [x.strip() for x in (item_data[uom_key].get("si_invoice") or "").split(",") if x.strip()]
+            if p not in seen:
+                seen.append(p)
+                item_data[uom_key]["si_invoice"] = ", ".join(seen)
 
     return item_data
 
@@ -607,7 +662,7 @@ def _aggregate_import_costs_bulk(
     item_codes=None,
     target_currency=None,
     conversion_date=None,
-    include_drafts=False,
+    draft_mode="submitted",
 ):
     """
     Return ALL distribution lines grouped by expense account.
@@ -630,7 +685,7 @@ def _aggregate_import_costs_bulk(
         }
 
     company_clause = "AND lcv.company = %(company)s" if company_filter else ""
-    lcv_ds_clause = "lcv.docstatus IN (0, 1)" if include_drafts else "lcv.docstatus = 1"
+    lcv_ds_clause = _lcv_docstatus_sql(draft_mode)
 
     # Step 1: find matching LCVs with company info
     lcv_rows = frappe.db.sql(f"""
@@ -794,7 +849,7 @@ def _aggregate_import_costs_bulk(
     
 
 
-def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, include_drafts=False):
+def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, draft_mode="submitted"):
     """Return ALL distribution lines grouped by expense account"""
     item_codes = item_codes or []
     if not si_names or not frappe.db.table_exists("Sales Shipment Cost"):
@@ -809,7 +864,7 @@ def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, incl
         }
 
     company_clause = "AND ssc.company = %(company)s" if company_filter else ""
-    ssc_ds_clause = "ssc.docstatus IN (0, 1)" if include_drafts else "ssc.docstatus = 1"
+    ssc_ds_clause = _ssc_docstatus_sql(draft_mode)
 
     # Step 1: find matching SSCs and get their total_amount
     ssc_rows = frappe.db.sql(f"""
@@ -1288,6 +1343,7 @@ def _build_journey_rows(
             "company_currency":      eff_cc,
             "export_currency":       eff_usd,
             "source":                source,
+            "sales_invoice":         None,
         })
         return rows
     
@@ -1346,6 +1402,7 @@ def _build_journey_rows(
             "company_currency":      eff_cc,
             "export_currency":       eff_usd,
             "source":                source,
+            "sales_invoice":         si_meta.get("si_invoice"),
         })
     
     return rows
@@ -1377,7 +1434,13 @@ def get_import_export_expense_report(filters=None):
         display_currency = currency_filter if (currency_filter and currency_filter != "all") else None
 
         item_codes = _parse_item_codes(filters)
-        include_drafts = str(filters.get("include_drafts") or "").lower() in ("1", "true", "yes", "on")
+        draft_mode = _parse_draft_mode(filters)
+        # Legacy boolean include_drafts=true → treat as "all"
+        if str(filters.get("include_drafts") or "").lower() in ("1", "true", "yes", "on"):
+            draft_mode = "all"
+        restrict_transit_to_company = str(filters.get("restrict_transit_to_company") or "").lower() in (
+            "1", "true", "yes", "on",
+        )
         expense_side = (filters.get("expense_side") or filters.get("expense_scope") or "all").strip().lower()
         if expense_side not in ("all", "purchase", "sales", "import", "export"):
             expense_side = "all"
@@ -1395,7 +1458,7 @@ def get_import_export_expense_report(filters=None):
             to_date,
             company_filter,
             company_group_filter=company_group_filter or None,
-            include_drafts=include_drafts,
+            draft_mode=draft_mode,
         )
         all_journey_ids = sorted(set(journey_to_pi.keys()) | set(journey_to_si.keys()))
 
@@ -1419,7 +1482,13 @@ def get_import_export_expense_report(filters=None):
             display_name = journey_display.get(journey_id, journey_id.replace("|", " "))
 
             all_pi_names, all_si_names = _expand_journey_invoices(pi_seed, si_seed)
-            all_pi_names, all_si_names = _filter_pi_si_by_company(all_pi_names, all_si_names, company_filter)
+            transit_company_arg = (
+                company_filter if (company_filter and restrict_transit_to_company) else None
+            )
+            if transit_company_arg:
+                all_pi_names, all_si_names = _filter_pi_si_by_company(
+                    all_pi_names, all_si_names, transit_company_arg,
+                )
             if not all_pi_names and not all_si_names:
                 continue
 
@@ -1448,7 +1517,7 @@ def get_import_export_expense_report(filters=None):
                         item_codes=item_codes,
                         target_currency=display_currency,
                         conversion_date=to_date,
-                        include_drafts=include_drafts,
+                        draft_mode=draft_mode,
                     )
                 if expense_side == "purchase":
                     export_data = _empty_export_aggregate()
@@ -1457,7 +1526,7 @@ def get_import_export_expense_report(filters=None):
                         slice_si,
                         company_filter,
                         item_codes=item_codes,
-                        include_drafts=include_drafts,
+                        draft_mode=draft_mode,
                     )
 
                 import_costs = import_data["item_costs"]
@@ -1485,8 +1554,8 @@ def get_import_export_expense_report(filters=None):
                     all_item_names.update(_bulk_item_names(unknown_codes))
 
                 all_dates    = import_dates + export_dates
-                transit_no   = _collect_transit_display(slice_pi, slice_si, company_filter)
-                transit_docs = _collect_transit_invoices_structured(slice_pi, slice_si, company_filter)
+                transit_no   = _collect_transit_display(slice_pi, slice_si, transit_company_arg)
+                transit_docs = _collect_transit_invoices_structured(slice_pi, slice_si, transit_company_arg)
 
                 imp_lines_conv = _convert_distribution_lines(
                     _distribution_lines_for_api(import_data.get("distribution_lines", [])),
@@ -1557,7 +1626,8 @@ def get_import_export_expense_report(filters=None):
                 "items":     item_codes,
                 "item":      item_codes[0] if len(item_codes) == 1 else "",
                 "expense_side": expense_side,
-                "include_drafts": include_drafts,
+                "draft_mode": draft_mode,
+                "restrict_transit_to_company": restrict_transit_to_company,
                 "currency":  currency_filter or "all",
                 "group_by":  gb_raw if gb_raw else "default",
             },
