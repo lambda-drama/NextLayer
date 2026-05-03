@@ -356,7 +356,6 @@ def create_daily_wage_purchase_invoice(wage_entry_name):
 
 	# ── Ensure item exists ────────────────────────────────────────────────────
 	ensure_daily_labour_item()
-
 	# ── Resolve supplier ──────────────────────────────────────────────────────
 	# Try common field names; fall back to a generic "Daily Labour" supplier.
 	supplier = (
@@ -379,6 +378,7 @@ def create_daily_wage_purchase_invoice(wage_entry_name):
 	pi.company_group     = doc.get("company_group") or None
 	pi.custom_remark     = doc.get("description") or None
 	pi.custom_wage_entry = wage_entry_name
+	pi.project = doc.get("project")
 
 	# Link back to the Wage Entry (add a custom field if you want a hard link)
 	# pi.custom_wage_entry = wage_entry_name
