@@ -157,6 +157,43 @@ function expandVariants(row: ImportExportEntry, invoiceLayout: string): DetailVa
   return ["merged"]
 }
 
+/** Stable key for pivoting distribution lines into columns */
+function accountColumnKey(ln: DistributionLine): string {
+  const ac = (ln.expense_account || "").trim()
+  return ac || (ln.label || "—").trim() || "—"
+}
+
+function amountMapFromLines(lines: DistributionLine[] | undefined): Map<string, number> {
+  const m = new Map<string, number>()
+  for (const ln of lines || []) {
+    const k = accountColumnKey(ln)
+    m.set(k, (m.get(k) ?? 0) + (Number(ln.amount) || 0))
+  }
+  return m
+}
+
+function collectAccountKeysFromBreakdowns(
+  jbs: Record<string, JourneyBreakdown>,
+  side: "import" | "export",
+): string[] {
+  const acc = new Set<string>()
+  const field = side === "import" ? "import_distribution_lines" : "export_distribution_lines"
+  for (const jb of Object.values(jbs)) {
+    const lines = jb[field as keyof JourneyBreakdown] as DistributionLine[] | undefined
+    for (const ln of lines || []) acc.add(accountColumnKey(ln))
+  }
+  return Array.from(acc).sort((a, b) => a.localeCompare(b))
+}
+
+/** Full account name — no truncation, wraps in cell */
+function acctHeaderLabel(k: string): string {
+  return (k || "—").trim()
+}
+
+/** Thin vertical band: start at journey, continue through units */
+const SI_BAND_START = "border-l-2 border-l-slate-400 border-y border-r border-blue-100"
+const SI_BAND_CONT = "border-y border-r border-blue-100"
+
 // ─── Column Picker Modal ──────────────────────────────────────────────────────
 
 interface ColumnPickerModalProps {
@@ -440,6 +477,14 @@ const TH = [
   "text-center whitespace-nowrap align-middle",
 ].join(" ")
 
+// Account column header style — allows wrapping for long names
+const TH_ACCT = [
+  "border border-blue-300",
+  "px-1.5 py-2",
+  "text-[9px] font-semibold text-center align-top",
+  "whitespace-normal break-words leading-tight",
+].join(" ")
+
 const TD = "border border-blue-100 px-2 py-2 text-[11px] text-gray-700 whitespace-nowrap"
 const TDR = "border border-blue-100 px-2 py-2 text-[11px] text-right font-mono text-gray-800 whitespace-nowrap"
 
@@ -459,11 +504,15 @@ interface JourneyRowProps {
   printRowInclude: "0" | "1"
   printSelected: boolean
   onTogglePrintSelect: () => void
+  expandAccountColumns: boolean
+  importAccountKeys: string[]
+  exportAccountKeys: string[]
 }
 
 function JourneyRow({
   group, index, expanded, onToggle, journeyBreakdown, invoiceLayout,
   printRowInclude, printSelected, onTogglePrintSelect,
+  expandAccountColumns, importAccountKeys, exportAccountKeys,
 }: JourneyRowProps) {
   const cc = (v: number | null | undefined) => fmt(v, group.companyCurrency)
 
@@ -472,7 +521,15 @@ function JourneyRow({
 
   const transitRefs = journeyBreakdown?.transit_invoices ?? []
   const impCc = group.companyCurrency
-  const showChargeStacks = expanded && journeyBreakdown
+  const impDistMap = useMemo(
+    () => amountMapFromLines(journeyBreakdown?.import_distribution_lines),
+    [journeyBreakdown],
+  )
+  const expDistMap = useMemo(
+    () => amountMapFromLines(journeyBreakdown?.export_distribution_lines),
+    [journeyBreakdown],
+  )
+  const showChargeStacks = expanded && journeyBreakdown && !expandAccountColumns
 
   const rowPrintAttrs = {
     "data-ie-print-jid": group.journeyId,
@@ -514,7 +571,7 @@ function JourneyRow({
           {index + 1}
         </td>
 
-        <td data-col="col-journey" className="border px-3 py-3 text-[11px] font-bold align-top min-w-[200px]" style={cell({ color: pal.text })}>
+        <td data-col="col-journey" className={`border px-3 py-3 text-[11px] font-bold align-top min-w-[200px] ${SI_BAND_START}`} style={cell({ color: pal.text })}>
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <Receipt className="h-3.5 w-3.5 shrink-0 opacity-60" />
@@ -527,9 +584,9 @@ function JourneyRow({
         </td>
 
         {/* item / source / units / price / total-value — empty on group row */}
-        <td data-col="col-item"        className="border px-2 py-3" style={cell()} />
-        <td data-col="col-source"      className="border px-2 py-3" style={cell()} />
-        <td data-col="col-units"       className="border px-2 py-3" style={cell()} />
+        <td data-col="col-item"        className={`border px-2 py-3 ${SI_BAND_CONT}`} style={cell()} />
+        <td data-col="col-source"      className={`border px-2 py-3 ${SI_BAND_CONT}`} style={cell()} />
+        <td data-col="col-units"       className={`border px-2 py-3 ${SI_BAND_CONT}`} style={cell()} />
         <td data-col="col-price"       className="border px-2 py-3" style={cell()} />
         <td data-col="col-total-value" className="border px-2 py-3" style={cell()} />
 
@@ -549,37 +606,79 @@ function JourneyRow({
           {group.destination}
         </td>
 
-        <td data-col="col-import-charges" className="border px-2 py-3 align-top" style={cell()}>
-          {showChargeStacks ? (
-            <ChargeStack
-              sectionTitle="Import charges"
-              itemChargesTotal={journeyBreakdown.import_item_charges_total}
-              lines={journeyBreakdown.import_distribution_lines}
-              currency={impCc}
-              accent="import"
-            />
-          ) : (
-            <div className="text-[11px] text-right font-mono font-bold" style={{ color: "#15803d" }}>
+        {!expandAccountColumns ? (
+          <>
+            <td data-col="col-import-charges" className="border px-2 py-3 align-top" style={cell()}>
+              {showChargeStacks ? (
+                <ChargeStack
+                  sectionTitle="Import charges"
+                  itemChargesTotal={journeyBreakdown!.import_item_charges_total}
+                  lines={journeyBreakdown!.import_distribution_lines}
+                  currency={impCc}
+                  accent="import"
+                />
+              ) : (
+                <div className="text-[11px] text-right font-mono font-bold" style={{ color: "#15803d" }}>
+                  {cc(group.totalImport)}
+                </div>
+              )}
+            </td>
+            <td data-col="col-export-charges" className="border px-2 py-3 align-top" style={cell()}>
+              {showChargeStacks ? (
+                <ChargeStack
+                  sectionTitle="Export charges"
+                  itemChargesTotal={journeyBreakdown!.export_item_charges_total}
+                  lines={journeyBreakdown!.export_distribution_lines}
+                  currency={impCc}
+                  accent="export"
+                />
+              ) : (
+                <div className="text-[11px] text-right font-mono font-bold" style={{ color: "#b91c1c" }}>
+                  {cc(group.totalExport)}
+                </div>
+              )}
+            </td>
+          </>
+        ) : (
+          <>
+            {importAccountKeys.map((k) => (
+              <td
+                key={`jimp-${group.journeyId}-${k}`}
+                className="ie-dyn-acct-col border px-1 py-2 text-[9px] text-right font-mono text-emerald-900 align-top bg-emerald-50/40"
+                style={cell()}
+                title={k}
+              >
+                {fmt(impDistMap.get(k), impCc, false)}
+              </td>
+            ))}
+            <td
+              data-col="col-import-charges"
+              className="border px-2 py-3 text-[11px] text-right font-mono font-bold text-emerald-800 bg-emerald-100/80"
+              style={cell()}
+              title="Journey import total (sum of all account lines)"
+            >
               {cc(group.totalImport)}
-            </div>
-          )}
-        </td>
-
-        <td data-col="col-export-charges" className="border px-2 py-3 align-top" style={cell()}>
-          {showChargeStacks ? (
-            <ChargeStack
-              sectionTitle="Export charges"
-              itemChargesTotal={journeyBreakdown.export_item_charges_total}
-              lines={journeyBreakdown.export_distribution_lines}
-              currency={impCc}
-              accent="export"
-            />
-          ) : (
-            <div className="text-[11px] text-right font-mono font-bold" style={{ color: "#b91c1c" }}>
+            </td>
+            {exportAccountKeys.map((k) => (
+              <td
+                key={`jexp-${group.journeyId}-${k}`}
+                className="ie-dyn-acct-col border px-1 py-2 text-[9px] text-right font-mono text-red-900 align-top bg-red-50/40"
+                style={cell()}
+                title={k}
+              >
+                {fmt(expDistMap.get(k), impCc, false)}
+              </td>
+            ))}
+            <td
+              data-col="col-export-charges"
+              className="border px-2 py-3 text-[11px] text-right font-mono font-bold text-red-800 bg-red-100/80"
+              style={cell()}
+              title="Journey export total (sum of all account lines)"
+            >
               {cc(group.totalExport)}
-            </div>
-          )}
-        </td>
+            </td>
+          </>
+        )}
 
         <td data-col="col-total"
           className="border px-2 py-3 text-[11px] text-right font-mono font-bold"
@@ -624,10 +723,15 @@ function JourneyRow({
                   data-ie-print-jid={group.journeyId}
                   data-ie-print-include={printRowInclude}
                 >
-                  {/* indent stripe — no data-col */}
+                  {/* align with parent: print column + expand column */}
                   <td
                     className="border border-blue-100 w-8 ie-report-no-print"
-                    style={{ background: "rgba(30,58,138,0.08)", borderLeft: "3px solid #3b82f6" }}
+                    style={{ background: rowBg }}
+                  />
+                  <td
+                    className="border border-blue-100 w-8"
+                    style={{ background: rowBg, borderLeft: "3px solid #3b82f6" }}
+                    aria-hidden
                   />
 
                   <td data-col="col-num" className="border border-blue-100 px-2 py-2 text-[11px] text-center text-gray-400 font-mono">
@@ -635,20 +739,20 @@ function JourneyRow({
                   </td>
 
                   <td data-col="col-journey"
-                    className="border border-blue-100 px-2 py-2 text-[11px] text-gray-700 max-w-[200px] truncate"
+                    className={`border border-blue-100 px-2 py-2 text-[11px] text-gray-700 max-w-[200px] truncate ${SI_BAND_START}`}
                     title={row.description}
                   >
                     {(row.description || "—") + descSuffix}
                   </td>
 
-                  <td data-col="col-item" className="border border-blue-100 px-2 py-2 text-[11px] font-semibold text-blue-800">
+                  <td data-col="col-item" className={`border border-blue-100 px-2 py-2 text-[11px] font-semibold text-blue-800 ${SI_BAND_CONT}`}>
                     {row.item_code || "—"}
                     {row.stock_uom && (
                       <span className="block text-[9px] font-normal text-slate-500">UOM: {row.stock_uom}</span>
                     )}
                   </td>
 
-                  <td data-col="col-source" className="border border-blue-100 px-2 py-2 text-center">
+                  <td data-col="col-source" className={`border border-blue-100 px-2 py-2 text-center ${SI_BAND_CONT}`}>
                     <div className="flex items-center justify-center gap-0.5">
                       {isImport && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
@@ -663,7 +767,17 @@ function JourneyRow({
                     </div>
                   </td>
 
-                  <td data-col="col-units"       className={TDR}>{unitsShown != null ? unitsShown.toLocaleString("en-US") : "—"}</td>
+                  <td
+                    data-col="col-units"
+                    className={`${TDR} ${SI_BAND_CONT}`}
+                    title={
+                      row.sales_invoice
+                        ? `Quantity from Sales Invoice line(s): ${row.sales_invoice}`
+                        : "Quantity from Sales Invoice"
+                    }
+                  >
+                    {unitsShown != null ? unitsShown.toLocaleString("en-US") : "—"}
+                  </td>
                   <td data-col="col-price"       className={TDR}>{priceShown != null ? tConv(priceShown) : "—"}</td>
                   <td data-col="col-total-value" className={`${TDR} font-semibold`}>{tvShown != null ? tConv(tvShown) : "—"}</td>
 
@@ -673,12 +787,34 @@ function JourneyRow({
                   <td data-col="col-export-bl"   className={`${TD} text-center text-gray-500`}>{row.export_bl || "—"}</td>
                   <td data-col="col-destination" className={`${TD} text-center font-medium text-indigo-700`}>{row.destination || "—"}</td>
 
-                  <td data-col="col-import-charges" className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-emerald-700">
-                    {impShown != null && impShown > 0 ? cConv(impShown) : "—"}
-                  </td>
-                  <td data-col="col-export-charges" className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-red-600">
-                    {expMerged != null && expMerged > 0 ? cConv(expMerged) : "—"}
-                  </td>
+                  {expandAccountColumns && (
+                    <>
+                      {importAccountKeys.map((k) => (
+                        <td key={`dimp-${rk}-${variant}-${k}`} className={`ie-dyn-acct-col ${TDR} text-gray-300 bg-emerald-50/20`}>—</td>
+                      ))}
+                      <td data-col="col-import-charges" className={`${TDR} text-emerald-700 font-semibold bg-emerald-50/40`}>
+                        {impShown != null && impShown > 0 ? fmt(impShown, row.company_currency) : "—"}
+                      </td>
+                      {exportAccountKeys.map((k) => (
+                        <td key={`dexp-${rk}-${variant}-${k}`} className={`ie-dyn-acct-col ${TDR} text-gray-300 bg-red-50/20`}>—</td>
+                      ))}
+                      <td data-col="col-export-charges" className={`${TDR} text-red-600 font-semibold bg-red-50/40`}>
+                        {expMerged != null && expMerged > 0 ? fmt(expMerged, row.company_currency) : "—"}
+                      </td>
+                    </>
+                  )}
+
+                  {!expandAccountColumns && (
+                    <>
+                      <td data-col="col-import-charges" className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-emerald-700">
+                        {impShown != null && impShown > 0 ? cConv(impShown) : "—"}
+                      </td>
+                      <td data-col="col-export-charges" className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-red-600">
+                        {expMerged != null && expMerged > 0 ? cConv(expMerged) : "—"}
+                      </td>
+                    </>
+                  )}
+
                   <td data-col="col-total" className="border border-blue-200 px-2 py-2 text-[11px] text-right font-mono font-bold text-blue-900 bg-blue-50 align-top">
                     {variant === "merged"
                       ? cConv(row.total)
@@ -705,12 +841,44 @@ function JourneyRow({
             >
               Journey Subtotal
             </td>
-            <td data-col="col-import-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700">
-              {cc(group.totalImport)}
-            </td>
-            <td data-col="col-export-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700">
-              {cc(group.totalExport)}
-            </td>
+            {expandAccountColumns && (
+              <>
+                {importAccountKeys.map((k) => (
+                  <td
+                    key={`simp-${group.journeyId}-${k}`}
+                    className="ie-dyn-acct-col border border-blue-200 px-1 py-1.5 text-[9px] text-right font-mono text-emerald-900 bg-emerald-50/50"
+                    title={k}
+                  >
+                    {fmt(impDistMap.get(k), group.companyCurrency, false)}
+                  </td>
+                ))}
+                <td data-col="col-import-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700 bg-emerald-100/80">
+                  {cc(group.totalImport)}
+                </td>
+                {exportAccountKeys.map((k) => (
+                  <td
+                    key={`sexp-${group.journeyId}-${k}`}
+                    className="ie-dyn-acct-col border border-blue-200 px-1 py-1.5 text-[9px] text-right font-mono text-red-900 bg-red-50/50"
+                    title={k}
+                  >
+                    {fmt(expDistMap.get(k), group.companyCurrency, false)}
+                  </td>
+                ))}
+                <td data-col="col-export-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700 bg-red-100/80">
+                  {cc(group.totalExport)}
+                </td>
+              </>
+            )}
+            {!expandAccountColumns && (
+              <>
+                <td data-col="col-import-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700">
+                  {cc(group.totalImport)}
+                </td>
+                <td data-col="col-export-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700">
+                  {cc(group.totalExport)}
+                </td>
+              </>
+            )}
             <td data-col="col-total" className="border border-blue-300 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-blue-900 bg-blue-100">
               {cc(group.grandTotal)}
             </td>
@@ -734,7 +902,9 @@ export default function ImportExportExpense() {
   const [companyGroup, setCompanyGroup] = useState<string>("")
   const [companyGroupOptions, setCompanyGroupOptions] = useState<{ name: string; value: string }[]>([])
   const [expenseSide, setExpenseSide] = useState<ExpenseSideFilter>("all")
-  const [includeDrafts, setIncludeDrafts] = useState(false)
+  const [draftMode, setDraftMode] = useState<"submitted" | "all" | "draft_only">("submitted")
+  const [restrictTransitToCompany, setRestrictTransitToCompany] = useState(false)
+  const [expandAccountColumns, setExpandAccountColumns] = useState(false)
   const [groupBy, setGroupBy] = useState<string>("default")
   const [invoiceLayout, setInvoiceLayout] = useState<string>("merged")
   const [hasLoadedData, setHasLoadedData] = useState(false)
@@ -759,13 +929,58 @@ export default function ImportExportExpense() {
   const displayCompanies = permissionAwareCompanies.length > 0 ? permissionAwareCompanies : allCompanies
 
   const { data, isLoading, error: fetchError } = useImportExportExpense({
-    company, items: selectedItems, fromDate, toDate, currency,
-    groupBy, companyGroup, expenseSide, includeDrafts, enabled: hasLoadedData,
+    company,
+    items: selectedItems,
+    fromDate,
+    toDate,
+    currency,
+    groupBy,
+    companyGroup,
+    expenseSide,
+    draftMode,
+    restrictTransitToCompany,
+    enabled: hasLoadedData,
   })
 
   const entries = useMemo(() => data?.entries ?? [], [data])
   const totals = data?.totals ?? ({} as ImportExportTotals)
   const journeyBreakdowns = data?.journey_breakdowns ?? {}
+
+  const importAccountKeys = useMemo(
+    () => collectAccountKeysFromBreakdowns(journeyBreakdowns, "import"),
+    [journeyBreakdowns],
+  )
+  const exportAccountKeys = useMemo(
+    () => collectAccountKeysFromBreakdowns(journeyBreakdowns, "export"),
+    [journeyBreakdowns],
+  )
+
+  const footerImportByAcct = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const jb of Object.values(journeyBreakdowns)) {
+      const mm = amountMapFromLines(jb.import_distribution_lines)
+      for (const [k, v] of mm) m.set(k, (m.get(k) ?? 0) + v)
+    }
+    return m
+  }, [journeyBreakdowns])
+
+  const footerExportByAcct = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const jb of Object.values(journeyBreakdowns)) {
+      const mm = amountMapFromLines(jb.export_distribution_lines)
+      for (const [k, v] of mm) m.set(k, (m.get(k) ?? 0) + v)
+    }
+    return m
+  }, [journeyBreakdowns])
+
+  // Number of static cols before dynamic account cols: checkbox, chevron, #, journey, item, source, units, price, total-value, import-cont, export-cont, import-bl, export-bl, destination = 14
+  const STATIC_COL_COUNT = 14
+  const emptyTableColSpan =
+    STATIC_COL_COUNT +
+    (expandAccountColumns
+      ? importAccountKeys.length + 1 + exportAccountKeys.length + 1  // acct cols + subtotal col for each group
+      : 2) + // import charges + export charges
+    1 // grand total
 
   const isConverting = currency !== "all"
   const grandTotCc = entries[0]?.company_currency ?? "USD"
@@ -819,7 +1034,6 @@ export default function ImportExportExpense() {
 
   const handleColPickerConfirm = useCallback(() => {
     setColPickerOpen(false)
-    // Give React one paint cycle to unmount the modal before opening the print dialog
     setTimeout(() => {
       fireColumnAwarePrint()
     }, 120)
@@ -904,6 +1118,12 @@ export default function ImportExportExpense() {
   const gcConv = (v: number | null | undefined) => fmt(v, grandTotCc)
 
   const TDF = "border border-blue-300 px-2 py-2.5 text-[11px] text-right font-mono font-bold whitespace-nowrap"
+
+  // ── Derived counts for the two-level thead colspan computation ──
+  // Import group spans: account sub-cols + 1 summary col
+  const importGroupSpan = importAccountKeys.length + 1
+  // Export group spans: account sub-cols + 1 summary col
+  const exportGroupSpan = exportAccountKeys.length + 1
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 p-4">
@@ -1075,10 +1295,47 @@ export default function ImportExportExpense() {
                 </Select>
               </div>
 
-              <div className="flex flex-col justify-end gap-2">
-                <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 cursor-pointer">
-                  <input type="checkbox" checked={includeDrafts} onChange={(e) => setIncludeDrafts(e.target.checked)} className="rounded border-blue-300" />
-                  Include draft PI / SI / LCV / SSC
+              <div className="space-y-1.5 xl:col-span-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Draft PI / SI / LCV / SSC</label>
+                <Select value={draftMode} onValueChange={(v) => setDraftMode(v as "submitted" | "all" | "draft_only")}>
+                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm">
+                    <SelectValue placeholder="Submitted only" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-blue-200">
+                    <SelectItem value="submitted">Default — submitted only (no drafts)</SelectItem>
+                    <SelectItem value="all">All — drafts and submitted</SelectItem>
+                    <SelectItem value="draft_only">Draft only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Transit scope</span>
+                <label
+                  className={`flex items-center gap-2 text-xs text-gray-700 cursor-pointer rounded-md border border-transparent px-1 py-1 -mx-1 hover:border-blue-100 hover:bg-blue-50/50 ${!company ? "opacity-50 pointer-events-none" : ""}`}
+                  title={!company ? "Pick a company first" : "Limit transit numbers and expanded invoices to the selected company"}
+                >
+                  <input
+                    type="checkbox"
+                    checked={restrictTransitToCompany}
+                    disabled={!company}
+                    onChange={(e) => setRestrictTransitToCompany(e.target.checked)}
+                    className="rounded border-blue-300 shrink-0"
+                  />
+                  <span className="leading-snug font-medium">Transit &amp; invoices for selected company only</span>
+                </label>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Charge layout</span>
+                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer rounded-md border border-transparent px-1 py-1 -mx-1 hover:border-blue-100 hover:bg-blue-50/50">
+                  <input
+                    type="checkbox"
+                    checked={expandAccountColumns}
+                    onChange={(e) => setExpandAccountColumns(e.target.checked)}
+                    className="rounded border-blue-300 shrink-0"
+                  />
+                  <span className="leading-snug font-medium">Expand import / export charge accounts as columns</span>
                 </label>
               </div>
 
@@ -1155,14 +1412,12 @@ export default function ImportExportExpense() {
                         <Download className="h-3.5 w-3.5" />Export CSV
                       </Button>
 
-                      {/* Print — opens column picker first */}
                       <Button variant="outline" size="sm" onClick={() => openColPicker("print")}
                         className="bg-white/10 border-white/30 text-white hover:bg-white/20 text-xs h-7 gap-1"
                         title="Choose columns, then print">
                         <Printer className="h-3.5 w-3.5" />Print
                       </Button>
 
-                      {/* PDF — opens column picker first */}
                       <Button variant="outline" size="sm" onClick={() => openColPicker("pdf")}
                         className="bg-white/10 border-white/30 text-white hover:bg-white/20 text-xs h-7 gap-1"
                         title="Choose columns, then save as PDF">
@@ -1191,6 +1446,51 @@ export default function ImportExportExpense() {
                 <div className="overflow-x-auto">
                   <table className={`w-full border-collapse ${printSubsetActive ? "ie-print-rows-filtered" : ""}`}>
                     <thead className="sticky top-0 z-10">
+
+                      {/* ══ Level 1: Parent group headers (only shown when account columns are expanded) ══ */}
+                      {expandAccountColumns && (importAccountKeys.length > 0 || exportAccountKeys.length > 0) && (
+                        <tr>
+                          {/* Span all static columns: print-checkbox, chevron, #, journey, item, source, units, price, total-value, import-cont, export-cont, import-bl, export-bl, destination */}
+                          <th
+                            colSpan={STATIC_COL_COUNT}
+                            className="border border-blue-200 bg-blue-50/80 ie-print-level1-spacer"
+                            aria-hidden
+                          />
+
+                          {/* Import group header — spans all import account sub-cols + the "Import total" summary col */}
+                          {importAccountKeys.length > 0 && (
+                            <th
+                              colSpan={importGroupSpan}
+                              className="border-2 border-emerald-500 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest text-center py-1.5 px-2"
+                            >
+                              <div className="flex items-center justify-center gap-1.5">
+                                <TrendingDown className="h-3 w-3 shrink-0" />
+                                Import Charges
+                                <span className="text-[9px] font-normal opacity-80">({importAccountKeys.length} account{importAccountKeys.length !== 1 ? "s" : ""})</span>
+                              </div>
+                            </th>
+                          )}
+
+                          {/* Export group header — spans all export account sub-cols + the "Export total" summary col */}
+                          {exportAccountKeys.length > 0 && (
+                            <th
+                              colSpan={exportGroupSpan}
+                              className="border-2 border-red-500 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest text-center py-1.5 px-2"
+                            >
+                              <div className="flex items-center justify-center gap-1.5">
+                                <TrendingUp className="h-3 w-3 shrink-0" />
+                                Export Charges
+                                <span className="text-[9px] font-normal opacity-80">({exportAccountKeys.length} account{exportAccountKeys.length !== 1 ? "s" : ""})</span>
+                              </div>
+                            </th>
+                          )}
+
+                          {/* Total column spacer */}
+                          <th className="border border-blue-200 bg-blue-50/80 ie-print-level1-spacer" aria-hidden />
+                        </tr>
+                      )}
+
+                      {/* ══ Level 2: Actual column headers ══ */}
                       <tr>
                         {/* print-select all — no data-col */}
                         <th className={`${TH} w-9 ie-report-no-print`} title="Select journeys for print / PDF / CSV">
@@ -1219,22 +1519,77 @@ export default function ImportExportExpense() {
                         <th data-col="col-import-bl"       className={TH} style={{ minWidth: 88 }}>Import B/L</th>
                         <th data-col="col-export-bl"       className={TH} style={{ minWidth: 88 }}>Export B/L</th>
                         <th data-col="col-destination"     className={TH} style={{ minWidth: 88 }}>Destination</th>
-                        <th data-col="col-import-charges"  className={TH} style={{ minWidth: 140, background: "#d1fae5", color: "#065f46", fontWeight: 700 }}>
-                          Import Charges
-                          <div className="text-[9px] font-normal opacity-70 mt-0.5">Expand journey for breakdown</div>
-                        </th>
-                        <th data-col="col-export-charges"  className={TH} style={{ minWidth: 140, background: "#fee2e2", color: "#7f1d1d", fontWeight: 700 }}>
-                          Export Charges
-                          <div className="text-[9px] font-normal opacity-70 mt-0.5">SSC items + freight, storage &amp; Doonta</div>
-                        </th>
-                        <th data-col="col-total"           className={TH} style={{ minWidth: 110, background: "#c7d2fe", color: "#1e1b4b", fontWeight: 700 }}>Total</th>
+
+                        {/* Dynamic import account sub-columns */}
+                        {expandAccountColumns && importAccountKeys.map((k) => (
+                          <th
+                            key={`him-${k}`}
+                            className={`${TH_ACCT} ie-dyn-acct-col bg-emerald-50 text-emerald-900 border-emerald-300`}
+                            style={{ minWidth: 72, maxWidth: 110, width: 90, verticalAlign: "top" }}
+                            title={k}
+                          >
+                            {acctHeaderLabel(k)}
+                          </th>
+                        ))}
+
+                        {/* Import total summary column (rightmost of the import group) */}
+                        {expandAccountColumns && importAccountKeys.length > 0 && (
+                          <th
+                            data-col="col-import-charges"
+                            className={TH}
+                            style={{ minWidth: 100, background: "#bbf7d0", color: "#065f46", fontWeight: 700, borderLeft: "2px solid #16a34a" }}
+                          >
+                            Total
+                            <div className="text-[9px] font-normal opacity-70 mt-0.5">Import</div>
+                          </th>
+                        )}
+
+                        {/* Dynamic export account sub-columns */}
+                        {expandAccountColumns && exportAccountKeys.map((k) => (
+                          <th
+                            key={`hex-${k}`}
+                            className={`${TH_ACCT} ie-dyn-acct-col bg-red-50 text-red-900 border-red-300`}
+                            style={{ minWidth: 72, maxWidth: 110, width: 90, verticalAlign: "top" }}
+                            title={k}
+                          >
+                            {acctHeaderLabel(k)}
+                          </th>
+                        ))}
+
+                        {/* Export total summary column (rightmost of the export group) */}
+                        {expandAccountColumns && exportAccountKeys.length > 0 && (
+                          <th
+                            data-col="col-export-charges"
+                            className={TH}
+                            style={{ minWidth: 100, background: "#fecaca", color: "#7f1d1d", fontWeight: 700, borderLeft: "2px solid #dc2626" }}
+                          >
+                            Total
+                            <div className="text-[9px] font-normal opacity-70 mt-0.5">Export</div>
+                          </th>
+                        )}
+
+                        {/* Non-expanded mode: regular import/export charge headers */}
+                        {!expandAccountColumns && (
+                          <>
+                            <th data-col="col-import-charges" className={TH} style={{ minWidth: 140, background: "#d1fae5", color: "#065f46", fontWeight: 700 }}>
+                              Import Charges
+                              <div className="text-[9px] font-normal opacity-70 mt-0.5">Expand journey for breakdown</div>
+                            </th>
+                            <th data-col="col-export-charges" className={TH} style={{ minWidth: 140, background: "#fee2e2", color: "#7f1d1d", fontWeight: 700 }}>
+                              Export Charges
+                              <div className="text-[9px] font-normal opacity-70 mt-0.5">SSC items + freight, storage &amp; Doonta</div>
+                            </th>
+                          </>
+                        )}
+
+                        <th data-col="col-total" className={TH} style={{ minWidth: 110, background: "#c7d2fe", color: "#1e1b4b", fontWeight: 700 }}>Total</th>
                       </tr>
                     </thead>
 
                     <tbody>
                       {groups.length === 0 ? (
                         <tr>
-                          <td colSpan={17} className="text-center text-gray-500 py-14 border border-gray-200 text-sm">
+                          <td colSpan={emptyTableColSpan} className="text-center text-gray-500 py-14 border border-gray-200 text-sm">
                             No data found. Ensure Purchase Invoices and Sales Invoices have <strong>Is Export Sale</strong> checked.
                           </td>
                         </tr>
@@ -1264,6 +1619,9 @@ export default function ImportExportExpense() {
                                 return n
                               })
                             }}
+                            expandAccountColumns={expandAccountColumns}
+                            importAccountKeys={importAccountKeys}
+                            exportAccountKeys={exportAccountKeys}
                           />
                         ))
                       )}
@@ -1276,17 +1634,54 @@ export default function ImportExportExpense() {
                           style={{ background: "#1e3a8a" }}
                         >
                           <td
-                            colSpan={14}
+                            colSpan={STATIC_COL_COUNT}
                             className="border border-blue-700 px-4 py-2.5 text-xs font-bold text-white text-right uppercase tracking-widest"
                           >
                             Grand Totals
                           </td>
-                          <td data-col="col-import-charges" className={`${TDF} bg-emerald-50 text-emerald-900 border-emerald-200`}>
-                            {gcConv(totals.total_additional_costs ?? 0)}
-                          </td>
-                          <td data-col="col-export-charges" className={`${TDF} bg-red-50 text-red-900 border-red-200`}>
-                            {gcConv(totals.total_export_expenses ?? 0)}
-                          </td>
+
+                          {expandAccountColumns && (
+                            <>
+                              {importAccountKeys.map((k) => (
+                                <td
+                                  key={`gfim-${k}`}
+                                  className={`${TDF} ie-dyn-acct-col bg-emerald-950/40 text-emerald-100 border-emerald-800/50`}
+                                  title={k}
+                                >
+                                  {gcConv(footerImportByAcct.get(k))}
+                                </td>
+                              ))}
+                              <td data-col="col-import-charges" className={`${TDF} bg-emerald-50 text-emerald-900 border-emerald-200`}
+                                style={{ borderLeft: "2px solid #16a34a" }}>
+                                {gcConv(totals.total_additional_costs ?? 0)}
+                              </td>
+                              {exportAccountKeys.map((k) => (
+                                <td
+                                  key={`gfex-${k}`}
+                                  className={`${TDF} ie-dyn-acct-col bg-red-950/40 text-red-100 border-red-800/50`}
+                                  title={k}
+                                >
+                                  {gcConv(footerExportByAcct.get(k))}
+                                </td>
+                              ))}
+                              <td data-col="col-export-charges" className={`${TDF} bg-red-50 text-red-900 border-red-200`}
+                                style={{ borderLeft: "2px solid #dc2626" }}>
+                                {gcConv(totals.total_export_expenses ?? 0)}
+                              </td>
+                            </>
+                          )}
+
+                          {!expandAccountColumns && (
+                            <>
+                              <td data-col="col-import-charges" className={`${TDF} bg-emerald-50 text-emerald-900 border-emerald-200`}>
+                                {gcConv(totals.total_additional_costs ?? 0)}
+                              </td>
+                              <td data-col="col-export-charges" className={`${TDF} bg-red-50 text-red-900 border-red-200`}>
+                                {gcConv(totals.total_export_expenses ?? 0)}
+                              </td>
+                            </>
+                          )}
+
                           <td data-col="col-total" className={`${TDF} bg-blue-200 text-blue-950 border-blue-400 text-sm`}>
                             {gcConv(totals.grand_total ?? 0)}
                           </td>
