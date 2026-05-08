@@ -112,6 +112,48 @@ def _filter_pi_si_by_company(pi_names, si_names, company_filter):
     return out_pi, out_si
 
 
+def _filter_pi_si_by_docstatus(pi_names, si_names, draft_mode):
+    dm = (draft_mode or "submitted").strip().lower()
+    if dm == "all":
+        return list(pi_names or []), list(si_names or [])
+
+    target_status = 0 if dm == "draft_only" else 1
+    pi_names = list(pi_names or [])
+    si_names = list(si_names or [])
+    out_pi, out_si = [], []
+
+    if pi_names:
+        rows = frappe.db.get_list(
+            "Purchase Invoice",
+            filters={"name": ["in", pi_names], "docstatus": target_status},
+            fields=["name"],
+        )
+        out_pi = [r.name for r in rows]
+    
+    if si_names:
+        rows = frappe.db.get_list(
+            "Sales Invoice",
+            filters={"name": ["in", si_names], "docstatus": target_status},
+            fields=["name"],
+        )
+        out_si = [r.name for r in rows]
+        
+    print("Results is ", str(out_si))
+    return out_pi, out_si
+
+
+def _bulk_invoice_docstatus(doctype, names):
+    """Return {invoice_name: docstatus} for PI or SI."""
+    if not names:
+        return {}
+    table = "Purchase Invoice" if doctype == "Purchase Invoice" else "Sales Invoice"
+    rows = frappe.db.sql(
+        f"SELECT name, docstatus FROM `tab{table}` WHERE name IN %(n)s",
+        {"n": list(names)},
+        as_dict=True,
+    )
+    return {r.name: int(r.docstatus or 0) for r in rows}
+
 def _bulk_invoice_companies(doctype, names):
     """Return {invoice_name: company} for PI or SI."""
     if not names:
@@ -147,6 +189,41 @@ def _filter_transit_refs_by_company(refs, company_filter):
     return out
 
 
+def _filter_transit_refs_by_docstatus(refs, draft_mode):
+    """
+    Keep linked transit references aligned with selected draft mode.
+    Prevents submitted linked PI/SI from appearing in Draft Only UI payloads.
+    """
+    dm = (draft_mode or "submitted").strip().lower()
+    if dm == "all" or not refs:
+        return refs
+
+    target_status = 0 if dm == "draft_only" else 1
+    pi_names = [r["name"] for r in refs if r.get("doctype") == "Purchase Invoice"]
+    si_names = [r["name"] for r in refs if r.get("doctype") == "Sales Invoice"]
+    pi_ds = _bulk_invoice_docstatus("Purchase Invoice", pi_names)
+    si_ds = _bulk_invoice_docstatus("Sales Invoice", si_names)
+
+    out = []
+    for r in refs:
+        dt, nm = r.get("doctype"), r.get("name")
+        if dt == "Purchase Invoice":
+            ds = pi_ds.get(nm)
+        elif dt == "Sales Invoice":
+            ds = si_ds.get(nm)
+        else:
+            ds = None
+
+        # For non PI/SI doctypes keep original behavior (do not drop unexpectedly)
+        if ds is None:
+            out.append(r)
+            continue
+
+        if ds == target_status:
+            out.append(r)
+    return out
+
+
 def _empty_import_aggregate(target_currency=None):
     return {
         "item_costs": defaultdict(float),
@@ -171,12 +248,14 @@ def _empty_export_aggregate():
     }
 
 
-def _collect_transit_display(pi_names, si_names, company_filter=None):
-    refs = _collect_transit_invoices_structured(pi_names, si_names, company_filter)
+def _collect_transit_display(pi_names, si_names, company_filter=None, draft_mode="submitted"):
+    refs = _collect_transit_invoices_structured(
+        pi_names, si_names, company_filter, draft_mode=draft_mode,
+    )
     return ", ".join(r["name"] for r in refs)
 
 
-def _collect_transit_invoices_structured(pi_names, si_names, company_filter=None):
+def _collect_transit_invoices_structured(pi_names, si_names, company_filter=None, draft_mode="submitted"):
     """
     Ordered unique linked invoices for Transit No. column (styling + ERPNext links).
     When Transit Numbers child rows exist, use their document_type + transit_no.
@@ -245,6 +324,7 @@ def _collect_transit_invoices_structured(pi_names, si_names, company_filter=None
             for n in pi_list:
                 out.append({"doctype": "Purchase Invoice", "name": n})
 
+    out = _filter_transit_refs_by_docstatus(out, draft_mode)
     return out
 
 
@@ -291,7 +371,7 @@ def _get_transit_neighbors_bulk(nodes):
     for r in rev_rows:
         # find which node(s) have this transit_no as their name
         for dt, n in nodes:
-            if n == r.transit_no:
+            if n == r.transit_no and r.document_type == dt:
                 neighbors[(dt, n)].add((r.parenttype, r.parent))
 
     return neighbors
@@ -314,6 +394,30 @@ def _get_journey_component(start_doctype, start_name):
                     next_frontier.append(nb)
         frontier = list(set(next_frontier) - visited)
 
+    return frozenset(visited)
+
+
+def _get_journey_component_seed_only(start_node, allowed_nodes):
+    """
+    BFS constrained to an allowed node set.
+    Used for strict draft/submitted modes so journeys don't merge through
+    opposite-status bridge invoices in Transit Numbers.
+    """
+    allowed = set(allowed_nodes or [])
+    if start_node not in allowed:
+        return frozenset()
+
+    visited = set()
+    frontier = [start_node]
+    while frontier:
+        neighbor_map = _get_transit_neighbors_bulk(frontier)
+        visited.update(frontier)
+        next_frontier = []
+        for node in frontier:
+            for nb in neighbor_map.get(node, set()):
+                if nb in allowed and nb not in visited:
+                    next_frontier.append(nb)
+        frontier = list(set(next_frontier) - visited)
     return frozenset(visited)
 
 
@@ -416,10 +520,23 @@ def _build_journey_map(from_date, to_date, company_filter, company_group_filter=
         if (doctype, name) in visited_nodes:
             continue
 
-        component = _get_journey_component(doctype, name)
+        # In strict status modes, keep journey traversal inside the filtered seed set
+        # so draft-only/submitted-only journeys don't merge through opposite-status links.
+        if (draft_mode or "submitted").strip().lower() == "all":
+            component = _get_journey_component(doctype, name)
+        else:
+            component = _get_journey_component_seed_only((doctype, name), seed_nodes)
+            if not component:
+                continue
 
         if component not in seen_components:
-            first_dt, first_name = sorted(component)[0]
+            # Anchor journey id/display to filtered seed nodes (draft/submitted mode aware),
+            # not arbitrary neighbors from the full transit graph.
+            component_seeds = sorted([node for node in component if node in seed_nodes])
+            if component_seeds:
+                first_dt, first_name = component_seeds[0]
+            else:
+                first_dt, first_name = sorted(component)[0]
             jid = f"{first_dt}|{first_name}"
             seen_components[component] = jid
             journey_display[jid] = first_name
@@ -1220,6 +1337,7 @@ def _export_expenses_native_company_currency(
 
 def _build_journey_rows(
     journey_id, display_name, pi_names, si_names,
+    journey_doctype, journey_invoice,
     import_data,        # dict with keys: item_costs, item_names, distribution_lines, total_charges, company_currency, lcv_names, posting_dates
     export_data,        # dict with keys: item_costs, item_names, distribution_lines, total_charges, currency, ssc_names, posting_dates
     all_item_names,
@@ -1258,6 +1376,7 @@ def _build_journey_rows(
             "posting_dates": list                       # dates for display
         }
     """
+    print("SI yangu ni", str(si_names))
     def _cc(amount, from_currency):
         """Convert amount from from_currency to display_currency if needed."""
         if not display_currency or not amount or from_currency == display_currency:
@@ -1310,17 +1429,22 @@ def _build_journey_rows(
     
     # If no items but there are charges (e.g., only freight/storage without items)
     if not specs and (total_import_charges > 0 or total_export_charges > 0):
+        has_transit_ref = bool((transit_no or "").strip())
+        if not has_transit_ref:
+            return rows
         imp_part = _cc(total_import_charges, company_currency) if total_import_charges > 0 else None
         exp_part = _cc(total_export_charges, export_currency) if total_export_charges > 0 else None
         total_disp = flt(flt(imp_part or 0, 2) + flt(exp_part or 0, 2), 2)
 
         rows.append({
             "journey_id":            journey_id,
+            "journey_doctype":       journey_doctype,
+            "journey_invoice":       journey_invoice,
             "transit_display":       display_name,
             "transit_no":            transit_no,
             "entry_row_key":         "_other_charges",
-            "item_code":             "",
-            "item_name":             "",
+            "item_code":             "OTHER_CHARGES",
+            "item_name":             "OTHER_CHARGES",
             "description":           _("Other Charges (Freight, Storage, Handling, etc.)"),
             "stock_uom":             None,
             "units":                 None,
@@ -1348,8 +1472,7 @@ def _build_journey_rows(
         return rows
     
     # Normal case: process each item
-    for idx, spec in enumerate(specs):
-        is_first = idx == 0
+    for spec in specs:
         item_code = spec["item_code"]
         entry_key = spec["entry_row_key"]
         
@@ -1372,9 +1495,21 @@ def _build_journey_rows(
         desc = all_item_names.get(item_code) or spec.get("description") or item_code
         if spec.get("stock_uom"):
             desc = f"{desc} ({spec['stock_uom']})"
+        if not (item_code or "").strip():
+            # Prevent emitting visually blank lines in UI grids.
+            item_code = "OTHER_CHARGES"
+            desc = desc or _("Other Charges")
+            entry_key = entry_key or "_other_charges"
+
+        sales_invoice_ref = (si_meta.get("si_invoice") or "").strip()
+        transit_ref = (transit_no or "").strip()
+        if not sales_invoice_ref and not transit_ref:
+            continue
         
         rows.append({
             "journey_id":            journey_id,
+            "journey_doctype":       journey_doctype,
+            "journey_invoice":       journey_invoice,
             "transit_display":       display_name,
             "transit_no":            transit_no,
             "entry_row_key":         entry_key,
@@ -1402,9 +1537,9 @@ def _build_journey_rows(
             "company_currency":      eff_cc,
             "export_currency":       eff_usd,
             "source":                source,
-            "sales_invoice":         si_meta.get("si_invoice"),
+            "sales_invoice":         sales_invoice_ref or None,
         })
-    
+    print("rows up are", str(rows))
     return rows
 
 
@@ -1482,6 +1617,9 @@ def get_import_export_expense_report(filters=None):
             display_name = journey_display.get(journey_id, journey_id.replace("|", " "))
 
             all_pi_names, all_si_names = _expand_journey_invoices(pi_seed, si_seed)
+            all_pi_names, all_si_names = _filter_pi_si_by_docstatus(
+                all_pi_names, all_si_names, draft_mode,
+            )
             transit_company_arg = (
                 company_filter if (company_filter and restrict_transit_to_company) else None
             )
@@ -1554,8 +1692,12 @@ def get_import_export_expense_report(filters=None):
                     all_item_names.update(_bulk_item_names(unknown_codes))
 
                 all_dates    = import_dates + export_dates
-                transit_no   = _collect_transit_display(slice_pi, slice_si, transit_company_arg)
-                transit_docs = _collect_transit_invoices_structured(slice_pi, slice_si, transit_company_arg)
+                transit_no   = _collect_transit_display(
+                    slice_pi, slice_si, transit_company_arg, draft_mode=draft_mode,
+                )
+                transit_docs = _collect_transit_invoices_structured(
+                    slice_pi, slice_si, transit_company_arg, draft_mode=draft_mode,
+                )
 
                 imp_lines_conv = _convert_distribution_lines(
                     _distribution_lines_for_api(import_data.get("distribution_lines", [])),
@@ -1572,21 +1714,13 @@ def get_import_export_expense_report(filters=None):
 
                 sum_imp_all = flt(import_data.get("total_charges", 0), 2)
                 sum_exp_all = flt(export_data.get("total_charges", 0), 2)
-
-                journeys_meta[sub_jid] = {
-                    "transit_invoices":          transit_docs,
-                    "import_item_charges_total": _cv_amt(sum_imp_all, company_currency),
-                    "import_distribution_lines": imp_lines_conv,
-                    "export_item_charges_total": _cv_amt(sum_exp_all, "USD"),
-                    "export_distribution_lines": exp_lines_conv,
-                    "container_bucket":          sl["label_suffix"] or None,
-                }
-
                 journey_rows = _build_journey_rows(
                     journey_id=sub_jid,
                     display_name=slice_display,
                     pi_names=slice_pi,
                     si_names=slice_si,
+                    journey_doctype=(journey_id.split("|", 1)[0] if "|" in journey_id else None),
+                    journey_invoice=(journey_id.split("|", 1)[1] if "|" in journey_id else journey_id),
                     import_data=import_data,
                     export_data=export_data,
                     all_item_names=all_item_names,
@@ -1605,6 +1739,18 @@ def get_import_export_expense_report(filters=None):
                     split_by_uom=split_by_uom,
                     expense_side=expense_side,
                 )
+                # Skip empty journeys entirely (no rows -> no journey shown in UI).
+                if not journey_rows:
+                    continue
+
+                journeys_meta[sub_jid] = {
+                    "transit_invoices":          transit_docs,
+                    "import_item_charges_total": _cv_amt(sum_imp_all, company_currency),
+                    "import_distribution_lines": imp_lines_conv,
+                    "export_item_charges_total": _cv_amt(sum_exp_all, "USD"),
+                    "export_distribution_lines": exp_lines_conv,
+                    "container_bucket":          sl["label_suffix"] or None,
+                }
 
                 for row in journey_rows:
                     totals["total_additional_costs"] += row.get("additional_costs") or 0
@@ -1612,7 +1758,7 @@ def get_import_export_expense_report(filters=None):
                     totals["grand_total"] += row.get("total") or 0
 
                 entries.extend(journey_rows)
-
+        print("Entries are", str(journeys_meta))
         return {
             "success":          True,
             "entries":          entries,
