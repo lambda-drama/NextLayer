@@ -25,6 +25,8 @@ export interface JourneyBreakdown {
 // ─── Entry row (one per journey × item line) ─────────────────────────────────
 export interface ImportExportEntry {
   journey_id: string
+  journey_doctype?: string | null
+  journey_invoice?: string | null
   transit_display: string
   transit_no: string // comma-joined legacy label
   entry_row_key?: string

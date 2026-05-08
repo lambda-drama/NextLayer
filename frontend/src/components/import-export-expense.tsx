@@ -420,6 +420,8 @@ function ChargeStack({
 
 interface JourneyGroup {
   journeyId: string
+  journeyDoctype: string | null
+  journeyInvoice: string | null
   transitNo: string
   displayName: string
   importContainer: string
@@ -443,6 +445,8 @@ function groupByJourney(entries: ImportExportEntry[]): JourneyGroup[] {
     if (!map.has(jid)) {
       map.set(jid, {
         journeyId: jid,
+        journeyDoctype: row.journey_doctype || null,
+        journeyInvoice: row.journey_invoice || null,
         transitNo: row.transit_no || "—",
         displayName: row.transit_display || jid,
         importContainer: row.import_container || "—",
@@ -575,7 +579,20 @@ function JourneyRow({
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <Receipt className="h-3.5 w-3.5 shrink-0 opacity-60" />
-              <span>{group.displayName}</span>
+              {group.journeyDoctype && group.journeyInvoice ? (
+                <a
+                  href={deskDocUrl(group.journeyDoctype, group.journeyInvoice)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="underline decoration-dotted underline-offset-2 hover:opacity-85"
+                  title={`Open ${group.journeyDoctype} ${group.journeyInvoice} in ERPNext`}
+                >
+                  {group.displayName}
+                </a>
+              ) : (
+                <span>{group.displayName}</span>
+              )}
             </div>
             {transitRefs.length > 0
               ? <TransitInvoiceLinks refs={transitRefs} />
