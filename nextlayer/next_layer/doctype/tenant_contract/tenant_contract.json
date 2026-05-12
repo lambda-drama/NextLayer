@@ -87,7 +87,9 @@
   "guarantors",
   "proceed_without_guarantors",
   "additional_tenants_tab",
-  "additional_tenants"
+  "additional_tenants",
+  "more_info_tab",
+  "bypass_digital_signature"
  ],
  "fields": [
   {
@@ -546,6 +548,18 @@
    "fieldname": "proceed_without_guarantors",
    "fieldtype": "Check",
    "label": "Proceed Without Guarantors"
+  },
+  {
+   "fieldname": "more_info_tab",
+   "fieldtype": "Tab Break",
+   "label": "More Info"
+  },
+  {
+   "default": "0",
+   "fieldname": "bypass_digital_signature",
+   "fieldtype": "Check",
+   "label": "Bypass Digital Signature",
+   "permlevel": 1
   }
  ],
  "grid_page_length": 50,
@@ -557,7 +571,7 @@
    "link_fieldname": "custom_tenant_contract"
   }
  ],
- "modified": "2026-04-29 21:32:44.585978",
+ "modified": "2026-05-12 23:25:02.831500",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",
