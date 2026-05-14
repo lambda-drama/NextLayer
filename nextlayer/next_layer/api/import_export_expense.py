@@ -129,7 +129,7 @@
 #             fields=["name"],
 #         )
 #         out_pi = [r.name for r in rows]
-    
+
 #     if si_names:
 #         rows = frappe.db.get_list(
 #             "Sales Invoice",
@@ -137,7 +137,7 @@
 #             fields=["name"],
 #         )
 #         out_si = [r.name for r in rows]
-        
+
 #     print("Results is ", str(out_si))
 #     return out_pi, out_si
 
@@ -723,7 +723,7 @@
 # #     lcv_names = [r.lcv_name for r in lcv_rows]
 # #     company_currency = _get_company_currency(lcv_rows[0].lcv_company) if lcv_rows else "USD"
 # #     posting_dates = [str(r.posting_date or "") for r in lcv_rows]
-    
+
 # #     # Sum the total_taxes_and_charges from all LCVs (this is the TRUE total)
 # #     total_charges_sum = sum([flt(r.total_taxes_and_charges, 2) for r in lcv_rows])
 
@@ -735,7 +735,7 @@
 # #             FROM `tabLanded Cost Taxes and Charges`
 # #             WHERE parent IN %(lcv_names)s
 # #         """, {"lcv_names": lcv_names}, as_dict=True)
-        
+
 # #         for t in tax_rows:
 # #             amt = flt(t.base_amount, 2)
 # #             distribution_lines.append({
@@ -834,18 +834,18 @@
 
 #     lcv_names = [r.lcv_name for r in lcv_rows]
 #     posting_dates = [str(r.posting_date or "") for r in lcv_rows]
-    
+
 #     # If no target currency provided, use first LCV's company currency as fallback
 #     if not target_currency:
 #         target_currency = _get_company_currency(lcv_rows[0].lcv_company) if lcv_rows else "USD"
-    
+
 #     # Convert and sum total_taxes_and_charges from all LCVs to target_currency
 #     total_charges_sum = 0.0
-    
+
 #     for r in lcv_rows:
 #         lcv_company_currency = _get_company_currency(r.lcv_company)
 #         amt_in_lcv_currency = flt(r.total_taxes_and_charges, 2)
-        
+
 #         # Convert to target currency if different
 #         if lcv_company_currency != target_currency:
 #             try:
@@ -868,10 +868,10 @@
 #     distribution_lines = []
 #     if frappe.db.table_exists("Landed Cost Taxes and Charges"):
 #         tax_rows = frappe.db.sql("""
-#             SELECT 
+#             SELECT
 #                 lctc.parent AS lcv_name,
-#                 lctc.expense_account, 
-#                 lctc.description, 
+#                 lctc.expense_account,
+#                 lctc.description,
 #                 lctc.base_amount,        -- Already in company currency of the LCV
 #                 lctc.amount,             -- Original amount in account_currency
 #                 lctc.account_currency,
@@ -880,12 +880,12 @@
 #             INNER JOIN `tabLanded Cost Voucher` lcv ON lcv.name = lctc.parent
 #             WHERE lctc.parent IN %(lcv_names)s
 #         """, {"lcv_names": lcv_names}, as_dict=True)
-        
+
 #         for t in tax_rows:
 #             # Get the company currency for this specific LCV
 #             lcv_company_currency = _get_company_currency(t.lcv_company)
 #             amt_in_lcv_currency = flt(t.base_amount, 2)
-            
+
 #             # Convert to target currency if needed
 #             if lcv_company_currency != target_currency:
 #                 try:
@@ -898,12 +898,12 @@
 #                     amt_converted = amt_in_lcv_currency
 #             else:
 #                 amt_converted = amt_in_lcv_currency
-            
+
 #             # Build label with original currency context for transparency
 #             original_info = ""
 #             if t.account_currency and t.account_currency != lcv_company_currency:
 #                 original_info = f" (Original: {flt(t.amount, 2)} {t.account_currency})"
-            
+
 #             distribution_lines.append({
 #                 "expense_account": t.expense_account or "",
 #                 "description": f"{t.description or ''}{original_info}",
@@ -917,8 +917,8 @@
 #     # Step 3: Get item-level charges and convert to target_currency
 #     item_frag, item_bind = _sql_in_clause_single("lci.item_code", item_codes)
 #     item_rows = frappe.db.sql(f"""
-#         SELECT 
-#             lci.item_code, 
+#         SELECT
+#             lci.item_code,
 #             lci.applicable_charges,
 #             lci.description,
 #             lcv.company AS lcv_company,
@@ -936,7 +936,7 @@
 #         ic = r.item_code
 #         lcv_company_currency = _get_company_currency(r.lcv_company)
 #         amt_in_lcv_currency = flt(r.applicable_charges, 2)
-        
+
 #         # Convert to target currency if needed
 #         if lcv_company_currency != target_currency:
 #             try:
@@ -949,7 +949,7 @@
 #                 amt_converted = amt_in_lcv_currency
 #         else:
 #             amt_converted = amt_in_lcv_currency
-            
+
 #         item_costs[ic] += amt_converted
 #         if ic not in item_names:
 #             item_names[ic] = r.description or ic
@@ -963,7 +963,7 @@
 #         "target_currency": target_currency,
 #         "lcv_names": lcv_names,
 #     }
-    
+
 
 
 # def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, draft_mode="submitted"):
@@ -985,8 +985,8 @@
 
 #     # Step 1: find matching SSCs and get their total_amount
 #     ssc_rows = frappe.db.sql(f"""
-#         SELECT DISTINCT 
-#             ssc.name AS ssc_name, 
+#         SELECT DISTINCT
+#             ssc.name AS ssc_name,
 #             ssc.posting_date,
 #             ssc.total_taxes_and_charges AS total_amount
 #         FROM `tabSales Shipment Cost` ssc
@@ -1009,7 +1009,7 @@
 #             "currency": "USD",
 #             "ssc_names": [],
 #         }
-    
+
 #     ssc_names = [r.ssc_name for r in ssc_rows]
 #     posting_dates = [str(r.posting_date or "") for r in ssc_rows]
 #     # Use total_amount from the SSC document (this is the TRUE total)
@@ -1018,21 +1018,21 @@
 
 #     # Step 2: Get ALL distribution lines for display in ChargeStack (no keyword filtering)
 #     distribution_lines = []
-    
+
 #     # Check both possible table names (different ERPNext versions might use different names)
 #     tax_table = None
 #     if frappe.db.table_exists("Sales Landed Cost Taxes and Charges"):
 #         tax_table = "Sales Landed Cost Taxes and Charges"
 #     elif frappe.db.table_exists("Shipment Cost Distribution"):
 #         tax_table = "Shipment Cost Distribution"
-    
+
 #     if tax_table:
 #         tax_rows = frappe.db.sql(f"""
 #             SELECT expense_account, description, amount
 #             FROM `tab{tax_table}`
 #             WHERE parent IN %(ssc_names)s
 #         """, {"ssc_names": ssc_names}, as_dict=True)
-        
+
 #         for t in tax_rows:
 #             amt = flt(t.amount, 2)
 #             distribution_lines.append({
@@ -1355,7 +1355,7 @@
 # ):
 #     """
 #     Build journey rows with complete expense account distribution.
-    
+
 #     Args:
 #         import_data: {
 #             "item_costs": defaultdict(float),           # per-item charges
@@ -1390,19 +1390,19 @@
 #     # Extract from the data dicts
 #     import_item_costs = import_data.get("item_costs", {})
 #     export_item_costs = export_data.get("item_costs", {})
-    
+
 #     # Get distribution lines for ChargeStack component
 #     import_distribution_lines = import_data.get("distribution_lines", [])
 #     export_distribution_lines = export_data.get("distribution_lines", [])
-    
+
 #     # Get totals (sum of ALL charges including distribution lines)
 #     total_import_charges = import_data.get("total_charges", 0.0)  # This already includes distribution + item charges
 #     total_export_charges = export_data.get("total_charges", 0.0)  # This already includes distribution + item charges
-    
+
 #     # Get document names for linking
 #     lcv_names = import_data.get("lcv_names", [])
 #     ssc_names = export_data.get("ssc_names", [])
-    
+
 #     # Determine source type (respect expense-side filter for UI badges)
 #     es = (expense_side or "all").lower()
 #     if es == "purchase":
@@ -1415,18 +1415,18 @@
 #             "import" if pi_names else
 #             "export"
 #         )
-    
+
 #     date_str = _fmt_dates(posting_dates)
 #     conv_date = conversion_date or frappe.utils.nowdate()
-    
+
 #     # Effective display currencies
 #     eff_cc  = display_currency or company_currency
 #     eff_usd = display_currency or export_currency
-    
+
 #     # Build per-item/spec rows
 #     rows = []
 #     specs = list(_iter_row_specs(import_item_costs, export_item_costs, si_item_data, split_by_uom))
-    
+
 #     # If no items but there are charges (e.g., only freight/storage without items)
 #     if not specs and (total_import_charges > 0 or total_export_charges > 0):
 #         has_transit_ref = bool((transit_no or "").strip())
@@ -1470,27 +1470,27 @@
 #             "sales_invoice":         None,
 #         })
 #         return rows
-    
+
 #     # Normal case: process each item
 #     for spec in specs:
 #         item_code = spec["item_code"]
 #         entry_key = spec["entry_row_key"]
-        
+
 #         # Get charges (now includes ALL allocated charges, not just item-level)
 #         import_charges = flt(spec.get("add_costs", 0), 2)
 #         export_charges = flt(spec.get("exp_charges", 0), 2)
-        
+
 #         # Convert to display currency
 #         import_disp = _cc(import_charges, company_currency) if import_charges > 0 else None
 #         export_disp = _cc(export_charges, export_currency) if export_charges > 0 else None
-        
+
 #         # Get SI metadata
 #         si_meta = spec.get("si_meta", {})
 #         transaction_currency = si_meta.get("transaction_currency") or company_currency
 #         eff_tx = display_currency or transaction_currency
-        
+
 #         total_disp = flt(flt(import_disp or 0, 2) + flt(export_disp or 0, 2), 2)
-        
+
 #         # Build description
 #         desc = all_item_names.get(item_code) or spec.get("description") or item_code
 #         if spec.get("stock_uom"):
@@ -1505,7 +1505,7 @@
 #         transit_ref = (transit_no or "").strip()
 #         if not sales_invoice_ref and not transit_ref:
 #             continue
-        
+
 #         rows.append({
 #             "journey_id":            journey_id,
 #             "journey_doctype":       journey_doctype,
@@ -1671,7 +1671,7 @@
 #                 import_item_names = import_data["item_names"]
 #                 import_dates = import_data["posting_dates"]
 #                 lcv_currency = import_data.get("target_currency") or display_currency
-                
+
 #                 export_costs = export_data["item_costs"]
 #                 export_item_names = export_data["item_names"]
 #                 export_dates = export_data["posting_dates"]
@@ -1990,7 +1990,7 @@ def _filter_pi_si_by_docstatus(pi_names, si_names, draft_mode):
             fields=["name"],
         )
         out_pi = [r.name for r in rows]
-    
+
     if si_names:
         rows = frappe.db.get_list(
             "Sales Invoice",
@@ -1998,7 +1998,7 @@ def _filter_pi_si_by_docstatus(pi_names, si_names, draft_mode):
             fields=["name"],
         )
         out_si = [r.name for r in rows]
-        
+
     print("Results is ", str(out_si))
     return out_pi, out_si
 
@@ -2574,7 +2574,7 @@ def _bulk_item_names(item_codes):
 #     lcv_names = [r.lcv_name for r in lcv_rows]
 #     company_currency = _get_company_currency(lcv_rows[0].lcv_company) if lcv_rows else "USD"
 #     posting_dates = [str(r.posting_date or "") for r in lcv_rows]
-    
+
 #     # Sum the total_taxes_and_charges from all LCVs (this is the TRUE total)
 #     total_charges_sum = sum([flt(r.total_taxes_and_charges, 2) for r in lcv_rows])
 
@@ -2586,7 +2586,7 @@ def _bulk_item_names(item_codes):
 #             FROM `tabLanded Cost Taxes and Charges`
 #             WHERE parent IN %(lcv_names)s
 #         """, {"lcv_names": lcv_names}, as_dict=True)
-        
+
 #         for t in tax_rows:
 #             amt = flt(t.base_amount, 2)
 #             distribution_lines.append({
@@ -2685,18 +2685,18 @@ def _aggregate_import_costs_bulk(
 
     lcv_names = [r.lcv_name for r in lcv_rows]
     posting_dates = [str(r.posting_date or "") for r in lcv_rows]
-    
+
     # If no target currency provided, use first LCV's company currency as fallback
     if not target_currency:
         target_currency = _get_company_currency(lcv_rows[0].lcv_company) if lcv_rows else "USD"
-    
+
     # Convert and sum total_taxes_and_charges from all LCVs to target_currency
     total_charges_sum = 0.0
-    
+
     for r in lcv_rows:
         lcv_company_currency = _get_company_currency(r.lcv_company)
         amt_in_lcv_currency = flt(r.total_taxes_and_charges, 2)
-        
+
         # Convert to target currency if different
         if lcv_company_currency != target_currency:
             try:
@@ -2719,10 +2719,10 @@ def _aggregate_import_costs_bulk(
     distribution_lines = []
     if frappe.db.table_exists("Landed Cost Taxes and Charges"):
         tax_rows = frappe.db.sql("""
-            SELECT 
+            SELECT
                 lctc.parent AS lcv_name,
-                lctc.expense_account, 
-                lctc.description, 
+                lctc.expense_account,
+                lctc.description,
                 lctc.base_amount,        -- Already in company currency of the LCV
                 lctc.amount,             -- Original amount in account_currency
                 lctc.account_currency,
@@ -2731,12 +2731,12 @@ def _aggregate_import_costs_bulk(
             INNER JOIN `tabLanded Cost Voucher` lcv ON lcv.name = lctc.parent
             WHERE lctc.parent IN %(lcv_names)s
         """, {"lcv_names": lcv_names}, as_dict=True)
-        
+
         for t in tax_rows:
             # Get the company currency for this specific LCV
             lcv_company_currency = _get_company_currency(t.lcv_company)
             amt_in_lcv_currency = flt(t.base_amount, 2)
-            
+
             # Convert to target currency if needed
             if lcv_company_currency != target_currency:
                 try:
@@ -2749,12 +2749,12 @@ def _aggregate_import_costs_bulk(
                     amt_converted = amt_in_lcv_currency
             else:
                 amt_converted = amt_in_lcv_currency
-            
+
             # Build label with original currency context for transparency
             original_info = ""
             if t.account_currency and t.account_currency != lcv_company_currency:
                 original_info = f" (Original: {flt(t.amount, 2)} {t.account_currency})"
-            
+
             distribution_lines.append({
                 "expense_account": t.expense_account or "",
                 "description": f"{t.description or ''}{original_info}",
@@ -2768,8 +2768,8 @@ def _aggregate_import_costs_bulk(
     # Step 3: Get item-level charges and convert to target_currency
     item_frag, item_bind = _sql_in_clause_single("lci.item_code", item_codes)
     item_rows = frappe.db.sql(f"""
-        SELECT 
-            lci.item_code, 
+        SELECT
+            lci.item_code,
             lci.applicable_charges,
             lci.description,
             lcv.company AS lcv_company,
@@ -2787,7 +2787,7 @@ def _aggregate_import_costs_bulk(
         ic = r.item_code
         lcv_company_currency = _get_company_currency(r.lcv_company)
         amt_in_lcv_currency = flt(r.applicable_charges, 2)
-        
+
         # Convert to target currency if needed
         if lcv_company_currency != target_currency:
             try:
@@ -2800,7 +2800,7 @@ def _aggregate_import_costs_bulk(
                 amt_converted = amt_in_lcv_currency
         else:
             amt_converted = amt_in_lcv_currency
-            
+
         item_costs[ic] += amt_converted
         if ic not in item_names:
             item_names[ic] = r.description or ic
@@ -2814,7 +2814,7 @@ def _aggregate_import_costs_bulk(
         "target_currency": target_currency,
         "lcv_names": lcv_names,
     }
-    
+
 
 
 def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, draft_mode="submitted"):
@@ -2836,8 +2836,8 @@ def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, draf
 
     # Step 1: find matching SSCs and get their total_amount
     ssc_rows = frappe.db.sql(f"""
-        SELECT DISTINCT 
-            ssc.name AS ssc_name, 
+        SELECT DISTINCT
+            ssc.name AS ssc_name,
             ssc.posting_date,
             ssc.total_taxes_and_charges AS total_amount
         FROM `tabSales Shipment Cost` ssc
@@ -2860,7 +2860,7 @@ def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, draf
             "currency": "USD",
             "ssc_names": [],
         }
-    
+
     ssc_names = [r.ssc_name for r in ssc_rows]
     posting_dates = [str(r.posting_date or "") for r in ssc_rows]
     # Use total_amount from the SSC document (this is the TRUE total)
@@ -2869,21 +2869,21 @@ def _aggregate_export_costs_bulk(si_names, company_filter, item_codes=None, draf
 
     # Step 2: Get ALL distribution lines for display in ChargeStack (no keyword filtering)
     distribution_lines = []
-    
+
     # Check both possible table names (different ERPNext versions might use different names)
     tax_table = None
     if frappe.db.table_exists("Sales Landed Cost Taxes and Charges"):
         tax_table = "Sales Landed Cost Taxes and Charges"
     elif frappe.db.table_exists("Shipment Cost Distribution"):
         tax_table = "Shipment Cost Distribution"
-    
+
     if tax_table:
         tax_rows = frappe.db.sql(f"""
             SELECT expense_account, description, amount
             FROM `tab{tax_table}`
             WHERE parent IN %(ssc_names)s
         """, {"ssc_names": ssc_names}, as_dict=True)
-        
+
         for t in tax_rows:
             amt = flt(t.amount, 2)
             distribution_lines.append({
@@ -3253,7 +3253,7 @@ def _build_journey_rows(
 ):
     """
     Build journey rows with complete expense account distribution.
-    
+
     Args:
         import_data: {
             "item_costs": defaultdict(float),           # per-item charges
@@ -3288,19 +3288,19 @@ def _build_journey_rows(
     # Extract from the data dicts
     import_item_costs = import_data.get("item_costs", {})
     export_item_costs = export_data.get("item_costs", {})
-    
+
     # Get distribution lines for ChargeStack component
     import_distribution_lines = import_data.get("distribution_lines", [])
     export_distribution_lines = export_data.get("distribution_lines", [])
-    
+
     # Get totals (sum of ALL charges including distribution lines)
     total_import_charges = import_data.get("total_charges", 0.0)  # This already includes distribution + item charges
     total_export_charges = export_data.get("total_charges", 0.0)  # This already includes distribution + item charges
-    
+
     # Get document names for linking
     lcv_names = import_data.get("lcv_names", [])
     ssc_names = export_data.get("ssc_names", [])
-    
+
     # Determine source type (respect expense-side filter for UI badges)
     es = (expense_side or "all").lower()
     if es == "purchase":
@@ -3313,18 +3313,18 @@ def _build_journey_rows(
             "import" if pi_names else
             "export"
         )
-    
+
     date_str = _fmt_dates(posting_dates)
     conv_date = conversion_date or frappe.utils.nowdate()
-    
+
     # Effective display currencies
     eff_cc  = display_currency or company_currency
     eff_usd = display_currency or export_currency
-    
+
     # Build per-item/spec rows
     rows = []
     specs = list(_iter_row_specs(import_item_costs, export_item_costs, si_item_data, split_by_uom))
-    
+
     # If no items but there are charges (e.g., only freight/storage without items)
     if not specs and (total_import_charges > 0 or total_export_charges > 0):
         has_transit_ref = bool((transit_no or "").strip())
@@ -3368,27 +3368,27 @@ def _build_journey_rows(
             "sales_invoice":         None,
         })
         return rows
-    
+
     # Normal case: process each item
     for spec in specs:
         item_code = spec["item_code"]
         entry_key = spec["entry_row_key"]
-        
+
         # Get charges (now includes ALL allocated charges, not just item-level)
         import_charges = flt(spec.get("add_costs", 0), 2)
         export_charges = flt(spec.get("exp_charges", 0), 2)
-        
+
         # Convert to display currency
         import_disp = _cc(import_charges, company_currency) if import_charges > 0 else None
         export_disp = _cc(export_charges, export_currency) if export_charges > 0 else None
-        
+
         # Get SI metadata
         si_meta = spec.get("si_meta", {})
         transaction_currency = si_meta.get("transaction_currency") or company_currency
         eff_tx = display_currency or transaction_currency
-        
+
         total_disp = flt(flt(import_disp or 0, 2) + flt(export_disp or 0, 2), 2)
-        
+
         # Build description
         desc = all_item_names.get(item_code) or spec.get("description") or item_code
         if spec.get("stock_uom"):
@@ -3403,7 +3403,7 @@ def _build_journey_rows(
         transit_ref = (transit_no or "").strip()
         if not sales_invoice_ref and not transit_ref:
             continue
-        
+
         rows.append({
             "journey_id":            journey_id,
             "journey_doctype":       journey_doctype,
@@ -3569,7 +3569,7 @@ def get_import_export_expense_report(filters=None):
                 import_item_names = import_data["item_names"]
                 import_dates = import_data["posting_dates"]
                 lcv_currency = import_data.get("target_currency") or display_currency
-                
+
                 export_costs = export_data["item_costs"]
                 export_item_names = export_data["item_names"]
                 export_dates = export_data["posting_dates"]

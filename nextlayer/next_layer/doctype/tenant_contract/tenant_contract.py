@@ -887,17 +887,20 @@ class TenantContract(Document):
 	def validate_signatures_before_submit(self):
 		"""Validate that signatures exist before submission"""
 		if self.docstatus == 1:  # Being submitted
-			if (not self.tenant_sign or self.tenant_signature) and not self.bypass_digital_signature:
-				frappe.throw(
-					"Tenant signature is required before submitting the contract.",
-					title="Missing Signature"
-				)
-				
-			if (not self.property_owner_sign or not self.owner_signature) and not self.bypass_digital_signature:
-				frappe.throw(
-					"Property owner signature is required before submitting the contract.",
-					title="Missing Signature"
-				)
+			has_documents = len(self.document or []) > 0
+
+			if not has_documents and not self.bypass_digital_signature:
+				if not self.tenant_sign or not self.tenant_signature:
+					frappe.throw(
+						"Tenant signature or uploaded document is required before submitting the contract.",
+						title="Missing Signature"
+					)
+
+				if not self.property_owner_sign or not self.owner_signature:
+					frappe.throw(
+						"Property owner signature or uploaded document is required before submitting the contract.",
+						title="Missing Signature"
+					)
 
 
 # ──────────────────────────────────────────
