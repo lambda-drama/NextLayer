@@ -27,9 +27,7 @@ frappe.ui.form.on('Tenant Contract', {
             }, __("Actions"));
 
             frm.add_custom_button(__("Terminate Contract"), () => {
-                frappe.confirm(__("Terminate this contract early?"), () => {
-                    frm.call("terminate_contract").then(() => frm.reload_doc());
-                });
+                show_terminate_modal(frm);
             }, __("Actions"));
         }
 
@@ -83,6 +81,46 @@ frappe.ui.form.on('Tenant Contract', {
         }
     },
 });
+
+// ============================================
+// TERMINATE CONTRACT MODAL
+// ============================================
+
+function show_terminate_modal(frm) {
+    const dialog = new frappe.ui.Dialog({
+        title: __("Terminate Contract"),
+        fields: [
+            {
+                fieldname: "termination_date",
+                fieldtype: "Date",
+                label: __("Termination Date"),
+                reqd: 1,
+                default: frappe.datetime.get_today(),
+            },
+        ],
+        primary_action_label: __("Terminate"),
+        primary_action(values) {
+            if (!values.termination_date) {
+                frappe.msgprint(__("Please enter a termination date."));
+                return;
+            }
+
+            frappe.confirm(
+                __("Terminate this contract with effect from {0}?", [values.termination_date]),
+                () => {
+                    frm.call("terminate_contract", {
+                        termination_date: values.termination_date,
+                    }).then(() => {
+                        dialog.hide();
+                        frm.reload_doc();
+                    });
+                }
+            );
+        },
+    });
+
+    dialog.show();
+}
 
 // ============================================
 // SIMPLE INVOICE MODAL

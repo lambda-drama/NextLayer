@@ -24,13 +24,28 @@ def monthly():
 
 
 def daily():
-	"""Entry-point for Frappe's daily scheduler (placeholder)."""
-	pass
+	"""Entry-point for Frappe's daily scheduler."""
+	_run_expire_tenant_contracts()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Private runners
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _run_expire_tenant_contracts():
+	"""Mark Active tenant contracts as Expired when end_date has passed."""
+	try:
+		from nextlayer.next_layer.doctype.tenant_contract.tenant_contract import (
+			expire_tenant_contracts_by_end_date,
+		)
+		expire_tenant_contracts_by_end_date()
+		frappe.logger().info("PMS: Tenant contract expiry check complete.")
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			"PMS Tenant Contract Expiry – Scheduler Error",
+		)
+
 
 def _run_pms_monthly_invoices():
 	"""

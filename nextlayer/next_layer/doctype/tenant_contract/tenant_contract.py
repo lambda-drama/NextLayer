@@ -60,10 +60,16 @@ class TenantContract(Document):
 		self._update_unit_on_deactivation()
 
 	@frappe.whitelist()
-	def terminate_contract(self):
+	def terminate_contract(self, termination_date=None):
 		if self.status != "Active":
 			frappe.throw("Only active contracts can be terminated.")
-		self.db_set("status", "Terminated")
+		if not termination_date:
+			frappe.throw("Termination date is required.")
+
+		self.db_set({
+			"termination_date": getdate(termination_date),
+			"status": "Terminated",
+		})
 		self._update_unit_on_deactivation()
 
 	# ──────────────────────────────────────────
@@ -906,6 +912,28 @@ class TenantContract(Document):
 # ──────────────────────────────────────────
 #  MODULE-LEVEL HELPERS
 # ──────────────────────────────────────────
+
+def expire_tenant_contracts_by_end_date():
+	"""
+	Daily job: set status to Expired when end_date has passed.
+	Only Active contracts are updated; other statuses are left unchanged.
+	"""
+	today = getdate(nowdate())
+	contracts = frappe.get_all(
+		"Tenant Contract",
+		filters={
+			"docstatus": 1,
+			"status": "Active",
+			"end_date": ["<", today],
+		},
+		fields=["name"],
+	)
+
+	for row in contracts:
+		doc = frappe.get_doc("Tenant Contract", row.name)
+		doc.db_set("status", "Expired")
+		doc._update_unit_on_deactivation()
+
 
 def _get_pms_settings():
 	try:
