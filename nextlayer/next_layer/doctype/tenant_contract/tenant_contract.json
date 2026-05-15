@@ -12,6 +12,7 @@
   "column_break_egej",
   "posting_date",
   "currency",
+  "termination_date",
   "section_break_parties",
   "party_type",
   "party_name",
@@ -560,6 +561,13 @@
    "fieldtype": "Check",
    "label": "Bypass Digital Signature",
    "permlevel": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "termination_date",
+   "fieldtype": "Date",
+   "label": "Termination Date",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -571,7 +579,7 @@
    "link_fieldname": "custom_tenant_contract"
   }
  ],
- "modified": "2026-05-12 23:25:02.831500",
+ "modified": "2026-05-15 23:48:15.073981",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",
