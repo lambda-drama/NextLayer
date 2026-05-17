@@ -8,6 +8,11 @@ from datetime import timedelta
 
 RENT_ITEM_CODE = "RENT-CHARGES"
 RENT_ITEM_NAME = "Rent Charges"
+FIXED_TERM_LEASE = "Fixed Term"
+
+
+def _is_fixed_term_lease(lease_type):
+	return (lease_type or "").strip() == FIXED_TERM_LEASE
 
 
 class TenantContract(Document):
@@ -43,6 +48,25 @@ class TenantContract(Document):
 				"current_contract": None
 			})
 
+	def _validate_unit_available_for_reactivation(self):
+		if not self.unit:
+			return
+		other = frappe.db.get_value(
+			"Tenant Contract",
+			{
+				"unit": self.unit,
+				"status": "Active",
+				"docstatus": 1,
+				"name": ["!=", self.name],
+			},
+			"name",
+		)
+		if other:
+			frappe.throw(
+				f"Unit '{self.unit}' already has active contract '{other}'. "
+				"End or terminate that contract before reactivating."
+			)
+
 	@frappe.whitelist()
 	def activate_contract(self):
 		"""Admin override: manually activate contract without signature requirement."""
@@ -56,8 +80,55 @@ class TenantContract(Document):
 	def end_contract(self):
 		if self.status != "Active":
 			frappe.throw("Only active contracts can be ended.")
+		if not _is_fixed_term_lease(self.lease_type):
+			frappe.throw(
+				"Only Fixed Term contracts can be ended by expiry. "
+				"Month-to-Month and Sublease contracts are not auto-expired."
+			)
 		self.db_set("status", "Expired")
 		self._update_unit_on_deactivation()
+
+	@frappe.whitelist()
+	def reactivate_contract(self, end_date=None):
+		"""
+		Restore an expired contract to Active and mark the unit Occupied.
+		Fixed Term: requires new end_date and updates end_date.
+		Other lease types: status + unit only; end_date is left unchanged.
+		"""
+		if self.docstatus != 1:
+			frappe.throw("Only submitted contracts can be reactivated.")
+		if self.status != "Expired":
+			frappe.throw("Only expired contracts can be reactivated.")
+
+		self._validate_unit_available_for_reactivation()
+
+		if _is_fixed_term_lease(self.lease_type):
+			if not end_date:
+				frappe.throw("End date is required for Fixed Term contracts.")
+			new_end = getdate(end_date)
+			today = getdate(nowdate())
+			if new_end < today:
+				frappe.throw("End date cannot be before today.")
+			if self.start_date and new_end < getdate(self.start_date):
+				frappe.throw("End date cannot be before the contract start date.")
+			self.db_set({
+				"end_date": new_end,
+				"status": "Active",
+				"termination_date": None,
+			})
+			self._update_unit_on_activation()
+			frappe.msgprint(
+				f"Contract reactivated until {frappe.format(new_end, {'fieldtype': 'Date'})}."
+			)
+			return
+
+		# Month-to-Month, Sublease, etc. — reactivate without changing end_date
+		self.db_set({
+			"status": "Active",
+			"termination_date": None,
+		})
+		self._update_unit_on_activation()
+		frappe.msgprint("Contract reactivated. Unit marked as occupied.")
 
 	@frappe.whitelist()
 	def terminate_contract(self, termination_date=None):
@@ -916,7 +987,8 @@ class TenantContract(Document):
 def expire_tenant_contracts_by_end_date():
 	"""
 	Daily job: set status to Expired when end_date has passed.
-	Only Active contracts are updated; other statuses are left unchanged.
+	Only submitted, Active, Fixed Term contracts with an end_date are updated.
+	Month-to-Month, Sublease, and other statuses are left unchanged.
 	"""
 	today = getdate(nowdate())
 	contracts = frappe.get_all(
@@ -924,6 +996,7 @@ def expire_tenant_contracts_by_end_date():
 		filters={
 			"docstatus": 1,
 			"status": "Active",
+			"lease_type": FIXED_TERM_LEASE,
 			"end_date": ["<", today],
 		},
 		fields=["name"],

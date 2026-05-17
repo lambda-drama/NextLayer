@@ -157,6 +157,7 @@ def get_dashboard_overview(company=None):
 	expiring_soon = frappe.db.count("Tenant Contract", filters={
 		**contract_base,
 		"status": "Active",
+		"lease_type": "Fixed Term",
 		"end_date": ["between", [today, expiry_cutoff]],
 	})
 
@@ -815,6 +816,7 @@ def get_tenant_contracts_dashboard(company=None):
 		fields=[
 			"name",
 			"status",
+			"lease_type",
 			"party_name",
 			"unit",
 			"property",
@@ -837,6 +839,7 @@ def get_tenant_contracts_dashboard(company=None):
 		end_d = getdate(r.end_date) if r.end_date else None
 		expiring_soon = (
 			r.status == "Active"
+			and (r.lease_type or "") == "Fixed Term"
 			and end_d is not None
 			and today <= end_d <= expiry_cutoff
 		)
