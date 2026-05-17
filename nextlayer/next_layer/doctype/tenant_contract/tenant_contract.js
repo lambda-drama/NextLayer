@@ -20,14 +20,23 @@ frappe.ui.form.on('Tenant Contract', {
                 });
             }, __("Utilities"));
 
-            frm.add_custom_button(__("End Contract"), () => {
-                frappe.confirm(__("Mark this contract as Expired?"), () => {
-                    frm.call("end_contract").then(() => frm.reload_doc());
-                });
-            }, __("Actions"));
+            if (frm.doc.lease_type === "Fixed Term") {
+                frm.add_custom_button(__("End Contract"), () => {
+                    frappe.confirm(__("Mark this contract as Expired?"), () => {
+                        frm.call("end_contract").then(() => frm.reload_doc());
+                    });
+                }, __("Actions"));
+            }
 
             frm.add_custom_button(__("Terminate Contract"), () => {
                 show_terminate_modal(frm);
+            }, __("Actions"));
+        }
+
+        // ── Expired – reactivate (all lease types; Fixed Term asks for new end date) ──
+        if (frm.doc.status === "Expired" && frm.doc.docstatus === 1) {
+            frm.add_custom_button(__("Reactivate Contract"), () => {
+                show_reactivate_modal(frm);
             }, __("Actions"));
         }
 
@@ -81,6 +90,61 @@ frappe.ui.form.on('Tenant Contract', {
         }
     },
 });
+
+// ============================================
+// REACTIVATE EXPIRED CONTRACT MODAL
+// ============================================
+
+function show_reactivate_modal(frm) {
+    const is_fixed_term = frm.doc.lease_type === "Fixed Term";
+
+    if (!is_fixed_term) {
+        frappe.confirm(
+            __("Reactivate this contract? Status will be set to Active and the unit will be marked Occupied. The end date will not be changed."),
+            () => {
+                frm.call("reactivate_contract").then(() => frm.reload_doc());
+            }
+        );
+        return;
+    }
+
+    const default_end = frappe.datetime.add_days(frappe.datetime.get_today(), 365);
+
+    const dialog = new frappe.ui.Dialog({
+        title: __("Reactivate Contract"),
+        fields: [
+            {
+                fieldname: "end_date",
+                fieldtype: "Date",
+                label: __("New End Date"),
+                reqd: 1,
+                default: default_end,
+                description: __("Contract will become Active and the unit will be marked Occupied."),
+            },
+        ],
+        primary_action_label: __("Activate"),
+        primary_action(values) {
+            if (!values.end_date) {
+                frappe.msgprint(__("Please enter an end date."));
+                return;
+            }
+
+            frappe.confirm(
+                __("Reactivate this contract with end date {0}?", [values.end_date]),
+                () => {
+                    frm.call("reactivate_contract", {
+                        end_date: values.end_date,
+                    }).then(() => {
+                        dialog.hide();
+                        frm.reload_doc();
+                    });
+                }
+            );
+        },
+    });
+
+    dialog.show();
+}
 
 // ============================================
 // TERMINATE CONTRACT MODAL

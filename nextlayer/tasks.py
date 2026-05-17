@@ -33,7 +33,7 @@ def daily():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _run_expire_tenant_contracts():
-	"""Mark Active tenant contracts as Expired when end_date has passed."""
+	"""Mark Active Fixed Term tenant contracts as Expired when end_date has passed."""
 	try:
 		from nextlayer.next_layer.doctype.tenant_contract.tenant_contract import (
 			expire_tenant_contracts_by_end_date,
