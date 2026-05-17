@@ -36,6 +36,14 @@ class PMSSettings(Document):
 		if day and (day < 1 or day > 28):
 			frappe.throw("Monthly Invoice Generation Day must be between 1 and 28")
 
+	@frappe.whitelist()
+	def reset_units_without_active_contract(self):
+		"""
+		Set units to Available when they have no submitted Active Tenant Contract.
+		Clears current_tenant and current_contract on affected units.
+		"""
+		return reset_units_without_active_contract()
+
 
 # ──────────────────────────────────────────
 #  SCHEDULED JOB HELPERS
@@ -69,3 +77,43 @@ def delete_scheduled_job(method_name: str) -> None:
 	job_name = frappe.db.exists("Scheduled Job Type", {"method": ["like", f"%{method_name}%"]})
 	if job_name:
 		frappe.delete_doc("Scheduled Job Type", job_name, ignore_permissions=True)
+
+
+@frappe.whitelist()
+def reset_units_without_active_contract():
+	"""
+	For every unit with no submitted Active Tenant Contract, set status to Available
+	and clear occupancy fields. Fixes units left Occupied after expired/ended leases.
+	"""
+	active_rows = frappe.get_all(
+		"Tenant Contract",
+		filters={"docstatus": 1, "status": "Active"},
+		fields=["unit"],
+	)
+	units_with_active = {r.unit for r in active_rows if r.get("unit")}
+
+	all_units = frappe.get_all("Unit", pluck="name")
+	updated = []
+
+	for unit_name in all_units:
+		if unit_name in units_with_active:
+			continue
+		frappe.db.set_value(
+			"Unit",
+			unit_name,
+			{
+				"status": "Available",
+				"is_occupied": 0,
+				"current_tenant": None,
+				"current_contract": None,
+			},
+			update_modified=True,
+		)
+		updated.append(unit_name)
+
+	frappe.db.commit()
+
+	return {
+		"updated_count": len(updated),
+		"updated_units": updated,
+	}
