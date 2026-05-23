@@ -302,9 +302,9 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 	parent_only = parent_only in (True, 1, "1", "true", "True")
 
 	# Log the selected sales invoice and company for debugging
-	frappe.log_error(f"Selected Sales Invoice: {selected_sales_invoice}", "Debugging")
-	frappe.log_error(f"Selected Company: {company}", "Debugging")
-	frappe.log_error(f"Parent Only: {parent_only}", "Debugging")
+	# frappe.log_error(f"Selected Sales Invoice: {selected_sales_invoice}", "Debugging")
+	# frappe.log_error(f"Selected Company: {company}", "Debugging")
+	# frappe.log_error(f"Parent Only: {parent_only}", "Debugging")
 
 	if not selected_sales_invoice:
 		frappe.throw("Sales invoice is not provided or is invalid.")
@@ -331,9 +331,7 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 		# Ensure the sales invoice is submitted before proceeding
 		if sales_invoice_doc.docstatus != 1:
 			frappe.throw(f"Selected sales invoice must be submitted.")
-		
-		frappe.log_error(f"Fetched Sales Invoice: {selected_sales_invoice}", "Sales Invoice Document")
-		
+				
 		# Use target_company (customer) for fetching expense accounts, as that's the company that will be used on Purchase Invoice
 		# This ensures expense accounts belong to the correct company
 		account_company = target_company if target_company else company
@@ -371,7 +369,7 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 			}
 			transit_numbers.append(transit_number)
 		
-		frappe.log_error(f"Items fetched: {len(purchase_invoice_items)}", "Purchase Invoice Items")
+		# frappe.log_error(f"Items fetched: {len(purchase_invoice_items)}", "Purchase Invoice Items")
 		
 		# Determine target company (customer from Sales Invoice, which becomes Purchase Invoice's company)
 		target_company = sales_invoice_doc.customer
