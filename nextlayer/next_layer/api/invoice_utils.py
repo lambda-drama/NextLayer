@@ -117,14 +117,14 @@ def check_mandatory_accounting_dimensions(company):
 			fields=["name", "document_type", "fieldname"]
 		)
 		
-		# Check each dimension for mandatory_for_bs in Dimension Defaults
+		# Check each dimension for mandatory_for_bs in Accounting Dimension Detail
 		for dim in accounting_dimensions:
 			if dim.document_type in ["Branch", "Company Group", "Marka"]:
 				# Try direct SQL query first (more reliable for child tables)
 				try:
 					dim_defaults = frappe.db.sql("""
 						SELECT mandatory_for_bs 
-						FROM `tabDimension Defaults`
+						FROM `tabAccounting Dimension Detail`
 						WHERE parent = %s AND company = %s AND mandatory_for_bs = 1
 						LIMIT 1
 					""", (dim.name, company), as_dict=True)
@@ -145,7 +145,7 @@ def check_mandatory_accounting_dimensions(company):
 				try:
 					dim_doc = frappe.get_doc("Accounting Dimension", dim.name)
 					
-					# Check Dimension Defaults child table (try different possible field names)
+					# Check dimension_defaults child table (Accounting Dimension Detail)
 					child_table = None
 					if hasattr(dim_doc, 'dimension_defaults'):
 						child_table = dim_doc.dimension_defaults
