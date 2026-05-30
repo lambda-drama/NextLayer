@@ -432,6 +432,8 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_bulk_edit": 1,
+   "allow_on_submit": 1,
    "fieldname": "document",
    "fieldtype": "Table",
    "label": "Document",
@@ -579,7 +581,7 @@
    "link_fieldname": "custom_tenant_contract"
   }
  ],
- "modified": "2026-05-15 23:48:15.073981",
+ "modified": "2026-05-30 23:37:57.790881",
  "modified_by": "Administrator",
  "module": "Next Layer",
  "name": "Tenant Contract",
