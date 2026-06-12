@@ -131,6 +131,14 @@ class TravelExpense(Document):
 				_("At least one attachment is required to submit this Travel Expense. Please attach a file and try again.")
 			)
 
+	def before_submit(self):
+		"""Block submit unless journal entry prerequisites are satisfied."""
+		self._validate_attachment_if_enforced()
+		from nextlayer.next_layer.api.travel_expense_utils import (
+			validate_travel_expense_journal_prerequisites,
+		)
+		validate_travel_expense_journal_prerequisites(self)
+
 	def before_cancel(self):
 		"""
 		Tell Frappe's link checker to ignore GL Entry / Payment Ledger Entry.
@@ -208,58 +216,26 @@ class TravelExpense(Document):
 				)
 
 	def on_submit(self):
-		"""Create Expense Claim and Journal Entry when Travel Expense is submitted"""
-		self._validate_attachment_if_enforced()
-
-		# Create journal entry based on is_paid status
+		"""Create journal entry when Travel Expense is submitted."""
 		if self.is_paid:
-			# When is_paid is ticked, create journal entry with expense and payment entries
-			from nextlayer.next_layer.api.travel_expense_utils import create_journal_entry_for_paid_travel_expense
-			try:
-				journal_entry_name = create_journal_entry_for_paid_travel_expense(self)
-				if journal_entry_name:
-					frappe.msgprint(
-						_("Journal Entry {0} has been created and submitted.").format(
-							frappe.bold(journal_entry_name)
-						),
-						indicator="green",
-						alert=True
-					)
-			except Exception as e:
-				frappe.log_error(
-					f"Error creating journal entry for Travel Expense {self.name}: {str(e)}",
-					"Travel Expense Error"
-				)
-				# Don't prevent submission if journal entry creation fails
-				frappe.msgprint(
-					_("Warning: Could not create journal entry. Please create it manually."),
-					indicator="orange",
-					alert=True
-				)
+			from nextlayer.next_layer.api.travel_expense_utils import (
+				create_journal_entry_for_paid_travel_expense,
+			)
+			journal_entry_name = create_journal_entry_for_paid_travel_expense(self)
 		else:
-			# When is_paid is not ticked, create journal entry for payment only
-			from nextlayer.next_layer.api.travel_expense_utils import create_journal_entry_for_travel_expense
-			try:
-				journal_entry_name = create_journal_entry_for_travel_expense(self)
-				if journal_entry_name:
-					frappe.msgprint(
-						_("Journal Entry {0} has been created and submitted.").format(
-							frappe.bold(journal_entry_name)
-						),
-						indicator="green",
-						alert=True
-					)
-			except Exception as e:
-				frappe.log_error(
-					f"Error creating journal entry for Travel Expense {self.name}: {str(e)}",
-					"Travel Expense Error"
-				)
-				# Don't prevent submission if journal entry creation fails
-				frappe.msgprint(
-					_("Warning: Could not create journal entry. Please create it manually."),
-					indicator="orange",
-					alert=True
-				)
+			from nextlayer.next_layer.api.travel_expense_utils import (
+				create_journal_entry_for_travel_expense,
+			)
+			journal_entry_name = create_journal_entry_for_travel_expense(self)
+
+		if journal_entry_name:
+			frappe.msgprint(
+				_("Journal Entry {0} has been created and submitted.").format(
+					frappe.bold(journal_entry_name)
+				),
+				indicator="green",
+				alert=True,
+			)
 
 def travel_expense_on_save(doc):
     """
