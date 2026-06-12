@@ -110,6 +110,71 @@ def _throw_missing_expense_claim_account(expense_type, company, account_field="d
 	)
 
 
+def validate_travel_expense_journal_prerequisites(travel_expense):
+	"""
+	Validate that a journal entry can be created for this Travel Expense.
+	Called on before_submit so configuration errors surface before the document is submitted.
+	"""
+	if not travel_expense.company:
+		frappe.throw(_("Company is required"))
+
+	if hasattr(travel_expense, "calculate_totals"):
+		travel_expense.calculate_totals()
+
+	total_amount = (
+		getattr(travel_expense, "grand_total_company_currency", None)
+		or getattr(travel_expense, "total_company_currency", None)
+		or 0
+	)
+	if total_amount <= 0:
+		frappe.throw(
+			_(
+				"Cannot submit: Travel expense grand total is zero or negative. "
+				"Please ensure expenses are added and amounts are set."
+			)
+		)
+
+	if not travel_expense.expenses:
+		frappe.throw(_("No expenses found. Please add expenses before submitting."))
+
+	company = travel_expense.company
+	for expense_row in travel_expense.expenses:
+		expense_type = expense_row.expense_type
+		if not expense_type:
+			frappe.throw(_("Expense Type is required for all expense rows"))
+		get_expense_account_from_expense_type(expense_type, company)
+
+	if travel_expense.is_paid:
+		if not travel_expense.direct_payment_account:
+			frappe.throw(_("Direct Payment Account is required when 'Is Paid' is ticked"))
+	else:
+		payable_account = travel_expense.payable_account or frappe.db.get_value(
+			"Company", company, "default_payable_account"
+		)
+		if not payable_account:
+			frappe.throw(_("Please set Payable Account in Travel Expense or Company settings"))
+
+	is_refund = getattr(travel_expense, "refund", 0)
+	if is_refund:
+		original_expense_name = getattr(travel_expense, "original_expense", None)
+		if not original_expense_name:
+			frappe.throw(_("Original Expense is required for refunds"))
+
+		original_te = frappe.get_doc("Travel Expense", original_expense_name)
+		original_total = (
+			getattr(original_te, "grand_total_company_currency", None)
+			or getattr(original_te, "total_company_currency", None)
+			or 0
+		)
+		if total_amount > original_total:
+			frappe.throw(_("Refund amount cannot exceed original expense amount"))
+
+		if original_te.expenses:
+			for expense_row in original_te.expenses:
+				if expense_row.expense_type:
+					get_expense_account_from_expense_type(expense_row.expense_type, company)
+
+
 @frappe.whitelist()
 def create_additional_travel_expense(original_travel_expense, expense_items, company=None, traveler_name=None, transaction_currency=None, expense_category=None, cash_account=None):
 	"""
