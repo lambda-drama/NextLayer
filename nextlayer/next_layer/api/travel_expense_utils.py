@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, get_link_to_form
 from erpnext.setup.utils import get_exchange_rate
 
 
@@ -33,28 +33,81 @@ def get_expense_account_from_expense_type(expense_type, company):
 	if not frappe.db.exists("Expense Claim Type", expense_type):
 		frappe.throw(_("Expense Claim Type {0} does not exist").format(expense_type))
 	
-	# Get expense account from Expense Claim Type
-	# Expense Claim Type has a child table "accounts" with company and default_account
-	expense_account = frappe.db.sql("""
-		SELECT default_account
-		FROM `tabExpense Claim Account`
-		WHERE parent = %s AND company = %s
-		LIMIT 1
-	""", (expense_type, company), as_dict=True)
-	
-	if expense_account and expense_account[0].get("default_account"):
-		return expense_account[0].get("default_account")
-	
-	# If not found in child table, try to get from Expense Claim Type directly
-	# Some setups might have default_account field directly on Expense Claim Type
-	expense_account = frappe.db.get_value("Expense Claim Type", expense_type, "default_account")
-	if expense_account:
-		return expense_account
-	
-	# If still not found, throw error like Expense Claim does
-	frappe.throw(_("Expense Account not found for Expense Claim Type {0} and Company {1}. Please set it in Expense Claim Type.").format(
-		frappe.bold(expense_type), frappe.bold(company)
-	))
+	# Expense Claim Type → child table "accounts" (Expense Claim Account: company + default_account)
+	account_field = "default_account"
+	if not frappe.db.has_column("Expense Claim Account", "default_account"):
+		if frappe.db.has_column("Expense Claim Account", "account"):
+			account_field = "account"
+		else:
+			frappe.throw(
+				_("Expense Claim Account table is missing account columns. Please run bench migrate.")
+			)
+
+	account = frappe.db.get_value(
+		"Expense Claim Account",
+		{"parent": expense_type, "company": company},
+		account_field,
+	)
+
+	if account:
+		return account
+
+	_throw_missing_expense_claim_account(expense_type, company, account_field)
+
+
+def _throw_missing_expense_claim_account(expense_type, company, account_field="default_account"):
+	"""Tell the user exactly what to fix when Expense Claim Type has no GL account for a company."""
+	expense_type_link = get_link_to_form("Expense Claim Type", expense_type)
+	company_link = get_link_to_form("Company", company)
+
+	rows = frappe.get_all(
+		"Expense Claim Account",
+		filters={"parent": expense_type},
+		fields=["company", account_field],
+	)
+
+	if not rows:
+		frappe.throw(
+			_(
+				"No expense account is configured for {0}. "
+				"Open {1}, go to the <b>Accounts</b> table, add a row for company {2}, "
+				"and set the <b>Default Account</b> before creating the journal entry."
+			).format(frappe.bold(expense_type), expense_type_link, company_link),
+			title=_("Expense Account Missing"),
+		)
+
+	company_row = next((r for r in rows if r.get("company") == company), None)
+	if company_row and not company_row.get(account_field):
+		frappe.throw(
+			_(
+				"{0} has a row for company {1}, but <b>Default Account</b> is empty. "
+				"Open {2}, edit the Accounts row for this company, and select an expense account."
+			).format(frappe.bold(expense_type), company_link, expense_type_link),
+			title=_("Expense Account Missing"),
+		)
+
+	configured_companies = ", ".join(
+		frappe.bold(r.company) for r in rows if r.get("company") and r.get(account_field)
+	)
+	frappe.throw(
+		_(
+			"{0} has no expense account set for company {1}. "
+			"Open {2}, go to the <b>Accounts</b> table, add a row for {1}, "
+			"and set the <b>Default Account</b>."
+			"{3}"
+		).format(
+			frappe.bold(expense_type),
+			company_link,
+			expense_type_link,
+			(
+				"<br><br>"
+				+ _("Accounts are currently configured for: {0}.").format(configured_companies)
+				if configured_companies
+				else ""
+			),
+		),
+		title=_("Expense Account Missing"),
+	)
 
 
 @frappe.whitelist()
