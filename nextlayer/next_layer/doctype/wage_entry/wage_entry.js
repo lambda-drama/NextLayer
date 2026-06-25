@@ -225,6 +225,14 @@ function create_journal(frm) {
 	if (frm.doc.docstatus !== 1 || frm.doc.wage_category == "Contract") return;
 
 	frm.add_custom_button(__('Journal Entry'), function () {
+		if (!frm.doc.payment_account && !frm.doc.default_payable_account) {
+			frappe.msgprint({
+				title: __('Missing Account'),
+				message: __('Please set a Payment Account (Cash/Bank) or Payable Account on the Payments tab before creating a Journal Entry.'),
+				indicator: 'red',
+			});
+			return;
+		}
 
 		const already_paid = frm.doc.total_paid || 0;
 		const remaining = (frm.doc.total_amount || 0) - already_paid;

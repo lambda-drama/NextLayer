@@ -128,6 +128,26 @@ def get_expense_account_for_work_type(work_type, company):
     ).format(work_type, company))
 
 
+def get_wage_entry_credit_account(doc):
+    """
+    Resolve the credit account for wage payment.
+    Direct payment (Cash/Bank) takes priority over payable accrual.
+    Returns (account_name, is_direct_payment).
+    """
+    payment_account = doc.get("payment_account")
+    payable_account = doc.get("default_payable_account")
+
+    if payment_account:
+        return payment_account, True
+    if payable_account:
+        return payable_account, False
+
+    frappe.throw(_(
+        "Please set a <b>Payment Account</b> (Cash/Bank for direct payment) "
+        "or <b>Payable Account</b> on the Wage Entry before creating a Journal Entry."
+    ))
+
+
 @frappe.whitelist()
 def make_journal_entry(wage_entry_name, amount=None):
     doc = frappe.get_doc("Wage Entry", wage_entry_name)
@@ -140,9 +160,11 @@ def make_journal_entry(wage_entry_name, amount=None):
     if payment_amount <= 0:
         frappe.throw(_("Payment amount must be greater than zero."))
 
-    company_currency         = frappe.db.get_value("Company", doc.company, "default_currency")
-    payable_account_currency = frappe.db.get_value("Account", doc.default_payable_account, "account_currency")
-    conversion_rate          = getattr(doc, "conversion_rate", None) or 1
+    credit_account, is_direct_payment = get_wage_entry_credit_account(doc)
+
+    company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
+    credit_account_currency = frappe.db.get_value("Account", credit_account, "account_currency")
+    conversion_rate = getattr(doc, "conversion_rate", None) or 1
 
     accounts = []
 
@@ -172,20 +194,21 @@ def make_journal_entry(wage_entry_name, amount=None):
             "company_group":              doc.company_group or "",
         })
 
-    # --- CREDIT: payable account ---
+    # --- CREDIT: payment account (direct) or payable account ---
     credit_row = {
-        "account":                    doc.default_payable_account,
+        "account":                    credit_account,
         "debit_in_account_currency":  0,
         "credit_in_account_currency": payment_amount,
         "project":                    doc.project or "",
         "cost_center":                doc.cost_center or "",
-        "exchange_rate":              conversion_rate if company_currency != payable_account_currency else 1,
+        "exchange_rate":              conversion_rate if company_currency != credit_account_currency else 1,
         "company_group":              doc.company_group or "",
         "reference_type":             "Wage Entry",
         "reference_name":             wage_entry_name,
     }
 
-    if doc.party_type and doc.party:
+    # Party only applies when crediting a payable account, not Cash/Bank direct payment
+    if not is_direct_payment and doc.party_type and doc.party:
         credit_row["party_type"] = doc.party_type
         credit_row["party"]      = doc.party
 
