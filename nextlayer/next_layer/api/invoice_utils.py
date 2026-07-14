@@ -206,6 +206,7 @@ def group_items_by_parent(items, parent_only=False):
 			'custom_containers': 0,
 			'custom_cartons': 0,
 			'stock_qty': 0,
+			'conversion_factor': 1,
 			'income_account': None,
 			'expense_account': None,
 			'custom_item_identifier': None,
@@ -284,6 +285,12 @@ def group_items_by_parent(items, parent_only=False):
 				# No rates found, calculate from amount and quantity
 				group_data['rate'] = group_data['amount'] / group_data['qty'] if group_data['qty'] > 0 else 0
 		
+		# Derive conversion factor from accumulated stock qty when grouping
+		if group_data['qty']:
+			group_data['conversion_factor'] = group_data['stock_qty'] / group_data['qty']
+		else:
+			group_data['conversion_factor'] = 1
+
 		# Remove the 'rates' key before adding to processed items
 		group_data.pop('rates', None)
 		processed_items.append(group_data)
@@ -349,6 +356,7 @@ def get_items_from_selected_sal_invoice(sales_invoice, company=None, parent_only
 				'stock_uom': item.stock_uom,
 				'stock_qty': item.stock_qty,
 				'uom': item.uom,
+				'conversion_factor': item.conversion_factor or 1,
 				'custom_containers': item.custom_containers,
 				'custom_cartons': item.custom_cartons,
 				'income_account': income_account,
@@ -477,15 +485,25 @@ def get_items_from_selected_purchase_invoice(purchase_invoice, company=None, par
 			income_account = get_accounts(item.item_code, account_company)
 			expense_account = get_expense_accounts(item.item_code, account_company)
 			
+			qty = item.custom_outward_qty or item.qty
+			conversion_factor = item.conversion_factor or 1
+			# Keep stock qty aligned with outward qty when using custom_outward_qty
+			if item.custom_outward_qty and item.qty:
+				stock_qty = (item.stock_qty or 0) * (item.custom_outward_qty / item.qty)
+			else:
+				stock_qty = item.stock_qty or (qty * conversion_factor)
+
 			# Create a dictionary representing each item with additional details
 			item_details = {
 				'item_code': item.item_code,
 				'item_name': item.item_name,
-				'qty': item.custom_outward_qty or item.qty,
+				'qty': qty,
 				'rate': calculated_rate,
 				'amount': calculated_amount,
 				'uom': item.uom,
 				'stock_uom': item.stock_uom,
+				'stock_qty': stock_qty,
+				'conversion_factor': conversion_factor,
 				'custom_containers': item.custom_containers,
 				'custom_cartons': item.custom_cartons,
 				'income_account': income_account,

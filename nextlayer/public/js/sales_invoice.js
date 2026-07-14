@@ -558,7 +558,6 @@ frappe.ui.form.on("Sales Invoice", {
 					}
 				},
 				error: function(r) {
-					// Silently fail - don't show error if generation fails
 				}
 			});
 		}
@@ -706,14 +705,19 @@ frappe.ui.form.on("Sales Invoice", {
 														new_item.custom_containers = item.custom_containers;
 														new_item.custom_cartons = item.custom_cartons;
 														new_item.uom = item.uom;
-														new_item.stock_uom = item.uom;
-														new_item.conversion_factor = 1.00;
+														new_item.stock_uom = item.stock_uom || item.uom;
+														new_item.conversion_factor = item.conversion_factor
+															|| (item.stock_qty && item.qty ? item.stock_qty / item.qty : 1);
+														new_item.stock_qty = item.stock_qty
+															|| (item.qty * new_item.conversion_factor);
 														new_item.income_account = item.income_account;
 														new_item.expense_account = item.expense_account;
 														new_item.custom_purchase_invoice = purchase_invoice;
 														new_item.custom_item_identifier = item.custom_item_identifier;
 														// Add other item fields as needed
 													});
+
+													frm.refresh_field('items');
 
 													// Update the transit numbers
 													response.message.transit_numbers.forEach(function(transit_number) {
