@@ -370,9 +370,14 @@ frappe.ui.form.on("Purchase Invoice", {
 														new_item.custom_cartons = item.custom_cartons;
 														new_item.uom = item.uom;
 														new_item.stock_uom = item.stock_uom;
-														new_item.stock_qty = item.stock_qty;
-														new_item.conversion_factor = 1.00;
+														new_item.conversion_factor = item.conversion_factor
+															|| (item.stock_qty && item.qty ? item.stock_qty / item.qty : 1);
+														// frappe.throw(item.conversion_factor)
+														new_item.stock_qty = item.stock_qty
+															|| (item.qty * new_item.conversion_factor);
 													});
+
+													frm.refresh_field('items');
 													
 													// Update the transit numbers
 													response.message.transit_numbers.forEach(function(transit_number) {
