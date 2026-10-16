@@ -1258,6 +1258,53 @@ function setup_verification_mode(frm) {
 	}
 }
 
+// Resolve conversion_factor from Item → UOM Conversion Detail (fallback 1)
+function resolve_conversion_factors(items_data, callback) {
+	let pending = items_data.length;
+
+	if (!pending) {
+		callback(items_data);
+		return;
+	}
+
+	items_data.forEach(function(item_data) {
+		let stock_uom = item_data.stock_uom || item_data.uom;
+
+		// Same UOM as stock → factor is 1
+		if (item_data.uom && stock_uom && item_data.uom === stock_uom) {
+			item_data.conversion_factor = 1;
+			pending--;
+			if (pending === 0) {
+				callback(items_data);
+			}
+			return;
+		}
+
+		frappe.call({
+			method: "erpnext.stock.get_item_details.get_conversion_factor",
+			args: {
+				item_code: item_data.item_code,
+				uom: item_data.uom
+			},
+			callback: function(r) {
+				let factor = r.message && r.message.conversion_factor;
+				item_data.conversion_factor = factor ? flt(factor) : 1;
+				pending--;
+				if (pending === 0) {
+					callback(items_data);
+				}
+			},
+			error: function() {
+				item_data.conversion_factor = 1;
+				pending--;
+				if (pending === 0) {
+					callback(items_data);
+				}
+			}
+		});
+	});
+}
+
 // Robust function to wait for document to load and add items
 function wait_for_document_and_add_items(doctype, items_data) {
 	let attempts = 0;
@@ -1269,59 +1316,70 @@ function wait_for_document_and_add_items(doctype, items_data) {
 		// Check if the current form is the target doctype
 		if (cur_frm && cur_frm.doctype === doctype) {
 
-			try {
-				// Clear any existing items first
-				cur_frm.clear_table("items");
+			resolve_conversion_factors(items_data, function(resolved_items) {
+				try {
+					// Clear any existing items first
+					cur_frm.clear_table("items");
 
-				// Add items one by one with error handling
-				items_data.forEach(function(item_data, index) {
-					try {
-						let new_row = cur_frm.add_child("items");
-						new_row.item_code = item_data.item_code;
-						new_row.item_name = item_data.item_name;
-						new_row.qty = item_data.qty;
-						new_row.uom = item_data.uom;
-						new_row.stock_uom = item_data.stock_uom || item_data.uom;
-						new_row.warehouse = item_data.warehouse;
+					// Add items one by one with error handling
+					resolved_items.forEach(function(item_data, index) {
+						try {
+							let conversion_factor = flt(item_data.conversion_factor) || 1;
+							let qty = flt(item_data.qty);
 
-						if (item_data.barcode) {
-							new_row.barcode = item_data.barcode;
-						}
-						if (item_data.description) {
-							new_row.description = item_data.description;
-						}
+							let new_row = cur_frm.add_child("items");
+							new_row.item_code = item_data.item_code;
+							new_row.item_name = item_data.item_name;
+							new_row.qty = qty;
+							new_row.uom = item_data.uom;
+							new_row.stock_uom = item_data.stock_uom || item_data.uom;
+							new_row.conversion_factor = conversion_factor;
+							new_row.stock_qty = qty * conversion_factor;
+							new_row.warehouse = item_data.warehouse;
 
-						// For Delivery Note, forward custom UOM fields
-						if (doctype === "Delivery Note") {
-							if (item_data.uomcontainers !== undefined && item_data.uomcontainers !== null) {
-								new_row.custom_uom_container = item_data.uomcontainers;
+							if (item_data.barcode) {
+								new_row.barcode = item_data.barcode;
 							}
-							if (item_data.uomcartons !== undefined && item_data.uomcartons !== null) {
-								new_row.custom_uom_cartons = item_data.uomcartons;
+							if (item_data.description) {
+								new_row.description = item_data.description;
 							}
+
+							// For Delivery Note, forward custom UOM fields
+							if (doctype === "Delivery Note") {
+								if (item_data.custom_containers !== undefined && item_data.custom_containers !== null) {
+									new_row.custom_uom_container = item_data.custom_containers;
+								} else if (item_data.uomcontainers !== undefined && item_data.uomcontainers !== null) {
+									new_row.custom_uom_container = item_data.uomcontainers;
+								}
+								if (item_data.custom_cartons !== undefined && item_data.custom_cartons !== null) {
+									new_row.custom_uom_cartons = item_data.custom_cartons;
+								} else if (item_data.uomcartons !== undefined && item_data.uomcartons !== null) {
+									new_row.custom_uom_cartons = item_data.uomcartons;
+								}
+							}
+
+							// For Sales Invoice, set income account if available
+							if (doctype === "Sales Invoice" && item_data.income_account) {
+								new_row.income_account = item_data.income_account;
+							}
+
+						} catch (item_error) {
+							console.error(`Error adding item ${index + 1}:`, item_error);
+							frappe.msgprint(__("Error adding item {0}: {1}", [item_data.item_code, item_error.message]));
 						}
+					});
 
-						// For Sales Invoice, set income account if available
-						if (doctype === "Sales Invoice" && item_data.income_account) {
-							new_row.income_account = item_data.income_account;
-						}
+					// Refresh the field to show the items
+					cur_frm.refresh_field("items");
 
-					} catch (item_error) {
-						console.error(`Error adding item ${index + 1}:`, item_error);
-						frappe.msgprint(__("Error adding item {0}: {1}", [item_data.item_code, item_error.message]));
-					}
-				});
+					// Show success message
+					frappe.show_alert(__("Successfully added {0} items to {1}", [resolved_items.length, doctype]));
 
-				// Refresh the field to show the items
-				cur_frm.refresh_field("items");
-
-				// Show success message
-				frappe.show_alert(__("Successfully added {0} items to {1}", [items_data.length, doctype]));
-
-			} catch (error) {
-				console.error(`Error adding items to ${doctype}:`, error);
-				frappe.msgprint(__("Error adding items to {0}: {1}", [doctype, error.message]));
-			}
+				} catch (error) {
+					console.error(`Error adding items to ${doctype}:`, error);
+					frappe.msgprint(__("Error adding items to {0}: {1}", [doctype, error.message]));
+				}
+			});
 
 		} else if (attempts < max_attempts) {
 			// Document not ready yet, try again
