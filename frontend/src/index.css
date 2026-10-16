@@ -4,6 +4,11 @@
 
 @layer base {
   :root {
+    /* Native widgets (date pickers + their calendar popup, scrollbars, spin
+       buttons, checkboxes) follow the UA colour scheme, not our CSS variables.
+       Pinning it here keeps them in the light scheme; `.dark` below flips them
+       to dark, which is what stopped `<input type="date">` rendering white. */
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -32,24 +37,35 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Render native date pickers / scrollbars in their dark flavour too. */
+    color-scheme: dark;
+    /* Dark ramp (one step lighter than the original near-black theme, which
+       read as "too dark"): page = slate-900, cards/fields = slate-800, raised
+       panels + default borders = slate-700. The page-level classes in
+       src/components/* follow the very same ramp, so the deltas between page,
+       card, panel and highlight are preserved — only the absolute lightness
+       moved up a notch. */
+    --background: 222.2 47.4% 11.2%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 217.2 32.6% 17.5%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    /* Dropdown/select/popover surfaces: one step lighter than `--background`,
+       otherwise an open menu is the same colour as the page it floats over and
+       the fields behind it appear to bleed into the list. */
+    --popover: 215.3 25% 26.7%;
     --popover-foreground: 210 40% 98%;
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 215.3 25% 26.7%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 215.3 25% 26.7%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 215.3 25% 26.7%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 215.3 25% 26.7%;
+    --input: 215.3 25% 26.7%;
     --ring: 224.3 76.3% 94.1%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;

@@ -79,11 +79,11 @@ function stripHtml(html: string | null | undefined): string {
 }
 
 const STATUS_CFG: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  Draft:     { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-300",   dot: "bg-amber-400" },
-  Submitted: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300", dot: "bg-emerald-500" },
-  Paid:      { bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-300",    dot: "bg-blue-500" },
-  Unpaid:    { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-300",   dot: "bg-amber-400" },
-  Cancelled: { bg: "bg-red-50",     text: "text-red-700",     border: "border-red-300",     dot: "bg-red-500" },
+  Draft:     { bg: "bg-amber-50 dark:bg-amber-950/40",   text: "text-amber-700 dark:text-amber-300",   border: "border-amber-300 dark:border-amber-800",   dot: "bg-amber-400" },
+  Submitted: { bg: "bg-emerald-50 dark:bg-emerald-950/40", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-300 dark:border-emerald-800", dot: "bg-emerald-500" },
+  Paid:      { bg: "bg-blue-50 dark:bg-blue-950/40",    text: "text-blue-700 dark:text-blue-300",    border: "border-blue-300 dark:border-blue-800",    dot: "bg-blue-500" },
+  Unpaid:    { bg: "bg-amber-50 dark:bg-amber-950/40",   text: "text-amber-700 dark:text-amber-300",   border: "border-amber-300 dark:border-amber-800",   dot: "bg-amber-400" },
+  Cancelled: { bg: "bg-red-50 dark:bg-red-950/40",     text: "text-red-700 dark:text-red-300",     border: "border-red-300 dark:border-red-800",     dot: "bg-red-500" },
 }
 
 const ALL_VAL = "__all__"
@@ -161,17 +161,17 @@ function SearchableCombobox({
           w-full h-9 px-3 pr-8 text-sm text-left rounded-md border
           flex items-center justify-between gap-2
           transition-all duration-150
-          ${disabled ? "opacity-60 cursor-not-allowed border-green-100 bg-slate-50" : ""}
+          ${disabled ? "opacity-60 cursor-not-allowed border-green-100 dark:border-green-900 bg-slate-50 dark:bg-slate-800/60" : ""}
           ${!disabled && open
-            ? "border-green-500 ring-2 ring-green-200 bg-green-50"
-            : !disabled ? "border-green-200 bg-white hover:border-green-400 hover:bg-green-50/40" : ""
+            ? "border-green-500 ring-2 ring-green-200 bg-green-50 dark:bg-green-950/40"
+            : !disabled ? "border-green-200 dark:border-green-900 bg-white dark:bg-slate-800 hover:border-green-400 hover:bg-green-50/40 dark:hover:bg-green-950/40" : ""
           }
-          ${required && !value && !disabled ? "border-amber-400 bg-amber-50/30" : ""}
-          text-slate-700 font-medium
+          ${required && !value && !disabled ? "border-amber-400 bg-amber-50/30 dark:bg-amber-950/30" : ""}
+          text-slate-700 dark:text-slate-200 font-medium
         `}
       >
         <span className="truncate">{selectedLabel}</span>
-        <ChevronDown className={`h-3.5 w-3.5 text-green-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {/* Dropdown panel */}
@@ -179,13 +179,13 @@ function SearchableCombobox({
         <div className="
           absolute left-0 top-full mt-1 z-50 min-w-full w-max max-w-xs
           rounded-xl border border-green-200 shadow-xl
-          bg-green-50/95 backdrop-blur-sm
+          bg-white dark:border-green-900 dark:bg-slate-700
           overflow-hidden
         ">
           {/* Search input */}
-          <div className="p-2 border-b border-green-200 bg-green-100/70">
+          <div className="p-2 border-b border-green-200 dark:border-green-900 bg-green-100 dark:bg-green-950">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-green-600" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-green-600 dark:text-green-400" />
               <input
                 ref={inputRef}
                 type="text"
@@ -194,9 +194,9 @@ function SearchableCombobox({
                 placeholder="Search…"
                 className="
                   w-full pl-8 pr-3 py-1.5 text-sm rounded-lg
-                  border border-green-300 bg-white/80
+                  border border-green-300 bg-white dark:border-green-800 dark:bg-slate-800
                   focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400
-                  placeholder:text-green-400 text-slate-700
+                  placeholder:text-green-400 text-slate-700 dark:text-slate-100
                 "
               />
             </div>
@@ -205,7 +205,7 @@ function SearchableCombobox({
           {/* Options list */}
           <div className="max-h-52 overflow-y-auto">
             {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-green-600 text-center">No results</div>
+              <div className="px-3 py-4 text-sm text-green-600 dark:text-green-400 text-center">No results</div>
             ) : (
               filtered.map(opt => (
                 <button
@@ -216,7 +216,7 @@ function SearchableCombobox({
                     w-full text-left px-3 py-2 text-sm transition-colors
                     ${opt.value === value
                       ? "bg-green-600 text-white font-semibold"
-                      : "text-slate-700 hover:bg-green-200/60 hover:text-green-900"
+                      : "text-slate-700 dark:text-slate-200 hover:bg-green-100 dark:hover:bg-green-900 hover:text-green-900 dark:hover:text-green-200"
                     }
                   `}
                 >
@@ -267,14 +267,14 @@ function KpiCard({ icon, label, value, sub, gradient }: {
   icon: React.ReactNode; label: string; value: string | number; sub?: string; gradient: string
 }) {
   return (
-    <Card className="border-green-100 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="border-green-100 dark:border-green-900 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-5">
         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} text-white flex items-center justify-center shadow-sm`}>
           {icon}
         </div>
-        <p className="text-2xl font-bold text-slate-800 mt-3">{value}</p>
-        <p className="text-sm font-medium text-slate-500 mt-0.5">{label}</p>
-        {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+        <p className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-3">{value}</p>
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">{label}</p>
+        {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>}
       </CardContent>
     </Card>
   )
@@ -301,7 +301,7 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
   const cfg = data ? (STATUS_CFG[data.docstatus === 1 ? "Submitted" : "Draft"] ?? STATUS_CFG.Draft) : STATUS_CFG.Draft
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-white shadow-2xl flex flex-col border-l border-green-100">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-white dark:bg-slate-800 shadow-2xl flex flex-col border-l border-green-100 dark:border-green-900">
       {/* Header */}
       <div className="bg-gradient-to-r from-green-700 to-emerald-800 text-white p-5 flex items-center justify-between shrink-0">
         <div>
@@ -329,13 +329,13 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
       {data && !loading && (
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 grid grid-cols-3 gap-3">
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-              <p className="text-xs text-green-600 font-medium">Workers</p>
-              <p className="text-2xl font-bold text-green-800">{data.total_qty}</p>
+            <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900 rounded-xl p-3 text-center">
+              <p className="text-xs text-green-600 dark:text-green-400 font-medium">Workers</p>
+              <p className="text-2xl font-bold text-green-800 dark:text-green-300">{data.total_qty}</p>
             </div>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-              <p className="text-xs text-emerald-600 font-medium">Total Amount</p>
-              <p className="text-xl font-bold text-emerald-800">{fmt(data.total_amount)}</p>
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-xl p-3 text-center">
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Total Amount</p>
+              <p className="text-xl font-bold text-emerald-800 dark:text-emerald-300">{fmt(data.total_amount)}</p>
             </div>
             <div className={`${cfg.bg} border ${cfg.border} rounded-xl p-3 text-center`}>
               <p className={`text-xs font-medium ${cfg.text}`}>Status</p>
@@ -345,25 +345,25 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
 
           <div className="px-4 pb-3">
             <div className="grid grid-cols-2 gap-2 text-sm">
-              {data.company && <div className="bg-slate-50 rounded-lg px-3 py-2"><p className="text-xs text-slate-400">Company</p><p className="font-medium">{data.company}</p></div>}
-              {data.wage_type && <div className="bg-slate-50 rounded-lg px-3 py-2"><p className="text-xs text-slate-400">Wage Type</p><p className="font-medium">{data.wage_type}</p></div>}
-              {data.start_date && <div className="bg-slate-50 rounded-lg px-3 py-2"><p className="text-xs text-slate-400">Period Start</p><p className="font-medium">{fmtDate(data.start_date)}</p></div>}
-              {data.end_date && <div className="bg-slate-50 rounded-lg px-3 py-2"><p className="text-xs text-slate-400">Period End</p><p className="font-medium">{fmtDate(data.end_date)}</p></div>}
-              {data.average_working_hours > 0 && <div className="bg-slate-50 rounded-lg px-3 py-2"><p className="text-xs text-slate-400">Avg Working Hrs</p><p className="font-medium">{data.average_working_hours}h</p></div>}
-              {data.wage_category && <div className="bg-slate-50 rounded-lg px-3 py-2"><p className="text-xs text-slate-400">Category</p><p className="font-medium">{data.wage_category}</p></div>}
+              {data.company && <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"><p className="text-xs text-slate-400 dark:text-slate-500">Company</p><p className="font-medium">{data.company}</p></div>}
+              {data.wage_type && <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"><p className="text-xs text-slate-400 dark:text-slate-500">Wage Type</p><p className="font-medium">{data.wage_type}</p></div>}
+              {data.start_date && <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"><p className="text-xs text-slate-400 dark:text-slate-500">Period Start</p><p className="font-medium">{fmtDate(data.start_date)}</p></div>}
+              {data.end_date && <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"><p className="text-xs text-slate-400 dark:text-slate-500">Period End</p><p className="font-medium">{fmtDate(data.end_date)}</p></div>}
+              {data.average_working_hours > 0 && <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"><p className="text-xs text-slate-400 dark:text-slate-500">Avg Working Hrs</p><p className="font-medium">{data.average_working_hours}h</p></div>}
+              {data.wage_category && <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"><p className="text-xs text-slate-400 dark:text-slate-500">Category</p><p className="font-medium">{data.wage_category}</p></div>}
             </div>
             {data.description && (
-              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">{stripHtml(data.description)}</div>
+              <div className="mt-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 text-sm text-amber-800 dark:text-amber-300">{stripHtml(data.description)}</div>
             )}
           </div>
 
-          <div className="px-4 pb-2 flex gap-2 border-b border-green-100">
+          <div className="px-4 pb-2 flex gap-2 border-b border-green-100 dark:border-green-900">
             <button onClick={() => setView("workers")}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${view === "workers" ? "bg-green-700 text-white shadow-sm" : "text-green-700 hover:bg-green-50"}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${view === "workers" ? "bg-green-700 text-white shadow-sm" : "text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40"}`}>
               <Users className="h-3.5 w-3.5 inline mr-1.5" />Workers ({data.wages.length})
             </button>
             <button onClick={() => setView("worktype")}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${view === "worktype" ? "bg-green-700 text-white shadow-sm" : "text-green-700 hover:bg-green-50"}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${view === "worktype" ? "bg-green-700 text-white shadow-sm" : "text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40"}`}>
               <Layers className="h-3.5 w-3.5 inline mr-1.5" />By Work Type ({data.work_breakdown.length})
             </button>
           </div>
@@ -372,9 +372,9 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
             <div className="p-4 space-y-3">
               {data.wages.length > 5 && (
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <input
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-white text-slate-900 border border-green-200 dark:border-green-900 dark:bg-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     placeholder="Search worker / type of work…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
@@ -382,43 +382,43 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
                 </div>
               )}
               {filteredWorkers.length === 0 ? (
-                <div className="text-center py-10 text-slate-400"><Users className="h-8 w-8 mx-auto mb-2 opacity-40" /><p>No workers</p></div>
+                <div className="text-center py-10 text-slate-400 dark:text-slate-500"><Users className="h-8 w-8 mx-auto mb-2 opacity-40" /><p>No workers</p></div>
               ) : (
                 filteredWorkers.map(w => (
-                  <div key={w.idx} className="rounded-xl border border-green-100 bg-white shadow-sm overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3 bg-green-50">
+                  <div key={w.idx} className="rounded-xl border border-green-100 dark:border-green-900 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-green-50 dark:bg-green-950/40">
                       <div>
-                        <p className="font-semibold text-slate-800">{w.name1 || `Worker #${w.idx}`}</p>
-                        <p className="text-xs text-green-700 mt-0.5">{w.type_of_work || "—"}</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">{w.name1 || `Worker #${w.idx}`}</p>
+                        <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">{w.type_of_work || "—"}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-green-800">{fmt(w.amount)}</p>
-                        <p className="text-xs text-slate-400">{fmtInt(w.qty)} × {fmt(w.rate)}</p>
+                        <p className="font-bold text-green-800 dark:text-green-300">{fmt(w.amount)}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{fmtInt(w.qty)} × {fmt(w.rate)}</p>
                       </div>
                     </div>
                     <div className="px-4 py-3 grid grid-cols-2 gap-2 text-sm">
-                      <div className="flex items-center gap-1.5 text-slate-600">
+                      <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                         <Clock className="h-3.5 w-3.5 text-green-500 shrink-0" />
                         <span className="text-xs">In: <b>{fmtTime(w.checkin)}</b></span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-slate-600">
+                      <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                         <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                         <span className="text-xs">Out: <b>{fmtTime(w.checkout)}</b></span>
                       </div>
                       {(w.checkin && w.checkout) && (
-                        <div className="flex items-center gap-1.5 text-slate-500 col-span-2">
-                          <CalendarDays className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 col-span-2">
+                          <CalendarDays className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                           <span className="text-xs">Duration: <b>{duration(w.checkin, w.checkout)}</b></span>
                         </div>
                       )}
                       {w.phone_no && (
                         <div className="flex items-center gap-1.5 col-span-2">
-                          <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <a href={`tel:${w.phone_no}`} className="text-xs text-green-700 hover:underline">{w.phone_no}</a>
+                          <Phone className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
+                          <a href={`tel:${w.phone_no}`} className="text-xs text-green-700 dark:text-green-300 hover:underline">{w.phone_no}</a>
                         </div>
                       )}
                       {w.description && (
-                        <div className="col-span-2 text-xs text-slate-500 bg-amber-50 rounded px-2 py-1">{stripHtml(w.description)}</div>
+                        <div className="col-span-2 text-xs text-slate-500 dark:text-slate-400 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1">{stripHtml(w.description)}</div>
                       )}
                     </div>
                   </div>
@@ -430,17 +430,17 @@ function DetailPanel({ entryName, onClose }: { entryName: string | null; onClose
           {view === "worktype" && (
             <div className="p-4">
               {data.work_breakdown.length === 0 ? (
-                <div className="text-center py-10 text-slate-400"><Layers className="h-8 w-8 mx-auto mb-2 opacity-40" /><p>No work type breakdown</p></div>
+                <div className="text-center py-10 text-slate-400 dark:text-slate-500"><Layers className="h-8 w-8 mx-auto mb-2 opacity-40" /><p>No work type breakdown</p></div>
               ) : (
                 <div className="space-y-2">
                   {data.work_breakdown.map((wt, i) => (
-                    <div key={i} className="rounded-xl border border-green-100 bg-white shadow-sm p-4">
+                    <div key={i} className="rounded-xl border border-green-100 dark:border-green-900 bg-white dark:bg-slate-800 shadow-sm p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-semibold text-slate-800">{wt.type_of_work || "—"}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{wt.no_of_workers} workers · {fmt(wt.total_qty)} qty · {fmt(wt.daily_wage)}/day</p>
+                          <p className="font-semibold text-slate-800 dark:text-slate-200">{wt.type_of_work || "—"}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{wt.no_of_workers} workers · {fmt(wt.total_qty)} qty · {fmt(wt.daily_wage)}/day</p>
                         </div>
-                        <p className="font-bold text-green-800 text-lg">{fmt(wt.total_amount)}</p>
+                        <p className="font-bold text-green-800 dark:text-green-300 text-lg">{fmt(wt.total_amount)}</p>
                       </div>
                     </div>
                   ))}
@@ -462,45 +462,45 @@ function WageEntryRow({ entry, onOpen }: { entry: WageEntry; onOpen: () => void 
     ? {
       label: "Checked out",
       title: "All check-ins have check-outs",
-      icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />,
-      cls: "bg-emerald-50 text-emerald-700 border-emerald-300",
+      icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />,
+      cls: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
     }
     : entry.checkout_state === "not_checked_out"
       ? {
         label: "Not checked out",
         title: "Has check-in rows pending check-out",
-        icon: <AlertCircle className="h-3.5 w-3.5 text-amber-600" />,
-        cls: "bg-amber-50 text-amber-700 border-amber-300",
+        icon: <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />,
+        cls: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800",
       }
       : {
         label: "—",
         title: "Legacy entry (before check-in/out tracking)",
-        icon: <Minus className="h-3.5 w-3.5 text-slate-500" />,
-        cls: "bg-slate-50 text-slate-600 border-slate-300",
+        icon: <Minus className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />,
+        cls: "bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-500",
       }
   return (
     <TableRow
-      className="hover:bg-green-50/60 cursor-pointer transition-colors group"
+      className="hover:bg-green-50/60 dark:hover:bg-green-950/60 cursor-pointer transition-colors group"
       onClick={onOpen}
     >
       <TableCell className="pl-4">
-        <p className="font-semibold text-slate-800 text-sm group-hover:text-green-700 transition-colors">{entry.name}</p>
-        {entry.wage_type && <p className="text-xs text-slate-400">{entry.wage_type}</p>}
+        <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm group-hover:text-green-700 dark:group-hover:text-green-300 transition-colors">{entry.name}</p>
+        {entry.wage_type && <p className="text-xs text-slate-400 dark:text-slate-500">{entry.wage_type}</p>}
       </TableCell>
-      <TableCell className="text-sm text-slate-700">{fmtDate(entry.date)}</TableCell>
+      <TableCell className="text-sm text-slate-700 dark:text-slate-200">{fmtDate(entry.date)}</TableCell>
       <TableCell>
-        <p className="text-sm text-slate-700 font-medium">{entry.project || "—"}</p>
-        {entry.stage && <p className="text-xs text-slate-400">{entry.stage}</p>}
+        <p className="text-sm text-slate-700 dark:text-slate-200 font-medium">{entry.project || "—"}</p>
+        {entry.stage && <p className="text-xs text-slate-400 dark:text-slate-500">{entry.stage}</p>}
       </TableCell>
-      <TableCell className="text-sm text-slate-500">{entry.company || "—"}</TableCell>
+      <TableCell className="text-sm text-slate-500 dark:text-slate-400">{entry.company || "—"}</TableCell>
       <TableCell className="text-center">
         <div className="flex items-center justify-center gap-1.5">
           <Users className="h-3.5 w-3.5 text-green-500" />
-          <span className="font-semibold text-slate-800 text-sm">{entry.total_qty}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{entry.total_qty}</span>
         </div>
       </TableCell>
       <TableCell className="text-right">
-        <span className="font-bold text-green-800 text-sm">{fmt(entry.total_amount, entry.currency)}</span>
+        <span className="font-bold text-green-800 dark:text-green-300 text-sm">{fmt(entry.total_amount, entry.currency)}</span>
       </TableCell>
       <TableCell className="text-center">
         <div className="inline-flex items-center gap-1.5">
@@ -517,7 +517,7 @@ function WageEntryRow({ entry, onOpen }: { entry: WageEntry; onOpen: () => void 
         </div>
       </TableCell>
       <TableCell className="pr-4">
-        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-green-600 transition-colors" />
+        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors" />
       </TableCell>
     </TableRow>
   )
@@ -610,7 +610,7 @@ export default function WageEntryReport() {
   const isCompanySelected = !!company
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 p-4 dark:bg-slate-900 dark:bg-none">
       {selectedEntry && <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={() => setSelectedEntry(null)} />}
       {selectedEntry && <DetailPanel entryName={selectedEntry} onClose={() => setSelectedEntry(null)} />}
 
@@ -620,7 +620,7 @@ export default function WageEntryReport() {
         <div className="flex items-center justify-between">
           <Button
             variant="outline"
-            className="border-green-300 text-green-700 hover:bg-green-50 flex items-center gap-2"
+            className="border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40 flex items-center gap-2"
             onClick={() => window.location.assign(`${window.location.origin}/app`)}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -631,41 +631,41 @@ export default function WageEntryReport() {
               <div className="p-2 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl text-white shadow-md">
                 <Leaf className="h-6 w-6" />
               </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-700 to-emerald-800 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-700 to-emerald-800 bg-clip-text text-transparent dark:from-green-400 dark:to-emerald-300">
                 Wage Entry Report
               </h1>
             </div>
-            <p className="text-slate-500 text-base">Track daily wages · worker check-in/out · project breakdowns</p>
+            <p className="text-slate-500 dark:text-slate-400 text-base">Track daily wages · worker check-in/out · project breakdowns</p>
           </div>
-          <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 flex items-center gap-2" onClick={reload} disabled={!isCompanySelected}>
+          <Button variant="outline" className="border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40 flex items-center gap-2" onClick={reload} disabled={!isCompanySelected}>
             <RefreshCw className={`h-4 w-4 ${sumLoading || listLoading ? "animate-spin" : ""}`} />Refresh
           </Button>
         </div>
 
         {/* ── Filters ── */}
-        <Card className="border-green-200 shadow-sm">
+        <Card className="border-green-200 dark:border-green-900 shadow-sm">
           <CardContent className="p-4">
             <div
               className="grid items-end gap-x-3 gap-y-1"
               style={{ gridTemplateColumns: "11rem 11rem 9rem 10rem 10rem 12rem auto" }}
             >
               {/* ── ROW 1: labels ── */}
-              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+              <label className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide flex items-center gap-1">
                 <Building2 className="h-3 w-3" />Company <span className="text-red-500">*</span>
               </label>
-              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+              <label className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide flex items-center gap-1">
                 <Briefcase className="h-3 w-3" />Project
               </label>
-              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+              <label className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide flex items-center gap-1">
                 <Filter className="h-3 w-3" />Status
               </label>
-              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-1">
+              <label className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide flex items-center gap-1">
                 <CalendarDays className="h-3 w-3" />Date From
               </label>
-              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+              <label className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">
                 Date To
               </label>
-              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+              <label className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">
                 Check-Out
               </label>
               {/* empty header cell for buttons column */}
@@ -701,17 +701,17 @@ export default function WageEntryReport() {
                 type="date"
                 value={dateFrom}
                 onChange={e => setDateFrom(e.target.value)}
-                className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white hover:border-green-400 w-full"
+                className="h-9 px-3 text-sm border border-green-200 dark:border-green-900 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white dark:bg-slate-800 hover:border-green-400 w-full text-slate-900 dark:text-slate-100"
                 disabled={!isCompanySelected}
               />
               <input
                 type="date"
                 value={dateTo}
                 onChange={e => setDateTo(e.target.value)}
-                className="h-9 px-3 text-sm border border-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white hover:border-green-400 w-full"
+                className="h-9 px-3 text-sm border border-green-200 dark:border-green-900 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 bg-white dark:bg-slate-800 hover:border-green-400 w-full text-slate-900 dark:text-slate-100"
                 disabled={!isCompanySelected}
               />
-              <label className="h-9 px-3 text-sm border border-green-200 rounded-md bg-white hover:border-green-400 w-full inline-flex items-center gap-2 cursor-pointer select-none">
+              <label className="h-9 px-3 text-sm border border-green-200 dark:border-green-900 rounded-md bg-white dark:bg-slate-800 hover:border-green-400 w-full inline-flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={pendingCheckout}
@@ -719,14 +719,14 @@ export default function WageEntryReport() {
                   className="h-4 w-4 accent-amber-600"
                   disabled={!isCompanySelected}
                 />
-                <span className="text-slate-700">Pending only</span>
+                <span className="text-slate-700 dark:text-slate-200">Pending only</span>
               </label>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap" onClick={setToday} disabled={!isCompanySelected}>
+                <Button size="sm" variant="outline" className="border-green-300 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40 whitespace-nowrap" onClick={setToday} disabled={!isCompanySelected}>
                   Today
                 </Button>
                 {(dateFrom || dateTo || pendingCheckout) && (
-                  <Button size="sm" variant="ghost" className="text-slate-400 hover:text-slate-600" onClick={clearDates}>
+                  <Button size="sm" variant="ghost" className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" onClick={clearDates}>
                     Clear
                   </Button>
                 )}
@@ -735,7 +735,7 @@ export default function WageEntryReport() {
             
             {/* Warning message when no company selected */}
             {!isCompanySelected && (
-              <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center gap-2">
+              <div className="mt-3 text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg p-2 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 Please select a company to view wage entries
               </div>
@@ -756,7 +756,7 @@ export default function WageEntryReport() {
         </div>
 
         {/* ── Main card ── */}
-        <Card className="border-green-200 shadow-lg">
+        <Card className="border-green-200 dark:border-green-900 shadow-lg">
           <CardHeader className="bg-gradient-to-r from-green-700 to-emerald-800 text-white rounded-t-lg p-0">
             <div className="flex items-center">
               {TABS.map((t, i) => (
@@ -777,20 +777,20 @@ export default function WageEntryReport() {
 
               <div className="flex items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <input
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300"
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-white text-slate-900 border border-green-200 dark:border-green-900 dark:bg-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-300 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     placeholder="Search entry / project / stage…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     disabled={!isCompanySelected}
                   />
                 </div>
-                <p className="text-sm text-slate-500 ml-auto">{isCompanySelected ? `${filteredEntries.length} entries` : "Select a company"}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 ml-auto">{isCompanySelected ? `${filteredEntries.length} entries` : "Select a company"}</p>
               </div>
 
               {!isCompanySelected ? (
-                <div className="text-center py-20 text-slate-400">
+                <div className="text-center py-20 text-slate-400 dark:text-slate-500">
                   <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30"/>
                   <p className="font-medium">Please select a company</p>
                   <p className="text-sm">Choose a company from the dropdown above to view wage entries</p>
@@ -798,23 +798,23 @@ export default function WageEntryReport() {
               ) : listLoading ? (
                 <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-green-500 animate-spin"/></div>
               ) : filteredEntries.length === 0 ? (
-                <div className="text-center py-20 text-slate-400">
+                <div className="text-center py-20 text-slate-400 dark:text-slate-500">
                   <TreePine className="h-12 w-12 mx-auto mb-3 opacity-30"/>
                   <p className="font-medium">No wage entries found</p>
                   <p className="text-sm">Try adjusting your filters</p>
                 </div>
               ) : (
-                <div className="rounded-xl border border-green-100 overflow-hidden">
+                <div className="rounded-xl border border-green-100 dark:border-green-900 overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-green-50">
-                        <TableHead className="text-green-800 text-xs font-semibold pl-4">Entry</TableHead>
-                        <TableHead className="text-green-800 text-xs font-semibold">Date</TableHead>
-                        <TableHead className="text-green-800 text-xs font-semibold">Project / Stage</TableHead>
-                        <TableHead className="text-green-800 text-xs font-semibold">Company</TableHead>
-                        <TableHead className="text-green-800 text-xs font-semibold text-center">Workers</TableHead>
-                        <TableHead className="text-green-800 text-xs font-semibold text-right">Amount</TableHead>
-                        <TableHead className="text-green-800 text-xs font-semibold text-center">Status</TableHead>
+                      <TableRow className="bg-green-50 dark:bg-green-950/40">
+                        <TableHead className="text-green-800 dark:text-green-300 text-xs font-semibold pl-4">Entry</TableHead>
+                        <TableHead className="text-green-800 dark:text-green-300 text-xs font-semibold">Date</TableHead>
+                        <TableHead className="text-green-800 dark:text-green-300 text-xs font-semibold">Project / Stage</TableHead>
+                        <TableHead className="text-green-800 dark:text-green-300 text-xs font-semibold">Company</TableHead>
+                        <TableHead className="text-green-800 dark:text-green-300 text-xs font-semibold text-center">Workers</TableHead>
+                        <TableHead className="text-green-800 dark:text-green-300 text-xs font-semibold text-right">Amount</TableHead>
+                        <TableHead className="text-green-800 dark:text-green-300 text-xs font-semibold text-center">Status</TableHead>
                         <TableHead className="pr-4"/>
                       </TableRow>
                     </TableHeader>
@@ -832,9 +832,9 @@ export default function WageEntryReport() {
           {/* ── TREND TAB ── */}
           {tab === "trend" && (
             <CardContent className="p-6 space-y-4">
-              <p className="text-sm text-slate-500">Daily wage amounts — last 30 days</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Daily wage amounts — last 30 days</p>
               {!isCompanySelected ? (
-                <div className="text-center py-16 text-slate-400">
+                <div className="text-center py-16 text-slate-400 dark:text-slate-500">
                   <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30"/>
                   <p className="font-medium">Please select a company</p>
                   <p className="text-sm">Choose a company to view wage trends</p>
@@ -843,7 +843,7 @@ export default function WageEntryReport() {
                 <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-green-500 animate-spin"/></div>
               ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <Card className="border-green-100 shadow-sm">
+                  <Card className="border-green-100 dark:border-green-900 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-green-700 to-emerald-800 text-white rounded-t-lg px-5 py-3">
                       <CardTitle className="flex items-center gap-2 text-sm font-semibold"><DollarSign className="h-4 w-4"/>Daily Amount (30 days)</CardTitle>
                     </CardHeader>
@@ -860,7 +860,7 @@ export default function WageEntryReport() {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-green-100 shadow-sm">
+                  <Card className="border-green-100 dark:border-green-900 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-green-700 to-emerald-800 text-white rounded-t-lg px-5 py-3">
                       <CardTitle className="flex items-center gap-2 text-sm font-semibold"><Users className="h-4 w-4"/>Daily Workers (30 days)</CardTitle>
                     </CardHeader>

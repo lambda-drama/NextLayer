@@ -56,22 +56,22 @@ function fmtDate(d: string | null | undefined): string {
 // ── Status configs ────────────────────────────────────────────────────────────
 
 const FINANCIAL_STATUS: Record<UnitPaymentStatus, { label: string; border: string; bg: string; dot: string; badge: string }> = {
-  paid:        { label: "Paid",        border: "border-emerald-300", bg: "bg-emerald-50", dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  outstanding: { label: "Outstanding", border: "border-amber-300",   bg: "bg-amber-50",   dot: "bg-amber-500",  badge: "bg-amber-100 text-amber-800 border-amber-200" },
-  overdue:     { label: "Overdue",     border: "border-red-400",     bg: "bg-red-50",     dot: "bg-red-500",    badge: "bg-red-100 text-red-800 border-red-200" },
-  no_invoice:  { label: "No Invoice",  border: "border-slate-200",   bg: "bg-slate-50",   dot: "bg-slate-400",  badge: "bg-slate-100 text-slate-600 border-slate-200" },
+  paid:        { label: "Paid",        border: "border-emerald-300 dark:border-emerald-800", bg: "bg-emerald-50 dark:bg-emerald-950/40", dot: "bg-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900" },
+  outstanding: { label: "Outstanding", border: "border-amber-300 dark:border-amber-800",   bg: "bg-amber-50 dark:bg-amber-950/40",   dot: "bg-amber-500",  badge: "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-900" },
+  overdue:     { label: "Overdue",     border: "border-red-400",     bg: "bg-red-50 dark:bg-red-950/40",     dot: "bg-red-500",    badge: "bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900" },
+  no_invoice:  { label: "No Invoice",  border: "border-slate-200 dark:border-slate-600",   bg: "bg-slate-50 dark:bg-slate-800/60",   dot: "bg-slate-400",  badge: "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600" },
 }
 const UNIT_STATUS: Record<UnitPayStatus, { label: string; border: string; bg: string; dot: string; badge: string }> = {
-  paid:        { label: "Paid",        border: "border-emerald-300", bg: "bg-emerald-50", dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  outstanding: { label: "Outstanding", border: "border-amber-300",   bg: "bg-amber-50",   dot: "bg-amber-500",  badge: "bg-amber-100 text-amber-800 border-amber-200" },
-  overdue:     { label: "Overdue",     border: "border-red-400",     bg: "bg-red-50",     dot: "bg-red-500",    badge: "bg-red-100 text-red-800 border-red-200" },
-  vacant:      { label: "Vacant",      border: "border-slate-200",   bg: "bg-slate-50",   dot: "bg-slate-400",  badge: "bg-slate-100 text-slate-500 border-slate-200" },
+  paid:        { label: "Paid",        border: "border-emerald-300 dark:border-emerald-800", bg: "bg-emerald-50 dark:bg-emerald-950/40", dot: "bg-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900" },
+  outstanding: { label: "Outstanding", border: "border-amber-300 dark:border-amber-800",   bg: "bg-amber-50 dark:bg-amber-950/40",   dot: "bg-amber-500",  badge: "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-900" },
+  overdue:     { label: "Overdue",     border: "border-red-400",     bg: "bg-red-50 dark:bg-red-950/40",     dot: "bg-red-500",    badge: "bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900" },
+  vacant:      { label: "Vacant",      border: "border-slate-200 dark:border-slate-600",   bg: "bg-slate-50 dark:bg-slate-800/60",   dot: "bg-slate-400",  badge: "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600" },
 }
 const MONTH_STATUS: Record<string, { bg: string; text: string; border: string }> = {
   paid:        { bg: "bg-emerald-500", text: "text-white", border: "border-emerald-500" },
   outstanding: { bg: "bg-amber-400",  text: "text-white", border: "border-amber-400" },
   overdue:     { bg: "bg-red-500",    text: "text-white", border: "border-red-500" },
-  no_invoice:  { bg: "bg-slate-200",  text: "text-slate-500", border: "border-slate-200" },
+  no_invoice:  { bg: "bg-slate-200 dark:bg-slate-600",  text: "text-slate-500 dark:text-slate-400", border: "border-slate-200 dark:border-slate-600" },
 }
 const LEASE_COLORS: Record<string, string> = {
   Active: "#f59e0b",
@@ -156,27 +156,27 @@ function CompanySearchableCombobox({
         className={`
           w-full h-9 px-3 pr-8 text-sm text-left rounded-md border
           flex items-center justify-between gap-2 transition-all duration-150
-          ${disabled ? "opacity-60 cursor-not-allowed border-emerald-100 bg-slate-50" : ""}
+          ${disabled ? "opacity-60 cursor-not-allowed border-emerald-100 dark:border-emerald-900 bg-slate-50 dark:bg-slate-800/60" : ""}
           ${!disabled && open
-            ? "border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50"
-            : !disabled ? "border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/40" : ""
+            ? "border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50 dark:bg-emerald-950/40"
+            : !disabled ? "border-emerald-200 dark:border-emerald-900 bg-white dark:bg-slate-800 hover:border-emerald-400 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/40" : ""
           }
-          ${!value ? "text-slate-400" : "text-slate-700 font-medium"}
+          ${!value ? "text-slate-400 dark:text-slate-500" : "text-slate-700 dark:text-slate-200 font-medium"}
         `}
       >
         <span className="truncate">{selectedLabel}</span>
-        <ChevronDown className={`h-3.5 w-3.5 text-emerald-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
         <div className="
           absolute left-0 top-full mt-1 z-50 min-w-full w-max max-w-xs
           rounded-xl border border-emerald-200 shadow-xl
-          bg-white overflow-hidden
+          bg-white dark:border-emerald-900 dark:bg-slate-700 overflow-hidden
         ">
-          <div className="p-2 border-b border-emerald-100 bg-emerald-50/80">
+          <div className="p-2 border-b border-emerald-100 dark:border-emerald-900 bg-emerald-50/80 dark:bg-emerald-950/80">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-600" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               <input
                 ref={inputRef}
                 type="text"
@@ -185,9 +185,9 @@ function CompanySearchableCombobox({
                 placeholder="Search…"
                 className="
                   w-full pl-8 pr-3 py-1.5 text-sm rounded-lg
-                  border border-emerald-200 bg-white
+                  border border-emerald-200 bg-white dark:border-emerald-900 dark:bg-slate-800
                   focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400
-                  placeholder:text-emerald-300 text-slate-700
+                  placeholder:text-emerald-300 text-slate-700 dark:text-slate-100
                 "
               />
             </div>
@@ -195,7 +195,7 @@ function CompanySearchableCombobox({
 
           <div className="max-h-52 overflow-y-auto">
             {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-slate-500 text-center">No results</div>
+              <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400 text-center">No results</div>
             ) : (
               filtered.map(opt => (
                 <button
@@ -206,7 +206,7 @@ function CompanySearchableCombobox({
                     w-full text-left px-3 py-2 text-sm transition-colors
                     ${opt.value === value
                       ? "bg-emerald-600 text-white font-semibold"
-                      : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-900"
+                      : "text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-900 dark:hover:text-emerald-200"
                     }
                   `}
                 >
@@ -242,13 +242,13 @@ function KpiCard({ icon, label, value, sub, tone = "green", onClick }: KpiCardPr
   const body = (
     <>
       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g[tone]} text-white flex items-center justify-center shadow-sm`}>{icon}</div>
-      <p className="text-2xl font-bold text-slate-800 mt-3">{value}</p>
-      <p className="text-sm font-medium text-slate-500 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200 mt-3">{value}</p>
+      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>}
     </>
   )
   const cardClass =
-    "overflow-hidden rounded-xl border border-emerald-100/80 bg-white shadow-sm hover:shadow-md transition-shadow" +
+    "overflow-hidden rounded-xl border border-emerald-100/80 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-shadow" +
     (onClick ? " hover:border-emerald-300/70 cursor-pointer w-full text-left" : "")
   if (onClick) {
     return (
@@ -272,11 +272,11 @@ type MetricTone = "default" | "green" | "red" | "amber" | "blue"
 interface MetricRow { label: string; value: string | number; tone?: MetricTone }
 
 const TONE_VALUE: Record<MetricTone, string> = {
-  default: "text-slate-800",
-  green:   "text-emerald-600",
-  red:     "text-red-600",
-  amber:   "text-amber-600",
-  blue:    "text-emerald-700",
+  default: "text-slate-800 dark:text-slate-200",
+  green:   "text-emerald-600 dark:text-emerald-400",
+  red:     "text-red-600 dark:text-red-400",
+  amber:   "text-amber-600 dark:text-amber-400",
+  blue:    "text-emerald-700 dark:text-emerald-300",
 }
 
 type MetricRowNav = MetricRow & { onNavigate?: () => void }
@@ -292,12 +292,12 @@ interface SummaryCardProps {
 function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: SummaryCardProps) {
   const safeGradient = "from-emerald-600 to-teal-700"
   return (
-    <Card className="border-slate-200 shadow-md overflow-hidden">
+    <Card className="border-slate-200 dark:border-slate-600 shadow-md overflow-hidden">
       <div className={`bg-gradient-to-r ${safeGradient} text-white px-5 py-3.5 flex items-center gap-2.5`}>
         <div className="p-1.5 bg-white/20 rounded-lg">{icon}</div>
         <span className="font-bold text-base">{title}</span>
       </div>
-      <CardContent className="p-0 divide-y divide-slate-100">
+      <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-700">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <RefreshCw className="h-5 w-5 text-emerald-400 animate-spin"/>
@@ -309,32 +309,32 @@ function SummaryCard({ title, icon, gradient, loading, rows = [], pairs = [] }: 
               if (r.onNavigate) {
                 return (
                   <button key={i} type="button" onClick={r.onNavigate}
-                    className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-emerald-50/90 transition-colors">
-                    <span className="text-sm text-slate-500">{r.label}</span>
+                    className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-emerald-50/90 dark:hover:bg-emerald-950/90 transition-colors">
+                    <span className="text-sm text-slate-500 dark:text-slate-400">{r.label}</span>
                     {val}
                   </button>
                 )
               }
               return (
                 <div key={i} className="flex items-center justify-between px-5 py-3">
-                  <span className="text-sm text-slate-500">{r.label}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">{r.label}</span>
                   {val}
                 </div>
               )
             })}
             {pairs.length > 0 && (
-              <div className="grid grid-cols-2 divide-x divide-slate-100">
+              <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700">
                 {pairs.map((p, i) => {
                   const body = (
                     <>
                       <span className={`text-xl font-extrabold ${TONE_VALUE[p.tone ?? "default"]}`}>{p.value}</span>
-                      <span className="text-xs text-slate-400 mt-0.5 text-center">{p.label}</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 text-center">{p.label}</span>
                     </>
                   )
                   if (p.onNavigate) {
                     return (
                       <button key={i} type="button" onClick={p.onNavigate}
-                        className="flex flex-col items-center py-4 px-3 hover:bg-emerald-50/90 transition-colors">
+                        className="flex flex-col items-center py-4 px-3 hover:bg-emerald-50/90 dark:hover:bg-emerald-950/90 transition-colors">
                         {body}
                       </button>
                     )
@@ -369,12 +369,12 @@ function MonthTile({ m }: { m: MonthBreakdown }) {
       </div>
       {hover && m.status !== "no_invoice" && (
         <div className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-2 w-36
-          bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 text-xs pointer-events-none">
-          <p className="font-semibold text-slate-700 mb-1">{m.month_label}</p>
+          bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 text-xs pointer-events-none dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100">
+          <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">{m.month_label}</p>
           <div className="space-y-1">
-            <div className="flex justify-between"><span className="text-slate-500">Invoiced</span><span className="font-medium">{fmt(m.invoiced)}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">Paid</span><span className="font-medium text-emerald-700">{fmt(m.paid)}</span></div>
-            {m.outstanding > 0 && <div className="flex justify-between"><span className="text-slate-500">Due</span><span className="font-medium text-amber-700">{fmt(m.outstanding)}</span></div>}
+            <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Invoiced</span><span className="font-medium">{fmt(m.invoiced)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Paid</span><span className="font-medium text-emerald-700 dark:text-emerald-300">{fmt(m.paid)}</span></div>
+            {m.outstanding > 0 && <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Due</span><span className="font-medium text-amber-700 dark:text-amber-300">{fmt(m.outstanding)}</span></div>}
           </div>
         </div>
       )}
@@ -397,7 +397,7 @@ function UnitDetailPanel({
   const { data: breakdown, loading: bkLoading } = useUnitMonthBreakdown(unitName, company)
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col border-l border-emerald-100">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white dark:bg-slate-800 shadow-2xl flex flex-col border-l border-emerald-100 dark:border-emerald-900">
       <div className="bg-gradient-to-r from-emerald-700 to-teal-800 text-white p-5 flex items-center justify-between shrink-0">
         <div>
           <h2 className="text-lg font-bold flex items-center gap-2">
@@ -416,41 +416,41 @@ function UnitDetailPanel({
       {error && <div className="p-4"><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>}
 
       {data && !loading && (
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
           <section className="p-5">
             <div className="flex items-center gap-3 flex-wrap">
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                data.unit_status === "Occupied" ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                : "bg-slate-50 text-slate-600 border-slate-200"
+                data.unit_status === "Occupied" ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                : "bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600"
               }`}>{data.unit_status}</span>
               {data.contract && (
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900">
                   Active Contract
                 </span>
               )}
             </div>
             {(data as any)?.area || (data as any)?.floor ? (
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                {(data as any).area && <div><p className="text-slate-400 text-xs">Area</p><p className="font-medium">{(data as any).area}</p></div>}
-                {(data as any).floor && <div><p className="text-slate-400 text-xs">Floor</p><p className="font-medium">{(data as any).floor}</p></div>}
+                {(data as any).area && <div><p className="text-slate-400 dark:text-slate-500 text-xs">Area</p><p className="font-medium">{(data as any).area}</p></div>}
+                {(data as any).floor && <div><p className="text-slate-400 dark:text-slate-500 text-xs">Floor</p><p className="font-medium">{(data as any).floor}</p></div>}
               </div>
             ) : null}
           </section>
 
           {data.tenant && (
             <section className="p-5">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5" />Current Tenant
               </h3>
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-2">
-                <p className="font-semibold text-slate-800 text-base">{data.tenant.tenant_name}</p>
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 rounded-xl p-4 space-y-2">
+                <p className="font-semibold text-slate-800 dark:text-slate-200 text-base">{data.tenant.tenant_name}</p>
                 {data.tenant.email && (
-                  <a href={`mailto:${data.tenant.email}`} className="flex items-center gap-2 text-sm text-emerald-700 hover:underline">
+                  <a href={`mailto:${data.tenant.email}`} className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300 hover:underline">
                     <Mail className="h-3.5 w-3.5 shrink-0" />{data.tenant.email}
                   </a>
                 )}
                 {data.tenant.mobile_no && (
-                  <a href={`tel:${data.tenant.mobile_no}`} className="flex items-center gap-2 text-sm text-slate-700 hover:underline">
+                  <a href={`tel:${data.tenant.mobile_no}`} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 hover:underline">
                     <Phone className="h-3.5 w-3.5 shrink-0" />{data.tenant.mobile_no}
                   </a>
                 )}
@@ -460,36 +460,36 @@ function UnitDetailPanel({
 
           {data.contract && (
             <section className="p-5">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
                 <FileText className="h-3.5 w-3.5" />Contract Details
               </h3>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-slate-400 text-xs">Monthly Rent</p>
-                  <p className="font-bold text-emerald-700 text-lg">{fmt(data.contract.monthly_rent)}</p>
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-3">
+                  <p className="text-slate-400 dark:text-slate-500 text-xs">Monthly Rent</p>
+                  <p className="font-bold text-emerald-700 dark:text-emerald-300 text-lg">{fmt(data.contract.monthly_rent)}</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-slate-400 text-xs">Company</p>
-                  <p className="font-medium text-slate-700">{data.contract.company}</p>
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-3">
+                  <p className="text-slate-400 dark:text-slate-500 text-xs">Company</p>
+                  <p className="font-medium text-slate-700 dark:text-slate-200">{data.contract.company}</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-slate-400 text-xs">Start Date</p>
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-3">
+                  <p className="text-slate-400 dark:text-slate-500 text-xs">Start Date</p>
                   <p className="font-medium">{fmtDate(data.contract.start_date)}</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-slate-400 text-xs">End Date</p>
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-3">
+                  <p className="text-slate-400 dark:text-slate-500 text-xs">End Date</p>
                   <p className="font-medium">{fmtDate(data.contract.end_date)}</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 col-span-2">
-                  <p className="text-slate-400 text-xs">Contract</p>
-                  <p className="font-medium text-xs text-slate-700">{data.contract.name}</p>
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-3 col-span-2">
+                  <p className="text-slate-400 dark:text-slate-500 text-xs">Contract</p>
+                  <p className="font-medium text-xs text-slate-700 dark:text-slate-200">{data.contract.name}</p>
                 </div>
               </div>
             </section>
           )}
 
           <section className="p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5" />12-Month Payment History
             </h3>
             {bkLoading ? (
@@ -499,7 +499,7 @@ function UnitDetailPanel({
                 <div className="grid grid-cols-6 gap-1.5 mb-3">
                   {breakdown.map(m => <MonthTile key={m.month_label} m={m} />)}
                 </div>
-                <div className="flex gap-4 text-xs text-slate-500 flex-wrap">
+                <div className="flex gap-4 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                   {Object.entries(MONTH_STATUS).map(([k, v]) => (
                     <div key={k} className="flex items-center gap-1">
                       <span className={`inline-block h-2.5 w-2.5 rounded-sm ${v.bg}`} />
@@ -512,34 +512,34 @@ function UnitDetailPanel({
           </section>
 
           <section className="p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
               <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
               Pending Invoices
               {data.pending_invoices.length > 0 && (
-                <span className="bg-amber-100 text-amber-700 text-xs px-1.5 rounded-full ml-1">{data.pending_invoices.length}</span>
+                <span className="bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-xs px-1.5 rounded-full ml-1">{data.pending_invoices.length}</span>
               )}
             </h3>
             {data.pending_invoices.length === 0 ? (
               <div className="text-center py-6">
                 <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-400" />
-                <p className="text-sm text-slate-400">All invoices paid</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">All invoices paid</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {data.pending_invoices.map(inv => {
                   const isOverdue = inv.due_date && new Date(inv.due_date) < new Date()
                   return (
-                    <div key={inv.name} className={`rounded-lg border p-3 text-sm ${isOverdue ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+                    <div key={inv.name} className={`rounded-lg border p-3 text-sm ${isOverdue ? "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40" : "border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40"}`}>
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-slate-700">{inv.custom_invoice_no || inv.name}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">Posted: {fmtDate(inv.posting_date)}</p>
-                          <p className="text-xs text-slate-400">Due: {fmtDate(inv.due_date)}</p>
+                          <p className="font-medium text-slate-700 dark:text-slate-200">{inv.custom_invoice_no || inv.name}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Posted: {fmtDate(inv.posting_date)}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">Due: {fmtDate(inv.due_date)}</p>
                         </div>
                         <div className="text-right shrink-0 ml-3">
-                          <p className={`font-bold text-base ${isOverdue ? "text-red-700" : "text-amber-700"}`}>{fmt(inv.outstanding_amount)}</p>
-                          <p className="text-xs text-slate-400">of {fmt(inv.grand_total)}</p>
-                          {isOverdue && <span className="text-[10px] font-semibold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">OVERDUE</span>}
+                          <p className={`font-bold text-base ${isOverdue ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"}`}>{fmt(inv.outstanding_amount)}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">of {fmt(inv.grand_total)}</p>
+                          {isOverdue && <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950/60 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">OVERDUE</span>}
                         </div>
                       </div>
                     </div>
@@ -550,25 +550,25 @@ function UnitDetailPanel({
           </section>
 
           <section className="p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5 text-emerald-300" />Recent Invoice History
             </h3>
             {data.invoice_history.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-4">No history</p>
+              <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-4">No history</p>
             ) : (
               <div className="space-y-1.5">
                 {data.invoice_history.map(inv => {
                   const isPaid = inv.outstanding_amount === 0
                   const paid = inv.grand_total - inv.outstanding_amount
                   return (
-                    <div key={inv.name} className="flex items-center justify-between rounded-lg bg-white border border-slate-100 px-3 py-2.5">
+                    <div key={inv.name} className="flex items-center justify-between rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-3 py-2.5">
                       <div>
-                        <p className="font-medium text-slate-700 text-xs">{inv.custom_invoice_no || inv.name}</p>
-                        <p className="text-xs text-slate-400">{fmtDate(inv.posting_date)}</p>
+                        <p className="font-medium text-slate-700 dark:text-slate-200 text-xs">{inv.custom_invoice_no || inv.name}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{fmtDate(inv.posting_date)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-slate-700 text-xs">{fmt(inv.grand_total)}</p>
-                        <span className={`text-xs font-medium ${isPaid ? "text-emerald-600" : "text-amber-600"}`}>
+                        <p className="font-medium text-slate-700 dark:text-slate-200 text-xs">{fmt(inv.grand_total)}</p>
+                        <span className={`text-xs font-medium ${isPaid ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                           {isPaid ? "✓ Paid" : `${fmt(paid)} paid`}
                         </span>
                       </div>
@@ -581,17 +581,17 @@ function UnitDetailPanel({
 
           {data.expenses.length > 0 && (
             <section className="p-5">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
                 <Wallet className="h-3.5 w-3.5 text-purple-400" />Related Expenses
               </h3>
               <div className="space-y-1.5">
                 {data.expenses.map(exp => (
-                  <div key={exp.name} className="flex items-center justify-between rounded-lg bg-purple-50 border border-purple-100 px-3 py-2.5">
+                  <div key={exp.name} className="flex items-center justify-between rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900 px-3 py-2.5">
                     <div>
-                      <p className="font-medium text-slate-700 text-xs truncate max-w-[200px]">{exp.description || exp.name}</p>
-                      <p className="text-xs text-slate-400">{fmtDate(exp.posting_date)}</p>
+                      <p className="font-medium text-slate-700 dark:text-slate-200 text-xs truncate max-w-[200px]">{exp.description || exp.name}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">{fmtDate(exp.posting_date)}</p>
                     </div>
-                    <p className="font-medium text-purple-700 text-xs shrink-0 ml-2">{fmt(exp.amount)}</p>
+                    <p className="font-medium text-purple-700 dark:text-purple-300 text-xs shrink-0 ml-2">{fmt(exp.amount)}</p>
                   </div>
                 ))}
               </div>
@@ -616,17 +616,17 @@ function UnitCard({ unit, statusCfg, outstandingLabel, overdueLabel, monthlyRent
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full ${statusCfg.dot}`} />
-          <span className="font-semibold text-slate-800 text-sm truncate max-w-[110px]">{unit}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate max-w-[110px]">{unit}</span>
         </div>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${statusCfg.badge}`}>{statusCfg.label}</span>
       </div>
-      <p className="text-xs text-slate-500 truncate mb-3">{tenantName || "—"}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-3">{tenantName || "—"}</p>
       <div className="space-y-1">
-        {overdueLabel > 0 && <div className="flex justify-between text-xs"><span className="text-slate-500">Overdue</span><span className="font-semibold text-red-700">{fmt(overdueLabel)}</span></div>}
-        {outstandingLabel > 0 && <div className="flex justify-between text-xs"><span className="text-slate-500">Outstanding</span><span className="font-semibold text-amber-700">{fmt(outstandingLabel)}</span></div>}
-        <div className="flex justify-between text-xs"><span className="text-slate-500">Monthly Rent</span><span className="font-medium text-slate-700">{fmt(monthlyRent)}</span></div>
+        {overdueLabel > 0 && <div className="flex justify-between text-xs"><span className="text-slate-500 dark:text-slate-400">Overdue</span><span className="font-semibold text-red-700 dark:text-red-300">{fmt(overdueLabel)}</span></div>}
+        {outstandingLabel > 0 && <div className="flex justify-between text-xs"><span className="text-slate-500 dark:text-slate-400">Outstanding</span><span className="font-semibold text-amber-700 dark:text-amber-300">{fmt(outstandingLabel)}</span></div>}
+        <div className="flex justify-between text-xs"><span className="text-slate-500 dark:text-slate-400">Monthly Rent</span><span className="font-medium text-slate-700 dark:text-slate-200">{fmt(monthlyRent)}</span></div>
       </div>
-      <div className="mt-3 flex justify-end"><ChevronRight className="h-4 w-4 text-slate-400" /></div>
+      <div className="mt-3 flex justify-end"><ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500" /></div>
     </button>
   )
 }
@@ -638,37 +638,37 @@ function PropertyCard({ prop, onUnitClick }: { prop: PropertyFinancial; onUnitCl
   const hasIssues = prop.total_outstanding > 0
 
   return (
-    <Card className={`border-2 transition-shadow hover:shadow-md ${hasIssues ? "border-amber-200" : "border-slate-200"}`}>
+    <Card className={`border-2 transition-shadow hover:shadow-md ${hasIssues ? "border-amber-200 dark:border-amber-900" : "border-slate-200 dark:border-slate-600"}`}>
       <button className="w-full text-left" onClick={() => setOpen(v => !v)}>
         <div className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <Building2 className="h-4 w-4 text-emerald-700 shrink-0" />
-                <span className="font-semibold text-slate-800 truncate">{prop.property_name}</span>
+                <Building2 className="h-4 w-4 text-emerald-700 dark:text-emerald-300 shrink-0" />
+                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{prop.property_name}</span>
               </div>
-              {prop.address && <p className="text-xs text-slate-400 flex items-center gap-1 mb-2"><MapPin className="h-3 w-3" />{prop.address}</p>}
+              {prop.address && <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1 mb-2"><MapPin className="h-3 w-3" />{prop.address}</p>}
               <div className="flex flex-wrap gap-2">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{prop.total_units} units</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{prop.occupied} occupied</span>
-                {prop.vacant > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{prop.vacant} vacant</span>}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">{prop.total_units} units</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">{prop.occupied} occupied</span>
+                {prop.vacant > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">{prop.vacant} vacant</span>}
               </div>
             </div>
             <div className="text-right shrink-0">
-              {prop.total_overdue > 0 && <p className="text-xs text-red-600 font-semibold">{fmt(prop.total_overdue)} overdue</p>}
-              {prop.total_outstanding > 0 && <p className="text-xs text-amber-700 font-medium">{fmt(prop.total_outstanding)} outstanding</p>}
-              <p className="text-xs text-slate-400 mt-0.5">{fmt(prop.total_monthly_rent)}/mo rent</p>
+              {prop.total_overdue > 0 && <p className="text-xs text-red-600 dark:text-red-400 font-semibold">{fmt(prop.total_overdue)} overdue</p>}
+              {prop.total_outstanding > 0 && <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">{fmt(prop.total_outstanding)} outstanding</p>}
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{fmt(prop.total_monthly_rent)}/mo rent</p>
             </div>
           </div>
         </div>
-        <div className="px-4 pb-3 flex items-center gap-1 text-xs text-emerald-700 font-medium">
+        <div className="px-4 pb-3 flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300 font-medium">
           {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           {open ? "Hide units" : `View ${prop.units.length} units`}
         </div>
       </button>
 
       {open && (
-        <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+        <div className="border-t border-slate-100 dark:border-slate-700 px-4 pb-4 pt-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {prop.units.map(u => {
               const status: UnitPayStatus =
@@ -678,14 +678,14 @@ function PropertyCard({ prop, onUnitClick }: { prop: PropertyFinancial; onUnitCl
                 <button key={u.name} onClick={() => onUnitClick(u.name)}
                   className={`flex items-center justify-between rounded-lg border ${cfg.border} ${cfg.bg} px-3 py-2 hover:shadow-sm transition-all text-left`}>
                   <div>
-                    <p className="font-medium text-slate-800 text-sm">{u.name}</p>
-                    <p className="text-xs text-slate-500">{u.tenant_name || "Vacant"}</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-200 text-sm">{u.name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{u.tenant_name || "Vacant"}</p>
                   </div>
                   <div className="text-right ml-2 shrink-0">
-                    {u.overdue > 0 && <p className="text-xs font-bold text-red-700">{fmt(u.overdue)}</p>}
-                    {u.outstanding > 0 && u.overdue === 0 && <p className="text-xs font-semibold text-amber-700">{fmt(u.outstanding)}</p>}
+                    {u.overdue > 0 && <p className="text-xs font-bold text-red-700 dark:text-red-300">{fmt(u.overdue)}</p>}
+                    {u.outstanding > 0 && u.overdue === 0 && <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{fmt(u.outstanding)}</p>}
                     {u.outstanding === 0 && <CheckCircle2 className="h-4 w-4 text-emerald-500 ml-auto" />}
-                    <ChevronRight className="h-3 w-3 text-slate-400 mt-0.5 ml-auto" />
+                    <ChevronRight className="h-3 w-3 text-slate-400 dark:text-slate-500 mt-0.5 ml-auto" />
                   </div>
                 </button>
               )
@@ -886,7 +886,7 @@ export default function PMSDashboard() {
   }, [propsData, propSearch, propertyQuickFilter])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4 dark:bg-slate-900 dark:bg-none">
       {selectedUnit && <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={() => setSelectedUnit(null)} />}
       {selectedUnit && (
         <UnitDetailPanel
@@ -909,10 +909,10 @@ export default function PMSDashboard() {
             Back to Desk
           </Button>
           <div className="text-center space-y-2 flex-1">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-teal-800 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-teal-800 bg-clip-text text-transparent dark:from-emerald-400 dark:to-teal-300">
               Property Management Dashboard
             </h1>
-            <p className="text-gray-600 text-lg">Portfolio overview · financial health · occupancy analytics</p>
+            <p className="text-slate-600 dark:text-slate-300 text-lg">Portfolio overview · financial health · occupancy analytics</p>
           </div>
           <Button
             variant="outline"
@@ -925,10 +925,10 @@ export default function PMSDashboard() {
         </div>
 
         {/* ── Company selector (mandatory) ── */}
-        <Card className="border-emerald-100 shadow-sm bg-white/90">
+        <Card className="border-emerald-100 dark:border-emerald-900 shadow-sm bg-white/90 dark:bg-slate-800/90">
           <CardContent className="py-3 px-4 flex flex-wrap items-center gap-3">
-            <Building2 className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
-            <span className="text-sm font-medium text-slate-600 shrink-0">Company</span>
+            <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden />
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 shrink-0">Company</span>
             <span className="text-xs text-red-500 font-medium shrink-0">* required</span>
             <CompanySearchableCombobox
               value={company}
@@ -939,26 +939,26 @@ export default function PMSDashboard() {
               className="min-w-[14rem] max-w-xs"
             />
             {!company && !companyOptsLoading && (
-              <span className="text-xs text-slate-400 italic">Select a company to load the dashboard</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 italic">Select a company to load the dashboard</span>
             )}
           </CardContent>
         </Card>
 
         {/* ── Gate: show prompt if no company selected, otherwise show dashboard ── */}
         {!company ? (
-          <Card className="border-emerald-200 shadow-lg">
+          <Card className="border-emerald-200 dark:border-emerald-900 shadow-lg">
             <CardContent className="py-24 text-center space-y-4">
-              <div className="w-20 h-20 mx-auto rounded-2xl bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center">
+              <div className="w-20 h-20 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-100 dark:border-emerald-900 flex items-center justify-center">
                 <Building2 className="h-10 w-10 text-emerald-300" />
               </div>
               <div className="space-y-2">
-                <p className="text-xl font-semibold text-slate-600">Select a Company to Continue</p>
-                <p className="text-slate-400 text-sm max-w-md mx-auto">
+                <p className="text-xl font-semibold text-slate-600 dark:text-slate-300">Select a Company to Continue</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm max-w-md mx-auto">
                   Please choose a company from the filter above to load the dashboard data.
                 </p>
               </div>
               {companyOptsLoading && (
-                <div className="flex items-center justify-center gap-2 text-sm text-emerald-600">
+                <div className="flex items-center justify-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
                   <RefreshCw className="h-4 w-4 animate-spin" />
                   Loading companies…
                 </div>
@@ -967,7 +967,7 @@ export default function PMSDashboard() {
           </Card>
         ) : (
           /* ── Main card with tab header ── */
-          <Card className="border-emerald-200 shadow-lg">
+          <Card className="border-emerald-200 dark:border-emerald-900 shadow-lg">
             {/* Tab bar */}
             <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg p-0">
               <div className="flex items-center overflow-x-auto">
@@ -1077,7 +1077,7 @@ export default function PMSDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                  <Card className="xl:col-span-2 border-emerald-100 shadow-sm">
+                  <Card className="xl:col-span-2 border-emerald-100 dark:border-emerald-900 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
                       <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4"/>Revenue Trend — Last 6 Months</CardTitle>
                     </CardHeader>
@@ -1094,11 +1094,11 @@ export default function PMSDashboard() {
                             <Bar dataKey="collected" name="Collected" fill="#f59e0b" radius={[4,4,0,0]}/>
                           </BarChart>
                         </ResponsiveContainer>
-                      ) : <div className="h-[240px] flex items-center justify-center text-slate-400 text-sm">No revenue data</div>}
+                      ) : <div className="h-[240px] flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm">No revenue data</div>}
                     </CardContent>
                   </Card>
 
-                  <Card className="border-emerald-100 shadow-sm">
+                  <Card className="border-emerald-100 dark:border-emerald-900 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-6 py-4">
                       <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4"/>Lease Status</CardTitle>
                     </CardHeader>
@@ -1119,20 +1119,20 @@ export default function PMSDashboard() {
                               <div key={k} className="flex items-center justify-between text-sm">
                                 <div className="flex items-center gap-2">
                                   <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:LEASE_COLORS[k]??"#94a3b8"}}/>
-                                  <span className="text-slate-600">{k}</span>
+                                  <span className="text-slate-600 dark:text-slate-300">{k}</span>
                                 </div>
-                                <span className="font-semibold text-slate-800">{v}</span>
+                                <span className="font-semibold text-slate-800 dark:text-slate-200">{v}</span>
                               </div>
                             ))}
                           </div>
                         </>
-                      ) : <div className="h-[200px] flex items-center justify-center text-slate-400 text-sm">No contracts</div>}
+                      ) : <div className="h-[200px] flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm">No contracts</div>}
                     </CardContent>
                   </Card>
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <Card className="border-emerald-100 shadow-sm">
+                  <Card className="border-emerald-100 dark:border-emerald-900 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
                       <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                         <Users className="h-4 w-4"/>Top Tenants by Monthly Rent
@@ -1141,30 +1141,30 @@ export default function PMSDashboard() {
                     <CardContent className="p-0">
                       {overview?.top_tenants?.length ? (
                         <Table>
-                          <TableHeader><TableRow className="bg-emerald-50">
-                            <TableHead className="text-teal-800 text-xs font-semibold pl-4">#</TableHead>
-                            <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
-                            <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
-                            <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
-                            <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Monthly Rent</TableHead>
+                          <TableHeader><TableRow className="bg-emerald-50 dark:bg-emerald-950/40">
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold pl-4">#</TableHead>
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Tenant</TableHead>
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Unit</TableHead>
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Property</TableHead>
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-right pr-4">Monthly Rent</TableHead>
                           </TableRow></TableHeader>
                           <TableBody>
                             {overview.top_tenants.map((t,i)=>(
-                              <TableRow key={t.tenant_id} className="hover:bg-emerald-50/50">
-                                <TableCell className="text-xs text-slate-400 font-medium pl-4">{i+1}</TableCell>
-                                <TableCell><p className="font-medium text-slate-800 text-sm">{t.tenant_name}</p><p className="text-xs text-slate-400">{t.company}</p></TableCell>
-                                <TableCell className="text-sm text-slate-700">{t.unit}</TableCell>
-                                <TableCell className="text-sm text-slate-500">{t.property}</TableCell>
-                                <TableCell className="text-right font-bold text-emerald-700 text-sm pr-4">{fmt(t.monthly_rent)}</TableCell>
+                              <TableRow key={t.tenant_id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/50">
+                                <TableCell className="text-xs text-slate-400 dark:text-slate-500 font-medium pl-4">{i+1}</TableCell>
+                                <TableCell><p className="font-medium text-slate-800 dark:text-slate-200 text-sm">{t.tenant_name}</p><p className="text-xs text-slate-400 dark:text-slate-500">{t.company}</p></TableCell>
+                                <TableCell className="text-sm text-slate-700 dark:text-slate-200">{t.unit}</TableCell>
+                                <TableCell className="text-sm text-slate-500 dark:text-slate-400">{t.property}</TableCell>
+                                <TableCell className="text-right font-bold text-emerald-700 dark:text-emerald-300 text-sm pr-4">{fmt(t.monthly_rent)}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
-                      ) : <div className="py-10 text-center text-slate-400 text-sm">No active tenants</div>}
+                      ) : <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-sm">No active tenants</div>}
                     </CardContent>
                   </Card>
 
-                  <Card className="border-emerald-100 shadow-sm">
+                  <Card className="border-emerald-100 dark:border-emerald-900 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-t-lg px-5 py-3">
                       <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                         <Building2 className="h-4 w-4"/>Properties
@@ -1173,32 +1173,32 @@ export default function PMSDashboard() {
                     <CardContent className="p-0">
                       {overview?.property_stats?.length ? (
                         <Table>
-                          <TableHeader><TableRow className="bg-emerald-50">
-                            <TableHead className="text-teal-800 text-xs font-semibold pl-4">Property</TableHead>
-                            <TableHead className="text-teal-800 text-xs font-semibold text-center">Total</TableHead>
-                            <TableHead className="text-teal-800 text-xs font-semibold text-center">Occ.</TableHead>
-                            <TableHead className="text-teal-800 text-xs font-semibold text-center">Vacant</TableHead>
+                          <TableHeader><TableRow className="bg-emerald-50 dark:bg-emerald-950/40">
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold pl-4">Property</TableHead>
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-center">Total</TableHead>
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-center">Occ.</TableHead>
+                            <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-center">Vacant</TableHead>
                           </TableRow></TableHeader>
                           <TableBody>
                             {overview.property_stats.map(p=>{
                               const rate = p.total_units ? Math.round((p.occupied / p.total_units) * 100) : 0
                               return (
-                                <TableRow key={p.name} className="hover:bg-emerald-50/50">
+                                <TableRow key={p.name} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/50">
                                   <TableCell className="pl-4">
-                                    <p className="font-medium text-slate-800 text-sm">{p.property_name}</p>
-                                    <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200">
+                                    <p className="font-medium text-slate-800 dark:text-slate-200 text-sm">{p.property_name}</p>
+                                    <div className="mt-1 h-1.5 w-24 rounded-full bg-slate-200 dark:bg-slate-600">
                                       <div className="h-full rounded-full bg-amber-500" style={{width:`${rate}%`}}/>
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center text-sm">{p.total_units}</TableCell>
-                                  <TableCell className="text-center"><span className="text-sm font-medium text-emerald-700">{p.occupied}</span></TableCell>
-                                  <TableCell className="text-center"><span className={`text-sm font-medium ${p.vacant>0?"text-amber-600":"text-slate-400"}`}>{p.vacant}</span></TableCell>
+                                  <TableCell className="text-center"><span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{p.occupied}</span></TableCell>
+                                  <TableCell className="text-center"><span className={`text-sm font-medium ${p.vacant>0?"text-amber-600 dark:text-amber-400":"text-slate-400 dark:text-slate-500"}`}>{p.vacant}</span></TableCell>
                                 </TableRow>
                               )
                             })}
                           </TableBody>
                         </Table>
-                      ) : <div className="py-10 text-center text-slate-400 text-sm">No properties</div>}
+                      ) : <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-sm">No properties</div>}
                     </CardContent>
                   </Card>
                 </div>
@@ -1232,14 +1232,14 @@ export default function PMSDashboard() {
                 </div>
 
                 {propertyQuickFilter && (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50/90 dark:bg-emerald-950/90 px-3 py-2 text-sm text-emerald-950">
                     <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
                     <span className="font-medium">
                       {propertyQuickFilter === "fully_occupied"
                         ? "Showing fully occupied properties only"
                         : "Showing properties with outstanding balance"}
                     </span>
-                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200"
                       onClick={() => setPropertyQuickFilter(null)}>
                       Clear
                     </Button>
@@ -1247,7 +1247,7 @@ export default function PMSDashboard() {
                 )}
 
                 <input
-                  className="w-full max-w-sm px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  className="w-full max-w-sm bg-white px-3 py-2 text-sm text-slate-900 border border-emerald-200 dark:border-emerald-900 dark:bg-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   placeholder="Search properties…"
                   value={propSearch}
                   onChange={e => setPropSearch(e.target.value)}
@@ -1256,7 +1256,7 @@ export default function PMSDashboard() {
                 {propLoading ? (
                   <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
                 ) : filteredProps.length === 0 ? (
-                  <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No properties found</p></div>
+                  <div className="text-center py-16 text-slate-400 dark:text-slate-500"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No properties found</p></div>
                 ) : (
                   <div className="space-y-3">
                     {filteredProps.map(p => <PropertyCard key={p.name} prop={p} onUnitClick={setSelectedUnit}/>)}
@@ -1299,7 +1299,7 @@ export default function PMSDashboard() {
                 </div>
 
                 {unitsQuickFilter && (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50/90 dark:bg-emerald-950/90 px-3 py-2 text-sm text-emerald-950">
                     <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
                     <span className="font-medium">
                       {unitsQuickFilter === "occupied" && "Showing occupied units only"}
@@ -1307,7 +1307,7 @@ export default function PMSDashboard() {
                       {unitsQuickFilter === "overdue" && "Showing units with overdue amounts"}
                       {unitsQuickFilter === "outstanding" && "Showing units with outstanding balance"}
                     </span>
-                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200"
                       onClick={() => setUnitsQuickFilter(null)}>
                       Clear
                     </Button>
@@ -1316,14 +1316,14 @@ export default function PMSDashboard() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   <input
-                    className="px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 w-52"
+                    className="bg-white px-3 py-2 text-sm text-slate-900 border border-emerald-200 dark:border-emerald-900 dark:bg-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 placeholder:text-slate-400 dark:placeholder:text-slate-500 w-52"
                     placeholder="Search unit…"
                     value={unitSearch}
                     onChange={e => setUnitSearch(e.target.value)}
                   />
                   <div className="w-52">
                     <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                      <SelectTrigger className="border-emerald-200 text-sm"><SelectValue placeholder="All Properties"/></SelectTrigger>
+                      <SelectTrigger className="border-emerald-200 dark:border-emerald-900"><SelectValue placeholder="All Properties"/></SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL_PROPS}>All Properties</SelectItem>
                         {Array.from(new Set(unitsData.map(u=>u.property).filter(Boolean))).sort().map(p=>(
@@ -1336,7 +1336,7 @@ export default function PMSDashboard() {
                     {(Object.entries(UNIT_STATUS) as [UnitPayStatus, typeof UNIT_STATUS[UnitPayStatus]][]).map(([k,v])=>(
                       <div key={k} className="flex items-center gap-1.5">
                         <span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/>
-                        <span className="text-xs text-slate-600">{v.label}</span>
+                        <span className="text-xs text-slate-600 dark:text-slate-300">{v.label}</span>
                       </div>
                     ))}
                   </div>
@@ -1345,21 +1345,21 @@ export default function PMSDashboard() {
                 {unitsLoading ? (
                   <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
                 ) : filteredUnits.length === 0 ? (
-                  <div className="text-center py-16 text-slate-400"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
+                  <div className="text-center py-16 text-slate-400 dark:text-slate-500"><Home className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No units found</p></div>
                 ) : (
-                  <Card className="border-emerald-100 shadow-sm">
+                  <Card className="border-emerald-100 dark:border-emerald-900 shadow-sm">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-emerald-50">
-                          <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">Floor / Area</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Monthly Rent</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Outstanding</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Overdue</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-center">Status</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold"/>
+                        <TableRow className="bg-emerald-50 dark:bg-emerald-950/40">
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Unit</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Property</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Tenant</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Floor / Area</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-right">Monthly Rent</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-right">Outstanding</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-right">Overdue</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-center">Status</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold"/>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1367,46 +1367,46 @@ export default function PMSDashboard() {
                           const cfg = UNIT_STATUS[u.pay_status] ?? UNIT_STATUS.vacant
                           return (
                             <TableRow key={u.unit}
-                              className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
+                              className="hover:bg-emerald-50/60 dark:hover:bg-emerald-950/60 cursor-pointer transition-colors"
                               onClick={() => setSelectedUnit(u.unit)}
                             >
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${cfg.dot}`}/>
-                                  <span className="font-semibold text-slate-800 text-sm">{u.unit}</span>
+                                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{u.unit}</span>
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <p className="text-sm text-slate-700">{u.property || "—"}</p>
+                                <p className="text-sm text-slate-700 dark:text-slate-200">{u.property || "—"}</p>
                               </TableCell>
                               <TableCell>
                                 {u.tenant_name
-                                  ? <p className="text-sm text-slate-700">{u.tenant_name}</p>
-                                  : <span className="text-xs text-slate-400 italic">Vacant</span>}
+                                  ? <p className="text-sm text-slate-700 dark:text-slate-200">{u.tenant_name}</p>
+                                  : <span className="text-xs text-slate-400 dark:text-slate-500 italic">Vacant</span>}
                               </TableCell>
                               <TableCell>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                   {[u.floor && `Floor ${u.floor}`, u.area && `${u.area} m²`].filter(Boolean).join(" · ") || "—"}
                                 </p>
                               </TableCell>
                               <TableCell className="text-right">
-                                <span className="text-sm font-medium text-slate-700">{u.monthly_rent ? fmt(u.monthly_rent) : "—"}</span>
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{u.monthly_rent ? fmt(u.monthly_rent) : "—"}</span>
                               </TableCell>
                               <TableCell className="text-right">
                                 {u.outstanding > 0
-                                  ? <span className="text-sm font-semibold text-amber-700">{fmt(u.outstanding)}</span>
-                                  : <span className="text-xs text-slate-400">—</span>}
+                                  ? <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{fmt(u.outstanding)}</span>
+                                  : <span className="text-xs text-slate-400 dark:text-slate-500">—</span>}
                               </TableCell>
                               <TableCell className="text-right">
                                 {u.overdue > 0
-                                  ? <span className="text-sm font-bold text-red-700">{fmt(u.overdue)}</span>
-                                  : <span className="text-xs text-slate-400">—</span>}
+                                  ? <span className="text-sm font-bold text-red-700 dark:text-red-300">{fmt(u.overdue)}</span>
+                                  : <span className="text-xs text-slate-400 dark:text-slate-500">—</span>}
                               </TableCell>
                               <TableCell className="text-center">
                                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.badge}`}>{cfg.label}</span>
                               </TableCell>
                               <TableCell>
-                                <ChevronRight className="h-4 w-4 text-slate-400"/>
+                                <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500"/>
                               </TableCell>
                             </TableRow>
                           )
@@ -1425,19 +1425,19 @@ export default function PMSDashboard() {
                   <Alert variant="destructive"><AlertDescription>{contractsError}</AlertDescription></Alert>
                 )}
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-slate-600 text-sm max-w-xl">
-                    Submitted <span className="font-medium text-emerald-800">Tenant Contract</span> records — same filters as Overview shortcuts below.
+                  <p className="text-slate-600 dark:text-slate-300 text-sm max-w-xl">
+                    Submitted <span className="font-medium text-emerald-800 dark:text-emerald-300">Tenant Contract</span> records — same filters as Overview shortcuts below.
                   </p>
-                  <Button variant="outline" type="button" className="border-emerald-200" onClick={contractsReload}>
+                  <Button variant="outline" type="button" className="border-emerald-200 dark:border-emerald-900" onClick={contractsReload}>
                     <RefreshCw className={`h-4 w-4 mr-2 ${contractsLoading ? "animate-spin" : ""}`}/>Refresh
                   </Button>
                 </div>
 
                 {contractQuickFilter !== null && (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50/90 dark:bg-emerald-950/90 px-3 py-2 text-sm text-emerald-950">
                     <FilterX className="h-4 w-4 shrink-0 opacity-70"/>
                     <span className="font-medium">{contractFilterDescription(contractQuickFilter)}</span>
-                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 text-emerald-900"
+                    <Button type="button" variant="outline" size="sm" className="ml-auto border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200"
                       onClick={() => setContractQuickFilter(null)}>
                       Clear filter
                     </Button>
@@ -1445,7 +1445,7 @@ export default function PMSDashboard() {
                 )}
 
                 <input
-                  className="w-full max-w-md px-3 py-2 text-sm border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  className="w-full max-w-md bg-white px-3 py-2 text-sm text-slate-900 border border-emerald-200 dark:border-emerald-900 dark:bg-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   placeholder="Search contract, tenant, unit, property…"
                   value={contractSearch}
                   onChange={e => setContractSearch(e.target.value)}
@@ -1456,45 +1456,45 @@ export default function PMSDashboard() {
                     <RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/>
                   </div>
                 ) : filteredTenantContracts.length === 0 ? (
-                  <div className="text-center text-slate-400 text-sm py-16 border border-dashed border-emerald-200 rounded-xl bg-emerald-50/40">
+                  <div className="text-center text-slate-400 dark:text-slate-500 text-sm py-16 border border-dashed border-emerald-200 dark:border-emerald-900 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/40">
                     No contracts match this view
                   </div>
                 ) : (
-                  <Card className="border-emerald-100 shadow-sm overflow-hidden">
+                  <Card className="border-emerald-100 dark:border-emerald-900 shadow-sm overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-emerald-50">
-                          <TableHead className="text-teal-800 text-xs font-semibold pl-4">Contract</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">Status</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">Tenant</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">Unit</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">Property</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-right">Rent / mo</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold">End date</TableHead>
-                          <TableHead className="text-teal-800 text-xs font-semibold text-right pr-4">Open</TableHead>
+                        <TableRow className="bg-emerald-50 dark:bg-emerald-950/40">
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold pl-4">Contract</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Status</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Tenant</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Unit</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">Property</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-right">Rent / mo</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold">End date</TableHead>
+                          <TableHead className="text-teal-800 dark:text-teal-300 text-xs font-semibold text-right pr-4">Open</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredTenantContracts.map(c => (
-                          <TableRow key={c.name} className="hover:bg-emerald-50/50">
-                            <TableCell className="pl-4 font-mono text-xs text-slate-800">{c.name}</TableCell>
+                          <TableRow key={c.name} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/50">
+                            <TableCell className="pl-4 font-mono text-xs text-slate-800 dark:text-slate-200">{c.name}</TableCell>
                             <TableCell className="text-xs">
                               <span className={`font-medium px-2 py-0.5 rounded-full border ${
-                                c.status === "Active" ? "bg-amber-50 text-amber-800 border-amber-200"
-                                  : c.status === "Terminated" ? "bg-red-50 text-red-800 border-red-200"
-                                  : "bg-slate-50 text-slate-700 border-slate-200"
+                                c.status === "Active" ? "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-900"
+                                  : c.status === "Terminated" ? "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900"
+                                  : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600"
                               }`}>{c.status}</span>
-                              {c.expiring_soon && <span className="ml-1 text-[10px] font-semibold text-amber-700">30d</span>}
+                              {c.expiring_soon && <span className="ml-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">30d</span>}
                             </TableCell>
-                            <TableCell className="text-sm text-slate-800">{c.tenant_name}</TableCell>
-                            <TableCell className="text-sm text-slate-700">{c.unit || "—"}</TableCell>
-                            <TableCell className="text-xs text-slate-600">{c.property || "—"}</TableCell>
-                            <TableCell className="text-right text-sm font-medium text-slate-800">{fmt(c.monthly_rent)}</TableCell>
-                            <TableCell className="text-xs text-slate-600">{fmtDate(c.end_date)}</TableCell>
+                            <TableCell className="text-sm text-slate-800 dark:text-slate-200">{c.tenant_name}</TableCell>
+                            <TableCell className="text-sm text-slate-700 dark:text-slate-200">{c.unit || "—"}</TableCell>
+                            <TableCell className="text-xs text-slate-600 dark:text-slate-300">{c.property || "—"}</TableCell>
+                            <TableCell className="text-right text-sm font-medium text-slate-800 dark:text-slate-200">{fmt(c.monthly_rent)}</TableCell>
+                            <TableCell className="text-xs text-slate-600 dark:text-slate-300">{fmtDate(c.end_date)}</TableCell>
                             <TableCell className="text-right pr-4">
                               <a
                                 href={deskTenantContractUrl(c.name)}
-                                className="text-xs font-medium text-emerald-700 hover:underline"
+                                className="text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline"
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
@@ -1515,9 +1515,9 @@ export default function PMSDashboard() {
               <CardContent className="p-6 space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Month</label>
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Month</label>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                      <SelectTrigger className="border-emerald-200"><SelectValue placeholder="Current Month"/></SelectTrigger>
+                      <SelectTrigger className="border-emerald-200 dark:border-emerald-900"><SelectValue placeholder="Current Month"/></SelectTrigger>
                       <SelectContent>
                         <SelectItem value={CURRENT_MONTH}>Current Month</SelectItem>
                         {months.map(m=><SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
@@ -1525,9 +1525,9 @@ export default function PMSDashboard() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Property</label>
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Property</label>
                     <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                      <SelectTrigger className="border-emerald-200"><SelectValue placeholder="All Properties"/></SelectTrigger>
+                      <SelectTrigger className="border-emerald-200 dark:border-emerald-900"><SelectValue placeholder="All Properties"/></SelectTrigger>
                       <SelectContent>
                         {finProperties.map(p=><SelectItem key={p} value={p}>{p===ALL_PROPS?"All Properties":p}</SelectItem>)}
                       </SelectContent>
@@ -1542,14 +1542,14 @@ export default function PMSDashboard() {
                 </div>
                 <div className="flex flex-wrap gap-3 items-center">
                   {(Object.entries(FINANCIAL_STATUS) as [UnitPaymentStatus, typeof FINANCIAL_STATUS[UnitPaymentStatus]][]).map(([k,v])=>(
-                    <div key={k} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/><span className="text-xs text-slate-600">{v.label}</span></div>
+                    <div key={k} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${v.dot}`}/><span className="text-xs text-slate-600 dark:text-slate-300">{v.label}</span></div>
                   ))}
                 </div>
                 {finError && <Alert variant="destructive"><AlertDescription>{finError}</AlertDescription></Alert>}
                 {finLoading ? (
                   <div className="flex items-center justify-center py-16"><RefreshCw className="h-6 w-6 text-emerald-500 animate-spin"/></div>
                 ) : filteredFinancial.length === 0 ? (
-                  <div className="text-center py-16 text-slate-400"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No contracts found for this period</p></div>
+                  <div className="text-center py-16 text-slate-400 dark:text-slate-500"><Building2 className="h-10 w-10 mx-auto mb-3 opacity-40"/><p>No contracts found for this period</p></div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                     {filteredFinancial.map(u=>{
@@ -1570,8 +1570,8 @@ export default function PMSDashboard() {
             {tab === "utility" && (
               <CardContent className="py-20 text-center space-y-3">
                 <Zap className="h-12 w-12 mx-auto text-emerald-200"/>
-                <p className="text-xl font-semibold text-slate-600">Coming Soon</p>
-                <p className="text-slate-400 text-sm max-w-md mx-auto">
+                <p className="text-xl font-semibold text-slate-600 dark:text-slate-300">Coming Soon</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm max-w-md mx-auto">
                   Utility consumption analytics — water, electricity, and gas trends per unit and property — will be available in a future release.
                 </p>
               </CardContent>

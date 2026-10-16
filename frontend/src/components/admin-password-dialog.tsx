@@ -50,11 +50,11 @@ export default function AdminPasswordDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-orange-800">
+          <DialogTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
             <Lock className="h-5 w-5" />
             Admin Access Required
           </DialogTitle>
-          <DialogDescription className="text-gray-600">
+          <DialogDescription className="text-slate-600 dark:text-slate-300">
             Enter the admin password to view hidden transactions that require special permission.
           </DialogDescription>
         </DialogHeader>
@@ -84,17 +84,17 @@ export default function AdminPasswordDialog({
                 disabled={isLoading}
               >
                 {showPassword ? (
-                  <EyeOff className="h-4 w-4 text-gray-400" />
+                  <EyeOff className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                 ) : (
-                  <Eye className="h-4 w-4 text-gray-400" />
+                  <Eye className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                 )}
               </Button>
             </div>
           </div>
 
           {error && (
-            <Alert className="border-red-200 bg-red-50">
-              <AlertDescription className="text-red-800">
+            <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40">
+              <AlertDescription className="text-red-800 dark:text-red-300">
                 {error}
               </AlertDescription>
             </Alert>

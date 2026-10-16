@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Link } from "react-router-dom"
-import { ArrowLeft, Building2, FileText } from "lucide-react"
+import { Building2, FileText } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
@@ -10,6 +9,7 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import IntercompanyTopNav, { PageHeader, compactInputClass } from "./intercompany-top-nav"
 
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -80,17 +80,17 @@ interface SummaryCardProps {
 function SummaryCard({ title, value, currency, tone }: SummaryCardProps) {
   const toneClasses =
     tone === "primary"
-      ? "bg-blue-50 border-blue-200 text-blue-900"
+      ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900 text-blue-900 dark:text-blue-200"
       : tone === "success"
-      ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+      ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-900 dark:text-emerald-200"
       : tone === "danger"
-      ? "bg-red-50 border-red-200 text-red-900"
-      : "bg-slate-50 border-slate-200 text-slate-900"
+      ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900 text-red-900 dark:text-red-200"
+      : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100"
 
   return (
     <Card className={`border ${toneClasses}`}>
       <CardContent className="p-4 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {title}
         </p>
         <p className="text-xl font-bold">{fmt(value, currency)}</p>
@@ -100,14 +100,14 @@ function SummaryCard({ title, value, currency, tone }: SummaryCardProps) {
 }
 
 function QuotationLink({ name, children }: { name: string | null; children: React.ReactNode }) {
-  if (!name) return <span className="text-slate-400">{children ?? "—"}</span>
+  if (!name) return <span className="text-slate-400 dark:text-slate-500">{children ?? "—"}</span>
   const href = `/app/quotation/${encodeURIComponent(name)}`
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-700 hover:text-blue-900 hover:underline font-medium"
+      className="text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-200 hover:underline font-medium"
     >
       {children ?? name}
     </a>
@@ -163,33 +163,17 @@ export default function QuotationStagesReport() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 p-4">
-      <div className="max-w-[1920px] mx-auto space-y-5">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:bg-slate-900 dark:bg-none">
+      <IntercompanyTopNav />
+      <div className="max-w-[1920px] mx-auto space-y-5 p-4">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link to="/reconciliation">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1.5 shrink-0"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
-
-          <div className="flex-1 text-center">
-            <h1 className="text-3xl font-bold text-blue-900 tracking-tight">
-              Quotation Stages Report
-            </h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              Compare Initial Quote → After Site Visit → Final Quote by deal
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Quotation Stages Report"
+          subtitle="Compare Initial Quote → After Site Visit → Final Quote by deal"
+        />
 
         {/* Filters */}
-        <Card className="border-blue-200 shadow-md">
+        <Card className="border-blue-200 dark:border-blue-900 shadow-md">
           <CardHeader className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-t-lg py-4 px-6">
             <CardTitle className="flex items-center gap-2 text-base">
               <Building2 className="h-5 w-5" />
@@ -199,7 +183,7 @@ export default function QuotationStagesReport() {
           <CardContent className="p-5">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Company
                 </label>
                 <Combobox
@@ -221,7 +205,7 @@ export default function QuotationStagesReport() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Project
                 </label>
                 <Combobox
@@ -245,35 +229,35 @@ export default function QuotationStagesReport() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   From Date
                 </label>
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none text-sm"
+                  className={compactInputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   To Date
                 </label>
                 <input
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none text-sm"
+                  className={compactInputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Display Currency
                 </label>
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400">
                     <SelectValue placeholder="Company Currency" />
                   </SelectTrigger>
                   <SelectContent>
@@ -300,20 +284,20 @@ export default function QuotationStagesReport() {
         </Card>
 
         {error && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertDescription className="text-red-800">{error}</AlertDescription>
+          <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40">
+            <AlertDescription className="text-red-800 dark:text-red-300">{error}</AlertDescription>
           </Alert>
         )}
 
         {fetchError && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertDescription className="text-red-800">{fetchError}</AlertDescription>
+          <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40">
+            <AlertDescription className="text-red-800 dark:text-red-300">{fetchError}</AlertDescription>
           </Alert>
         )}
 
         {/* Sticky summary cards */}
         {hasLoadedData && meta && totals && (
-          <div className="sticky top-0 z-20 space-y-4 pb-4 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+          <div className="sticky top-0 z-20 space-y-4 pb-4 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:bg-slate-900 dark:bg-none">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <SummaryCard
                 title="Initial Quote (Total)"
@@ -339,12 +323,12 @@ export default function QuotationStagesReport() {
                 currency={displayCurrency}
                 tone={totals.variance_initial_to_final >= 0 ? "muted" : "danger"}
               />
-              <Card className="border-slate-200 bg-slate-50">
+              <Card className="border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/60">
                 <CardContent className="p-4 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Deals
                   </p>
-                  <p className="text-xl font-bold text-slate-900">{totals.deal_count}</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{totals.deal_count}</p>
                 </CardContent>
               </Card>
             </div>
@@ -353,7 +337,7 @@ export default function QuotationStagesReport() {
 
         {/* Main table: deals with three stages */}
         {hasLoadedData && (
-          <Card className="border-blue-200 shadow-md overflow-hidden">
+          <Card className="border-blue-200 dark:border-blue-900 shadow-md overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-t-lg py-4 px-6">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -371,23 +355,23 @@ export default function QuotationStagesReport() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
-                      <TableHead className="text-blue-800 text-xs font-semibold whitespace-nowrap">
+                    <TableRow className="bg-blue-50 dark:bg-blue-950/40">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
                         Customer / Deal
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
                         Project
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold whitespace-nowrap min-w-[140px]">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold whitespace-nowrap min-w-[140px]">
                         Initial Quote
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold whitespace-nowrap min-w-[140px]">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold whitespace-nowrap min-w-[140px]">
                         After Site Visit
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold whitespace-nowrap min-w-[140px]">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold whitespace-nowrap min-w-[140px]">
                         Final Quote
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right whitespace-nowrap">
                         Variance (Initial → Final)
                       </TableHead>
                     </TableRow>
@@ -397,7 +381,7 @@ export default function QuotationStagesReport() {
                       <TableRow>
                         <TableCell
                           colSpan={6}
-                          className="text-center text-gray-500 py-10 text-sm"
+                          className="text-center text-slate-500 dark:text-slate-400 py-10 text-sm"
                         >
                           No quotations found. Ensure submitted quotations have Revision Type
                           (Initial Quote, After Site Visit, Final Quote) in the selected period.
@@ -405,11 +389,11 @@ export default function QuotationStagesReport() {
                       </TableRow>
                     ) : (
                       entries.map((row) => (
-                        <TableRow key={row.group_key} className="hover:bg-blue-50/50">
-                          <TableCell className="text-sm font-medium text-gray-900">
+                        <TableRow key={row.group_key} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/50">
+                          <TableCell className="text-sm font-medium text-slate-900 dark:text-slate-100">
                             {row.party_name || row.group_key}
                           </TableCell>
-                          <TableCell className="text-xs text-gray-600">
+                          <TableCell className="text-xs text-slate-600 dark:text-slate-300">
                             {row.project || "—"}
                           </TableCell>
                           <TableCell className="text-xs align-top">
@@ -417,8 +401,8 @@ export default function QuotationStagesReport() {
                               <QuotationLink name={row.initial_quote_name}>
                                 {row.initial_quote_name || "—"}
                               </QuotationLink>
-                              <div className="text-gray-500">{formatDate(row.initial_quote_date)}</div>
-                              <div className="font-mono text-blue-900">
+                              <div className="text-slate-500 dark:text-slate-400">{formatDate(row.initial_quote_date)}</div>
+                              <div className="font-mono text-blue-900 dark:text-blue-200">
                                 {fmt(row.initial_quote_amount, row.currency)}
                               </div>
                             </div>
@@ -428,10 +412,10 @@ export default function QuotationStagesReport() {
                               <QuotationLink name={row.after_site_visit_name}>
                                 {row.after_site_visit_name || "—"}
                               </QuotationLink>
-                              <div className="text-gray-500">
+                              <div className="text-slate-500 dark:text-slate-400">
                                 {formatDate(row.after_site_visit_date)}
                               </div>
-                              <div className="font-mono text-blue-900">
+                              <div className="font-mono text-blue-900 dark:text-blue-200">
                                 {fmt(row.after_site_visit_amount, row.currency)}
                               </div>
                             </div>
@@ -441,8 +425,8 @@ export default function QuotationStagesReport() {
                               <QuotationLink name={row.final_quote_name}>
                                 {row.final_quote_name || "—"}
                               </QuotationLink>
-                              <div className="text-gray-500">{formatDate(row.final_quote_date)}</div>
-                              <div className="font-mono text-blue-900 font-medium">
+                              <div className="text-slate-500 dark:text-slate-400">{formatDate(row.final_quote_date)}</div>
+                              <div className="font-mono text-blue-900 dark:text-blue-200 font-medium">
                                 {fmt(row.final_quote_amount, row.currency)}
                               </div>
                             </div>
@@ -450,8 +434,8 @@ export default function QuotationStagesReport() {
                           <TableCell
                             className={`text-xs text-right font-mono align-top ${
                               row.variance_initial_to_final < 0
-                                ? "text-red-700"
-                                : "text-slate-700"
+                                ? "text-red-700 dark:text-red-300"
+                                : "text-slate-700 dark:text-slate-200"
                             }`}
                           >
                             {fmt(row.variance_initial_to_final, row.currency)}

@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Combobox } from "./ui/combobox"
 import { Alert, AlertDescription } from "../../components/ui/alert"
 import {
-  ArrowLeft,
   RefreshCw,
   Package,
   ChevronDown,
@@ -22,7 +21,7 @@ import {
   FileText,
   X,
 } from "lucide-react"
-import { Link } from "react-router-dom"
+import IntercompanyTopNav, { PageHeader, compactInputClass } from "./intercompany-top-nav"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
 import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
 import {
@@ -191,8 +190,8 @@ function acctHeaderLabel(k: string): string {
 }
 
 /** Thin vertical band: start at journey, continue through units */
-const SI_BAND_START = "border-l-2 border-l-slate-400 border-y border-r border-blue-100"
-const SI_BAND_CONT = "border-y border-r border-blue-100"
+const SI_BAND_START = "border-l-2 border-l-slate-400 border-y border-r border-blue-100 dark:border-blue-900"
+const SI_BAND_CONT = "border-y border-r border-blue-100 dark:border-blue-900"
 
 // ─── Column Picker Modal ──────────────────────────────────────────────────────
 
@@ -226,7 +225,7 @@ function ColumnPickerModal({
       aria-label="Column picker"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <div className="bg-white rounded-xl shadow-2xl border border-blue-200 w-[460px] max-h-[88vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-blue-200 dark:border-blue-900 w-[460px] max-h-[88vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-700 to-blue-800 text-white px-5 py-4 flex items-center justify-between shrink-0">
           <div>
@@ -247,29 +246,29 @@ function ColumnPickerModal({
         </div>
 
         {/* Quick-select bar */}
-        <div className="flex gap-2 px-5 py-3 border-b border-blue-100 bg-blue-50/60 shrink-0 items-center">
+        <div className="flex gap-2 px-5 py-3 border-b border-blue-100 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/60 shrink-0 items-center">
           <button
             onClick={onSelectAll}
             disabled={allSelected}
-            className="text-[11px] px-3 py-1.5 rounded border border-blue-300 text-blue-800 bg-white hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="text-[11px] px-3 py-1.5 rounded border border-blue-300 dark:border-blue-800 text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Select all
           </button>
           <button
             onClick={onDeselectAll}
             disabled={noneSelected}
-            className="text-[11px] px-3 py-1.5 rounded border border-blue-300 text-blue-800 bg-white hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="text-[11px] px-3 py-1.5 rounded border border-blue-300 dark:border-blue-800 text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Deselect all
           </button>
-          <span className="ml-auto text-[11px] text-blue-600">
+          <span className="ml-auto text-[11px] text-blue-600 dark:text-blue-400">
             {enabledCols.size} / {PRINTABLE_COLUMNS.length} columns
           </span>
         </div>
 
         {/* Page orientation */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 bg-white shrink-0">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide shrink-0">Orientation</span>
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 dark:border-blue-900 bg-white dark:bg-slate-800 shrink-0">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide shrink-0">Orientation</span>
           <div className="flex gap-2">
             {(["landscape", "portrait"] as const).map((o) => {
               const active = orientation === o
@@ -280,7 +279,7 @@ function ColumnPickerModal({
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${
                     active
                       ? "bg-blue-700 border-blue-700 text-white"
-                      : "bg-white border-blue-200 text-blue-800 hover:bg-blue-50"
+                      : "bg-white dark:bg-slate-800 border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                   }`}
                 >
                   <span
@@ -292,7 +291,7 @@ function ColumnPickerModal({
               )
             })}
           </div>
-          <span className="ml-auto text-[10px] text-gray-400">
+          <span className="ml-auto text-[10px] text-slate-400 dark:text-slate-500">
             {orientation === "landscape" ? "Wide — fits more columns" : "Tall — fewer columns recommended"}
           </span>
         </div>
@@ -302,17 +301,17 @@ function ColumnPickerModal({
           {PRINTABLE_COLUMNS.map((col) => (
             <label
               key={col.key}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer transition-colors"
             >
               <input
                 type="checkbox"
                 checked={enabledCols.has(col.key)}
                 onChange={() => onToggleCol(col.key)}
-                className="rounded border-blue-400 text-blue-700 cursor-pointer"
+                className="rounded border-blue-400 text-blue-700 dark:text-blue-300 cursor-pointer"
               />
-              <span className="text-[13px] text-gray-800 select-none flex-1">{col.label}</span>
+              <span className="text-[13px] text-slate-800 dark:text-slate-200 select-none flex-1">{col.label}</span>
               {!col.defaultOn && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
                   optional
                 </span>
               )}
@@ -321,10 +320,10 @@ function ColumnPickerModal({
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 px-5 py-4 border-t border-blue-100 bg-blue-50/40 shrink-0 justify-end">
+        <div className="flex gap-2 px-5 py-4 border-t border-blue-100 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/40 shrink-0 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-[13px] rounded-lg border border-blue-200 text-blue-800 bg-white hover:bg-blue-50 transition-colors"
+            className="px-4 py-2 text-[13px] rounded-lg border border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
           >
             Cancel
           </button>
@@ -344,7 +343,7 @@ function ColumnPickerModal({
 // ─── Transit invoice pills ────────────────────────────────────────────────────
 
 function TransitInvoiceLinks({ refs }: { refs: TransitInvoiceRef[] }) {
-  if (!refs?.length) return <span className="text-[10px] text-gray-400">—</span>
+  if (!refs?.length) return <span className="text-[10px] text-slate-400 dark:text-slate-500">—</span>
   return (
     <div className="flex flex-wrap gap-1 items-center justify-start">
       {refs.map((r) => {
@@ -360,7 +359,7 @@ function TransitInvoiceLinks({ refs }: { refs: TransitInvoiceRef[] }) {
             className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border max-w-[150px] truncate transition-colors ${
               isSi
                 ? "bg-blue-700 text-white border-blue-800 hover:bg-blue-800 shadow-sm"
-                : "bg-sky-100 text-sky-900 border-sky-400/70 hover:bg-sky-200"
+                : "bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-200 border-sky-400/70 hover:bg-sky-200 dark:hover:bg-sky-900"
             }`}
             title={`Open ${r.doctype} ${r.name} in ERPNext`}
           >
@@ -383,8 +382,8 @@ function ChargeStack({
   currency: string
   accent: "import" | "export"
 }) {
-  const border = accent === "import" ? "border-emerald-200 bg-emerald-50/40" : "border-red-200 bg-red-50/40"
-  const titleCls = accent === "import" ? "text-emerald-900" : "text-red-900"
+  const border = accent === "import" ? "border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/40" : "border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/40"
+  const titleCls = accent === "import" ? "text-emerald-900 dark:text-emerald-200" : "text-red-900 dark:text-red-200"
 
   return (
     <div className={`rounded-md border px-1.5 py-1 space-y-1 ${border}`}>
@@ -475,22 +474,22 @@ function groupByJourney(entries: ImportExportEntry[]): JourneyGroup[] {
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
 const TH = [
-  "border border-blue-300",
+  "border border-blue-300 dark:border-blue-800",
   "px-2 py-2",
-  "text-[11px] font-semibold text-blue-900 bg-blue-50",
+  "text-[11px] font-semibold text-blue-900 dark:text-blue-200 bg-blue-50 dark:bg-blue-950/40",
   "text-center whitespace-nowrap align-middle",
 ].join(" ")
 
 // Account column header style — allows wrapping for long names
 const TH_ACCT = [
-  "border border-blue-300",
+  "border border-blue-300 dark:border-blue-800",
   "px-1.5 py-2",
   "text-[9px] font-semibold text-center align-top",
   "whitespace-normal break-words leading-tight",
 ].join(" ")
 
-const TD = "border border-blue-100 px-2 py-2 text-[11px] text-gray-700 whitespace-nowrap"
-const TDR = "border border-blue-100 px-2 py-2 text-[11px] text-right font-mono text-gray-800 whitespace-nowrap"
+const TD = "border border-blue-100 dark:border-blue-900 px-2 py-2 text-[11px] text-slate-700 dark:text-slate-200 whitespace-nowrap"
+const TDR = "border border-blue-100 dark:border-blue-900 px-2 py-2 text-[11px] text-right font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap"
 
 const PAL_OPEN = { bg: "#f0f6ff", text: "#1e3a8a", sub: "#64748b", border: "#bfdbfe" }
 const PAL_EVEN = { bg: "#eef2ff", text: "#1e3a8a", sub: "#6b7280", border: "#c7d2fe" }
@@ -661,7 +660,7 @@ function JourneyRow({
             {importAccountKeys.map((k) => (
               <td
                 key={`jimp-${group.journeyId}-${k}`}
-                className="ie-dyn-acct-col border px-1 py-2 text-[9px] text-right font-mono text-emerald-900 align-top bg-emerald-50/40"
+                className="ie-dyn-acct-col border px-1 py-2 text-[9px] text-right font-mono text-emerald-900 dark:text-emerald-200 align-top bg-emerald-50/40 dark:bg-emerald-950/40"
                 style={cell()}
                 title={k}
               >
@@ -670,7 +669,7 @@ function JourneyRow({
             ))}
             <td
               data-col="col-import-charges"
-              className="border px-2 py-3 text-[11px] text-right font-mono font-bold text-emerald-800 bg-emerald-100/80"
+              className="border px-2 py-3 text-[11px] text-right font-mono font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/80"
               style={cell()}
               title="Journey import total (sum of all account lines)"
             >
@@ -679,7 +678,7 @@ function JourneyRow({
             {exportAccountKeys.map((k) => (
               <td
                 key={`jexp-${group.journeyId}-${k}`}
-                className="ie-dyn-acct-col border px-1 py-2 text-[9px] text-right font-mono text-red-900 align-top bg-red-50/40"
+                className="ie-dyn-acct-col border px-1 py-2 text-[9px] text-right font-mono text-red-900 dark:text-red-200 align-top bg-red-50/40 dark:bg-red-950/40"
                 style={cell()}
                 title={k}
               >
@@ -688,7 +687,7 @@ function JourneyRow({
             ))}
             <td
               data-col="col-export-charges"
-              className="border px-2 py-3 text-[11px] text-right font-mono font-bold text-red-800 bg-red-100/80"
+              className="border px-2 py-3 text-[11px] text-right font-mono font-bold text-red-800 dark:text-red-300 bg-red-100/80 dark:bg-red-950/80"
               style={cell()}
               title="Journey export total (sum of all account lines)"
             >
@@ -742,42 +741,42 @@ function JourneyRow({
                 >
                   {/* align with parent: print column + expand column */}
                   <td
-                    className="border border-blue-100 w-8 ie-report-no-print"
+                    className="border border-blue-100 dark:border-blue-900 w-8 ie-report-no-print"
                     style={{ background: rowBg }}
                   />
                   <td
-                    className="border border-blue-100 w-8"
+                    className="border border-blue-100 dark:border-blue-900 w-8"
                     style={{ background: rowBg, borderLeft: "3px solid #3b82f6" }}
                     aria-hidden
                   />
 
-                  <td data-col="col-num" className="border border-blue-100 px-2 py-2 text-[11px] text-center text-gray-400 font-mono">
+                  <td data-col="col-num" className="border border-blue-100 dark:border-blue-900 px-2 py-2 text-[11px] text-center text-slate-400 dark:text-slate-500 font-mono">
                     {iIdx + 1}
                   </td>
 
                   <td data-col="col-journey"
-                    className={`border border-blue-100 px-2 py-2 text-[11px] text-gray-700 max-w-[200px] truncate ${SI_BAND_START}`}
+                    className={`border border-blue-100 dark:border-blue-900 px-2 py-2 text-[11px] text-slate-700 dark:text-slate-200 max-w-[200px] truncate ${SI_BAND_START}`}
                     title={row.description}
                   >
                     {(row.description || "—") + descSuffix}
                   </td>
 
-                  <td data-col="col-item" className={`border border-blue-100 px-2 py-2 text-[11px] font-semibold text-blue-800 ${SI_BAND_CONT}`}>
+                  <td data-col="col-item" className={`border border-blue-100 dark:border-blue-900 px-2 py-2 text-[11px] font-semibold text-blue-800 dark:text-blue-300 ${SI_BAND_CONT}`}>
                     {row.item_code || "—"}
                     {row.stock_uom && (
-                      <span className="block text-[9px] font-normal text-slate-500">UOM: {row.stock_uom}</span>
+                      <span className="block text-[9px] font-normal text-slate-500 dark:text-slate-400">UOM: {row.stock_uom}</span>
                     )}
                   </td>
 
-                  <td data-col="col-source" className={`border border-blue-100 px-2 py-2 text-center ${SI_BAND_CONT}`}>
+                  <td data-col="col-source" className={`border border-blue-100 dark:border-blue-900 px-2 py-2 text-center ${SI_BAND_CONT}`}>
                     <div className="flex items-center justify-center gap-0.5">
                       {isImport && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
                           <TrendingDown className="h-2.5 w-2.5" />IMP
                         </span>
                       )}
                       {isExport && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-700 border border-red-200">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900">
                           <TrendingUp className="h-2.5 w-2.5" />EXP
                         </span>
                       )}
@@ -798,24 +797,24 @@ function JourneyRow({
                   <td data-col="col-price"       className={TDR}>{priceShown != null ? tConv(priceShown) : "—"}</td>
                   <td data-col="col-total-value" className={`${TDR} font-semibold`}>{tvShown != null ? tConv(tvShown) : "—"}</td>
 
-                  <td data-col="col-import-cont" className={`${TD} text-center text-gray-500 max-w-[100px] truncate`} title={row.import_container}>{row.import_container || "—"}</td>
-                  <td data-col="col-export-cont" className={`${TD} text-center text-gray-500 max-w-[100px] truncate`} title={row.export_container}>{row.export_container || "—"}</td>
-                  <td data-col="col-import-bl"   className={`${TD} text-center text-gray-500`}>{row.import_bl || "—"}</td>
-                  <td data-col="col-export-bl"   className={`${TD} text-center text-gray-500`}>{row.export_bl || "—"}</td>
-                  <td data-col="col-destination" className={`${TD} text-center font-medium text-indigo-700`}>{row.destination || "—"}</td>
+                  <td data-col="col-import-cont" className={`${TD} text-center text-slate-500 dark:text-slate-400 max-w-[100px] truncate`} title={row.import_container}>{row.import_container || "—"}</td>
+                  <td data-col="col-export-cont" className={`${TD} text-center text-slate-500 dark:text-slate-400 max-w-[100px] truncate`} title={row.export_container}>{row.export_container || "—"}</td>
+                  <td data-col="col-import-bl"   className={`${TD} text-center text-slate-500 dark:text-slate-400`}>{row.import_bl || "—"}</td>
+                  <td data-col="col-export-bl"   className={`${TD} text-center text-slate-500 dark:text-slate-400`}>{row.export_bl || "—"}</td>
+                  <td data-col="col-destination" className={`${TD} text-center font-medium text-indigo-700 dark:text-indigo-300`}>{row.destination || "—"}</td>
 
                   {expandAccountColumns && (
                     <>
                       {importAccountKeys.map((k) => (
-                        <td key={`dimp-${rk}-${variant}-${k}`} className={`ie-dyn-acct-col ${TDR} text-gray-300 bg-emerald-50/20`}>—</td>
+                        <td key={`dimp-${rk}-${variant}-${k}`} className={`ie-dyn-acct-col ${TDR} text-gray-300 bg-emerald-50/20 dark:bg-emerald-950/20`}>—</td>
                       ))}
-                      <td data-col="col-import-charges" className={`${TDR} text-emerald-700 font-semibold bg-emerald-50/40`}>
+                      <td data-col="col-import-charges" className={`${TDR} text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50/40 dark:bg-emerald-950/40`}>
                         {impShown != null && impShown > 0 ? fmt(impShown, row.company_currency) : "—"}
                       </td>
                       {exportAccountKeys.map((k) => (
-                        <td key={`dexp-${rk}-${variant}-${k}`} className={`ie-dyn-acct-col ${TDR} text-gray-300 bg-red-50/20`}>—</td>
+                        <td key={`dexp-${rk}-${variant}-${k}`} className={`ie-dyn-acct-col ${TDR} text-gray-300 bg-red-50/20 dark:bg-red-950/20`}>—</td>
                       ))}
-                      <td data-col="col-export-charges" className={`${TDR} text-red-600 font-semibold bg-red-50/40`}>
+                      <td data-col="col-export-charges" className={`${TDR} text-red-600 dark:text-red-400 font-semibold bg-red-50/40 dark:bg-red-950/40`}>
                         {expMerged != null && expMerged > 0 ? fmt(expMerged, row.company_currency) : "—"}
                       </td>
                     </>
@@ -823,16 +822,16 @@ function JourneyRow({
 
                   {!expandAccountColumns && (
                     <>
-                      <td data-col="col-import-charges" className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-emerald-700">
+                      <td data-col="col-import-charges" className="border border-blue-100 dark:border-blue-900 px-2 py-2 text-[11px] text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300">
                         {impShown != null && impShown > 0 ? cConv(impShown) : "—"}
                       </td>
-                      <td data-col="col-export-charges" className="border border-blue-100 px-2 py-2 text-[11px] text-right font-mono font-semibold text-red-600">
+                      <td data-col="col-export-charges" className="border border-blue-100 dark:border-blue-900 px-2 py-2 text-[11px] text-right font-mono font-semibold text-red-600 dark:text-red-400">
                         {expMerged != null && expMerged > 0 ? cConv(expMerged) : "—"}
                       </td>
                     </>
                   )}
 
-                  <td data-col="col-total" className="border border-blue-200 px-2 py-2 text-[11px] text-right font-mono font-bold text-blue-900 bg-blue-50 align-top">
+                  <td data-col="col-total" className="border border-blue-200 dark:border-blue-900 px-2 py-2 text-[11px] text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-50 dark:bg-blue-950/40 align-top">
                     {variant === "merged"
                       ? cConv(row.total)
                       : variant === "sales"
@@ -850,11 +849,11 @@ function JourneyRow({
             data-ie-print-jid={group.journeyId}
             data-ie-print-include={printRowInclude}
           >
-            <td className="border border-blue-200 ie-report-no-print" style={{ background: "rgba(30,58,138,0.06)" }} />
-            <td className="border border-blue-200" style={{ background: "rgba(30,58,138,0.06)" }} />
+            <td className="border border-blue-200 dark:border-blue-900 ie-report-no-print" style={{ background: "rgba(30,58,138,0.06)" }} />
+            <td className="border border-blue-200 dark:border-blue-900" style={{ background: "rgba(30,58,138,0.06)" }} />
             <td
               colSpan={12}
-              className="border border-blue-200 px-4 py-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-widest text-right"
+              className="border border-blue-200 dark:border-blue-900 px-4 py-1.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest text-right"
             >
               Journey Subtotal
             </td>
@@ -863,40 +862,40 @@ function JourneyRow({
                 {importAccountKeys.map((k) => (
                   <td
                     key={`simp-${group.journeyId}-${k}`}
-                    className="ie-dyn-acct-col border border-blue-200 px-1 py-1.5 text-[9px] text-right font-mono text-emerald-900 bg-emerald-50/50"
+                    className="ie-dyn-acct-col border border-blue-200 dark:border-blue-900 px-1 py-1.5 text-[9px] text-right font-mono text-emerald-900 dark:text-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/50"
                     title={k}
                   >
                     {fmt(impDistMap.get(k), group.companyCurrency, false)}
                   </td>
                 ))}
-                <td data-col="col-import-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700 bg-emerald-100/80">
+                <td data-col="col-import-charges" className="border border-blue-200 dark:border-blue-900 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/80">
                   {cc(group.totalImport)}
                 </td>
                 {exportAccountKeys.map((k) => (
                   <td
                     key={`sexp-${group.journeyId}-${k}`}
-                    className="ie-dyn-acct-col border border-blue-200 px-1 py-1.5 text-[9px] text-right font-mono text-red-900 bg-red-50/50"
+                    className="ie-dyn-acct-col border border-blue-200 dark:border-blue-900 px-1 py-1.5 text-[9px] text-right font-mono text-red-900 dark:text-red-200 bg-red-50/50 dark:bg-red-950/50"
                     title={k}
                   >
                     {fmt(expDistMap.get(k), group.companyCurrency, false)}
                   </td>
                 ))}
-                <td data-col="col-export-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700 bg-red-100/80">
+                <td data-col="col-export-charges" className="border border-blue-200 dark:border-blue-900 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700 dark:text-red-300 bg-red-100/80 dark:bg-red-950/80">
                   {cc(group.totalExport)}
                 </td>
               </>
             )}
             {!expandAccountColumns && (
               <>
-                <td data-col="col-import-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700">
+                <td data-col="col-import-charges" className="border border-blue-200 dark:border-blue-900 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-emerald-700 dark:text-emerald-300">
                   {cc(group.totalImport)}
                 </td>
-                <td data-col="col-export-charges" className="border border-blue-200 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700">
+                <td data-col="col-export-charges" className="border border-blue-200 dark:border-blue-900 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-red-700 dark:text-red-300">
                   {cc(group.totalExport)}
                 </td>
               </>
             )}
-            <td data-col="col-total" className="border border-blue-300 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-blue-900 bg-blue-100">
+            <td data-col="col-total" className="border border-blue-300 dark:border-blue-800 px-2 py-1.5 text-[11px] text-right font-mono font-bold text-blue-900 dark:text-blue-200 bg-blue-100 dark:bg-blue-950/60">
               {cc(group.grandTotal)}
             </td>
           </tr>
@@ -1134,7 +1133,7 @@ export default function ImportExportExpense() {
 
   const gcConv = (v: number | null | undefined) => fmt(v, grandTotCc)
 
-  const TDF = "border border-blue-300 px-2 py-2.5 text-[11px] text-right font-mono font-bold whitespace-nowrap"
+  const TDF = "border border-blue-300 dark:border-blue-800 px-2 py-2.5 text-[11px] text-right font-mono font-bold whitespace-nowrap"
 
   // ── Derived counts for the two-level thead colspan computation ──
   // Import group spans: account sub-cols + 1 summary col
@@ -1143,7 +1142,7 @@ export default function ImportExportExpense() {
   const exportGroupSpan = exportAccountKeys.length + 1
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:bg-slate-900 dark:bg-none">
       <style>{`
         @page { margin: 10mm; }
         @media print {
@@ -1169,24 +1168,19 @@ export default function ImportExportExpense() {
         onCancel={() => setColPickerOpen(false)}
       />
 
-      <div className="max-w-[1900px] mx-auto space-y-5">
-        <div className="flex items-center gap-4 ie-report-no-print">
-          <Link to="/reconciliation">
-            <Button variant="outline" size="sm" className="flex items-center gap-1.5 shrink-0">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
-          <div className="flex-1 text-center">
-            <h1 className="text-3xl font-bold text-blue-900 tracking-tight">Import &amp; Export Expense Report</h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              Per-item cost breakdown by transit journey — Purchase Invoice (LCV) ↔ Sales Invoice (SSC).
-            </p>
-          </div>
+      <IntercompanyTopNav className="ie-report-no-print" />
+
+      <div className="max-w-[1900px] mx-auto space-y-5 p-4">
+        {/* Header */}
+        <div className="ie-report-no-print">
+          <PageHeader
+            title="Import & Export Expense Report"
+            subtitle="Per-item cost breakdown by transit journey — Purchase Invoice (LCV) ↔ Sales Invoice (SSC)."
+          />
         </div>
 
         {/* Filters card */}
-        <Card className="border-blue-200 shadow-md ie-report-no-print">
+        <Card className="border-blue-200 dark:border-blue-900 shadow-md ie-report-no-print">
           <CardHeader className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-t-lg py-4 px-6">
             <CardTitle className="flex items-center gap-2 text-base">
               <Package className="h-5 w-5" />
@@ -1197,7 +1191,7 @@ export default function ImportExportExpense() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Company</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Company</label>
                 <Combobox
                   options={displayCompanies.map((c) => ({
                     name: ("company_name" in c ? (c as { company_name?: string }).company_name : c.name) ?? c.name,
@@ -1212,7 +1206,7 @@ export default function ImportExportExpense() {
               </div>
 
               <div className="space-y-1.5 xl:col-span-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Items (multi-select)</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Items (multi-select)</label>
                 <Combobox
                   key={itemPickerKey}
                   options={itemOptions.filter((o) => !selectedItems.includes(o.value))}
@@ -1229,9 +1223,9 @@ export default function ImportExportExpense() {
                 {selectedItems.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2 items-center">
                     {selectedItems.map((code) => (
-                      <span key={code} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md bg-blue-100 text-blue-900 text-[11px] font-mono border border-blue-200">
+                      <span key={code} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 text-[11px] font-mono border border-blue-200 dark:border-blue-900">
                         {code}
-                        <button type="button" className="p-0.5 rounded hover:bg-blue-200" onClick={() => removeSelectedItem(code)} aria-label={`Remove ${code}`}>
+                        <button type="button" className="p-0.5 rounded hover:bg-blue-200 dark:hover:bg-blue-900" onClick={() => removeSelectedItem(code)} aria-label={`Remove ${code}`}>
                           <X className="h-3 w-3" />
                         </button>
                       </span>
@@ -1244,32 +1238,32 @@ export default function ImportExportExpense() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">From Date</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">From Date</label>
                 <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none text-sm" />
+                  className={compactInputClass} />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">To Date</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">To Date</label>
                 <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none text-sm" />
+                  className={compactInputClass} />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Display Currency</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Display Currency</label>
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm"><SelectValue placeholder="All Currencies" /></SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400"><SelectValue placeholder="All Currencies" /></SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground dark:bg-slate-700 dark:text-slate-100">
                     {CURRENCY_OPTIONS.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Group by</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Group by</label>
                 <Select value={groupBy} onValueChange={setGroupBy}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground dark:bg-slate-700 dark:text-slate-100">
                     <SelectItem value="default">Journey (merged containers)</SelectItem>
                     <SelectItem value="container">Container</SelectItem>
                     <SelectItem value="unit">Unit (stock UOM)</SelectItem>
@@ -1278,10 +1272,10 @@ export default function ImportExportExpense() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice rows</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Invoice rows</label>
                 <Select value={invoiceLayout} onValueChange={setInvoiceLayout}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground dark:bg-slate-700 dark:text-slate-100">
                     <SelectItem value="merged">Merged (single line)</SelectItem>
                     <SelectItem value="separated">Separated (SI line / PI line)</SelectItem>
                   </SelectContent>
@@ -1289,7 +1283,7 @@ export default function ImportExportExpense() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Company group</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Company group</label>
                 <Combobox
                   options={companyGroupOptions}
                   value={companyGroup}
@@ -1301,10 +1295,10 @@ export default function ImportExportExpense() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Expense side</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Expense side</label>
                 <Select value={expenseSide} onValueChange={(v) => setExpenseSide(v as ExpenseSideFilter)}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-popover text-popover-foreground dark:bg-slate-700 dark:text-slate-100">
                     <SelectItem value="all">Import + export (default)</SelectItem>
                     <SelectItem value="purchase">Purchase / import charges only</SelectItem>
                     <SelectItem value="sales">Sales / export charges only</SelectItem>
@@ -1313,12 +1307,12 @@ export default function ImportExportExpense() {
               </div>
 
               <div className="space-y-1.5 xl:col-span-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Draft PI / SI / LCV / SSC</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Draft PI / SI / LCV / SSC</label>
                 <Select value={draftMode} onValueChange={(v) => setDraftMode(v as "submitted" | "all" | "draft_only")}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400">
                     <SelectValue placeholder="Submitted only" />
                   </SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectContent className="bg-popover text-popover-foreground dark:bg-slate-700 dark:text-slate-100">
                     <SelectItem value="submitted">Default — submitted only (no drafts)</SelectItem>
                     <SelectItem value="all">All — drafts and submitted</SelectItem>
                     <SelectItem value="draft_only">Draft only</SelectItem>
@@ -1327,9 +1321,9 @@ export default function ImportExportExpense() {
               </div>
 
               <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Transit scope</span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Transit scope</span>
                 <label
-                  className={`flex items-center gap-2 text-xs text-gray-700 cursor-pointer rounded-md border border-transparent px-1 py-1 -mx-1 hover:border-blue-100 hover:bg-blue-50/50 ${!company ? "opacity-50 pointer-events-none" : ""}`}
+                  className={`flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 cursor-pointer rounded-md border border-transparent px-1 py-1 -mx-1 hover:border-blue-100 dark:hover:border-blue-900 hover:bg-blue-50/50 dark:hover:bg-blue-950/50 ${!company ? "opacity-50 pointer-events-none" : ""}`}
                   title={!company ? "Pick a company first" : "Limit transit numbers and expanded invoices to the selected company"}
                 >
                   <input
@@ -1337,20 +1331,20 @@ export default function ImportExportExpense() {
                     checked={restrictTransitToCompany}
                     disabled={!company}
                     onChange={(e) => setRestrictTransitToCompany(e.target.checked)}
-                    className="rounded border-blue-300 shrink-0"
+                    className="rounded border-blue-300 dark:border-blue-800 shrink-0"
                   />
                   <span className="leading-snug font-medium">Transit &amp; invoices for selected company only</span>
                 </label>
               </div>
 
               <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Charge layout</span>
-                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer rounded-md border border-transparent px-1 py-1 -mx-1 hover:border-blue-100 hover:bg-blue-50/50">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Charge layout</span>
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 cursor-pointer rounded-md border border-transparent px-1 py-1 -mx-1 hover:border-blue-100 dark:hover:border-blue-900 hover:bg-blue-50/50 dark:hover:bg-blue-950/50">
                   <input
                     type="checkbox"
                     checked={expandAccountColumns}
                     onChange={(e) => setExpandAccountColumns(e.target.checked)}
-                    className="rounded border-blue-300 shrink-0"
+                    className="rounded border-blue-300 dark:border-blue-800 shrink-0"
                   />
                   <span className="leading-snug font-medium">Expand import / export charge accounts as columns</span>
                 </label>
@@ -1364,7 +1358,7 @@ export default function ImportExportExpense() {
             </div>
 
             {isConverting && (
-              <div className="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-700">
+              <div className="mt-3 px-3 py-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md text-[11px] text-amber-700 dark:text-amber-300">
                 All amounts are converted to <strong>{currency}</strong> using your Currency Exchange records.
               </div>
             )}
@@ -1373,22 +1367,22 @@ export default function ImportExportExpense() {
 
         <div ref={printRef} className="ie-report-print-root space-y-5">
           {error && (
-            <Alert className="border-red-200 bg-red-50 ie-report-no-print">
-              <AlertDescription className="text-red-800">{error}</AlertDescription>
+            <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 ie-report-no-print">
+              <AlertDescription className="text-red-800 dark:text-red-300">{error}</AlertDescription>
             </Alert>
           )}
           {fetchError && (
-            <Alert className="border-red-200 bg-red-50 ie-report-no-print">
-              <AlertDescription className="text-red-800">{fetchError}</AlertDescription>
+            <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 ie-report-no-print">
+              <AlertDescription className="text-red-800 dark:text-red-300">{fetchError}</AlertDescription>
             </Alert>
           )}
 
           {hasLoadedData && isLoading && !data && (
-            <Card className="border-blue-200 shadow-md ie-report-no-print">
-              <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-blue-900">
-                <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+            <Card className="border-blue-200 dark:border-blue-900 shadow-md ie-report-no-print">
+              <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-blue-900 dark:text-blue-200">
+                <RefreshCw className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
                 <p className="text-sm font-medium">Loading report…</p>
-                <p className="text-xs text-muted-foreground max-w-md text-center">
+                <p className="text-xs text-blue-700 dark:text-blue-300/80 max-w-md text-center">
                   Large date ranges can take a while. The page stays usable while data loads.
                 </p>
               </CardContent>
@@ -1396,7 +1390,7 @@ export default function ImportExportExpense() {
           )}
 
           {hasLoadedData && data && (
-            <Card className="border-blue-200 shadow-md overflow-hidden">
+            <Card className="border-blue-200 dark:border-blue-900 shadow-md overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-t-lg py-4 px-6">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <CardTitle className="text-base flex flex-wrap items-center gap-2">
@@ -1420,7 +1414,7 @@ export default function ImportExportExpense() {
                     <div className="flex gap-2 flex-wrap justify-end ie-report-no-print">
                       {printFilterActive && (
                         <Button variant="outline" size="sm" onClick={clearPrintSelection}
-                          className="bg-amber-500/20 border-amber-200 text-amber-100 hover:bg-amber-500/30 text-xs h-7">
+                          className="bg-amber-500/20 border-amber-200 dark:border-amber-900 text-amber-100 hover:bg-amber-500/30 text-xs h-7">
                           Clear print selection ({selectedJourneyIdsForPrint.size})
                         </Button>
                       )}
@@ -1455,7 +1449,7 @@ export default function ImportExportExpense() {
               </CardHeader>
 
               <CardContent className="p-0">
-                <p className="ie-report-no-print px-4 py-2 text-[11px] text-slate-600 border-b border-blue-100 bg-slate-50/80">
+                <p className="ie-report-no-print px-4 py-2 text-[11px] text-slate-600 dark:text-slate-300 border-b border-blue-100 dark:border-blue-900 bg-slate-50/80 dark:bg-slate-800/80">
                   <strong>Print / PDF:</strong> click the button to choose which columns to include before printing.
                   Tick journeys (first column or header checkbox) to print only those journeys.
                   Leave all unchecked for the full report.
@@ -1470,7 +1464,7 @@ export default function ImportExportExpense() {
                           {/* Span all static columns: print-checkbox, chevron, #, journey, item, source, units, price, total-value, import-cont, export-cont, import-bl, export-bl, destination */}
                           <th
                             colSpan={STATIC_COL_COUNT}
-                            className="border border-blue-200 bg-blue-50/80 ie-print-level1-spacer"
+                            className="border border-blue-200 dark:border-blue-900 bg-blue-50/80 dark:bg-blue-950/80 ie-print-level1-spacer"
                             aria-hidden
                           />
 
@@ -1503,7 +1497,7 @@ export default function ImportExportExpense() {
                           )}
 
                           {/* Total column spacer */}
-                          <th className="border border-blue-200 bg-blue-50/80 ie-print-level1-spacer" aria-hidden />
+                          <th className="border border-blue-200 dark:border-blue-900 bg-blue-50/80 dark:bg-blue-950/80 ie-print-level1-spacer" aria-hidden />
                         </tr>
                       )}
 
@@ -1541,7 +1535,7 @@ export default function ImportExportExpense() {
                         {expandAccountColumns && importAccountKeys.map((k) => (
                           <th
                             key={`him-${k}`}
-                            className={`${TH_ACCT} ie-dyn-acct-col bg-emerald-50 text-emerald-900 border-emerald-300`}
+                            className={`${TH_ACCT} ie-dyn-acct-col bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800`}
                             style={{ minWidth: 72, maxWidth: 110, width: 90, verticalAlign: "top" }}
                             title={k}
                           >
@@ -1565,7 +1559,7 @@ export default function ImportExportExpense() {
                         {expandAccountColumns && exportAccountKeys.map((k) => (
                           <th
                             key={`hex-${k}`}
-                            className={`${TH_ACCT} ie-dyn-acct-col bg-red-50 text-red-900 border-red-300`}
+                            className={`${TH_ACCT} ie-dyn-acct-col bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-300 dark:border-red-800`}
                             style={{ minWidth: 72, maxWidth: 110, width: 90, verticalAlign: "top" }}
                             title={k}
                           >
@@ -1606,7 +1600,7 @@ export default function ImportExportExpense() {
                     <tbody>
                       {groups.length === 0 ? (
                         <tr>
-                          <td colSpan={emptyTableColSpan} className="text-center text-gray-500 py-14 border border-gray-200 text-sm">
+                          <td colSpan={emptyTableColSpan} className="text-center text-slate-500 dark:text-slate-400 py-14 border border-slate-200 dark:border-slate-600 text-sm">
                             No data found. Ensure Purchase Invoices and Sales Invoices have <strong>Is Export Sale</strong> checked.
                           </td>
                         </tr>
@@ -1668,7 +1662,7 @@ export default function ImportExportExpense() {
                                   {gcConv(footerImportByAcct.get(k))}
                                 </td>
                               ))}
-                              <td data-col="col-import-charges" className={`${TDF} bg-emerald-50 text-emerald-900 border-emerald-200`}
+                              <td data-col="col-import-charges" className={`${TDF} bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-emerald-200 dark:border-emerald-900`}
                                 style={{ borderLeft: "2px solid #16a34a" }}>
                                 {gcConv(totals.total_additional_costs ?? 0)}
                               </td>
@@ -1681,7 +1675,7 @@ export default function ImportExportExpense() {
                                   {gcConv(footerExportByAcct.get(k))}
                                 </td>
                               ))}
-                              <td data-col="col-export-charges" className={`${TDF} bg-red-50 text-red-900 border-red-200`}
+                              <td data-col="col-export-charges" className={`${TDF} bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-900`}
                                 style={{ borderLeft: "2px solid #dc2626" }}>
                                 {gcConv(totals.total_export_expenses ?? 0)}
                               </td>
@@ -1690,16 +1684,16 @@ export default function ImportExportExpense() {
 
                           {!expandAccountColumns && (
                             <>
-                              <td data-col="col-import-charges" className={`${TDF} bg-emerald-50 text-emerald-900 border-emerald-200`}>
+                              <td data-col="col-import-charges" className={`${TDF} bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-emerald-200 dark:border-emerald-900`}>
                                 {gcConv(totals.total_additional_costs ?? 0)}
                               </td>
-                              <td data-col="col-export-charges" className={`${TDF} bg-red-50 text-red-900 border-red-200`}>
+                              <td data-col="col-export-charges" className={`${TDF} bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-900`}>
                                 {gcConv(totals.total_export_expenses ?? 0)}
                               </td>
                             </>
                           )}
 
-                          <td data-col="col-total" className={`${TDF} bg-blue-200 text-blue-950 border-blue-400 text-sm`}>
+                          <td data-col="col-total" className={`${TDF} bg-blue-200 dark:bg-blue-900 text-blue-950 border-blue-400 text-sm`}>
                             {gcConv(totals.grand_total ?? 0)}
                           </td>
                         </tr>

@@ -9,8 +9,8 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "./ui/alert"
 import { Checkbox } from "../../components/ui/checkbox"
-import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff, ArrowUpDown, Package, FileText } from "lucide-react"
-import { Link } from "react-router-dom"
+import { ArrowLeftRight, CheckCircle, XCircle, AlertTriangle, RefreshCw, Building2, BarChart3, Eraser, Eye, EyeOff, ArrowUpDown } from "lucide-react"
+import IntercompanyTopNav, { PageHeader } from "./intercompany-top-nav"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
 import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
@@ -2767,11 +2767,11 @@ export default function IntercompanyReconciliation() {
   const getStatusBadge = (status: 'Match' | 'Mismatch' | 'Pending') => {
     switch (status) {
       case 'Match':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">✓ Match</Badge>
+        return <Badge className="bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300 border-green-200 dark:border-green-900">✓ Match</Badge>
       case 'Mismatch':
-        return <Badge className="bg-red-100 text-red-800 border-red-200">✗ Mismatch</Badge>
+        return <Badge className="bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900">✗ Mismatch</Badge>
       default:
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">? Pending</Badge>
+        return <Badge className="bg-yellow-100 dark:bg-yellow-950/60 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-900">? Pending</Badge>
     }
   }
 
@@ -3078,92 +3078,53 @@ export default function IntercompanyReconciliation() {
     console.log('[MatchedAmountCell] Render - amount:', amount, 'isLoading:', isLoading)
 
     if (isLoading) {
-      return <span className="text-gray-400 text-sm">Loading...</span>
+      return <span className="text-slate-400 dark:text-slate-500 text-sm">Loading...</span>
     }
 
     if (amount !== null) {
       return <>{formatCurrency(amount, currency, party, partyType)}</>
     }
 
-    return <span className="text-gray-400">-</span>
+    return <span className="text-slate-400 dark:text-slate-500">-</span>
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
-      <div className="max-w-8xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <IntercompanyTopNav />
+      <div className="mx-auto max-w-screen-2xl space-y-4 px-4 py-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="text-center space-y-2 flex-1">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-              Intercompany General Ledger Reconciliation
-            </h1>
-            <p className="text-gray-600 text-lg">
-              Compare and reconcile General Ledger entries between intercompany transactions
-            </p>
-          </div>
-          <div className="flex space-x-2">
+        <PageHeader
+          title="Intercompany General Ledger Reconciliation"
+          subtitle="Compare and reconcile General Ledger entries between intercompany transactions"
+          actions={
             <Button
               variant="outline"
-              className="flex items-center space-x-2"
+              size="sm"
+              className="h-8 space-x-1.5 border-slate-200 px-2.5 text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
               onClick={handleClearCache}
               title="Clear cache"
             >
-              <Eraser className="h-4 w-4" />
+              <Eraser className="h-3.5 w-3.5" />
+              <span>Clear cache</span>
             </Button>
-            <Link to="/ledger">
-              <Button
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <Building2 className="h-4 w-4" />
-                <span>Ledger Summary</span>
-              </Button>
-            </Link>
-            <Link to="/import-export">
-              <Button
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <Package className="h-4 w-4" />
-                <span>Import/Export</span>
-              </Button>
-            </Link>
-            <Link to="/cost-estimate-vs-consumed">
-              <Button
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span>CEC</span>
-              </Button>
-            </Link>
-            <Link to="/quotation-stages">
-              <Button
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <FileText className="h-4 w-4" />
-                <span>Quotation Stages</span>
-              </Button>
-            </Link>
-          </div>
-        </div>
+          }
+        />
 
         {/* Company Selection */}
-        <Card className="border-blue-200 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2">
+        <Card className="rounded-xl border-slate-200 shadow-sm dark:border-slate-700">
+          <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
               <ArrowLeftRight className="h-5 w-5" />
               General Ledger Selection
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6 w-full">
+          <CardContent className="p-4 w-full">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Company A Selection */}
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <div className="flex items-center justify-between">
 
-                  <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
+                  <h3 className="border-b border-slate-200 pb-1.5 text-[13px] font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
                      <Checkbox
                      className="mr-2"
                       id="customer-view"
@@ -3175,8 +3136,8 @@ export default function IntercompanyReconciliation() {
 
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Company</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Company</label>
                     <Combobox
                       options={[
                         ...displayCompaniesA.map((company) => ({
@@ -3201,20 +3162,20 @@ export default function IntercompanyReconciliation() {
                       emptyMessage="No companies found."
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Party Type</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Party Type</label>
                     <Select value="Customer" disabled>
-                      <SelectTrigger className="border-blue-200 bg-blue-50">
+                      <SelectTrigger className="border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60">
                         <SelectValue placeholder="Customer" />
                       </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
+                      <SelectContent className="dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
                         <SelectItem value="Supplier">Supplier</SelectItem>
                         <SelectItem value="Customer">Customer</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Party</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Party</label>
                     <Combobox
                       options={[
                         ...displayPartiesA.map((party) => ({
@@ -3242,9 +3203,9 @@ export default function IntercompanyReconciliation() {
               </div>
 
               {/* Company B Selection */}
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-blue-800 border-b border-blue-200 pb-2">
+                  <h3 className="border-b border-slate-200 pb-1.5 text-[13px] font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
                     <Checkbox
                       className="mr-2"
                       id="supplier-view"
@@ -3253,7 +3214,7 @@ export default function IntercompanyReconciliation() {
                     />
                     Company B (Supplier View)
                     {isAutoFilled && (
-                      <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
+                      <Badge variant="secondary" className="ml-2 bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300">
                         Auto-filled
                       </Badge>
                     )}
@@ -3261,8 +3222,8 @@ export default function IntercompanyReconciliation() {
 
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Company</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Company</label>
                     <Combobox
                       options={[
                         ...displayCompaniesB.map((company) => ({
@@ -3287,20 +3248,20 @@ export default function IntercompanyReconciliation() {
                       emptyMessage="No companies found."
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Party Type</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Party Type</label>
                     <Select value={partyTypeB} onValueChange={handlePartyTypeBChange}>
-                      <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                      <SelectTrigger className="border-slate-200 dark:border-slate-600 focus:border-blue-400">
                         <SelectValue placeholder="Select Party Type" />
                       </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
+                      <SelectContent className="dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
                         <SelectItem value="Supplier">Supplier</SelectItem>
                         <SelectItem value="Customer">Customer</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Party</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Party</label>
                     <Combobox
                       options={[
                         ...displayPartiesB.map((party) => ({
@@ -3329,32 +3290,32 @@ export default function IntercompanyReconciliation() {
             </div>
 
             {/* Date Range, Currency and Filters */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 w-full">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">From Date</label>
+            <div className="mt-4 grid w-full grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-6">
+              <div className="min-w-0 space-y-1">
+                <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">From Date</label>
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none"
+                  className="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-900 shadow-sm transition-colors focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-blue-500"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">To Date</label>
+              <div className="min-w-0 space-y-1">
+                <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">To Date</label>
                 <input
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none"
+                  className="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-900 shadow-sm transition-colors focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-blue-500"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Currency</label>
+              <div className="min-w-0 space-y-1">
+                <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Currency</label>
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                  <SelectTrigger className="border-slate-200 dark:border-slate-600 focus:border-blue-400">
                     <SelectValue placeholder="All Currencies" />
                   </SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectContent className="dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
                     <SelectItem value="all">All Currencies</SelectItem>
                     <SelectItem value="AED">AED (UAE Dirham)</SelectItem>
                     <SelectItem value="CDF">CDF (Congolese Franc)</SelectItem>
@@ -3378,48 +3339,48 @@ export default function IntercompanyReconciliation() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Ignore Exchange Rate Revaluation</label>
-                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
+              <div className="min-w-0 space-y-1">
+                <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Ignore Exchange Rate Revaluation</label>
+                <div className="flex items-center space-x-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-600 dark:bg-slate-700/60">
                   <input
                     type="checkbox"
                     id="ignoreExchangeRateRevaluation"
                     checked={ignoreExchangeRateRevaluation}
                     onChange={(e) => setIgnoreExchangeRateRevaluation(e.target.checked)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                   />
-                  <label htmlFor="ignoreExchangeRateRevaluation" className="text-sm text-gray-700">
+                  <label htmlFor="ignoreExchangeRateRevaluation" className="text-sm text-slate-600 dark:text-slate-300">
                     Enable
                   </label>
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Ignore System Generated Notes</label>
-                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
+              <div className="min-w-0 space-y-1">
+                <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Ignore System Generated Notes</label>
+                <div className="flex items-center space-x-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-600 dark:bg-slate-700/60">
                   <input
                     type="checkbox"
                     id="ignoreSystemGeneratedNotes"
                     checked={ignoreSystemGeneratedNotes}
                     onChange={(e) => setIgnoreSystemGeneratedNotes(e.target.checked)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                   />
-                  <label htmlFor="ignoreSystemGeneratedNotes" className="text-sm text-gray-700">
+                  <label htmlFor="ignoreSystemGeneratedNotes" className="text-sm text-slate-600 dark:text-slate-300">
                     Enable
                   </label>
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Show Opening Entries</label>
-                <div className={`flex items-center space-x-2 p-2 border rounded-md ${hasLoadedData ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="min-w-0 space-y-1">
+                <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Show Opening Entries</label>
+                <div className={`flex items-center space-x-2 rounded-md border px-2.5 py-1.5 ${hasLoadedData ? 'border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-700/60' : 'border-slate-200 bg-slate-100 opacity-60 dark:border-slate-600 dark:bg-slate-700/60'}`}>
                   <input
                     type="checkbox"
                     id="showOpeningEntries"
                     checked={showOpeningEntries}
                     onChange={(e) => setShowOpeningEntries(e.target.checked)}
                     disabled={!hasLoadedData}
-                    className={`rounded border-blue-300 text-blue-600 focus:ring-blue-500 ${!hasLoadedData ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 ${!hasLoadedData ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
-                  <label htmlFor="showOpeningEntries" className={`text-sm ${hasLoadedData ? 'text-gray-700' : 'text-gray-400'}`}>
+                  <label htmlFor="showOpeningEntries" className={`text-sm ${hasLoadedData ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}>
                     Enable
                   </label>
                 </div>
@@ -3429,9 +3390,9 @@ export default function IntercompanyReconciliation() {
 
 
             {/* {error && (
-                <Alert className="mt-4 border-red-200 bg-red-50">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-800">
+                <Alert className="mt-4 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40">
+                  <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  <AlertDescription className="text-red-800 dark:text-red-300">
                     {typeof error === 'string' && error.includes("permission") ?
                       "You don't have permission to access this company's data. Please contact your administrator to request access." :
                       typeof error === 'string' ? error :
@@ -3443,9 +3404,9 @@ export default function IntercompanyReconciliation() {
 
             {/* Show info when companies are filtered by permissions */}
             {companies.length > 0 && companies.length < 10 && (
-              <Alert className="mt-4 border-blue-200 bg-blue-50">
-                <AlertTriangle className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800">
+              <Alert className="mt-4 border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60">
+                <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <AlertDescription className="text-slate-600 dark:text-slate-300">
                   You have access to {companies.length} company{companies.length !== 1 ? 'ies' : ''} based on your user permissions.
                   Contact your administrator if you need access to additional companies.
                 </AlertDescription>
@@ -3454,9 +3415,9 @@ export default function IntercompanyReconciliation() {
 
             {/* Show warning when no companies are available */}
             {companies.length === 0 && !companiesLoading && !companiesError && (
-              <Alert className="mt-4 border-orange-200 bg-orange-50">
-                <AlertTriangle className="h-4 w-4 text-orange-600" />
-                <AlertDescription className="text-orange-800">
+              <Alert className="mt-4 border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/40">
+                <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <AlertDescription className="text-orange-800 dark:text-orange-200">
                   <strong>No companies available:</strong> You don't have permission to access any companies.
                   Please contact your administrator to set up company permissions for your user account.
                 </AlertDescription>
@@ -3465,9 +3426,9 @@ export default function IntercompanyReconciliation() {
 
             {/* Show restore notification */}
             {showRestoreNotification && (
-              <Alert className="mt-4 border-green-200 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
+              <Alert className="mt-4 border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-800 dark:text-green-300">
                   <strong>Data Restored:</strong> Your previous session has been restored.
                   Click "Load General Ledger Data" to refresh the data.
                 </AlertDescription>
@@ -3475,7 +3436,7 @@ export default function IntercompanyReconciliation() {
             )}
 
             {/* Auto-Match Toggle */}
-            <div className="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 dark:border-orange-900 dark:bg-orange-950/40">
               <div className="flex items-center justify-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -3484,11 +3445,11 @@ export default function IntercompanyReconciliation() {
                     checked={automatchEnabled}
                     onCheckedChange={handleAutomatchChange}
                   />
-                  <label htmlFor="automatch-enabled" className="text-sm font-medium text-orange-800">
+                  <label htmlFor="automatch-enabled" className="text-sm font-medium text-orange-800 dark:text-orange-200">
                     Enable Auto-Match
                   </label>
                 </div>
-                <div className="text-xs text-orange-600">
+                <div className="text-xs text-orange-600 dark:text-orange-400">
                   {automatchEnabled
                     ? "Auto-match considers amounts, dates, and transaction status"
                     : "Only transaction status is considered for auto-matching. Manual matching always validates amounts."
@@ -3497,15 +3458,15 @@ export default function IntercompanyReconciliation() {
               </div>
             </div>
 
-            <div className="flex justify-center mt-6">
+            <div className="mt-4 flex justify-end">
               <Button
                 onClick={handleLoadData}
                 disabled={!customerViewEnabled && !supplierViewEnabled || !companyA || !partyA || !companyB || !partyB || isTableLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                className="h-8 rounded-md bg-blue-600 px-3.5 text-[13px] font-medium text-white hover:bg-blue-700"
               >
                 {isTableLoading ? (
                   <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                     {isLoading ? "Loading..." : "Processing..."}
                   </>
                 ) : (
@@ -3518,64 +3479,64 @@ export default function IntercompanyReconciliation() {
 
         {/* Reconciliation Analysis */}
         {reconciliationAnalysis && (
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
+          <Card className="rounded-xl border-slate-200 shadow-sm dark:border-slate-700">
+            <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <CardTitle className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
                 {reconciliationAnalysis.isFullyReconciled ? (
-                  <CheckCircle className="h-5 w-5 text-green-300" />
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <AlertTriangle className="h-5 w-5 text-yellow-300" />
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 )}
                 Reconciliation Analysis
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Company A Cards */}
-                <Card className="border-blue-200">
-                  <CardHeader className="bg-gray-50 border-b border-gray-200">
-                    <CardTitle className="text-lg text-gray-800">
+                <Card className="border-slate-200 dark:border-slate-600">
+                  <CardHeader className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-600">
+                    <CardTitle className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       {companyA} Summary
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
                     <div className="grid grid-cols-2 gap-4">
                                               <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">
+                          <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">
                             {formatCurrency(reconciliationAnalysis.totalDebitA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                           </div>
-                          <div className="text-sm text-gray-600">Total Debit ({getPartyCurrency(partyA, 'Customer')})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Total Debit ({getPartyCurrency(partyA, 'Customer')})</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">
+                          <div className="text-xl font-semibold text-green-600 dark:text-green-400">
                             {formatCurrency(reconciliationAnalysis.totalCreditA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                           </div>
-                          <div className="text-sm text-gray-600">Total Credit ({getPartyCurrency(partyA, 'Customer')})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Total Credit ({getPartyCurrency(partyA, 'Customer')})</div>
                         </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 {/* Company B Cards */}
-                <Card className="border-blue-200">
-                  <CardHeader className="bg-gray-50 border-b border-gray-200">
-                    <CardTitle className="text-lg text-gray-800">
+                <Card className="border-slate-200 dark:border-slate-600">
+                  <CardHeader className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-600">
+                    <CardTitle className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       {companyB} Summary
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
                     <div className="grid grid-cols-2 gap-4">
                                               <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">
+                          <div className="text-xl font-semibold text-green-600 dark:text-green-400">
                             {formatCurrency(reconciliationAnalysis.totalDebitB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
-                          <div className="text-sm text-gray-600">Total Debit ({getPartyCurrency(partyB, partyTypeB)})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Total Debit ({getPartyCurrency(partyB, partyTypeB)})</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">
+                          <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">
                             {formatCurrency(reconciliationAnalysis.totalCreditB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
-                          <div className="text-sm text-gray-600">Total Credit ({getPartyCurrency(partyB, partyTypeB)})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Total Credit ({getPartyCurrency(partyB, partyTypeB)})</div>
                         </div>
                     </div>
                   </CardContent>
@@ -3586,29 +3547,29 @@ export default function IntercompanyReconciliation() {
               {showOpeningEntries && (totalsA?.openingDebit !== undefined || totalsB?.openingDebit !== undefined) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Company A Opening */}
-                  <Card className="border-orange-200">
-                    <CardHeader className="bg-orange-50 border-b border-orange-200">
-                      <CardTitle className="text-lg text-orange-800">
+                  <Card className="border-orange-200 dark:border-orange-900">
+                    <CardHeader className="bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-900">
+                      <CardTitle className="text-lg text-orange-800 dark:text-orange-200">
                         {companyA} Opening Amounts
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-orange-600">
+                          <div className="text-xl font-semibold text-orange-600 dark:text-orange-400">
                             {formatCurrency(totalsA?.openingDebit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                           </div>
-                          <div className="text-sm text-gray-600">Opening Debit ({getPartyCurrency(partyA, 'Customer')})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Opening Debit ({getPartyCurrency(partyA, 'Customer')})</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-orange-600">
+                          <div className="text-xl font-semibold text-orange-600 dark:text-orange-400">
                             {formatCurrency(totalsA?.openingCredit || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                           </div>
-                          <div className="text-sm text-gray-600">Opening Credit ({getPartyCurrency(partyA, 'Customer')})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Opening Credit ({getPartyCurrency(partyA, 'Customer')})</div>
                         </div>
                       </div>
                       <div className="mt-4 text-center">
-                        <div className="text-lg font-semibold text-orange-700">
+                        <div className="text-base font-semibold text-orange-700 dark:text-orange-300">
                           Opening Balance: {formatCurrency(totalsA?.openingBalance || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                         </div>
                       </div>
@@ -3616,29 +3577,29 @@ export default function IntercompanyReconciliation() {
                   </Card>
 
                   {/* Company B Opening */}
-                  <Card className="border-orange-200">
-                    <CardHeader className="bg-orange-50 border-b border-orange-200">
-                      <CardTitle className="text-lg text-orange-800">
+                  <Card className="border-orange-200 dark:border-orange-900">
+                    <CardHeader className="bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-900">
+                      <CardTitle className="text-lg text-orange-800 dark:text-orange-200">
                         {companyB} Opening Amounts
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-orange-600">
+                          <div className="text-xl font-semibold text-orange-600 dark:text-orange-400">
                             {formatCurrency(totalsB?.openingDebit || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
-                          <div className="text-sm text-gray-600">Opening Debit ({getPartyCurrency(partyB, partyTypeB)})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Opening Debit ({getPartyCurrency(partyB, partyTypeB)})</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-orange-600">
+                          <div className="text-xl font-semibold text-orange-600 dark:text-orange-400">
                             {formatCurrency(totalsB?.openingCredit || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                           </div>
-                          <div className="text-sm text-gray-600">Opening Credit ({getPartyCurrency(partyB, partyTypeB)})</div>
+                          <div className="text-sm text-slate-500 dark:text-slate-400">Opening Credit ({getPartyCurrency(partyB, partyTypeB)})</div>
                         </div>
                       </div>
                       <div className="mt-4 text-center">
-                        <div className="text-lg font-semibold text-orange-700">
+                        <div className="text-base font-semibold text-orange-700 dark:text-orange-300">
                           Opening Balance: {formatCurrency(totalsB?.openingBalance || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                         </div>
                       </div>
@@ -3649,16 +3610,16 @@ export default function IntercompanyReconciliation() {
 
               <div className="space-y-3">
                 <Alert
-                  className={`border-2 ${reconciliationAnalysis.debitCreditMatch ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
+                  className={`border-2 ${reconciliationAnalysis.debitCreditMatch ? "border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40" : "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40"}`}
                 >
                   <div className="flex items-center gap-2">
                     {reconciliationAnalysis.debitCreditMatch ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-red-600" />
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                     )}
                     <AlertDescription
-                      className={reconciliationAnalysis.debitCreditMatch ? "text-green-800" : "text-red-800"}
+                      className={reconciliationAnalysis.debitCreditMatch ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}
                     >
                       {bypassTotalCalculation ? (
                         <>
@@ -3666,7 +3627,7 @@ export default function IntercompanyReconciliation() {
                           {reconciliationAnalysis.debitCreditMatch ? " matches " : " does not match "}
                           Company B Net Total ({formatCurrency(reconciliationAnalysis.totalCreditB - reconciliationAnalysis.totalDebitB, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)})
                           <br />
-                          <span className="text-xs text-gray-600">Net Total = Credit - Debit</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">Net Total = Credit - Debit</span>
                           {!reconciliationAnalysis.debitCreditMatch && (
                             <div className="mt-1">
                               Difference: {formatCurrency(Math.abs((reconciliationAnalysis.totalCreditA - reconciliationAnalysis.totalDebitA) - (reconciliationAnalysis.totalCreditB - reconciliationAnalysis.totalDebitB)), getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
@@ -3690,16 +3651,16 @@ export default function IntercompanyReconciliation() {
                 </Alert>
 
                 <Alert
-                  className={`border-2 ${reconciliationAnalysis.creditDebitMatch ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
+                  className={`border-2 ${reconciliationAnalysis.creditDebitMatch ? "border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40" : "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40"}`}
                 >
                   <div className="flex items-center gap-2">
                     {reconciliationAnalysis.creditDebitMatch ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-red-600" />
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                     )}
                     <AlertDescription
-                      className={reconciliationAnalysis.creditDebitMatch ? "text-green-800" : "text-red-800"}
+                      className={reconciliationAnalysis.creditDebitMatch ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}
                     >
                       <strong>Credit-Debit Match:</strong> Company A Credit ({formatCurrency(reconciliationAnalysis.totalCreditA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')})
                       {reconciliationAnalysis.creditDebitMatch ? " matches " : " does not match "}
@@ -3714,10 +3675,10 @@ export default function IntercompanyReconciliation() {
                 </Alert>
 
                 {/* Overall Balance Comparison */}
-                <Alert className="border-2 border-blue-200 bg-blue-50">
+                <Alert className="border-2 border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-blue-800">
+                    <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <AlertDescription className="text-slate-600 dark:text-slate-300">
                       <strong>Balance Summary:</strong>
                                               <div className="mt-2 grid grid-cols-2 gap-4">
                           <div>{companyA} Balance: {formatCurrency(reconciliationAnalysis.balanceA, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}</div>
@@ -3733,95 +3694,95 @@ export default function IntercompanyReconciliation() {
 
         {/* Summary Statistics */}
         {hasLoadedData && summaryStats && (
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
+          <Card className="rounded-xl border-slate-200 shadow-sm dark:border-slate-700">
+            <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <CardTitle className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
                 <BarChart3 className="h-5 w-5" />
                 Reconciliation Summary Statistics
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Company A Statistics */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                <div className="min-w-0 space-y-4">
+                  <h3 className="flex items-center gap-2 text-[13px] font-semibold text-slate-800 dark:text-slate-100">
                     <Building2 className="h-5 w-5" />
                     {companyA} Statistics
                   </h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-blue-700 font-medium">Total Entries:</span>
-                      <span className="text-blue-900 font-bold text-lg">{summaryStats.companyA.total}</span>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/60 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-300 font-medium">Total Entries:</span>
+                      <span className="text-slate-900 dark:text-slate-100 font-bold text-lg">{summaryStats.companyA.total}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="text-green-700 font-medium">Matched:</span>
-                      <span className="text-green-900 font-bold text-lg">{summaryStats.companyA.matched}</span>
+                    <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/40 rounded-lg">
+                      <span className="text-green-700 dark:text-green-300 font-medium">Matched:</span>
+                      <span className="text-green-900 dark:text-green-200 font-bold text-lg">{summaryStats.companyA.matched}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                      <span className="text-red-700 font-medium">Mismatched:</span>
-                      <span className="text-red-900 font-bold text-lg">{summaryStats.companyA.mismatched}</span>
+                    <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-950/40 rounded-lg">
+                      <span className="text-red-700 dark:text-red-300 font-medium">Mismatched:</span>
+                      <span className="text-red-900 dark:text-red-200 font-bold text-lg">{summaryStats.companyA.mismatched}</span>
                     </div>
-                    {/* <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                      <span className="text-yellow-700 font-medium">Pending:</span>
-                      <span className="text-yellow-900 font-bold text-lg">{summaryStats.companyA.pending}</span>
+                    {/* <div className="flex justify-between items-center p-3 bg-yellow-50 dark:bg-yellow-950/40 rounded-lg">
+                      <span className="text-yellow-700 dark:text-yellow-300 font-medium">Pending:</span>
+                      <span className="text-yellow-900 dark:text-yellow-200 font-bold text-lg">{summaryStats.companyA.pending}</span>
                     </div> */}
                   </div>
                 </div>
 
                 {/* Company B Statistics */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                <div className="min-w-0 space-y-4">
+                  <h3 className="flex items-center gap-2 text-[13px] font-semibold text-slate-800 dark:text-slate-100">
                     <Building2 className="h-5 w-5" />
                     {companyB} Statistics
                   </h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-blue-700 font-medium">Total Entries:</span>
-                      <span className="text-blue-900 font-bold text-lg">{summaryStats.companyB.total}</span>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/60 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-300 font-medium">Total Entries:</span>
+                      <span className="text-slate-900 dark:text-slate-100 font-bold text-lg">{summaryStats.companyB.total}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="text-green-700 font-medium">Matched:</span>
-                      <span className="text-green-900 font-bold text-lg">{summaryStats.companyB.matched}</span>
+                    <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/40 rounded-lg">
+                      <span className="text-green-700 dark:text-green-300 font-medium">Matched:</span>
+                      <span className="text-green-900 dark:text-green-200 font-bold text-lg">{summaryStats.companyB.matched}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                      <span className="text-red-700 font-medium">Mismatched:</span>
-                      <span className="text-red-900 font-bold text-lg">{summaryStats.companyB.mismatched}</span>
+                    <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-950/40 rounded-lg">
+                      <span className="text-red-700 dark:text-red-300 font-medium">Mismatched:</span>
+                      <span className="text-red-900 dark:text-red-200 font-bold text-lg">{summaryStats.companyB.mismatched}</span>
                     </div>
-                    {/* <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                      <span className="text-yellow-700 font-medium">Pending:</span>
-                      <span className="text-yellow-900 font-bold text-lg">{summaryStats.companyB.pending}</span>
+                    {/* <div className="flex justify-between items-center p-3 bg-yellow-50 dark:bg-yellow-950/40 rounded-lg">
+                      <span className="text-yellow-700 dark:text-yellow-300 font-medium">Pending:</span>
+                      <span className="text-yellow-900 dark:text-yellow-200 font-bold text-lg">{summaryStats.companyB.pending}</span>
                     </div> */}
                   </div>
                 </div>
               </div>
 
               {/* Overall Progress */}
-              <div className="mt-6 pt-6 border-t border-blue-200">
-                <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
+              <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-600">
+                <h4 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Overall Reconciliation Progress</h4>
                 {summaryStats ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-                      <div className="text-3xl font-bold text-green-700">
+                    <div className="text-center p-6 bg-gradient-to-r from-green-50 dark:from-green-950/40 to-green-100 dark:to-green-900/40 rounded-lg">
+                      <div className="text-2xl font-semibold text-green-700 dark:text-green-300">
                         {summaryStats.overall.matched}
                       </div>
-                      <div className="text-lg text-green-600 font-medium">Total Matched</div>
+                      <div className="text-lg text-green-600 dark:text-green-400 font-medium">Total Matched</div>
                     </div>
-                    <div className="text-center p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-lg">
-                      <div className="text-3xl font-bold text-red-700">
+                    <div className="text-center p-6 bg-gradient-to-r from-red-50 dark:from-red-950/40 to-red-100 dark:to-red-900/40 rounded-lg">
+                      <div className="text-2xl font-semibold text-red-700 dark:text-red-300">
                         {summaryStats.overall.mismatched}
                       </div>
-                      <div className="text-lg text-red-600 font-medium">Total Mismatched</div>
+                      <div className="text-lg text-red-600 dark:text-red-400 font-medium">Total Mismatched</div>
                     </div>
                     {/* <div className="text-center p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
-                      <div className="text-3xl font-bold text-yellow-700">
+                      <div className="text-2xl font-semibold text-yellow-700 dark:text-yellow-300">
                         {summaryStats.overall.pending}
                       </div>
-                      <div className="text-lg text-yellow-600 font-medium">Total Pending</div>
+                      <div className="text-lg text-yellow-600 dark:text-yellow-400 font-medium">Total Pending</div>
                     </div> */}
                   </div>
                 ) : (
-                  <div className="text-center p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg">
-                    <div className="text-lg text-gray-600 font-medium">
+                  <div className="text-center p-6 bg-gradient-to-r from-slate-50 dark:from-slate-700/60 to-slate-100 dark:to-slate-700/40 rounded-lg">
+                    <div className="text-lg text-slate-500 dark:text-slate-400 font-medium">
                       {isFetchingBackendStatus ? "Calculating reconciliation totals..." : "Loading reconciliation data..."}
                     </div>
                   </div>
@@ -3855,19 +3816,19 @@ export default function IntercompanyReconciliation() {
 
         {/* Status Filter and Actions */}
         {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
+          <Card className="rounded-xl border-slate-200 shadow-sm dark:border-slate-700">
+            <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <CardTitle className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
                 <CheckCircle className="h-5 w-5" />
                 Status Filter & Actions
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {/* Sort Buttons */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Sort by Amount</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Sort by Amount</label>
                     <div className="flex items-center gap-1">
                       <Button
                         onClick={() => {
@@ -3879,26 +3840,26 @@ export default function IntercompanyReconciliation() {
                         }}
                         variant="outline"
                         size="sm"
-                        className={`border-blue-200 ${sortOrder === 'asc' ? 'bg-blue-100 text-blue-700 border-blue-400' : sortOrder === 'desc' ? 'bg-blue-100 text-blue-700 border-blue-400' : 'hover:bg-blue-50'}`}
+                        className={`border-slate-200 dark:border-slate-600 ${sortOrder === 'asc' ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-blue-400' : sortOrder === 'desc' ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-blue-400' : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}
                         title={sortOrder === 'asc' ? 'Currently: Ascending (click for Descending)' : sortOrder === 'desc' ? 'Currently: Descending (click for Ascending)' : 'Click to sort ascending'}
                       >
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                       {sortOrder && (
-                        <span className="text-xs text-gray-500 ml-1">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">
                           {sortOrder === 'asc' ? '↑' : '↓'}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Filter by Status</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Filter by Status</label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-48 border-blue-200 focus:border-blue-400">
+                      <SelectTrigger className="w-48 border-slate-200 dark:border-slate-600 focus:border-blue-400">
                         <SelectValue placeholder="Select Status" />
                       </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
+                      <SelectContent className="dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
                         <SelectItem value="All">All Entries</SelectItem>
                         <SelectItem value="Match">✓ Matched</SelectItem>
                         <SelectItem value="Mismatch">✗ Mismatched</SelectItem>
@@ -3907,13 +3868,13 @@ export default function IntercompanyReconciliation() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Filter by Debit/Credit</label>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Filter by Debit/Credit</label>
                     <Select value={debitCreditFilter} onValueChange={setDebitCreditFilter}>
-                      <SelectTrigger className="w-48 border-blue-200 focus:border-blue-400">
+                      <SelectTrigger className="w-48 border-slate-200 dark:border-slate-600 focus:border-blue-400">
                         <SelectValue placeholder="Select Filter" />
                       </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
+                      <SelectContent className="dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
                         <SelectItem value="All">All (Default)</SelectItem>
                         <SelectItem value="Debit => Credit">Debit → Credit</SelectItem>
                         <SelectItem value="Credit => Debit">Credit → Debit</SelectItem>
@@ -3921,16 +3882,16 @@ export default function IntercompanyReconciliation() {
                     </Select>
                   </div>
 
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
                     Showing {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length} of {findMatchingEntries.glDataAWithStatus.length} entries
                     {isBackendStatusLoading && (
-                      <span className="ml-2 inline-flex items-center px-2 py-1 bg-blue-50 border border-blue-200 rounded-full">
-                        <RefreshCw className="h-3 w-3 animate-spin text-blue-600 mr-1" />
-                        <span className="text-blue-600 text-xs font-medium">Syncing statuses...</span>
+                      <span className="ml-2 inline-flex items-center px-2 py-1 bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-full">
+                        <RefreshCw className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400 mr-1" />
+                        <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">Syncing statuses...</span>
                       </span>
                     )}
                     {automatchEnabled && (
-                      <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
+                      <span className="ml-2 px-2 py-1 bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 text-xs rounded-full">
                         Auto-Match Enabled
                       </span>
                     )}
@@ -3938,18 +3899,18 @@ export default function IntercompanyReconciliation() {
 
                    {/* Bypass Total Calculation Checkbox - Only visible to System Manager or Administrator */}
                   {isSystemManagerOrAdmin() && (
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="bypass-total-calculation"
                           checked={bypassTotalCalculation}
                           onCheckedChange={handleBypassTotalCalculationChange}
                         />
-                        <label htmlFor="bypass-total-calculation" className="text-sm text-gray-700">
+                        <label htmlFor="bypass-total-calculation" className="text-sm text-slate-600 dark:text-slate-300">
                           Match Net Amounts
                         </label>
                       </div>
-                      {/* <div className="text-xs text-gray-500">
+                      {/* <div className="text-xs text-slate-500 dark:text-slate-400">
                         {bypassTotalCalculation
                           ? "Match based on net total (credit - debit)"
                           : "Match based on individual debit/credit amounts"
@@ -3959,14 +3920,14 @@ export default function IntercompanyReconciliation() {
                   )}
 
                   {/* Pair Matching Checkbox */}
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-1">
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="pair-matching"
                         checked={pairMatchingEnabled}
                         onCheckedChange={handlePairMatchingChange}
                       />
-                      <label htmlFor="pair-matching" className="text-sm text-gray-700">
+                      <label htmlFor="pair-matching" className="text-sm text-slate-600 dark:text-slate-300">
                         Pair Matching
                       </label>
                     </div>
@@ -3984,8 +3945,8 @@ export default function IntercompanyReconciliation() {
                     disabled={selectedEntries.size === 0 || isProcessing}
                     variant="outline"
                     className={areSelectedEntriesMatched
-                      ? "border-red-200 text-red-700 hover:bg-red-50"
-                      : "border-green-200 text-green-700 hover:bg-green-50"
+                      ? "border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
+                      : "border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40"
                     }
                   >
                     {isProcessing ? (
@@ -4018,7 +3979,7 @@ export default function IntercompanyReconciliation() {
                       }}
                       variant="outline"
                       size="sm"
-                      className="border-red-200 text-red-600 hover:bg-red-50 px-2"
+                      className="border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 px-2"
                       title="Clear all selections"
                     >
                       <XCircle className="h-4 w-4" />
@@ -4031,7 +3992,7 @@ export default function IntercompanyReconciliation() {
                       onClick={handleCancelManualMatch}
                       variant="outline"
                       size="sm"
-                      className="border-orange-200 text-orange-600 hover:bg-orange-50 px-2"
+                      className="border-orange-200 dark:border-orange-900 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 px-2"
                       title="Cancel manual match mode"
                     >
                       <XCircle className="h-4 w-4 mr-1" />
@@ -4050,11 +4011,11 @@ export default function IntercompanyReconciliation() {
         {(findMatchingEntries.glDataAWithStatus.length > 0 || findMatchingEntries.glDataBWithStatus.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Company A GL */}
-            <Card className="border-blue-200 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-                <CardTitle>
+            <Card className="rounded-xl border-slate-200 shadow-sm dark:border-slate-700">
+              <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                <CardTitle className="text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
                   {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyA)?.name || companyA} - General Ledger
-                  <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">
+                  <Badge variant="secondary" className="ml-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                     Customer View
                   </Badge>
                 </CardTitle>
@@ -4063,8 +4024,8 @@ export default function IntercompanyReconciliation() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead className="text-blue-800 w-12">
+                      <TableRow className="bg-slate-50 dark:bg-slate-700/60">
+                        <TableHead className="text-slate-600 dark:text-slate-300 w-12">
                           <input
                             type="checkbox"
                             onChange={(e) => {
@@ -4078,37 +4039,37 @@ export default function IntercompanyReconciliation() {
                                 setSelectedEntries(newSelected)
                               }
                             }}
-                            className="rounded border-blue-300"
+                            className="rounded border-slate-300 dark:border-slate-600"
                           />
                         </TableHead>
-                        <TableHead className="text-blue-800">Date</TableHead>
-                        <TableHead className="text-blue-800">Voucher</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300">Date</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300">Voucher</TableHead>
                         {debitCreditFilter !== 'Credit => Debit' && (
-                          <TableHead className="text-blue-800 text-right">Debit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Debit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         )}
                         {debitCreditFilter !== 'Debit => Credit' && (
-                          <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Credit ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-right">IR Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-right">IR Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         {showMatchedAmountColumn && (
-                          <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Balance ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-center">Status</TableHead>
-                        <TableHead className="text-blue-800 text-center">Matched With</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center">Status</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center">Matched With</TableHead>
                         {showMatchedAmountColumn && (
-                          <TableHead className="text-blue-800 text-right">Amount ({getPartyCurrency(partyA, 'Customer')})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Amount ({getPartyCurrency(partyA, 'Customer')})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-center">Actions</TableHead>
-                        <TableHead className="text-blue-800 text-center w-12">
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center">Actions</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center w-12">
                           <button
                             onClick={() => setShowMatchedAmountColumn(!showMatchedAmountColumn)}
-                            className="p-1 hover:bg-blue-100 rounded transition-colors"
+                            className="rounded p-1 transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/60 dark:hover:bg-slate-600"
                             title={showMatchedAmountColumn ? "Hide extra columns" : "Show extra columns"}
                           >
                             {showMatchedAmountColumn ? (
-                              <Eye className="h-4 w-4 text-blue-600" />
+                              <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             ) : (
-                              <EyeOff className="h-4 w-4 text-blue-600" />
+                              <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             )}
                           </button>
                         </TableHead>
@@ -4119,8 +4080,8 @@ export default function IntercompanyReconciliation() {
                         <TableRow>
                           <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
-                              <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                              <span className="text-gray-600">
+                              <RefreshCw className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                              <span className="text-slate-500 dark:text-slate-400">
                                 {isLoading ? "Loading data..." : "Processing and populating tables..."}
                               </span>
                             </div>
@@ -4178,7 +4139,7 @@ export default function IntercompanyReconciliation() {
                         if (filteredForTable.length === 0) {
                           return (
                             <TableRow>
-                              <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center text-gray-500 py-8">
+                              <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center text-slate-500 dark:text-slate-400 py-8">
                                 No data found for selected criteria
                               </TableCell>
                             </TableRow>
@@ -4209,26 +4170,26 @@ export default function IntercompanyReconciliation() {
                         return (
                           <TableRow 
                             key={entryKey} 
-                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''} ${isInternalMatchEntry ? 'border-l-4 border-green-600 bg-green-50' : ''}`}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-700/40 ${isMatchButAmountsDontMatch ? 'bg-orange-100 dark:bg-orange-950/60' : ''} ${isInternalMatchEntry ? 'border-l-4 border-green-600 bg-green-50 dark:bg-green-950/40' : ''}`}
                           >
                             <TableCell>
                               <input
                                 type="checkbox"
                                 checked={selectedEntries.has(entryKey)}
                                 onChange={(e) => handleEntrySelect(entryKey, e.target.checked)}
-                                className="rounded border-blue-300"
+                                className="rounded border-slate-300 dark:border-slate-600"
                               />
                             </TableCell>
                             <TableCell className="font-medium">{entry.posting_date}</TableCell>
                             <TableCell>
                               <div>
                                 <div className="font-medium">{entry.voucher_type}</div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
                                   <a
                                     href={getVoucherUrl(entry.voucher_type, entry.voucher_no)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                    className="cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
                                     onClick={() => handleVoucherClick(entry)}
                                     title={`Click to view ${entry.voucher_type} ${entry.voucher_no} in ERPNext`}
                                   >
@@ -4238,16 +4199,16 @@ export default function IntercompanyReconciliation() {
                               </div>
                             </TableCell>
                             {debitCreditFilter !== 'Credit => Debit' && (
-                              <TableCell className="text-right font-medium text-blue-600">
+                              <TableCell className="text-right font-medium text-blue-600 dark:text-blue-400">
                                 {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
                               </TableCell>
                             )}
                             {debitCreditFilter !== 'Debit => Credit' && (
-                              <TableCell className="text-right font-medium text-green-600">
+                              <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
                                 {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer') : "-"}
                               </TableCell>
                             )}
-                            <TableCell className="text-right font-medium text-purple-600">
+                            <TableCell className="text-right font-medium text-purple-600 dark:text-purple-400">
                               {formatCurrency(entry.ir_balance || 0, getPartyCurrency(partyA, 'Customer'), partyA, 'Customer')}
                             </TableCell>
                             {showMatchedAmountColumn && (
@@ -4258,7 +4219,7 @@ export default function IntercompanyReconciliation() {
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
                               {isInternalMatchEntry && (
-                                <div className="text-xs text-green-700 font-medium mt-1">(Internal)</div>
+                                <div className="text-xs text-green-700 dark:text-green-300 font-medium mt-1">(Internal)</div>
                               )}
                             </TableCell>
                             <TableCell className="text-center">
@@ -4270,18 +4231,18 @@ export default function IntercompanyReconciliation() {
                                   const matchesToDisplay = Array.isArray(matchedData) ? matchedData : [matchedData]
                                   
                                   if (matchesToDisplay.length === 0) {
-                                    return <span className="text-gray-400 text-sm">-</span>
+                                    return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                                   }
                                   
                                   // If single match, show as before
                                   if (matchesToDisplay.length === 1) {
                                     const match = matchesToDisplay[0]
                                     if (!match || !match.voucher_type || !match.voucher_no) {
-                                      return <span className="text-gray-400 text-sm">-</span>
+                                      return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                                     }
                                     return (
                                       <div className="text-sm">
-                                        <div className="font-medium text-blue-600">
+                                        <div className="font-medium text-blue-600 dark:text-blue-400">
                                           <a
                                             href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
                                             target="_blank"
@@ -4291,7 +4252,7 @@ export default function IntercompanyReconciliation() {
                                             {match.voucher_type}
                                           </a>
                                         </div>
-                                        <div className="text-gray-600">
+                                        <div className="text-slate-500 dark:text-slate-400">
                                           <a
                                             href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
                                             target="_blank"
@@ -4301,7 +4262,7 @@ export default function IntercompanyReconciliation() {
                                             {match.voucher_no}
                                           </a>
                                         </div>
-                                        <div className="text-xs text-gray-400">
+                                        <div className="text-xs text-slate-400 dark:text-slate-500">
                                           (Manual Match)
                                         </div>
                                       </div>
@@ -4311,11 +4272,11 @@ export default function IntercompanyReconciliation() {
                                   // If multiple matches, show first one with count
                                   const firstMatch = matchesToDisplay[0]
                                   if (!firstMatch || !firstMatch.voucher_type || !firstMatch.voucher_no) {
-                                    return <span className="text-gray-400 text-sm">-</span>
+                                    return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                                   }
                                   return (
                                     <div className="text-sm">
-                                      <div className="font-medium text-blue-600">
+                                      <div className="font-medium text-blue-600 dark:text-blue-400">
                                         <a
                                           href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
@@ -4325,7 +4286,7 @@ export default function IntercompanyReconciliation() {
                                           {firstMatch.voucher_type}
                                         </a>
                                       </div>
-                                      <div className="text-gray-600">
+                                      <div className="text-slate-500 dark:text-slate-400">
                                         <a
                                           href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
@@ -4335,7 +4296,7 @@ export default function IntercompanyReconciliation() {
                                           {firstMatch.voucher_no}
                                         </a>
                                       </div>
-                                      <div className="text-xs text-gray-400">
+                                      <div className="text-xs text-slate-400 dark:text-slate-500">
                                         (+{matchesToDisplay.length - 1} more) (Manual Match)
                                       </div>
                                     </div>
@@ -4346,7 +4307,7 @@ export default function IntercompanyReconciliation() {
                                 if (entry.matchedEntry && automatchEnabled) {
                                   return (
                                     <div className="text-sm">
-                                      <div className="font-medium text-blue-600">
+                                      <div className="font-medium text-blue-600 dark:text-blue-400">
                                         <a
                                           href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
                                           target="_blank"
@@ -4356,7 +4317,7 @@ export default function IntercompanyReconciliation() {
                                           {entry.matchedEntry.voucher_type}
                                         </a>
                                       </div>
-                                      <div className="text-gray-600">
+                                      <div className="text-slate-500 dark:text-slate-400">
                                         <a
                                           href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
                                           target="_blank"
@@ -4366,14 +4327,14 @@ export default function IntercompanyReconciliation() {
                                           {entry.matchedEntry.voucher_no}
                                         </a>
                                       </div>
-                                      <div className="text-xs text-gray-400">
+                                      <div className="text-xs text-slate-400 dark:text-slate-500">
                                         (Automatic Match)
                                       </div>
                                     </div>
                                   )
                                 }
 
-                                return <span className="text-gray-400 text-sm">-</span>
+                                return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                               })()}
                             </TableCell>
                             {showMatchedAmountColumn && (
@@ -4387,7 +4348,7 @@ export default function IntercompanyReconciliation() {
                                     partyType="Customer"
                                   />
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-slate-400 dark:text-slate-500">-</span>
                                 )}
                               </TableCell>
                             )}
@@ -4405,7 +4366,7 @@ export default function IntercompanyReconciliation() {
                                       onClick={() => handleShowUnmatchConfirmation(entry)}
                                       size="sm"
                                       variant="outline"
-                                      className="border-red-200 text-red-700 hover:bg-red-50"
+                                      className="border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
                                     >
                                       <XCircle className="h-3 w-3 mr-1" />
                                       Unmatch
@@ -4420,7 +4381,7 @@ export default function IntercompanyReconciliation() {
                                       onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
                                       size="sm"
                                       variant="outline"
-                                      className="border-green-200 text-green-700 hover:bg-green-50"
+                                      className="border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40"
                                     >
                                       <CheckCircle className="h-3 w-3 mr-1" />
                                       Match
@@ -4436,8 +4397,8 @@ export default function IntercompanyReconciliation() {
                                     variant="outline"
                                     className={`${
                                       manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
-                                        ? "border-blue-200 text-blue-700 bg-blue-50"
-                                        : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                                        ? "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/60"
+                                        : "border-orange-200 dark:border-orange-900 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/40"
                                     }`}
                                   >
                                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -4457,12 +4418,12 @@ export default function IntercompanyReconciliation() {
 
                       {/* Customer Table Totals Row - Exclude internal matches from totals */}
                       {filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).length > 0 && (
-                        <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
-                          <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
+                        <TableRow className="bg-slate-50 dark:bg-slate-700/60 border-t-2 border-slate-300 dark:border-slate-600 font-bold">
+                          <TableCell colSpan={3} className="text-center font-bold text-slate-900 dark:text-slate-100">
                             TOTAL
                           </TableCell>
                           {debitCreditFilter !== 'Credit => Debit' && (
-                            <TableCell className="text-right font-bold text-beveren-700">
+                            <TableCell className="text-right font-bold text-slate-600 dark:text-slate-300">
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
@@ -4483,7 +4444,7 @@ export default function IntercompanyReconciliation() {
                             </TableCell>
                           )}
                           {debitCreditFilter !== 'Debit => Credit' && (
-                            <TableCell className="text-right font-bold text-beveren-700">
+                            <TableCell className="text-right font-bold text-slate-600 dark:text-slate-300">
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataAWithStatus, true).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
@@ -4503,7 +4464,7 @@ export default function IntercompanyReconciliation() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-right font-bold text-purple-800">
+                          <TableCell className="text-right font-bold text-purple-800 dark:text-purple-200">
                             {formatCurrency(
                               (() => {
                                 // IR Balance total = last transaction's IR Balance (running balance at bottom)
@@ -4529,7 +4490,7 @@ export default function IntercompanyReconciliation() {
                             )}
                           </TableCell>
                           {showMatchedAmountColumn && (
-                            <TableCell className="text-right font-bold text-beveren-800">
+                            <TableCell className="text-right font-bold text-slate-900 dark:text-slate-100">
                               {formatCurrency(
                                 (() => {
                                   // Balance total = last transaction's balance (running balance at bottom), not sum of column
@@ -4561,11 +4522,11 @@ export default function IntercompanyReconciliation() {
             </Card>
 
             {/* Company B GL */}
-            <Card className="border-blue-200 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-                <CardTitle>
+            <Card className="rounded-xl border-slate-200 shadow-sm dark:border-slate-700">
+              <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                <CardTitle className="text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
                   {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === companyB)?.name || companyB} - General Ledger
-                  <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">
+                  <Badge variant="secondary" className="ml-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                     {partyTypeB} View
                   </Badge>
                 </CardTitle>
@@ -4574,8 +4535,8 @@ export default function IntercompanyReconciliation() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead className="text-blue-800 w-12">
+                      <TableRow className="bg-slate-50 dark:bg-slate-700/60">
+                        <TableHead className="text-slate-600 dark:text-slate-300 w-12">
                           <input
                             type="checkbox"
                             onChange={(e) => {
@@ -4589,37 +4550,37 @@ export default function IntercompanyReconciliation() {
                                 setSelectedEntries(newSelected)
                               }
                             }}
-                            className="rounded border-blue-300"
+                            className="rounded border-slate-300 dark:border-slate-600"
                           />
                         </TableHead>
-                        <TableHead className="text-blue-800">Date</TableHead>
-                        <TableHead className="text-blue-800">Voucher</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300">Date</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300">Voucher</TableHead>
                         {debitCreditFilter !== 'Debit => Credit' && (
-                          <TableHead className="text-blue-800 text-right">Debit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Debit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         )}
                         {debitCreditFilter !== 'Credit => Debit' && (
-                          <TableHead className="text-blue-800 text-right">Credit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Credit ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-right">IR Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-right">IR Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         {showMatchedAmountColumn && (
-                          <TableHead className="text-blue-800 text-right">Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Balance ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-center">Status</TableHead>
-                        <TableHead className="text-blue-800 text-center">Matched With</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center">Status</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center">Matched With</TableHead>
                         {showMatchedAmountColumn && (
-                          <TableHead className="text-blue-800 text-right">Amount ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
+                          <TableHead className="text-slate-600 dark:text-slate-300 text-right">Amount ({getPartyCurrency(partyB, partyTypeB)})</TableHead>
                         )}
-                        <TableHead className="text-blue-800 text-center">Actions</TableHead>
-                        <TableHead className="text-blue-800 text-center w-12">
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center">Actions</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 text-center w-12">
                           <button
                             onClick={() => setShowMatchedAmountColumn(!showMatchedAmountColumn)}
-                            className="p-1 hover:bg-blue-100 rounded transition-colors"
+                            className="rounded p-1 transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/60 dark:hover:bg-slate-600"
                             title={showMatchedAmountColumn ? "Hide extra columns" : "Show extra columns"}
                           >
                             {showMatchedAmountColumn ? (
-                              <Eye className="h-4 w-4 text-blue-600" />
+                              <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             ) : (
-                              <EyeOff className="h-4 w-4 text-blue-600" />
+                              <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             )}
                           </button>
                         </TableHead>
@@ -4630,8 +4591,8 @@ export default function IntercompanyReconciliation() {
                         <TableRow>
                           <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center py-8">
                             <div className="flex items-center justify-center space-x-2">
-                              <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                              <span className="text-gray-600">
+                              <RefreshCw className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                              <span className="text-slate-500 dark:text-slate-400">
                                 {isLoading ? "Loading data..." : "Processing and populating tables..."}
                               </span>
                             </div>
@@ -4639,7 +4600,7 @@ export default function IntercompanyReconciliation() {
                         </TableRow>
                       ) : filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={debitCreditFilter === 'All' ? (showMatchedAmountColumn ? 12 : 10) : (showMatchedAmountColumn ? 11 : 9)} className="text-center text-slate-500 dark:text-slate-400 py-8">
                             No data found for selected criteria
                           </TableCell>
                         </TableRow>
@@ -4669,26 +4630,26 @@ export default function IntercompanyReconciliation() {
                         return (
                           <TableRow 
                             key={entryKey} 
-                            className={`hover:bg-blue-50 ${isMatchButAmountsDontMatch ? 'bg-orange-100' : ''} ${isInternalMatchEntry ? 'border-l-4 border-green-600 bg-green-50' : ''}`}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-700/40 ${isMatchButAmountsDontMatch ? 'bg-orange-100 dark:bg-orange-950/60' : ''} ${isInternalMatchEntry ? 'border-l-4 border-green-600 bg-green-50 dark:bg-green-950/40' : ''}`}
                           >
                             <TableCell>
                               <input
                                 type="checkbox"
                                 checked={selectedEntries.has(entryKey)}
                                 onChange={(e) => handleEntrySelect(entryKey, e.target.checked)}
-                                className="rounded border-blue-300"
+                                className="rounded border-slate-300 dark:border-slate-600"
                               />
                             </TableCell>
                             <TableCell className="font-medium">{entry.posting_date}</TableCell>
                             <TableCell>
                               <div>
                                 <div className="font-medium">{entry.voucher_type}</div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
                                   <a
                                     href={getVoucherUrl(entry.voucher_type, entry.voucher_no)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                    className="cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
                                     onClick={() => handleVoucherClick(entry)}
                                     title={`Click to view ${entry.voucher_type} ${entry.voucher_no} in ERPNext`}
                                   >
@@ -4698,16 +4659,16 @@ export default function IntercompanyReconciliation() {
                               </div>
                             </TableCell>
                             {debitCreditFilter !== 'Debit => Credit' && (
-                              <TableCell className="text-right font-medium text-blue-600">
+                              <TableCell className="text-right font-medium text-blue-600 dark:text-blue-400">
                                 {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
                               </TableCell>
                             )}
                             {debitCreditFilter !== 'Credit => Debit' && (
-                              <TableCell className="text-right font-medium text-green-600">
+                              <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
                                 {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB) : "-"}
                               </TableCell>
                             )}
-                            <TableCell className="text-right font-medium text-purple-600">
+                            <TableCell className="text-right font-medium text-purple-600 dark:text-purple-400">
                               {formatCurrency(entry.ir_balance || 0, getPartyCurrency(partyB, partyTypeB), partyB, partyTypeB)}
                             </TableCell>
                             {showMatchedAmountColumn && (
@@ -4718,7 +4679,7 @@ export default function IntercompanyReconciliation() {
                             <TableCell className="text-center">
                               {getStatusBadge(entry.status || 'Pending')}
                               {isInternalMatchEntry && (
-                                <div className="text-xs text-green-700 font-medium mt-1">(Internal)</div>
+                                <div className="text-xs text-green-700 dark:text-green-300 font-medium mt-1">(Internal)</div>
                               )}
                             </TableCell>
                             <TableCell className="text-center">
@@ -4730,18 +4691,18 @@ export default function IntercompanyReconciliation() {
                                   const matchesToDisplay = Array.isArray(matchedData) ? matchedData : [matchedData]
                                   
                                   if (matchesToDisplay.length === 0) {
-                                    return <span className="text-gray-400 text-sm">-</span>
+                                    return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                                   }
                                   
                                   // If single match, show as before
                                   if (matchesToDisplay.length === 1) {
                                     const match = matchesToDisplay[0]
                                     if (!match || !match.voucher_type || !match.voucher_no) {
-                                      return <span className="text-gray-400 text-sm">-</span>
+                                      return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                                     }
                                     return (
                                       <div className="text-sm">
-                                        <div className="font-medium text-blue-600">
+                                        <div className="font-medium text-blue-600 dark:text-blue-400">
                                           <a
                                             href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
                                             target="_blank"
@@ -4751,7 +4712,7 @@ export default function IntercompanyReconciliation() {
                                             {match.voucher_type}
                                           </a>
                                         </div>
-                                        <div className="text-gray-600">
+                                        <div className="text-slate-500 dark:text-slate-400">
                                           <a
                                             href={`/app/${match.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${match.voucher_no}`}
                                             target="_blank"
@@ -4761,7 +4722,7 @@ export default function IntercompanyReconciliation() {
                                             {match.voucher_no}
                                           </a>
                                         </div>
-                                        <div className="text-xs text-gray-400">
+                                        <div className="text-xs text-slate-400 dark:text-slate-500">
                                           (Manual Match)
                                         </div>
                                       </div>
@@ -4771,11 +4732,11 @@ export default function IntercompanyReconciliation() {
                                   // If multiple matches, show first one with count
                                   const firstMatch = matchesToDisplay[0]
                                   if (!firstMatch || !firstMatch.voucher_type || !firstMatch.voucher_no) {
-                                    return <span className="text-gray-400 text-sm">-</span>
+                                    return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                                   }
                                   return (
                                     <div className="text-sm">
-                                      <div className="font-medium text-blue-600">
+                                      <div className="font-medium text-blue-600 dark:text-blue-400">
                                         <a
                                           href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
@@ -4785,7 +4746,7 @@ export default function IntercompanyReconciliation() {
                                           {firstMatch.voucher_type}
                                         </a>
                                       </div>
-                                      <div className="text-gray-600">
+                                      <div className="text-slate-500 dark:text-slate-400">
                                         <a
                                           href={`/app/${firstMatch.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${firstMatch.voucher_no}`}
                                           target="_blank"
@@ -4795,7 +4756,7 @@ export default function IntercompanyReconciliation() {
                                           {firstMatch.voucher_no}
                                         </a>
                                       </div>
-                                      <div className="text-xs text-gray-400">
+                                      <div className="text-xs text-slate-400 dark:text-slate-500">
                                         (+{matchesToDisplay.length - 1} more) (Manual Match)
                                       </div>
                                     </div>
@@ -4806,7 +4767,7 @@ export default function IntercompanyReconciliation() {
                                 if (entry.matchedEntry && automatchEnabled) {
                                   return (
                                     <div className="text-sm">
-                                      <div className="font-medium text-blue-600">
+                                      <div className="font-medium text-blue-600 dark:text-blue-400">
                                         <a
                                           href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
                                           target="_blank"
@@ -4816,7 +4777,7 @@ export default function IntercompanyReconciliation() {
                                           {entry.matchedEntry.voucher_type}
                                         </a>
                                       </div>
-                                      <div className="text-gray-600">
+                                      <div className="text-slate-500 dark:text-slate-400">
                                         <a
                                           href={`/app/${entry.matchedEntry.voucher_type.toLowerCase().replace(/\s+/g, '-')}/${entry.matchedEntry.voucher_no}`}
                                           target="_blank"
@@ -4826,14 +4787,14 @@ export default function IntercompanyReconciliation() {
                                           {entry.matchedEntry.voucher_no}
                                         </a>
                                       </div>
-                                      <div className="text-xs text-gray-400">
+                                      <div className="text-xs text-slate-400 dark:text-slate-500">
                                         (Automatic Match)
                                       </div>
                                     </div>
                                   )
                                 }
 
-                                return <span className="text-gray-400 text-sm">-</span>
+                                return <span className="text-slate-400 dark:text-slate-500 text-sm">-</span>
                               })()}
                             </TableCell>
                             {showMatchedAmountColumn && (
@@ -4847,7 +4808,7 @@ export default function IntercompanyReconciliation() {
                                     partyType={partyTypeB}
                                   />
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-slate-400 dark:text-slate-500">-</span>
                                 )}
                               </TableCell>
                             )}
@@ -4865,7 +4826,7 @@ export default function IntercompanyReconciliation() {
                                       onClick={() => handleShowUnmatchConfirmation(entry)}
                                       size="sm"
                                       variant="outline"
-                                      className="border-red-200 text-red-700 hover:bg-red-50"
+                                      className="border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
                                     >
                                       <XCircle className="h-3 w-3 mr-1" />
                                       Unmatch
@@ -4880,7 +4841,7 @@ export default function IntercompanyReconciliation() {
                                       onClick={() => handleShowMatchConfirmation(entry, entry.matchedEntry!)}
                                       size="sm"
                                       variant="outline"
-                                      className="border-green-200 text-green-700 hover:bg-green-50"
+                                      className="border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40"
                                     >
                                       <CheckCircle className="h-3 w-3 mr-1" />
                                       Match
@@ -4896,8 +4857,8 @@ export default function IntercompanyReconciliation() {
                                     variant="outline"
                                     className={`${
                                       manualMatchMode && selectedForManualMatch?.voucher_type === entry.voucher_type && selectedForManualMatch?.voucher_no === entry.voucher_no
-                                        ? "border-blue-200 text-blue-700 bg-blue-50"
-                                        : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                                        ? "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/60"
+                                        : "border-orange-200 dark:border-orange-900 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/40"
                                     }`}
                                   >
                                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -4917,12 +4878,12 @@ export default function IntercompanyReconciliation() {
 
                       {/* Supplier Table Totals Row - Exclude internal matches from totals */}
                       {filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).length > 0 && (
-                        <TableRow className="bg-beveren-50 border-t-2 border-beveren-300 font-bold">
-                          <TableCell colSpan={3} className="text-center font-bold text-beveren-800">
+                        <TableRow className="bg-slate-50 dark:bg-slate-700/60 border-t-2 border-slate-300 dark:border-slate-600 font-bold">
+                          <TableCell colSpan={3} className="text-center font-bold text-slate-900 dark:text-slate-100">
                             TOTAL
                           </TableCell>
                           {debitCreditFilter !== 'Debit => Credit' && (
-                            <TableCell className="text-right font-bold text-beveren-700">
+                            <TableCell className="text-right font-bold text-slate-600 dark:text-slate-300">
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
@@ -4943,7 +4904,7 @@ export default function IntercompanyReconciliation() {
                             </TableCell>
                           )}
                           {debitCreditFilter !== 'Credit => Debit' && (
-                            <TableCell className="text-right font-bold text-beveren-700">
+                            <TableCell className="text-right font-bold text-slate-600 dark:text-slate-300">
                               {formatCurrency(
                                 filterEntriesByStatus(findMatchingEntries.glDataBWithStatus, false).reduce((sum, entry) => {
                                   // Exclude internal matches from totals
@@ -4963,7 +4924,7 @@ export default function IntercompanyReconciliation() {
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="text-right font-bold text-purple-800">
+                          <TableCell className="text-right font-bold text-purple-800 dark:text-purple-200">
                             {formatCurrency(
                               (() => {
                                 // IR Balance total = last transaction's IR Balance (running balance at bottom)
@@ -4989,7 +4950,7 @@ export default function IntercompanyReconciliation() {
                             )}
                           </TableCell>
                           {showMatchedAmountColumn && (
-                            <TableCell className="text-right font-bold text-beveren-800">
+                            <TableCell className="text-right font-bold text-slate-900 dark:text-slate-100">
                               {formatCurrency(
                                 (() => {
                                   // Balance total = last transaction's balance (running balance at bottom), not sum of column
@@ -5025,11 +4986,11 @@ export default function IntercompanyReconciliation() {
         {/* Match Confirmation Modal */}
         {showMatchModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-4">
                 {processingSuccess ? "Success!" : isProcessing ? `Processing Bulk ${areSelectedEntriesMatched ? 'Unmatching' : 'Matching'}` : `Confirm Bulk ${areSelectedEntriesMatched ? 'Unmatching' : 'Matching'}`}
               </h3>
-              <p className="text-gray-600 mb-4">
+              <p className="text-slate-500 dark:text-slate-400 mb-4">
                 {processingSuccess
                   ? `Successfully ${areSelectedEntriesMatched ? 'unmatched' : 'matched'} ${selectedEntries.size} entries! Modal will close automatically.`
                   : isProcessing
@@ -5043,7 +5004,7 @@ export default function IntercompanyReconciliation() {
                 <div className="mb-4">
                   <button
                     onClick={() => setShowBulkMatchDetails(!showBulkMatchDetails)}
-                    className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                   >
                     {showBulkMatchDetails ? (
                       <>
@@ -5063,16 +5024,16 @@ export default function IntercompanyReconciliation() {
                   </button>
 
                   {showBulkMatchDetails && (
-                    <div className="mt-3 bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
+                    <div className="mt-3 bg-slate-50 dark:bg-slate-700/60 rounded-lg p-4 max-h-60 overflow-y-auto">
                       <div className="space-y-3">
                         {getSelectedEntriesForDisplay.map((item, index) => (
-                          <div key={index} className="bg-white p-3 rounded border">
+                          <div key={index} className="bg-white dark:bg-slate-800 dark:text-slate-100 p-3 rounded border">
                             <div className="flex items-center">
                               <div className="flex-1">
-                                <div className="font-medium text-blue-600">
+                                <div className="font-medium text-blue-600 dark:text-blue-400">
                                   {item.entry.voucher_type} {item.entry.voucher_no}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
                                   {item.side === 'A' ? companyA : companyB} - {item.entry.posting_date}
                                 </div>
                                 <div className="text-sm font-medium">
@@ -5089,15 +5050,15 @@ export default function IntercompanyReconciliation() {
                                     )}`
                                   }
                                 </div>
-                                <div className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                                   Status: {item.entry.status || 'Pending'}
                                 </div>
                               </div>
                               <div className="ml-4">
                                 <div className={`px-2 py-1 rounded text-xs font-medium ${
                                   item.side === 'A'
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : 'bg-green-100 text-green-700'
+                                    ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                    : 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300'
                                 }`}>
                                   {item.side === 'A' ? 'Company A' : 'Company B'}
                                 </div>
@@ -5106,7 +5067,7 @@ export default function IntercompanyReconciliation() {
                           </div>
                         ))}
                         {getSelectedEntriesForDisplay.length === 0 && (
-                          <div className="text-center text-gray-500 py-4">
+                          <div className="text-center text-slate-500 dark:text-slate-400 py-4">
                             No entries selected
                           </div>
                         )}
@@ -5118,10 +5079,10 @@ export default function IntercompanyReconciliation() {
               {isProcessing && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                    <span className="text-sm text-blue-600">Processing entries...</span>
+                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm text-blue-600 dark:text-blue-400">Processing entries...</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2">
                     <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
                   </div>
                 </div>
@@ -5129,13 +5090,13 @@ export default function IntercompanyReconciliation() {
               {processingSuccess && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-600">Successfully completed!</span>
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm text-green-600 dark:text-green-400">Successfully completed!</span>
                   </div>
                 </div>
               )}
               {matchError && (
-                <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded text-red-700">
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-950/60 border border-red-300 dark:border-red-800 rounded text-red-700 dark:text-red-300">
                   <div className="flex justify-between items-center">
                     <span>{matchError}</span>
                     <Button
@@ -5170,7 +5131,7 @@ export default function IntercompanyReconciliation() {
                   <Button
                     onClick={handleCancelProcessing}
                     variant="outline"
-                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                    className="border-orange-200 dark:border-orange-900 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/40"
                   >
                     Stop Processing
                   </Button>
@@ -5230,15 +5191,15 @@ export default function IntercompanyReconciliation() {
       {/* Validation Error Modal */}
       {showValidationError && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="max-w-2xl mx-4 bg-white">
-            <CardHeader className="bg-red-50 border-b border-red-200">
-              <CardTitle className="text-red-600 flex items-center gap-2">
+          <Card className="max-w-2xl mx-4 bg-white dark:bg-slate-800 dark:text-slate-100">
+            <CardHeader className="bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900">
+              <CardTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
                 <XCircle className="h-5 w-5" />
                 Cannot Match Selected Entries
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="text-gray-700 whitespace-pre-line text-sm leading-relaxed">
+            <CardContent className="p-4">
+              <div className="text-slate-600 dark:text-slate-300 whitespace-pre-line text-sm leading-relaxed">
                 {validationErrorMessage}
               </div>
             </CardContent>
@@ -5257,21 +5218,21 @@ export default function IntercompanyReconciliation() {
       {/* Individual Match Confirmation Modal */}
       {showIndividualMatchModal && selectedEntryForAction && selectedEntryForAction.matchedEntry && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4 text-green-700">
+          <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-green-700 dark:text-green-300">
               Confirm Match
             </h3>
             <div className="mb-4">
-              <p className="text-gray-700 mb-3">
+              <p className="text-slate-600 dark:text-slate-300 mb-3">
                 Are you sure you want to match these transactions?
               </p>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="bg-slate-50 dark:bg-slate-700/60 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-medium text-blue-600">
+                    <div className="font-medium text-blue-600 dark:text-blue-400">
                       {selectedEntryForAction.voucher_type} {selectedEntryForAction.voucher_no}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
                       {companyA} - {selectedEntryForAction.posting_date}
                     </div>
                     <div className="text-sm font-medium">
@@ -5281,12 +5242,12 @@ export default function IntercompanyReconciliation() {
                       }
                     </div>
                   </div>
-                  <div className="text-2xl text-gray-400">↔</div>
+                  <div className="text-2xl text-slate-400 dark:text-slate-500">↔</div>
                   <div>
-                    <div className="font-medium text-blue-600">
+                    <div className="font-medium text-blue-600 dark:text-blue-400">
                       {selectedEntryForAction.matchedEntry.voucher_type} {selectedEntryForAction.matchedEntry.voucher_no}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
                       {companyB} - {selectedEntryForAction.matchedEntry.posting_date}
                     </div>
                     <div className="text-sm font-medium">
@@ -5335,21 +5296,21 @@ export default function IntercompanyReconciliation() {
       {/* Individual Unmatch Confirmation Modal */}
       {showIndividualUnmatchModal && selectedEntryForAction && (selectedEntryForAction.matchedEntry || selectedEntryForAction.backendMatchData?.matched_with_parsed) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4 text-red-700">
+          <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-red-700 dark:text-red-300">
               Confirm Unmatch
             </h3>
             <div className="mb-4">
-              <p className="text-gray-700 mb-3">
+              <p className="text-slate-600 dark:text-slate-300 mb-3">
                 Are you sure you want to unmatch these transactions?
               </p>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="bg-slate-50 dark:bg-slate-700/60 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-medium text-blue-600">
+                    <div className="font-medium text-blue-600 dark:text-blue-400">
                       {selectedEntryForAction.voucher_type} {selectedEntryForAction.voucher_no}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
                       {companyA} - {selectedEntryForAction.posting_date}
                     </div>
                     <div className="text-sm font-medium">
@@ -5359,7 +5320,7 @@ export default function IntercompanyReconciliation() {
                       }
                     </div>
                   </div>
-                  <div className="text-2xl text-gray-400">↔</div>
+                  <div className="text-2xl text-slate-400 dark:text-slate-500">↔</div>
                   <div>
                     {(() => {
                       // Get matched entry data - either from frontend or backend
@@ -5374,7 +5335,7 @@ export default function IntercompanyReconciliation() {
                         }
                       }
 
-                      if (!matchedData) return <div className="text-gray-500">Match data</div>
+                      if (!matchedData) return <div className="text-slate-500 dark:text-slate-400">Match data</div>
 
                       const matchedEntry = findMatchingEntries.glDataAWithStatus.find(e =>
                         e.voucher_type === matchedData.voucher_type && e.voucher_no === matchedData.voucher_no
@@ -5388,10 +5349,10 @@ export default function IntercompanyReconciliation() {
 
                       return (
                         <>
-                          <div className="font-medium text-blue-600">
+                          <div className="font-medium text-blue-600 dark:text-blue-400">
                             {matchedData.voucher_type} {matchedData.voucher_no}
                           </div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-slate-500 dark:text-slate-400">
                             {matchedCompany} - {matchedEntry?.posting_date || 'N/A'}
                           </div>
                           <div className="text-sm font-medium">

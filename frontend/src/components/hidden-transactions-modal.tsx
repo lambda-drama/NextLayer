@@ -134,9 +134,9 @@ export default function HiddenTransactionsModal({
     if (!status) return null
 
     const statusConfig = {
-      'matched': { variant: 'default' as const, className: 'bg-green-100 text-green-800 border-green-200' },
-      'unmatched': { variant: 'outline' as const, className: 'bg-gray-100 text-gray-800 border-gray-200' },
-      'partial': { variant: 'secondary' as const, className: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
+      'matched': { variant: 'default' as const, className: 'bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300 border-green-200 dark:border-green-900' },
+      'unmatched': { variant: 'outline' as const, className: 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-600' },
+      'partial': { variant: 'secondary' as const, className: 'bg-yellow-100 dark:bg-yellow-950/60 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-900' }
     }
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.unmatched
@@ -157,18 +157,18 @@ export default function HiddenTransactionsModal({
       <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0 overflow-hidden">
         <div className="p-6 pb-0 flex-shrink-0">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-orange-800">
+            <DialogTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
               <Lock className="h-5 w-5" />
               Hidden Transactions - Admin View
             </DialogTitle>
-            <DialogDescription className="text-gray-600">
+            <DialogDescription className="text-slate-600 dark:text-slate-300">
               Viewing hidden transactions that require special permission. These transactions are normally not visible due to access restrictions.
             </DialogDescription>
           </DialogHeader>
 
           {error && (
-            <Alert className="border-red-200 bg-red-50 mt-4">
-              <AlertDescription className="text-red-800">
+            <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 mt-4">
+              <AlertDescription className="text-red-800 dark:text-red-300">
                 {error}
               </AlertDescription>
             </Alert>
@@ -180,10 +180,10 @@ export default function HiddenTransactionsModal({
             {/* Company A Table */}
             <div className="flex flex-col h-full min-h-0">
               <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <h3 className="text-lg font-semibold text-blue-800">
+                <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300">
                   {companyA} - Hidden Transactions
                 </h3>
-                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                <Badge variant="outline" className="bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-900">
                   {hiddenDataA.length} entries
                 </Badge>
               </div>
@@ -191,36 +191,36 @@ export default function HiddenTransactionsModal({
               <div className="border rounded-lg flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(90vh - 200px)' }}>
                   <Table>
-                    <TableHeader className="sticky top-0 bg-blue-50 z-10">
+                    <TableHeader className="sticky top-0 bg-blue-50 dark:bg-blue-950/40 z-10">
                       <TableRow>
-                        <TableHead className="text-blue-800 bg-blue-50">Date</TableHead>
-                        <TableHead className="text-blue-800 bg-blue-50">Voucher</TableHead>
-                        <TableHead className="text-blue-800 text-right bg-blue-50">Debit ({getPartyCurrency(partyA || '', 'Customer')})</TableHead>
-                        <TableHead className="text-blue-800 text-right bg-blue-50">Credit ({getPartyCurrency(partyA || '', 'Customer')})</TableHead>
-                        <TableHead className="text-blue-800 text-right bg-blue-50">Balance ({getPartyCurrency(partyA || '', 'Customer')})</TableHead>
-                        <TableHead className="text-blue-800 text-center bg-blue-50">Status</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40">Date</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40">Voucher</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-right bg-blue-50 dark:bg-blue-950/40">Debit ({getPartyCurrency(partyA || '', 'Customer')})</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-right bg-blue-50 dark:bg-blue-950/40">Credit ({getPartyCurrency(partyA || '', 'Customer')})</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-right bg-blue-50 dark:bg-blue-950/40">Balance ({getPartyCurrency(partyA || '', 'Customer')})</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-center bg-blue-50 dark:bg-blue-950/40">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {hiddenDataA.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 dark:text-slate-400 py-8">
                             No hidden transactions found
                           </TableCell>
                         </TableRow>
                       ) : (
                         hiddenDataA.map((entry, index) => (
-                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
+                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50 dark:hover:bg-blue-950/40">
                             <TableCell className="font-medium">{entry.posting_date}</TableCell>
                             <TableCell>
                               <div>
                                 <div className="font-medium">{entry.voucher_type}</div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-slate-600 dark:text-slate-300">
                                   <a
                                     href={getVoucherUrl(entry.voucher_type, entry.voucher_no)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
                                     onClick={() => handleVoucherClick(entry)}
                                     title={`Click to view ${entry.voucher_type} ${entry.voucher_no} in ERPNext`}
                                   >
@@ -229,10 +229,10 @@ export default function HiddenTransactionsModal({
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-medium text-blue-600">
+                            <TableCell className="text-right font-medium text-blue-600 dark:text-blue-400">
                               {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyA || '', 'Customer'), partyA, 'Customer') : "-"}
                             </TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
+                            <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
                               {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyA || '', 'Customer'), partyA, 'Customer') : "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium">
@@ -253,10 +253,10 @@ export default function HiddenTransactionsModal({
             {/* Company B Table */}
             <div className="flex flex-col h-full min-h-0">
               <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <h3 className="text-lg font-semibold text-blue-800">
+                <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300">
                   {companyB} - Hidden Transactions
                 </h3>
-                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                <Badge variant="outline" className="bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-900">
                   {hiddenDataB.length} entries
                 </Badge>
               </div>
@@ -264,36 +264,36 @@ export default function HiddenTransactionsModal({
               <div className="border rounded-lg flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(90vh - 200px)' }}>
                   <Table>
-                    <TableHeader className="sticky top-0 bg-blue-50 z-10">
+                    <TableHeader className="sticky top-0 bg-blue-50 dark:bg-blue-950/40 z-10">
                       <TableRow>
-                        <TableHead className="text-blue-800 bg-blue-50">Date</TableHead>
-                        <TableHead className="text-blue-800 bg-blue-50">Voucher</TableHead>
-                        <TableHead className="text-blue-800 text-right bg-blue-50">Debit ({getPartyCurrency(partyB || '', partyTypeB)})</TableHead>
-                        <TableHead className="text-blue-800 text-right bg-blue-50">Credit ({getPartyCurrency(partyB || '', partyTypeB)})</TableHead>
-                        <TableHead className="text-blue-800 text-right bg-blue-50">Balance ({getPartyCurrency(partyB || '', partyTypeB)})</TableHead>
-                        <TableHead className="text-blue-800 text-center bg-blue-50">Status</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40">Date</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40">Voucher</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-right bg-blue-50 dark:bg-blue-950/40">Debit ({getPartyCurrency(partyB || '', partyTypeB)})</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-right bg-blue-50 dark:bg-blue-950/40">Credit ({getPartyCurrency(partyB || '', partyTypeB)})</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-right bg-blue-50 dark:bg-blue-950/40">Balance ({getPartyCurrency(partyB || '', partyTypeB)})</TableHead>
+                        <TableHead className="text-blue-800 dark:text-blue-300 text-center bg-blue-50 dark:bg-blue-950/40">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {hiddenDataB.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={6} className="text-center text-slate-500 dark:text-slate-400 py-8">
                             No hidden transactions found
                           </TableCell>
                         </TableRow>
                       ) : (
                         hiddenDataB.map((entry, index) => (
-                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50">
+                          <TableRow key={entry.gl_entry || index} className="hover:bg-blue-50 dark:hover:bg-blue-950/40">
                             <TableCell className="font-medium">{entry.posting_date}</TableCell>
                             <TableCell>
                               <div>
                                 <div className="font-medium">{entry.voucher_type}</div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-slate-600 dark:text-slate-300">
                                   <a
                                     href={getVoucherUrl(entry.voucher_type, entry.voucher_no)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
                                     onClick={() => handleVoucherClick(entry)}
                                     title={`Click to view ${entry.voucher_type} ${entry.voucher_no} in ERPNext`}
                                   >
@@ -302,10 +302,10 @@ export default function HiddenTransactionsModal({
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-medium text-blue-600">
+                            <TableCell className="text-right font-medium text-blue-600 dark:text-blue-400">
                               {entry.debit > 0 ? formatCurrency(entry.debit, getPartyCurrency(partyB || '', partyTypeB), partyB, partyTypeB) : "-"}
                             </TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
+                            <TableCell className="text-right font-medium text-green-600 dark:text-green-400">
                               {entry.credit > 0 ? formatCurrency(entry.credit, getPartyCurrency(partyB || '', partyTypeB), partyB, partyTypeB) : "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium">

@@ -7,8 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "../../components/ui/alert"
-import { ArrowLeftRight, RefreshCw, ArrowLeft, CheckCircle, XCircle, BarChart3, Users, Building2 } from "lucide-react"
-import { Link } from "react-router-dom"
+import { RefreshCw, BarChart3, Users, Building2 } from "lucide-react"
+import IntercompanyTopNav, {
+  PageHeader,
+  FilterField,
+  CheckOption,
+  compactInputClass,
+} from "./intercompany-top-nav"
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
 import { useAllCompaniesForUI } from "../hook/useAllCompaniesForUI"
@@ -295,7 +300,7 @@ export default function InterCompanyLedgerSummary() {
   const getStatus = (difference: number, glClosing: number, isLoading: boolean, party: string, intransitTotal?: number, showInTransitColumns?: boolean, specificIntransitTotal?: number, isCustomerTable?: boolean) => {
     // If GL data is still loading for this specific party, show pending
     if (isLoading) {
-      return { text: "Pending", color: "text-yellow-600", bgColor: "bg-yellow-50" }
+      return { text: "Pending", color: "text-yellow-600 dark:text-yellow-400", bgColor: "bg-yellow-50 dark:bg-yellow-950/40" }
     }
 
     const tolerance = 0.01 // Small tolerance for floating point comparison
@@ -306,13 +311,13 @@ export default function InterCompanyLedgerSummary() {
       const absIntransitTotal = Math.abs(intransitTotal)
 
       if (Math.abs(absDifference - absIntransitTotal) < tolerance) {
-        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: false }
+        return { text: "Match with In-Transit", color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-950/40", isOffsetMatch: false }
       }
     }
 
 
     if (absDifference < tolerance) {
-      return { text: "Match", color: "text-green-600", bgColor: "bg-green-50" }
+      return { text: "Match", color: "text-green-600 dark:text-green-400", bgColor: "bg-green-50 dark:bg-green-950/40" }
     }
 
     // Allow offset match (Inter Company Reconciliation Settings): when unmatched, check if
@@ -322,7 +327,7 @@ export default function InterCompanyLedgerSummary() {
       // difference = |party_balance| - |gl_closing|, so |party_balance| + |gl_closing| = difference + 2*|gl_closing|
       const offsetSum = difference + 2 * Math.abs(glClosing)
       if (Math.abs(offsetSum - absIntransitTotal) <= tolerance) {
-        return { text: "Match with In-Transit", color: "text-blue-600", bgColor: "bg-blue-50", isOffsetMatch: true }
+        return { text: "Match with In-Transit", color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-950/40", isOffsetMatch: true }
       }
     }
 
@@ -331,11 +336,11 @@ export default function InterCompanyLedgerSummary() {
       const absSpecificIntransitTotal = Math.abs(specificIntransitTotal)
       if (Math.abs(absDifference - absSpecificIntransitTotal) <= tolerance) {
         const statusText = isCustomerTable ? "Match with In-Transit SI" : "Match with In-Transit PI"
-        return { text: statusText, color: "text-blue-500", bgColor: "bg-orange-50" }
+        return { text: statusText, color: "text-blue-500", bgColor: "bg-orange-50 dark:bg-orange-950/40" }
       }
     }
 
-    return { text: "Unmatched", color: "text-red-600", bgColor: "bg-red-50" }
+    return { text: "Unmatched", color: "text-red-600 dark:text-red-400", bgColor: "bg-red-50 dark:bg-red-950/40" }
   }
 
   // Filter entries by status
@@ -451,44 +456,21 @@ export default function InterCompanyLedgerSummary() {
   }, [customerLedgerData, supplierLedgerData, customerGLClosing, supplierGLClosing, customerIntransitTotals, supplierIntransitTotals])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4">
-      <div className="max-w-8xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <IntercompanyTopNav />
+      <div className="mx-auto max-w-screen-2xl space-y-4 px-4 py-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="text-center space-y-2 flex-1">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-              InterCompany Ledger Summary
-            </h1>
-            <p className="text-gray-600 text-lg">
-              View customer and supplier ledger summaries for intercompany transactions
-            </p>
-          </div>
-          <div className="flex space-x-2">
-            <Link to="/reconciliation">
-              <Button
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Reconciliation</span>
-              </Button>
-            </Link>
-          </div>
-        </div>
+        <PageHeader
+          title="Intercompany Ledger Summary"
+          subtitle="View customer and supplier ledger summaries for intercompany transactions"
+        />
 
         {/* Company Selection */}
-        <Card className="border-blue-200 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg p-6">
-            <CardTitle className="flex items-center gap-2">
-              <ArrowLeftRight className="h-5 w-5" />
-              Ledger Summary Selection
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 w-full">
+        <Card className="rounded-xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <CardContent className="p-4">
             {/* All Filters in Single Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 w-full">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Company</label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <FilterField label="Company">
                 <Combobox
                   options={displayCompaniesForFilter.map((companyItem) => ({
                     name: ("company_name" in companyItem ? companyItem.company_name : companyItem.name) ?? companyItem.name,
@@ -504,33 +486,31 @@ export default function InterCompanyLedgerSummary() {
                   disabled={permissionCompaniesLoading || displayCompaniesForFilter.length === 0}
                   searchPlaceholder="Search companies..."
                   emptyMessage="No companies found."
+                  className="h-8 border-slate-200 bg-white px-2.5 text-[13px] font-normal text-slate-900 shadow-sm hover:bg-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                 />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">From Date</label>
+              </FilterField>
+              <FilterField label="From Date">
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none"
+                  className={compactInputClass}
                 />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">To Date</label>
+              </FilterField>
+              <FilterField label="To Date">
                 <input
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none"
+                  className={compactInputClass}
                 />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Currency</label>
+              </FilterField>
+              <FilterField label="Currency">
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400" disabled>
+                  <SelectTrigger className="h-8 border-slate-200 bg-white px-2.5 text-[13px] font-normal text-slate-900 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" disabled>
                     <SelectValue placeholder="All Currencies" />
                   </SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectContent className="dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                     <SelectItem value="all">All Currencies</SelectItem>
                     <SelectItem value="AED">AED (UAE Dirham)</SelectItem>
                     <SelectItem value="CDF">CDF (Congolese Franc)</SelectItem>
@@ -553,84 +533,48 @@ export default function InterCompanyLedgerSummary() {
                     <SelectItem value="XOF">XOF (West African CFA Franc)</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Show Intercompany Only</label>
-                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
-                  <input
-                    type="checkbox"
-                    id="showIntercompanyOnly"
-                    checked={showIntercompanyOnly}
-                    onChange={(e) => setShowIntercompanyOnly(e.target.checked)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="showIntercompanyOnly" className="text-sm text-gray-700">
-                    Enable
-                  </label>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">In Party Currency</label>
-                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
-                  <input
-                    type="checkbox"
-                    id="inPartyCurrency"
-                    checked={inPartyCurrency}
-                    onChange={(e) => setInPartyCurrency(e.target.checked)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="inPartyCurrency" className="text-sm text-gray-700">
-                    Enable
-                  </label>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Ignore System Generated Notes</label>
-                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
-                  <input
-                    type="checkbox"
-                    id="ignoreSystemGeneratedNotes"
-                    checked={ignoreSystemGeneratedNotes}
-                    onChange={(e) => setIgnoreSystemGeneratedNotes(e.target.checked)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="ignoreSystemGeneratedNotes" className="text-sm text-gray-700">
-                    Enable
-                  </label>
-                </div>
-              </div>
+              </FilterField>
             </div>
 
-            {/* Exchange Rate Filter - Second Row */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Ignore Exchange Rate Revaluation</label>
-                <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
-                  <input
-                    type="checkbox"
-                    id="ignoreExchangeRateRevaluation"
-                    checked={ignoreExchangeRateRevaluation}
-                    onChange={(e) => setIgnoreExchangeRateRevaluation(e.target.checked)}
-                    className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="ignoreExchangeRateRevaluation" className="text-sm text-gray-700">
-                    Enable
-                  </label>
-                </div>
+            {/* Filter Options + Action */}
+            <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-700 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <CheckOption
+                  id="showIntercompanyOnly"
+                  label="Show Intercompany Only"
+                  checked={showIntercompanyOnly}
+                  onChange={(e) => setShowIntercompanyOnly(e.target.checked)}
+                />
+                <CheckOption
+                  id="inPartyCurrency"
+                  label="In Party Currency"
+                  checked={inPartyCurrency}
+                  onChange={(e) => setInPartyCurrency(e.target.checked)}
+                />
+                <CheckOption
+                  id="ignoreSystemGeneratedNotes"
+                  label="Ignore System Generated Notes"
+                  checked={ignoreSystemGeneratedNotes}
+                  onChange={(e) => setIgnoreSystemGeneratedNotes(e.target.checked)}
+                />
+                <CheckOption
+                  id="ignoreExchangeRateRevaluation"
+                  label="Ignore Exchange Rate Revaluation"
+                  checked={ignoreExchangeRateRevaluation}
+                  onChange={(e) => setIgnoreExchangeRateRevaluation(e.target.checked)}
+                />
               </div>
-            </div>
-
-            <div className="flex justify-center mt-6">
               <Button
                 onClick={() => {
                   handleLoadData()
                 }}
                 disabled={!company || isLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                size="sm"
+                className="h-8 shrink-0 rounded-md bg-blue-600 px-3.5 text-[13px] font-medium text-white hover:bg-blue-700"
               >
                 {isLoading ? (
                   <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                     Loading...
                   </>
                 ) : (
@@ -638,50 +582,63 @@ export default function InterCompanyLedgerSummary() {
                 )}
               </Button>
             </div>
+
           </CardContent>
         </Card>
 
         {/* Error Display */}
         {error && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertDescription className="text-red-800">{error}</AlertDescription>
+          <Alert className="rounded-xl border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
+            <AlertDescription className="text-red-800 dark:text-red-300">{error}</AlertDescription>
           </Alert>
+        )}
+
+        {/* Empty State */}
+        {!hasLoadedData && !isLoading && !error && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center dark:border-slate-600 dark:bg-slate-800">
+            <p className="text-[13px] font-medium text-slate-700 dark:text-slate-200">
+              No ledger data loaded yet
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Select a company and date range above, then press Load Summary Data.
+            </p>
+          </div>
         )}
 
       
 
         {/* Totals Summary */}
         {hasLoadedData && customerLedgerData && supplierLedgerData && (
-          <Card className="border-beveren-200 shadow-lg mb-6">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
+          <Card className="rounded-xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <CardTitle className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                <Building2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                 Totals Summary
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Customer Summary */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-beveren-800 border-b border-beveren-200 pb-2">
+                <div className="space-y-3">
+                  <h3 className="text-[13px] font-semibold text-slate-800 border-b border-slate-200 pb-1.5 dark:border-slate-700 dark:text-slate-100">
                     Customer Summary
                   </h3>
                   <div className="grid grid-cols-1 gap-3">
-                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
-                      <span className="font-medium text-beveren-700">Total Party Balance:</span>
-                      <span className="font-bold text-beveren-800">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg dark:bg-slate-700/60">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">Total Party Balance:</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">
                         {formatCurrency(customerLedgerData.totals.totalClosingBalance, customerLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
-                      <span className="font-medium text-beveren-700">GL Closing:</span>
-                      <span className="font-bold text-beveren-800">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg dark:bg-slate-700/60">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">GL Closing:</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">
                         {formatCurrency(Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0), customerLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                      <span className="font-medium text-orange-700">Difference:</span>
-                      <span className="font-bold text-orange-800">
+                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200 dark:border-orange-900 dark:bg-orange-950/40">
+                      <span className="font-medium text-orange-700 dark:text-orange-300">Difference:</span>
+                      <span className="font-bold text-orange-800 dark:text-orange-200">
                         {formatCurrency(Math.abs(customerLedgerData.totals.totalClosingBalance - Object.values(customerGLClosing).reduce((sum, amount) => sum + amount, 0)), customerLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
@@ -689,26 +646,26 @@ export default function InterCompanyLedgerSummary() {
                 </div>
 
                 {/* Supplier Summary */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-beveren-800 border-b border-beveren-200 pb-2">
+                <div className="space-y-3">
+                  <h3 className="text-[13px] font-semibold text-slate-800 border-b border-slate-200 pb-1.5 dark:border-slate-700 dark:text-slate-100">
                     Supplier Summary
                   </h3>
                   <div className="grid grid-cols-1 gap-3">
-                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
-                      <span className="font-medium text-beveren-700">Total Party Balance:</span>
-                      <span className="font-bold text-beveren-800">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg dark:bg-slate-700/60">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">Total Party Balance:</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">
                         {formatCurrency(supplierLedgerData.totals.totalClosingBalance, supplierLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-beveren-50 rounded-lg">
-                      <span className="font-medium text-beveren-700">GL Closing:</span>
-                      <span className="font-bold text-beveren-800">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg dark:bg-slate-700/60">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">GL Closing:</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">
                         {formatCurrency(Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0), supplierLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                      <span className="font-medium text-orange-700">Difference:</span>
-                      <span className="font-bold text-orange-800">
+                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200 dark:border-orange-900 dark:bg-orange-950/40">
+                      <span className="font-medium text-orange-700 dark:text-orange-300">Difference:</span>
+                      <span className="font-bold text-orange-800 dark:text-orange-200">
                         {formatCurrency(Math.abs(supplierLedgerData.totals.totalClosingBalance - Object.values(supplierGLClosing).reduce((sum, amount) => sum + amount, 0)), supplierLedgerData.entries[0]?.currency || 'USD', company)}
                       </span>
                     </div>
@@ -721,56 +678,56 @@ export default function InterCompanyLedgerSummary() {
 
         {/* Summary Statistics */}
         {hasLoadedData && summaryStats && (
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
+          <Card className="rounded-xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <CardTitle className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+                <BarChart3 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                 Reconciliation Summary Statistics
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Customer Statistics */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
-                    <Users className="h-5 w-5" />
+                <div className="space-y-3">
+                  <h3 className="text-[13px] font-semibold text-slate-800 flex items-center gap-2 dark:text-slate-100">
+                    <Users className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                     Customer Statistics
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-blue-700 font-medium">Total Customers:</span>
-                      <span className="text-blue-900 font-bold text-lg">{summaryStats.customers.total}</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg dark:bg-blue-950/40">
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Total Customers:</span>
+                      <span className="text-lg font-bold text-blue-900 dark:text-blue-100">{summaryStats.customers.total}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="text-green-700 font-medium">Matched:</span>
-                      <span className="text-green-900 font-bold text-lg">{summaryStats.customers.matched}</span>
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg dark:bg-green-950/40">
+                      <span className="font-medium text-green-700 dark:text-green-300">Matched:</span>
+                      <span className="text-lg font-bold text-green-900 dark:text-green-100">{summaryStats.customers.matched}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                      <span className="text-red-700 font-medium">Unmatched:</span>
-                      <span className="text-red-900 font-bold text-lg">{summaryStats.customers.unmatched}</span>
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg dark:bg-red-950/40">
+                      <span className="font-medium text-red-700 dark:text-red-300">Unmatched:</span>
+                      <span className="text-lg font-bold text-red-900 dark:text-red-100">{summaryStats.customers.unmatched}</span>
                     </div>
 
                   </div>
                 </div>
 
                 {/* Supplier Statistics */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
+                <div className="space-y-3">
+                  <h3 className="text-[13px] font-semibold text-slate-800 flex items-center gap-2 dark:text-slate-100">
+                    <Building2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                     Supplier Statistics
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-blue-700 font-medium">Total Suppliers:</span>
-                      <span className="text-blue-900 font-bold text-lg">{summaryStats.suppliers.total}</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg dark:bg-blue-950/40">
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Total Suppliers:</span>
+                      <span className="text-lg font-bold text-blue-900 dark:text-blue-100">{summaryStats.suppliers.total}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="text-green-700 font-medium">Matched:</span>
-                      <span className="text-green-900 font-bold text-lg">{summaryStats.suppliers.matched}</span>
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg dark:bg-green-950/40">
+                      <span className="font-medium text-green-700 dark:text-green-300">Matched:</span>
+                      <span className="text-lg font-bold text-green-900 dark:text-green-100">{summaryStats.suppliers.matched}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                      <span className="text-red-700 font-medium">Unmatched:</span>
-                      <span className="text-red-900 font-bold text-lg">{summaryStats.suppliers.unmatched}</span>
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg dark:bg-red-950/40">
+                      <span className="font-medium text-red-700 dark:text-red-300">Unmatched:</span>
+                      <span className="text-lg font-bold text-red-900 dark:text-red-100">{summaryStats.suppliers.unmatched}</span>
                     </div>
 
                   </div>
@@ -778,26 +735,26 @@ export default function InterCompanyLedgerSummary() {
               </div>
 
               {/* Overall Progress */}
-              <div className="mt-6 pt-6 border-t border-blue-200">
-                <h4 className="text-lg font-semibold text-blue-800 mb-4">Overall Reconciliation Progress</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center p-6 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-                    <div className="text-3xl font-bold text-green-700">
+              <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+                <h4 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">Overall Reconciliation Progress</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-lg bg-green-50 p-4 text-center dark:bg-green-950/40">
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
                       {summaryStats.overall.matched}
                     </div>
-                    <div className="text-lg text-green-600 font-medium">Total Matched</div>
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-green-600 dark:text-green-400">Total Matched</div>
                   </div>
-                  <div className="text-center p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-lg">
-                    <div className="text-3xl font-bold text-red-700">
+                  <div className="rounded-lg bg-red-50 p-4 text-center dark:bg-red-950/40">
+                    <div className="text-2xl font-bold text-red-700 dark:text-red-300">
                       {summaryStats.overall.unmatched}
                     </div>
-                    <div className="text-lg text-red-600 font-medium">Total Unmatched</div>
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-red-600 dark:text-red-400">Total Unmatched</div>
                   </div>
-                  <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-                    <div className="text-3xl font-bold text-blue-700">
+                  <div className="rounded-lg bg-blue-50 p-4 text-center dark:bg-blue-950/40">
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                       {summaryStats.overall.matchWithIntransit}
                     </div>
-                    <div className="text-lg text-blue-600 font-medium">Match with Intransit</div>
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Match with Intransit</div>
                   </div>
                 </div>
               </div>
@@ -807,17 +764,16 @@ export default function InterCompanyLedgerSummary() {
 
         {/* Status Filter */}
         {hasLoadedData && customerLedgerData && supplierLedgerData && (
-          <Card className="border-blue-200 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Filter by Status</label>
+          <Card className="rounded-xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
+                  <FilterField label="Filter by Status" className="w-48">
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-48 border-blue-200 focus:border-blue-400">
+                      <SelectTrigger className="h-8 border-slate-200 bg-white px-2.5 text-[13px] font-normal text-slate-900 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                         <SelectValue placeholder="Select Status" />
                       </SelectTrigger>
-                      <SelectContent className="bg-blue-200">
+                      <SelectContent className="dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                         <SelectItem value="All">All Entries</SelectItem>
                         <SelectItem value="Match">✓ Matched</SelectItem>
                         <SelectItem value="Match with In-Transit">✓ Match with Intransit</SelectItem>
@@ -826,24 +782,17 @@ export default function InterCompanyLedgerSummary() {
                         <SelectItem value="Unmatched">✗ Unmatched</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Display In-Transit SI & PI</label>
-                    <div className="flex items-center space-x-2 p-2 border border-blue-200 rounded-md bg-blue-50">
-                      <input
-                        type="checkbox"
-                        id="showInTransitColumns"
-                        checked={showInTransitColumns}
-                        onChange={(e) => setShowInTransitColumns(e.target.checked)}
-                        className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <label htmlFor="showInTransitColumns" className="text-sm text-gray-700">
-                        Enable
-                      </label>
-                    </div>
+                  </FilterField>
+                  <div className="pb-1.5">
+                    <CheckOption
+                      id="showInTransitColumns"
+                      label="Display In-Transit SI & PI"
+                      checked={showInTransitColumns}
+                      onChange={(e) => setShowInTransitColumns(e.target.checked)}
+                    />
                   </div>
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
                   Showing {filterEntriesByStatus(customerLedgerData.entries, customerGLClosing, customerIntransitTotals).length} of {customerLedgerData.entries.length} customers, {filterEntriesByStatus(supplierLedgerData.entries, supplierGLClosing, supplierIntransitTotals).length} of {supplierLedgerData.entries.length} suppliers
                 </div>
               </div>
@@ -855,9 +804,9 @@ export default function InterCompanyLedgerSummary() {
         {hasLoadedData && customerLedgerData && supplierLedgerData && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Customer Ledger Summary */}
-            <Card className="border-blue-200 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-                <CardTitle>
+            <Card className="rounded-xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                <CardTitle className="text-[13px] font-semibold text-slate-800 dark:text-slate-100">
                   {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === company)?.name || company} - Customer Ledger Summary
                 </CardTitle>
               </CardHeader>
@@ -865,15 +814,15 @@ export default function InterCompanyLedgerSummary() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead className="text-blue-800">Party</TableHead>
-                        <TableHead className="text-blue-800 text-right">Party Balance</TableHead>
-                        <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
-                        <TableHead className="text-blue-800 text-right">Difference</TableHead>
-                        <TableHead className="text-gray-500 text-right">In-Transit Total</TableHead>
-                        <TableHead className="text-blue-800 text-right">Status</TableHead>
+                      <TableRow className="bg-slate-50 dark:bg-slate-700/60">
+                        <TableHead className="text-slate-600 dark:text-slate-300">Party</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">Party Balance</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">GL Closing</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">Difference</TableHead>
+                        <TableHead className="text-slate-500 text-right dark:text-slate-400">In-Transit Total</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">Status</TableHead>
                         {showInTransitColumns && (
-                          <TableHead className="text-blue-800 text-right">In-Transit SI</TableHead>
+                          <TableHead className="text-slate-600 text-right dark:text-slate-300">In-Transit SI</TableHead>
                         )}
                       </TableRow>
                     </TableHeader>
@@ -896,12 +845,12 @@ export default function InterCompanyLedgerSummary() {
                           : difference
 
                         return (
-                          <TableRow key={index} className="hover:bg-blue-50">
+                          <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(showDifference, entry.currency, company)}</TableCell>
-                            <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
+                            <TableCell className="text-right font-normal text-slate-500 dark:text-slate-400">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
                                 {status.text}
@@ -924,9 +873,9 @@ export default function InterCompanyLedgerSummary() {
             </Card>
 
             {/* Supplier Ledger Summary */}
-            <Card className="border-blue-200 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
-                <CardTitle>
+            <Card className="rounded-xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <CardHeader className="border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                <CardTitle className="text-[13px] font-semibold text-slate-800 dark:text-slate-100">
                   {(allCompanies.length > 0 ? allCompanies : companies).find((c) => c.name === company)?.name || company} - Supplier Ledger Summary
                 </CardTitle>
               </CardHeader>
@@ -934,15 +883,15 @@ export default function InterCompanyLedgerSummary() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead className="text-blue-800">Party</TableHead>
-                        <TableHead className="text-blue-800 text-right">Party Balance</TableHead>
-                        <TableHead className="text-blue-800 text-right">GL Closing</TableHead>
-                        <TableHead className="text-blue-800 text-right">Difference</TableHead>
-                        <TableHead className="text-gray-500 text-right">In-Transit Total</TableHead>
-                        <TableHead className="text-blue-800 text-right">Status</TableHead>
+                      <TableRow className="bg-slate-50 dark:bg-slate-700/60">
+                        <TableHead className="text-slate-600 dark:text-slate-300">Party</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">Party Balance</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">GL Closing</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">Difference</TableHead>
+                        <TableHead className="text-slate-500 text-right dark:text-slate-400">In-Transit Total</TableHead>
+                        <TableHead className="text-slate-600 text-right dark:text-slate-300">Status</TableHead>
                         {showInTransitColumns && (
-                          <TableHead className="text-blue-800 text-right">In-Transit PI</TableHead>
+                          <TableHead className="text-slate-600 text-right dark:text-slate-300">In-Transit PI</TableHead>
                         )}
                       </TableRow>
                     </TableHeader>
@@ -965,12 +914,12 @@ export default function InterCompanyLedgerSummary() {
                           : difference
 
                         return (
-                          <TableRow key={index} className="hover:bg-blue-50">
+                          <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
                             <TableCell className="font-medium">{entry.party_name}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(entry.closing_balance, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(glClosing, entry.currency, company)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(showDifference, entry.currency, company)}</TableCell>
-                            <TableCell className="text-right text-gray-500 font-normal">{showIntransitTotal}</TableCell>
+                            <TableCell className="text-right font-normal text-slate-500 dark:text-slate-400">{showIntransitTotal}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
                                 {status.text}

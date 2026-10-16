@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Link } from "react-router-dom"
-import { ArrowLeft, BarChart3, Building2 } from "lucide-react"
+import { BarChart3, Building2 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
@@ -10,6 +9,7 @@ import { Combobox } from "./ui/combobox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Alert, AlertDescription } from "../../components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import IntercompanyTopNav, { PageHeader, compactInputClass } from "./intercompany-top-nav"
 
 import { useCompanies } from "../hook/useCompanies"
 import { usePermissionAwareCompanies } from "../hook/usePermissionAwareCompanies"
@@ -67,17 +67,17 @@ interface SummaryCardProps {
 function SummaryCard({ title, value, currency, tone }: SummaryCardProps) {
   const toneClasses =
     tone === "primary"
-      ? "bg-blue-50 border-blue-200 text-blue-900"
+      ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900 text-blue-900 dark:text-blue-200"
       : tone === "success"
-      ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+      ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-900 dark:text-emerald-200"
       : tone === "danger"
-      ? "bg-red-50 border-red-200 text-red-900"
-      : "bg-slate-50 border-slate-200 text-slate-900"
+      ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900 text-red-900 dark:text-red-200"
+      : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100"
 
   return (
     <Card className={`border ${toneClasses}`}>
       <CardContent className="p-4 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {title}
         </p>
         <p className="text-xl font-bold">{fmt(value, currency)}</p>
@@ -185,34 +185,17 @@ export default function CostEstimateVsConsumed() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 p-4">
-      <div className="max-w-8xl mx-auto space-y-5">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:bg-slate-900 dark:bg-none">
+      <IntercompanyTopNav />
+      <div className="max-w-[1920px] mx-auto space-y-5 p-4">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link to="/reconciliation">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1.5 shrink-0"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
-
-          <div className="flex-1 text-center">
-            <h1 className="text-3xl font-bold text-blue-900 tracking-tight">
-              Cost Estimate vs Consumed
-            </h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              Compare project Cost Estimate (materials) against actual consumption
-              (Purchase Invoices &amp; Stock Entries)
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Cost Estimate vs Consumed"
+          subtitle="Compare project Cost Estimate (materials) against actual consumption (Purchase Invoices & Stock Entries)"
+        />
 
         {/* Filters */}
-        <Card className="border-blue-200 shadow-md">
+        <Card className="border-blue-200 dark:border-blue-900 shadow-md">
           <CardHeader className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-t-lg py-4 px-6">
             <CardTitle className="flex items-center gap-2 text-base">
               <Building2 className="h-5 w-5" />
@@ -222,7 +205,7 @@ export default function CostEstimateVsConsumed() {
           <CardContent className="p-5">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Company
                 </label>
                 <Combobox
@@ -244,14 +227,14 @@ export default function CostEstimateVsConsumed() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Project Type
                 </label>
                 <Select value={projectType} onValueChange={setProjectType}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400">
                     <SelectValue placeholder="All types" />
                   </SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectContent className="bg-popover text-popover-foreground dark:bg-slate-700 dark:text-slate-100">
                     <SelectItem value="all">All Types</SelectItem>
                     {projectTypes.map((pt) => (
                       <SelectItem key={pt} value={pt}>
@@ -263,7 +246,7 @@ export default function CostEstimateVsConsumed() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Project
                 </label>
                 <Combobox
@@ -287,38 +270,38 @@ export default function CostEstimateVsConsumed() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   From Date
                 </label>
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none text-sm"
+                  className={compactInputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   To Date
                 </label>
                 <input
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-full p-2 border border-blue-200 rounded-md focus:border-blue-400 focus:outline-none text-sm"
+                  className={compactInputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Display Currency
                 </label>
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="border-blue-200 focus:border-blue-400 text-sm">
+                  <SelectTrigger className="border-blue-200 dark:border-blue-900 focus:border-blue-400">
                     <SelectValue placeholder="Company Currency" />
                   </SelectTrigger>
-                  <SelectContent className="bg-blue-200">
+                  <SelectContent className="bg-popover text-popover-foreground dark:bg-slate-700 dark:text-slate-100">
                     {CURRENCY_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
@@ -342,26 +325,26 @@ export default function CostEstimateVsConsumed() {
         </Card>
 
         {error && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertDescription className="text-red-800">{error}</AlertDescription>
+          <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40">
+            <AlertDescription className="text-red-800 dark:text-red-300">{error}</AlertDescription>
           </Alert>
         )}
 
         {fetchError && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertDescription className="text-red-800">{fetchError}</AlertDescription>
+          <Alert className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40">
+            <AlertDescription className="text-red-800 dark:text-red-300">{fetchError}</AlertDescription>
           </Alert>
         )}
 
         {hasLoadedData && meta?.message && (
-          <Alert className="border-blue-200 bg-blue-50">
-            <AlertDescription className="text-blue-800">{meta.message}</AlertDescription>
+          <Alert className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40">
+            <AlertDescription className="text-blue-800 dark:text-blue-300">{meta.message}</AlertDescription>
           </Alert>
         )}
 
         {/* Sticky summary + labour/overhead cards */}
         {hasLoadedData && meta && totals && (
-          <div className="sticky top-0 z-20 space-y-4 pb-4 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+          <div className="sticky top-0 z-20 space-y-4 pb-4 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:bg-slate-900 dark:bg-none">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <SummaryCard
                 title="Estimated Materials (Total)"
@@ -428,7 +411,7 @@ export default function CostEstimateVsConsumed() {
 
         {/* Table */}
         {hasLoadedData && (
-          <Card className="border-blue-200 shadow-md overflow-hidden">
+          <Card className="border-blue-200 dark:border-blue-900 shadow-md overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-t-lg py-4 px-6">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -452,29 +435,29 @@ export default function CostEstimateVsConsumed() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
-                      <TableHead className="text-blue-800 text-xs font-semibold whitespace-nowrap">
+                    <TableRow className="bg-blue-50 dark:bg-blue-950/40">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
                         Type
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
                         Item / Group
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right whitespace-nowrap">
                         Est. Qty
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right whitespace-nowrap">
                         Est. Amount
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right whitespace-nowrap">
                         Consumed Qty
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right whitespace-nowrap">
                         Consumed Amount
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right whitespace-nowrap">
                         Variance Qty
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right whitespace-nowrap">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right whitespace-nowrap">
                         Variance Amount
                       </TableHead>
                     </TableRow>
@@ -484,7 +467,7 @@ export default function CostEstimateVsConsumed() {
                       <TableRow>
                         <TableCell
                           colSpan={8}
-                          className="text-center text-gray-500 py-10 text-sm"
+                          className="text-center text-slate-500 dark:text-slate-400 py-10 text-sm"
                         >
                           {meta?.has_cost_estimate === false
                             ? "No consumption data for this project in the selected period."
@@ -519,7 +502,7 @@ export default function CostEstimateVsConsumed() {
                                 })
                               }}
                             >
-                              <TableCell className="text-xs text-gray-600 whitespace-nowrap">
+                              <TableCell className="text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
                                 {row.key_type}
                                 {hasChildren && (
                                   <span className="ml-1 text-[10px] text-blue-500">
@@ -527,30 +510,30 @@ export default function CostEstimateVsConsumed() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs font-medium text-gray-900 whitespace-nowrap">
+                              <TableCell className="text-xs font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                                 {row.label}
                               </TableCell>
-                              <TableCell className="text-xs text-right text-gray-700 whitespace-nowrap">
+                              <TableCell className="text-xs text-right text-slate-700 dark:text-slate-200 whitespace-nowrap">
                                 {row.estimate_qty.toLocaleString("en-US", {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
                                 })}
                               </TableCell>
-                              <TableCell className="text-xs text-right text-blue-900 font-mono whitespace-nowrap">
+                              <TableCell className="text-xs text-right text-blue-900 dark:text-blue-200 font-mono whitespace-nowrap">
                                 {fmt(row.estimate_amount, row.currency)}
                               </TableCell>
-                              <TableCell className="text-xs text-right text-gray-700 whitespace-nowrap">
+                              <TableCell className="text-xs text-right text-slate-700 dark:text-slate-200 whitespace-nowrap">
                                 {row.consumed_qty.toLocaleString("en-US", {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
                                 })}
                               </TableCell>
-                              <TableCell className="text-xs text-right text-emerald-800 font-mono whitespace-nowrap">
+                              <TableCell className="text-xs text-right text-emerald-800 dark:text-emerald-300 font-mono whitespace-nowrap">
                                 {fmt(row.consumed_amount, row.currency)}
                               </TableCell>
                               <TableCell
                                 className={`text-xs text-right font-mono whitespace-nowrap ${
-                                  row.variance_qty < 0 ? "text-red-700" : "text-slate-700"
+                                  row.variance_qty < 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-200"
                                 }`}
                               >
                                 {row.variance_qty.toLocaleString("en-US", {
@@ -560,7 +543,7 @@ export default function CostEstimateVsConsumed() {
                               </TableCell>
                               <TableCell
                                 className={`text-xs text-right font-mono whitespace-nowrap ${
-                                  row.variance_amount < 0 ? "text-red-700" : "text-slate-700"
+                                  row.variance_amount < 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-200"
                                 }`}
                               >
                                 {fmt(row.variance_amount, row.currency)}
@@ -571,21 +554,21 @@ export default function CostEstimateVsConsumed() {
                               isExpanded &&
                               meta?.group_items?.[row.key]?.map((item) => (
                                 <TableRow key={`${row.key}-${item.item_code}`}>
-                                  <TableCell className="text-[11px] text-gray-400 pl-6">
+                                  <TableCell className="text-[11px] text-slate-400 dark:text-slate-500 pl-6">
                                     Item
                                   </TableCell>
-                                  <TableCell className="text-[11px] text-gray-700">
+                                  <TableCell className="text-[11px] text-slate-700 dark:text-slate-200">
                                     {item.item_code}
                                   </TableCell>
                                   <TableCell />
                                   <TableCell />
-                                  <TableCell className="text-[11px] text-right text-gray-700">
+                                  <TableCell className="text-[11px] text-right text-slate-700 dark:text-slate-200">
                                     {item.consumed_qty.toLocaleString("en-US", {
                                       minimumFractionDigits: 2,
                                       maximumFractionDigits: 2,
                                     })}
                                   </TableCell>
-                                  <TableCell className="text-[11px] text-right font-mono text-emerald-700">
+                                  <TableCell className="text-[11px] text-right font-mono text-emerald-700 dark:text-emerald-300">
                                     {fmt(
                                       item.consumed_amount_ccy,
                                       displayCurrency,
@@ -608,7 +591,7 @@ export default function CostEstimateVsConsumed() {
 
         {/* When no Cost Estimate: single Expense by account (actual only) */}
         {hasLoadedData && meta && meta.has_cost_estimate === false && (
-          <Card className="border-blue-200 shadow-sm mt-4">
+          <Card className="border-blue-200 dark:border-blue-900 shadow-sm mt-4">
             <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg py-3 px-5">
               <CardTitle className="flex items-center gap-2 text-sm">
                 Expense by Account (Actual)
@@ -621,11 +604,11 @@ export default function CostEstimateVsConsumed() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-50">
-                      <TableHead className="text-blue-800 text-xs font-semibold">
+                    <TableRow className="bg-blue-50 dark:bg-blue-950/40">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold">
                         Expense Account
                       </TableHead>
-                      <TableHead className="text-blue-800 text-xs font-semibold text-right">
+                      <TableHead className="text-blue-800 dark:text-blue-300 text-xs font-semibold text-right">
                         Actual Amount
                       </TableHead>
                     </TableRow>
@@ -636,10 +619,10 @@ export default function CostEstimateVsConsumed() {
                       Object.entries(meta.combined_expense_actual_by_account).map(
                         ([account, amount]) => (
                           <TableRow key={account}>
-                            <TableCell className="text-xs text-gray-800">
+                            <TableCell className="text-xs text-slate-800 dark:text-slate-200">
                               {account}
                             </TableCell>
-                            <TableCell className="text-xs text-right font-mono text-blue-900">
+                            <TableCell className="text-xs text-right font-mono text-blue-900 dark:text-blue-200">
                               {fmt(amount, displayCurrency)}
                             </TableCell>
                           </TableRow>
@@ -649,7 +632,7 @@ export default function CostEstimateVsConsumed() {
                       <TableRow>
                         <TableCell
                           colSpan={2}
-                          className="text-center text-xs text-gray-500 py-4"
+                          className="text-center text-xs text-slate-500 dark:text-slate-400 py-4"
                         >
                           No expense GL entries for this project in the selected period.
                         </TableCell>
@@ -665,7 +648,7 @@ export default function CostEstimateVsConsumed() {
         {/* Detailed Labour & Overhead breakdown (only when Cost Estimate exists) */}
         {hasLoadedData && meta && meta.has_cost_estimate && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-            <Card className="border-emerald-200 shadow-sm">
+            <Card className="border-emerald-200 dark:border-emerald-900 shadow-sm">
               <CardHeader className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-t-lg py-3 px-5">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   Labour Estimate by Expense Account
@@ -675,17 +658,17 @@ export default function CostEstimateVsConsumed() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-emerald-50">
-                        <TableHead className="text-emerald-900 text-xs font-semibold">
+                      <TableRow className="bg-emerald-50 dark:bg-emerald-950/40">
+                        <TableHead className="text-emerald-900 dark:text-emerald-200 text-xs font-semibold">
                           Expense Account
                         </TableHead>
-                        <TableHead className="text-emerald-900 text-xs font-semibold text-right">
+                        <TableHead className="text-emerald-900 dark:text-emerald-200 text-xs font-semibold text-right">
                           Estimated Labour
                         </TableHead>
-                        <TableHead className="text-emerald-900 text-xs font-semibold text-right">
+                        <TableHead className="text-emerald-900 dark:text-emerald-200 text-xs font-semibold text-right">
                           Actual Labour
                         </TableHead>
-                        <TableHead className="text-emerald-900 text-xs font-semibold text-right">
+                        <TableHead className="text-emerald-900 dark:text-emerald-200 text-xs font-semibold text-right">
                           Variance
                         </TableHead>
                       </TableRow>
@@ -703,18 +686,18 @@ export default function CostEstimateVsConsumed() {
 
                             return (
                               <TableRow key={account}>
-                                <TableCell className="text-xs text-gray-800">
+                                <TableCell className="text-xs text-slate-800 dark:text-slate-200">
                                   {account}
                                 </TableCell>
-                                <TableCell className="text-xs text-right font-mono text-emerald-800">
+                                <TableCell className="text-xs text-right font-mono text-emerald-800 dark:text-emerald-300">
                                   {fmt(est as number, displayCurrency)}
                                 </TableCell>
-                                <TableCell className="text-xs text-right font-mono text-slate-800">
+                                <TableCell className="text-xs text-right font-mono text-slate-800 dark:text-slate-200">
                                   {fmt(actual, displayCurrency)}
                                 </TableCell>
                                 <TableCell
                                   className={`text-xs text-right font-mono ${
-                                    variance < 0 ? "text-red-700" : "text-slate-700"
+                                    variance < 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-200"
                                   }`}
                                 >
                                   {fmt(variance, displayCurrency)}
@@ -727,7 +710,7 @@ export default function CostEstimateVsConsumed() {
                         <TableRow>
                           <TableCell
                             colSpan={4}
-                            className="text-center text-xs text-gray-500 py-4"
+                            className="text-center text-xs text-slate-500 dark:text-slate-400 py-4"
                           >
                             No labour rows with expense accounts on this Cost Estimate.
                           </TableCell>
@@ -739,7 +722,7 @@ export default function CostEstimateVsConsumed() {
               </CardContent>
             </Card>
 
-            <Card className="border-indigo-200 shadow-sm">
+            <Card className="border-indigo-200 dark:border-indigo-900 shadow-sm">
               <CardHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-lg py-3 px-5">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   Overhead Estimate by Expense Account
@@ -749,17 +732,17 @@ export default function CostEstimateVsConsumed() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-indigo-50">
-                        <TableHead className="text-indigo-900 text-xs font-semibold">
+                      <TableRow className="bg-indigo-50 dark:bg-indigo-950/40">
+                        <TableHead className="text-indigo-900 dark:text-indigo-200 text-xs font-semibold">
                           Expense Account
                         </TableHead>
-                        <TableHead className="text-indigo-900 text-xs font-semibold text-right">
+                        <TableHead className="text-indigo-900 dark:text-indigo-200 text-xs font-semibold text-right">
                           Estimated Overhead
                         </TableHead>
-                        <TableHead className="text-indigo-900 text-xs font-semibold text-right">
+                        <TableHead className="text-indigo-900 dark:text-indigo-200 text-xs font-semibold text-right">
                           Actual Overhead
                         </TableHead>
-                        <TableHead className="text-indigo-900 text-xs font-semibold text-right">
+                        <TableHead className="text-indigo-900 dark:text-indigo-200 text-xs font-semibold text-right">
                           Variance
                         </TableHead>
                       </TableRow>
@@ -777,18 +760,18 @@ export default function CostEstimateVsConsumed() {
 
                             return (
                               <TableRow key={account}>
-                                <TableCell className="text-xs text-gray-800">
+                                <TableCell className="text-xs text-slate-800 dark:text-slate-200">
                                   {account}
                                 </TableCell>
-                                <TableCell className="text-xs text-right font-mono text-indigo-800">
+                                <TableCell className="text-xs text-right font-mono text-indigo-800 dark:text-indigo-300">
                                   {fmt(est as number, displayCurrency)}
                                 </TableCell>
-                                <TableCell className="text-xs text-right font-mono text-slate-800">
+                                <TableCell className="text-xs text-right font-mono text-slate-800 dark:text-slate-200">
                                   {fmt(actual, displayCurrency)}
                                 </TableCell>
                                 <TableCell
                                   className={`text-xs text-right font-mono ${
-                                    variance < 0 ? "text-red-700" : "text-slate-700"
+                                    variance < 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-200"
                                   }`}
                                 >
                                   {fmt(variance, displayCurrency)}
@@ -801,7 +784,7 @@ export default function CostEstimateVsConsumed() {
                         <TableRow>
                           <TableCell
                             colSpan={4}
-                            className="text-center text-xs text-gray-500 py-4"
+                            className="text-center text-xs text-slate-500 dark:text-slate-400 py-4"
                           >
                             No overhead rows on this Cost Estimate.
                           </TableCell>

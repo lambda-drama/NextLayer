@@ -9,7 +9,12 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-background text-foreground",
-        destructive: "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+        // Explicit palette instead of the shadcn `destructive` token: that token is
+        // not registered in tailwind.config.js, and even if it were, the dark-mode
+        // value (0 62.8% 30.6%) is too dark to read as text. This keeps the error
+        // banner legible in both themes.
+        destructive:
+          "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 [&>svg]:text-red-600 dark:[&>svg]:text-red-400",
       },
     },
     defaultVariants: {
